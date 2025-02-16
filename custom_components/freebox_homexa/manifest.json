@@ -2,7 +2,7 @@
   "domain": "freebox_homexa",
   "name": "Freebox Homexa",
   "after_dependencies": ["zeroconf"],
-  "codeowners": ["@gvigroux,@XAV59213,@Steph73HB"],
+  "codeowners": ["@gvigroux", "@XAV59213", "@Steph73HB"],
   "config_flow": true,
   "dependencies": ["generic","ffmpeg"],
   "documentation": "https://github.com/XAV59213/freebox_homexa",

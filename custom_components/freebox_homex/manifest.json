@@ -1,6 +1,6 @@
 {
-  "domain": "freebox_homex",
-  "name": "Freebox Homex",
+  "domain": "freebox_homexa",
+  "name": "Freebox Homexa",
   "after_dependencies": ["zeroconf"],
   "codeowners": ["@gvigroux,@XAV59213,@Steph73HB"],
   "config_flow": true,

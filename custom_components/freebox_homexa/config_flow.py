@@ -12,7 +12,6 @@ from homeassistant.helpers.service_info.zeroconf import ZeroconfServiceInfo
 from homeassistant.helpers.storage import Store  # Import du module de stockage
 
 from .const import DOMAIN
-from .router import get_api, get_hosts_list_if_supported
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -28,37 +27,37 @@ class FreeboxFlowHandler(ConfigFlow, domain=DOMAIN):
     def __init__(self) -> None:
         """Initialize config flow."""
         self._data: dict[str, Any] = {}
-        self._store = None  # Initialisation du stockage
+        self._store = None
 
     async def async_step_user(
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
         """Handle a flow initiated by the user."""
+        self._store = Store(self.hass, STORAGE_VERSION, STORAGE_KEY)
+
         if user_input is None:
-            return self.async_show_form(
-                step_id="user",
-                data_schema=vol.Schema(
-                    {
-                        vol.Required(CONF_HOST): str,
-                        vol.Required(CONF_PORT): int,
-                    }
-                ),
-                errors={},
-            )
+            # Charger les anciennes données si elles existent
+            stored_data = await self._store.async_load()
+            if stored_data:
+                _LOGGER.info("Restoring saved Freebox_HomeXa configuration.")
+                user_input = stored_data
+            else:
+                return self.async_show_form(
+                    step_id="user",
+                    data_schema=vol.Schema(
+                        {
+                            vol.Required(CONF_HOST): str,
+                            vol.Required(CONF_PORT): int,
+                        }
+                    ),
+                    errors={},
+                )
 
         self._data = user_input
 
         # Check if already configured
         await self.async_set_unique_id(self._data[CONF_HOST])
         self._abort_if_unique_id_configured()
-
-        # Charger les paramètres stockés si disponibles
-        self._store = Store(self.hass, STORAGE_VERSION, STORAGE_KEY)
-        stored_data = await self._store.async_load()
-
-        if stored_data:
-            _LOGGER.info("Restoring stored configuration data.")
-            self._data.update(stored_data)
 
         return await self.async_step_link()
 
@@ -75,8 +74,11 @@ class FreeboxFlowHandler(ConfigFlow, domain=DOMAIN):
 
         errors = {}
 
-        fbx = await get_api(self.hass, self._data[CONF_HOST])
         try:
+            from .router import get_api, get_hosts_list_if_supported
+
+            fbx = await get_api(self.hass, self._data[CONF_HOST])
+
             # Open connection and check authentication
             await fbx.open(self._data[CONF_HOST], self._data[CONF_PORT])
 
@@ -87,10 +89,10 @@ class FreeboxFlowHandler(ConfigFlow, domain=DOMAIN):
             # Close connection
             await fbx.close()
 
-            # Sauvegarder les paramètres après connexion réussie
+            # Sauvegarder la configuration
             if self._store:
+                _LOGGER.info("Saving Freebox_HomeXa configuration.")
                 await self._store.async_save(self._data)
-                _LOGGER.info("Configuration data successfully saved.")
 
             return self.async_create_entry(
                 title=self._data[CONF_HOST],

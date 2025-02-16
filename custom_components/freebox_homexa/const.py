@@ -8,7 +8,7 @@ import socket
 
 from homeassistant.const import Platform
 
-DOMAIN = "freebox_home"
+DOMAIN = "freebox_homexa"
 SERVICE_REBOOT = "reboot"
 
 #default Value

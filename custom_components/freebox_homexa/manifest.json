@@ -11,7 +11,7 @@
   "requirements": ["freebox-api>=0.0.7"],  
   "version": "2025.2.5",
   "zeroconf": ["_fbx-api._tcp.local."],
-  "integration_quality_scale": "silver",
   "bluetooth": []
 }
+
 

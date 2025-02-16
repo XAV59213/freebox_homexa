@@ -1,0 +1,6 @@
+{
+    "name": "Freebox Homex",
+    "content_in_root": false,
+    "homeassistant": "2025.2.4",
+    "render_readme": true
+}

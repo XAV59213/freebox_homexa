@@ -1,0 +1,14 @@
+{
+  "domain": "freebox_homex",
+  "name": "Freebox Homex",
+  "after_dependencies": ["zeroconf"],
+  "codeowners": ["@gvigroux,@XAV59213,@Steph73HB"],
+  "config_flow": true,
+  "dependencies": ["generic","ffmpeg"],
+  "documentation": "https://github.com/XAV59213/freebox_homex",
+  "iot_class": "local_polling",
+  "issue_tracker": "https://github.com/XAV59213/freebox_homex/issues",
+  "requirements": ["freebox-api"],
+  "version": "2025.2.4",
+  "zeroconf": ["_fbx-api._tcp.local."]
+}

@@ -1,4 +1,5 @@
 # Freebox service entries description.
 
 reboot:
-  description: "Reboots the Freebox."
+  name: "Restart Freebox"
+  description: "Reboots the Freebox router."

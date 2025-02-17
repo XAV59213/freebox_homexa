@@ -1,3 +1,9 @@
+[![GitHub Workflow Status][workflow-shield]][workflow]
+[![GitHub Release][releases-shield]][releases]
+[![hacs][hacsbadge]][hacs]
+[![GitHub Activity][commits-shield]][commits]
+[![Installs][installs-shield]][installs]
+
 ☕ Soutiens nos codeurs et évite-leur une panne de caféine !
 Parce que coder sans café, c’est comme une Freebox sans WiFi... ça ne fonctionne pas ! 😅
 

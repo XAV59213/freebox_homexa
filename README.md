@@ -1,5 +1,33 @@
 # Freebox Homexa - version beta testeurs
 Version stable 25.2.17
+Freebox Homexa - L'intégration ultime des services Free dans Home Assistant
+Vous rêvez d’une intégration complète de votre Freebox et des services Free dans Home Assistant ? Freebox Homexa est là pour ça ! 🎉
+
+Ce custom component a pour objectif de compiler et centraliser toutes les applications et services Free au sein d’Home Assistant. Que ce soit la gestion de votre Freebox, la télévision, le réseau, ou encore d'autres services liés à l’écosystème Free, tout est réuni en un seul composant pour une expérience fluide et optimisée.
+
+🚀 Fonctionnalités principales
+✅ Contrôle total de votre Freebox (réseau, WiFi, équipements, état système)
+✅ Gestion des chaînes TV directement depuis Home Assistant
+✅ Pilotage des équipements connectés compatibles Freebox
+✅ Statistiques avancées sur votre connexion Internet
+✅ Notifications intelligentes pour rester informé sur l’état de votre réseau et de vos services
+
+🔧 En cours de développement : Ajout d’intégrations avancées pour enrichir encore plus l’expérience !
+
+⚠️ Version Bêta - Tests en cours ⚠️
+Le projet est actuellement en phase de test, avec une version bêta disponible. Nous travaillons activement pour améliorer la stabilité et ajouter encore plus de fonctionnalités. Vos retours sont les bienvenus pour perfectionner l’intégration !
+
+📌 Intégration actuelle :
+À ce jour, Freebox Home est déjà intégré avec :
+🔹 Freebox Serveur - Gestion complète de la box, réseau, WiFi, et équipements connectés
+🔹 Freebox Player - Contrôle du lecteur multimédia et des chaînes TV
+
+D’autres fonctionnalités sont en cours d’ajout pour offrir une expérience encore plus complète et fluide dans Home Assistant !
+
+📌 Votre Freebox. Vos règles. Votre maison connectée.
+
+
+
 # Freebox Homexa - Home Assistant Custom Component
 
 Ce composant permet d'intégrer les équipements **Freebox** **Freebox Home** **Freebox Connect** dans Home Assistant sous le nom `freebox_homexa`.

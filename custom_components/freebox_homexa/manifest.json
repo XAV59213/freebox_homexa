@@ -8,10 +8,9 @@
   "documentation": "https://github.com/XAV59213/freebox_homexa",
   "iot_class": "local_polling",
   "issue_tracker": "https://github.com/XAV59213/freebox_homexa/issues",
-  "requirements": ["freebox-api>=0.0.7"],  
+  "quality_scale": "silver",
+  "requirements": ["freebox-api>=0.0.7"],
   "version": "2025.2.6",
-  "zeroconf": ["_fbx-api._tcp.local."],
-  "quality_scale": "silver"
+  "zeroconf": ["_fbx-api._tcp.local."]
 }
-
 

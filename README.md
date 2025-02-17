@@ -83,11 +83,16 @@ Shortcut:
 
 ### ⚙️ Configuration manuelle
 
-Ajoutez cette ligne dans votre `configuration.yaml` si nécessaire :
+### 📌 Configuration de Freebox Homexa
 
+Ajoutez cette ligne dans votre fichier **`configuration.yaml`** :  
+
+```yaml
 freebox_homexa:
   host: "192.168.X.X"
   token: "VOTRE_TOKEN"
+```
+
 
 ### 📖 Autorisation d’accès
 

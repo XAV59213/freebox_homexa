@@ -1,4 +1,4 @@
- [![GitHub Workflow Status][workflow-shield]][workflow]
+[![GitHub Workflow Status](https://github.com/XAV59213/freebox_homexa/actions/workflows/main.yml/badge.svg)](https://github.com/XAV59213/freebox_homexa/actions)
 
 ☕ Soutiens nos codeurs et évite-leur une panne de caféine !
 Parce que coder sans café, c’est comme une Freebox sans WiFi... ça ne fonctionne pas ! 😅

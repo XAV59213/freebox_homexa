@@ -1,4 +1,4 @@
-[![GitHub Workflow Status](https://github.com/XAV59213/freebox_homexa/actions/workflows/main.yml/badge.svg)](https://github.com/XAV59213/freebox_homexa/actions)  
+[![GitHub Workflow Status](https://github.com/XAV59213/freebox_homexa/actions/workflows/main.yml/badge.svg)](https://github.com/XAV59213/freebox_homexa/actions)
 [![GitHub Release](https://img.shields.io/github/v/release/XAV59213/freebox_homexa?style=flat-square)](https://github.com/XAV59213/freebox_homexa/releases)  
 [![hacs](https://img.shields.io/badge/HACS-Custom_Component-orange.svg?style=flat-square)](https://hacs.xyz/)  
 [![GitHub Activity](https://img.shields.io/github/commit-activity/m/XAV59213/freebox_homexa?style=flat-square)](https://github.com/XAV59213/freebox_homexa/commits/main)  

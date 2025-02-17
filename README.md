@@ -66,7 +66,7 @@ Nous travaillons activement pour améliorer la stabilité et ajouter encore plus
 
 ---
 
-## ⚙️ Setup  
+### ⚙️ Setup  
 
 Shortcut:  
 [![](https://my.home-assistant.io/badges/config_flow_start.svg)](https://my.home-assistant.io/redirect/config_flow_start/?domain=freebox_homexa)  
@@ -76,16 +76,15 @@ Shortcut:
 
 ---
 
-## ⚙️ Configuration manuelle
+### ⚙️ Configuration manuelle
 
 Ajoutez cette ligne dans votre `configuration.yaml` si nécessaire :
 
-```yaml
 freebox_homexa:
   host: "192.168.X.X"
   token: "VOTRE_TOKEN"
 
-## 📖 Autorisation d’accès
+### 📖 Autorisation d’accès
 
 ### 📌 Étape 1 : Vérifier votre Freebox Delta
 
@@ -93,7 +92,7 @@ Voici l’image de la **Freebox Delta** compatible avec cette intégration :
 
 ![Freebox Delta](https://www.mezabo.fr/wp-content/uploads/2023/06/freebox-delta-vs-revolution.png)
 
-### 📌 Étape 2 : Activer les autorisations dans Freebox OS
+#### 📌 Étape 2 : Activer les autorisations dans Freebox OS
 
 1. Rendez-vous sur [mafreebox.freebox.fr](http://mafreebox.freebox.fr/#Fbx.os.app.settings.Accounts).
 2. Allez dans l'onglet **Application**.

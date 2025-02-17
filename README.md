@@ -1,4 +1,5 @@
 # Freebox Homexa - version beta testeurs
+Version stable 25.2.17
 # Freebox Homexa - Home Assistant Custom Component
 
 Ce composant permet d'intégrer les équipements **Freebox** **Freebox Home** **Freebox Connect** dans Home Assistant sous le nom `freebox_homexa`.

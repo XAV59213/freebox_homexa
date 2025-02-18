@@ -4,8 +4,8 @@
 ☕ Soutiens nos codeurs et évite-leur une panne de caféine !
 Parce que coder sans café, c’est comme une Freebox sans WiFi... ça ne fonctionne pas ! 😅
 
-@gvigroux<a href="https://www.buymeacoffee.com/gvigroux"> <img src="https://img.buymeacoffee.com/button-api/?text=Buy me a coffee&emoji=&slug=gvigroux&button_colour=5F7FFF&font_colour=ffffff&font_family=Cookie&outline_colour=000000&coffee_colour=FFDD00" /> </a>
-@XAV59213<a href="https://www.buymeacoffee.com/XAV59213"> <img src="https://img.buymeacoffee.com/button-api/?text=Buy me a coffee&emoji=&slug=XAV59213&button_colour=5F7FFF&font_colour=ffffff&font_family=Cookie&outline_colour=000000&coffee_colour=FFDD00" /> </a>
+@gvigroux<a href="https://www.buymeacoffee.com/gvigroux"> <img src="https://img.buymeacoffee.com/button-api/?text=@gvigroux Buy me a coffee&emoji=&slug=gvigroux&button_colour=5F7FFF&font_colour=ffffff&font_family=Cookie&outline_colour=000000&coffee_colour=FFDD00" /> </a>
+<a href="https://www.buymeacoffee.com/XAV59213"> <img src="https://img.buymeacoffee.com/button-api/?text=@XAV59213 Buy me a coffee&emoji=&slug=XAV59213&button_colour=5F7FFF&font_colour=ffffff&font_family=Cookie&outline_colour=000000&coffee_colour=FFDD00" /> </a>
 
 # Freebox Homexa - Home Assistant Custom Component
 

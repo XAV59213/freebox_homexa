@@ -1,3 +1,4 @@
+
 """Support for Freebox devices (Freebox v6 and Freebox mini 4K)."""
 
 from datetime import timedelta
@@ -98,3 +99,18 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             await hass.data[DOMAIN]["store"].async_save(hass.data[DOMAIN]["config"])
 
     return unload_ok
+
+
+# Importation du contrôleur Freebox Player
+import requests
+
+FREEBOX_PLAYER_PATH = "/pub/remote_control"
+
+def send_freebox_command(host, code):
+    """Envoie une commande au Freebox Player."""
+    url = f"http://{host}{FREEBOX_PLAYER_PATH}?code={code}"
+    try:
+        response = requests.get(url, timeout=5)
+        response.raise_for_status()
+    except requests.RequestException as err:
+        _LOGGER.error("Erreur lors de l'envoi de la commande Freebox Player: %s", err)

@@ -3,3 +3,10 @@
 reboot:
   name: "Restart Freebox"
   description: "Reboots the Freebox router."
+
+remote:
+  description: Call remote code to the Freebox Player
+  fields:
+    code:
+      description: Code Number
+      example: 'power'

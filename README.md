@@ -5,7 +5,7 @@
 Parce que coder sans café, c’est comme une Freebox sans WiFi... ça ne fonctionne pas ! 😅
 
 @gvigroux<a href="https://www.buymeacoffee.com/gvigroux"> <img src="https://img.buymeacoffee.com/button-api/?text=Buy me a coffee&emoji=&slug=gvigroux&button_colour=5F7FFF&font_colour=ffffff&font_family=Cookie&outline_colour=000000&coffee_colour=FFDD00" /> </a>
-
+@XAV59213<script type="text/javascript" src="https://cdnjs.buymeacoffee.com/1.0.0/button.prod.min.js" data-name="bmc-button" data-slug="XAV59213" data-color="#FFDD00" data-emoji="" data-font="Cookie" data-text="Buy me a coffee" data-outline-color="#000000" data-font-color="#000000" data-coffee-color="#ffffff" ></script>
 # Freebox Homexa - Home Assistant Custom Component
 
 🚀 **Version Bêta - Testeurs**  

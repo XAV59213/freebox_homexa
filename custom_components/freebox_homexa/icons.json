@@ -2,15 +2,6 @@
   "services": {
     "reboot": {
       "service": "mdi:restart"
-    },
-    "cover_open": {
-      "service": "mdi:window-shutter-open"
-    },
-    "cover_close": {
-      "service": "mdi:window-shutter"
-    },
-    "sensor_temperature": {
-      "service": "mdi:thermometer"
     }
   }
 }

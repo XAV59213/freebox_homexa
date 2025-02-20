@@ -1,29 +1,26 @@
-"""Constants for the Freebox Homexa integration."""
+"""Freebox component constants."""
 
 from __future__ import annotations
 
 import enum
 import socket
-from datetime import timedelta  # Ajout pour SCAN_INTERVAL
 
 from homeassistant.const import Platform
 
-# General constants
-DOMAIN = "freebox_homexa"
+DOMAIN = "freebox_home"
 SERVICE_REBOOT = "reboot"
-VALUE_NOT_SET = -1  # Default value when a sensor or attribute is not set
-SCAN_INTERVAL = timedelta(seconds=40)  # Intervalle de mise à jour périodique
 
-# Freebox API application description
+#default Value
+VALUE_NOT_SET = -1
+
 APP_DESC = {
     "app_id": "hass",
     "app_name": "Home Assistant",
-    "app_version": "25.2.17",  # Matches integration version from manifest.json
+    "app_version": "0.106",
     "device_name": socket.gethostname(),
 }
 API_VERSION = "v6"
 
-# Supported Home Assistant platforms
 PLATFORMS = [
     Platform.ALARM_CONTROL_PANEL,
     Platform.BINARY_SENSOR,
@@ -35,26 +32,22 @@ PLATFORMS = [
     Platform.SWITCH,
 ]
 
-# Default device name when unknown
 DEFAULT_DEVICE_NAME = "Unknown device"
 
 # to store the cookie
 STORAGE_KEY = DOMAIN
 STORAGE_VERSION = 1
+#cover
+ATTR_MODEL = "model"
 
-# Device attributes
-ATTR_MODEL = "model"  # Model name of the device
-ATTR_DETECTION = "detection"  # Detection state for sensors
+CONNECTION_SENSORS_KEYS = {"rate_down", "rate_up"}
 
-# Connection sensor keys (download/upload rates in bytes/s)
-CONNECTION_SENSORS_KEYS: set[str] = {"rate_down", "rate_up"}
-
-# Device type to Material Design Icon mapping
+# Icons
 DEVICE_ICONS = {
     "freebox_delta": "mdi:television-guide",
-    "freebox_hd": "mdi:television-classic",
-    "freebox_mini": "mdi:television-box",
-    "freebox_player": "mdi:play-box",
+    "freebox_hd": "mdi:television-guide",
+    "freebox_mini": "mdi:television-guide",
+    "freebox_player": "mdi:television-guide",
     "ip_camera": "mdi:cctv",
     "ip_phone": "mdi:phone-voip",
     "laptop": "mdi:laptop",
@@ -70,21 +63,25 @@ DEVICE_ICONS = {
     "workstation": "mdi:desktop-tower-monitor",
 }
 
-# Freebox Home categories and mappings
+ATTR_DETECTION = "detection"
+
+
+# Home
 class FreeboxHomeCategory(enum.StrEnum):
-    """Categories of Freebox Home devices."""
+    """Freebox Home categories."""
+
     ALARM = "alarm"
     CAMERA = "camera"
-    DWS = "dws"  # Door/Window Sensor
+    DWS = "dws"
     IOHOME = "iohome"
-    KFB = "kfb"  # Keyfob (remote control)
+    KFB = "kfb"
     OPENER = "opener"
-    PIR = "pir"  # Passive Infrared (motion sensor)
-    RTS = "rts"  # Roller Shutter
+    PIR = "pir"
+    RTS = "rts"
     BASIC_SHUTTER = "basic_shutter"
     SHUTTER = "shutter"
 
-# Mapping of Freebox Home categories to model names for display in Home Assistant
+    """Freebox Home categories affichage HA """
 CATEGORY_TO_MODEL = {
     FreeboxHomeCategory.PIR: "F-HAPIR01A",
     FreeboxHomeCategory.CAMERA: "F-HACAM01A",
@@ -95,7 +92,8 @@ CATEGORY_TO_MODEL = {
     FreeboxHomeCategory.IOHOME: "IOHome",
     FreeboxHomeCategory.SHUTTER: "Volet roulant",
     FreeboxHomeCategory.BASIC_SHUTTER: "Volet roulant basic",
-    FreeboxHomeCategory.OPENER: "Ouvrant, Porte",
+    FreeboxHomeCategory.OPENER: "Ouvrant,Porte",
+    
 }
 
 HOME_COMPATIBLE_CATEGORIES = [

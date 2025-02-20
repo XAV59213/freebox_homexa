@@ -2,8 +2,9 @@
 
 from datetime import timedelta
 import logging
+import os
 
-from freebox_api.exceptions import HttpRequestError
+from freebox_api.exceptions import HttpRequestError, AuthorizationError
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_HOST, CONF_PORT, EVENT_HOMEASSISTANT_STOP
@@ -11,34 +12,29 @@ from homeassistant.core import Event, HomeAssistant, ServiceCall
 from homeassistant.exceptions import ConfigEntryNotReady
 from homeassistant.helpers.event import async_track_time_interval
 
-from .const import DOMAIN, PLATFORMS, SERVICE_REBOOT
+from .const import DOMAIN, PLATFORMS, SERVICE_REBOOT, SCAN_INTERVAL
 from .router import FreeboxRouter, get_api
-
-SCAN_INTERVAL = timedelta(seconds=40)
 
 _LOGGER = logging.getLogger(__name__)
 
-
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
-    """Set up a Freebox entry in Home Assistant.
-
-    Args:
-        hass: The HomeAssistant instance.
-        entry: The configuration entry for this Freebox.
-
-    Raises:
-        ConfigEntryNotReady: If the Freebox API cannot be opened or configured.
-
-    Returns:
-        bool: True if setup is successful, False otherwise.
-    """
+    """Set up a Freebox entry in Home Assistant."""
     host = entry.data[CONF_HOST]
     port = entry.data[CONF_PORT]
 
     # Initialize Freebox API
     api = await get_api(hass, host)
     try:
+        # Check if token exists and is valid
+        token_file = api.token_file
+        if not os.path.exists(token_file):
+            _LOGGER.error("No token file found at %s. Re-authentication required.", token_file)
+            raise ConfigEntryNotReady("Missing authentication token. Please reconfigure the integration.")
+        
         await api.open(host, port)
+    except AuthorizationError as err:
+        _LOGGER.error("Authorization timed out for %s:%s - %s", host, port, err)
+        raise ConfigEntryNotReady("Authorization timed out. Please re-authenticate via the config flow.") from err
     except HttpRequestError as err:
         _LOGGER.error("Failed to connect to Freebox at %s:%s - %s", host, port, err)
         raise ConfigEntryNotReady(f"Connection failed: {err}") from err
@@ -74,11 +70,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
     # Register reboot service (deprecated)
     async def async_reboot(call: ServiceCall) -> None:
-        """Handle the reboot service call (deprecated).
-
-        Args:
-            call: The service call data.
-        """
+        """Handle the reboot service call (deprecated)."""
         _LOGGER.warning(
             "The 'freebox.reboot' service is deprecated; use the reboot button entity instead."
         )
@@ -86,13 +78,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
     hass.services.async_register(DOMAIN, SERVICE_REBOOT, async_reboot)
 
-    # Close connection on HA stop
     async def async_close_connection(event: Event) -> None:
-        """Close the Freebox connection when Home Assistant stops.
-
-        Args:
-            event: The Home Assistant stop event.
-        """
+        """Close the Freebox connection when Home Assistant stops."""
         try:
             await router.close()
         except Exception as err:
@@ -105,17 +92,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     _LOGGER.info("Successfully set up Freebox integration for %s:%s", host, port)
     return True
 
-
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
-    """Unload a Freebox config entry.
-
-    Args:
-        hass: The HomeAssistant instance.
-        entry: The configuration entry to unload.
-
-    Returns:
-        bool: True if unload is successful, False otherwise.
-    """
+    """Unload a Freebox config entry."""
     host = entry.data[CONF_HOST]
     port = entry.data[CONF_PORT]
 

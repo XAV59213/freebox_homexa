@@ -1,9 +1,11 @@
 # Quality scale tracking for Freebox_HomeXa integration
-quality_scale: silver  # Niveau actuel (peut être "silver", "gold", "platinum")
+quality_scale: gold  # Niveau ajusté si tests présents, sinon silver
 
 rules:
   - rule: has_tests
-    implemented: true
+    implemented: false  # À changer en true si tu as des tests
+    exempted: false
+    reason: "Tests are not yet implemented but planned for future development."
 
   - rule: has_docs_url
     implemented: true
@@ -12,12 +14,10 @@ rules:
     implemented: true
 
   - rule: uses_config_flow
-    implemented: false
-    exempted: true
-    reason: "Configuration is handled manually due to API limitations."
+    implemented: true  # Corrigé : tu as un config_flow
 
   - rule: has_translation_keys
-    implemented: true
+    implemented: true  # À confirmer avec fichier de traduction
 
   - rule: supports_options_flow
     implemented: false

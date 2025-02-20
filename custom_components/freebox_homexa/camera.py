@@ -69,12 +69,12 @@ def add_entities(
 
 
 class FreeboxCamera(FreeboxHomeEntity, FFmpegCamera):
-    """Representation of a Freebox camera with streaming and motion detection."""
+    """Representation of a Freebox camera without TurboJPEG dependency."""
 
     def __init__(
         self, hass: HomeAssistant, router: FreeboxRouter, node: dict[str, Any]
     ) -> None:
-        """Initialize a Freebox camera entity."""
+        """Initialize a Freebox camera."""
         super().__init__(hass, router, node)
         self._attr_unique_id = f"{self._attr_unique_id}_camera"
 
@@ -86,7 +86,8 @@ class FreeboxCamera(FreeboxHomeEntity, FFmpegCamera):
             CONF_INPUT: str(stream_url),
             CONF_EXTRA_ARGUMENTS: DEFAULT_ARGUMENTS,
         }
-        FFmpegCamera.__init__(self, hass, device_info)
+        # Désactiver les instantanés pour éviter l'utilisation de TurboJPEG
+        FFmpegCamera.__init__(self, hass, device_info, still_image_url=None)
 
         self._attr_supported_features = (
             CameraEntityFeature.ON_OFF | CameraEntityFeature.STREAM
@@ -96,6 +97,11 @@ class FreeboxCamera(FreeboxHomeEntity, FFmpegCamera):
         )
         self._attr_extra_state_attributes = {}
         self._update_node(node)
+
+    @property
+    def still_image_url(self) -> str | None:
+        """Return None to disable still image generation."""
+        return None
 
     async def async_enable_motion_detection(self) -> None:
         """Enable motion detection on the camera."""

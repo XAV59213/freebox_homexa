@@ -18,6 +18,7 @@ from freebox_api.api.call import Call
 from freebox_api.api.home import Home
 from freebox_api.api.wifi import Wifi
 from freebox_api.exceptions import HttpRequestError, NotOpenError
+import aiohttp  # Ajouté pour gérer le timeout
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_HOST, CONF_PORT
@@ -39,7 +40,6 @@ from .const import (
 
 _LOGGER = logging.getLogger(__name__)
 
-
 def is_json(json_str: str) -> bool:
     """Validate if a string is a JSON value."""
     try:
@@ -47,7 +47,6 @@ def is_json(json_str: str) -> bool:
         return True
     except (ValueError, TypeError):
         return False
-
 
 async def get_api(hass: HomeAssistant, host: str) -> Freepybox:
     """Get the Freebox API."""
@@ -58,7 +57,6 @@ async def get_api(hass: HomeAssistant, host: str) -> Freepybox:
 
     token_file = Path(f"{freebox_path}/{slugify(host)}.conf")
     return Freepybox(APP_DESC, token_file, API_VERSION)
-
 
 async def get_hosts_list_if_supported(
     fbx_api: Freepybox,
@@ -85,7 +83,6 @@ async def get_hosts_list_if_supported(
             raise
 
     return supports_hosts, fbx_devices
-
 
 class FreeboxRouter:
     """Representation of a Freebox router."""
@@ -252,10 +249,13 @@ class FreeboxRouter:
             return
 
         try:
-            home_nodes: list[dict[str, Any]] = await self.home.get_home_nodes()
-            if home_nodes is None:
-                _LOGGER.debug("No home nodes returned by API for %s", self.name)
-                home_nodes = []
+            # Ajout d'un timeout personnalisé de 60 secondes
+            timeout = aiohttp.ClientTimeout(total=60)
+            async with timeout:
+                home_nodes: list[dict[str, Any]] = await self.home.get_home_nodes() or []
+        except asyncio.TimeoutError:
+            _LOGGER.warning("Timeout lors de la récupération des appareils domestiques pour %s", self.name)
+            return
         except HttpRequestError as e:
             self.home_granted = False
             _LOGGER.warning(
@@ -265,6 +265,9 @@ class FreeboxRouter:
                 self._port,
                 e,
             )
+            return
+        except Exception as e:
+            _LOGGER.error("Erreur inattendue lors de la mise à jour des appareils domestiques pour %s: %s", self.name, e)
             return
 
         new_device = False

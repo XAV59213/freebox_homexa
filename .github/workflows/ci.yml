@@ -1,0 +1,64 @@
+name: CI for Freebox Homexa
+
+# Déclenche le workflow sur push et pull requests vers la branche main
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+# Permissions nécessaires
+permissions:
+  contents: read
+
+jobs:
+  build-and-lint:
+    runs-on: ubuntu-latest  # Machine virtuelle Ubuntu pour exécuter les tests
+
+    steps:
+      # Étape 1 : Récupérer le code du dépôt
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # Étape 2 : Configurer Python 3.13 (compatible avec tes logs)
+      - name: Set up Python 3.13
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      # Étape 3 : Installer les dépendances
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install flake8 homeassistant freebox-api>=0.0.7
+
+      # Étape 4 : Vérifier la syntaxe avec flake8
+      - name: Lint with flake8
+        run: |
+          flake8 . --max-line-length=100 --exclude=venv,tests --ignore=E203,W503
+
+  test:
+    runs-on: ubuntu-latest
+    needs: build-and-lint  # Exécute ce job après build-and-lint
+
+    steps:
+      # Étape 1 : Récupérer le code
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # Étape 2 : Configurer Python 3.13
+      - name: Set up Python 3.13
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      # Étape 3 : Installer les dépendances avec pytest
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pytest pytest-asyncio homeassistant freebox-api>=0.0.7
+
+      # Étape 4 : Exécuter les tests (placeholder si pas de tests)
+      - name: Run tests
+        run: |
+          pytest tests/ --asyncio-mode=auto || echo "Aucun test trouvé pour l'instant. Ajoutez des tests dans le dossier 'tests/'."

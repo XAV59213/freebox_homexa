@@ -10,6 +10,6 @@
   "issue_tracker": "https://github.com/XAV59213/freebox_homexa/issues",
   "quality_scale": "gold",
   "requirements": ["freebox-api>=0.0.7"],
-  "version": "25.2.17",
+  "version": "25.2.18",
   "zeroconf": ["_fbx-api._tcp.local."]
 }

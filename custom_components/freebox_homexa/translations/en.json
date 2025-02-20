@@ -21,21 +21,3 @@
       "cannot_connect": "[%key:common::config_flow::error::cannot_connect%]",
       "unknown": "[%key:common::config_flow::error::unknown%]"
     },
-    "abort": {
-      "already_configured": "[%key:common::config_flow::abort::already_configured_device%]"
-    }
-  },
-  "entity": {
-    "switch": {
-      "invert_switch": {
-        "name": "Invert Positioning"
-      }
-    }
-  },
-  "services": {
-    "reboot": {
-      "name": "Reboot",
-      "description": "Reboots the Freebox router."
-    }
-  }
-}

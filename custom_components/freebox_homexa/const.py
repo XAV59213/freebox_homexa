@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import enum
 import socket
+from datetime import timedelta  # Ajout pour SCAN_INTERVAL
 
 from homeassistant.const import Platform
 
@@ -11,6 +12,7 @@ from homeassistant.const import Platform
 DOMAIN = "freebox_homexa"
 SERVICE_REBOOT = "reboot"
 VALUE_NOT_SET = -1  # Default value when a sensor or attribute is not set
+SCAN_INTERVAL = timedelta(seconds=40)  # Intervalle de mise à jour périodique
 
 # Freebox API application description
 APP_DESC = {
@@ -36,7 +38,7 @@ PLATFORMS = [
 # Default device name when unknown
 DEFAULT_DEVICE_NAME = "Unknown device"
 
-# Storage configuration for token persistence
+# to store the cookie
 STORAGE_KEY = DOMAIN
 STORAGE_VERSION = 1
 
@@ -71,7 +73,6 @@ DEVICE_ICONS = {
 # Freebox Home categories and mappings
 class FreeboxHomeCategory(enum.StrEnum):
     """Categories of Freebox Home devices."""
-
     ALARM = "alarm"
     CAMERA = "camera"
     DWS = "dws"  # Door/Window Sensor
@@ -97,7 +98,6 @@ CATEGORY_TO_MODEL = {
     FreeboxHomeCategory.OPENER: "Ouvrant, Porte",
 }
 
-# Categories compatible with Home Assistant entities
 HOME_COMPATIBLE_CATEGORIES = [
     FreeboxHomeCategory.ALARM,
     FreeboxHomeCategory.CAMERA,

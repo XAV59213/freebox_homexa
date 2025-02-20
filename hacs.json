@@ -2,5 +2,9 @@
     "name": "Freebox Homexa",
     "content_in_root": false,
     "homeassistant": "2025.2.4",
-    "render_readme": true
+    "render_readme": true,
+    "repository": "https://github.com/XAV59213/freebox_homexa",
+    "hacs": "1.33.0",
+    "country": ["FR"],
+    "hide_default_branch": false
 }

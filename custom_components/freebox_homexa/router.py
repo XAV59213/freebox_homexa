@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 from collections.abc import Callable, Mapping
 from contextlib import suppress
 from datetime import datetime
@@ -40,17 +41,12 @@ _LOGGER = logging.getLogger(__name__)
 
 
 def is_json(json_str: str) -> bool:
-    """Validate if a String is a JSON value or not."""
+    """Validate if a string is a JSON value."""
     try:
         json.loads(json_str)
-    except (ValueError, TypeError) as err:
-        _LOGGER.error(
-            "Failed to parse JSON '%s', error '%s'",
-            json_str,
-            err,
-        )
+        return True
+    except (ValueError, TypeError):
         return False
-    return True
 
 
 async def get_api(hass: HomeAssistant, host: str) -> Freepybox:
@@ -61,31 +57,30 @@ async def get_api(hass: HomeAssistant, host: str) -> Freepybox:
         await hass.async_add_executor_job(os.makedirs, freebox_path)
 
     token_file = Path(f"{freebox_path}/{slugify(host)}.conf")
-
     return Freepybox(APP_DESC, token_file, API_VERSION)
 
 
 async def get_hosts_list_if_supported(
     fbx_api: Freepybox,
 ) -> tuple[bool, list[dict[str, Any]]]:
-    """Hosts list is not supported when freebox is configured in bridge mode."""
+    """Hosts list is not supported when Freebox is in bridge mode."""
     supports_hosts: bool = True
     fbx_devices: list[dict[str, Any]] = []
     try:
-        fbx_devices = await fbx_api.lan.get_hosts_list() or []
+        fbx_devices = await fbx_api.lan.get_hosts_list()
+        if fbx_devices is None:
+            _LOGGER.debug("No hosts returned by API for %s", fbx_api.host)
+            fbx_devices = []
     except HttpRequestError as err:
         if (
             (matcher := re.search(r"Request failed \(APIResponse: (.+)\)", str(err)))
             and is_json(json_str := matcher.group(1))
             and (json_resp := json.loads(json_str)).get("error_code") == "nodev"
         ):
-            # No need to retry, Host list not available
             supports_hosts = False
             _LOGGER.debug(
-                "Host list is not available using bridge mode (%s)",
-                json_resp.get("msg"),
+                "Host list not available in bridge mode (%s)", json_resp.get("msg")
             )
-
         else:
             raise
 
@@ -106,7 +101,6 @@ class FreeboxRouter:
         self.hass = hass
         self._host = entry.data[CONF_HOST]
         self._port = entry.data[CONF_PORT]
-
         self._api: Freepybox = api
         self.name: str = freebox_config["model_info"]["pretty_name"]
         self.mac: str = freebox_config["mac"]
@@ -123,28 +117,29 @@ class FreeboxRouter:
         self.sensors_connection: dict[str, float] = {}
         self.call_list: list[dict[str, Any]] = []
         self.home_granted = True
-        self.home_devices: dict[str, Any] = {}
+        self.home_devices: dict[str, dict[str, Any]] = {}
         self.listeners: list[Callable[[], None]] = []
 
     async def update_all(self, now: datetime | None = None) -> None:
-        """Update all Freebox platforms."""
-        await self.update_device_trackers()
-        await self.update_sensors()
-        await self.update_home_devices()
+        """Update all Freebox platforms in parallel."""
+        await asyncio.gather(
+            self.update_device_trackers(),
+            self.update_sensors(),
+            self.update_home_devices(),
+            return_exceptions=True,  # Log errors instead of failing entirely
+        )
 
     async def update_device_trackers(self) -> None:
         """Update Freebox devices."""
         new_device = False
-
         fbx_devices: list[dict[str, Any]] = []
 
-        # Access to Host list not available in bridge mode, API return error_code 'nodev'
         if self.supports_hosts:
             self.supports_hosts, fbx_devices = await get_hosts_list_if_supported(
                 self._api
             )
 
-        # Adds the Freebox itself
+        # Add the Freebox itself
         fbx_devices.append(
             {
                 "primary_name": self.name,
@@ -153,85 +148,99 @@ class FreeboxRouter:
                 "host_type": "router",
                 "active": True,
                 "attrs": self._attrs,
-                "model":self.model
+                "model": self.model,
             }
         )
 
         for fbx_device in fbx_devices:
             device_mac = fbx_device["l2ident"]["id"]
-
-            if self.devices.get(device_mac) is None:
+            if device_mac not in self.devices:
                 new_device = True
-
             self.devices[device_mac] = fbx_device
 
         async_dispatcher_send(self.hass, self.signal_device_update)
-
         if new_device:
             async_dispatcher_send(self.hass, self.signal_device_new)
 
     async def update_sensors(self) -> None:
         """Update Freebox sensors."""
-
         # System sensors
-        syst_datas: dict[str, Any] = await self._api.system.get_config()
+        try:
+            syst_datas: dict[str, Any] = await self._api.system.get_config()
+        except HttpRequestError as e:
+            _LOGGER.error("Failed to fetch system config for %s: %s", self.name, e)
+            return
 
-        # According to the doc `syst_datas["sensors"]` is temperature sensors in celsius degree.
-        # Name and id of sensors may vary under Freebox devices.
-        for sensor in syst_datas["sensors"]:
-            self.sensors_temperature[sensor["name"]] = sensor.get("value")
+        for sensor in syst_datas.get("sensors", []):
+            self.sensors_temperature[sensor["name"]] = sensor.get("value", 0)
 
         # Connection sensors
-        connection_datas: dict[str, Any] = await self._api.connection.get_status()
+        try:
+            connection_datas: dict[str, Any] = await self._api.connection.get_status()
+        except HttpRequestError as e:
+            _LOGGER.error("Failed to fetch connection status for %s: %s", self.name, e)
+            return
+
         for sensor_key in CONNECTION_SENSORS_KEYS:
-            self.sensors_connection[sensor_key] = connection_datas[sensor_key]
+            self.sensors_connection[sensor_key] = connection_datas.get(sensor_key, 0.0)
 
         self._attrs = {
             "IPv4": connection_datas.get("ipv4"),
             "IPv6": connection_datas.get("ipv6"),
-            "connection_type": connection_datas["media"],
+            "connection_type": connection_datas.get("media"),
             "uptime": datetime.fromtimestamp(
-                round(datetime.now().timestamp()) - syst_datas["uptime_val"]
+                round(datetime.now().timestamp()) - syst_datas.get("uptime_val", 0)
             ),
             "firmware_version": self._sw_v,
-            "serial": syst_datas["serial"],
+            "serial": syst_datas.get("serial"),
         }
 
-        self.call_list = await self._api.call.get_calls_log()
+        try:
+            self.call_list = await self._api.call.get_calls_log() or []
+        except HttpRequestError as e:
+            _LOGGER.warning("Failed to fetch call logs for %s: %s", self.name, e)
+            self.call_list = []
 
-        await self._update_disks_sensors()
-        await self._update_raids_sensors()
+        await asyncio.gather(
+            self._update_disks_sensors(),
+            self._update_raids_sensors(),
+            return_exceptions=True,
+        )
 
         async_dispatcher_send(self.hass, self.signal_sensor_update)
 
     async def _update_disks_sensors(self) -> None:
         """Update Freebox disks."""
-        # None at first request
-        fbx_disks: list[dict[str, Any]] = await self._api.storage.get_disks() or []
+        try:
+            fbx_disks: list[dict[str, Any]] = await self._api.storage.get_disks()
+            if fbx_disks is None:
+                _LOGGER.debug("No disks returned by API for %s", self.name)
+                fbx_disks = []
+        except HttpRequestError as e:
+            _LOGGER.warning("Failed to fetch disks for %s: %s", self.name, e)
+            return
 
         for fbx_disk in fbx_disks:
             disk: dict[str, Any] = {**fbx_disk}
             disk_part: dict[int, dict[str, Any]] = {}
-            for fbx_disk_part in fbx_disk["partitions"]:
+            for fbx_disk_part in fbx_disk.get("partitions", []):
                 disk_part[fbx_disk_part["id"]] = fbx_disk_part
             disk["partitions"] = disk_part
             self.disks[fbx_disk["id"]] = disk
-        #_LOGGER.error(str(self.disks) + " FIN ")
 
     async def _update_raids_sensors(self) -> None:
         """Update Freebox raids."""
-        # None at first request
         if not self.supports_raid:
             return
 
         try:
-            fbx_raids: list[dict[str, Any]] = await self._api.storage.get_raids() or []
+            fbx_raids: list[dict[str, Any]] = await self._api.storage.get_raids()
+            if fbx_raids is None:
+                _LOGGER.debug("No RAIDs returned by API for %s", self.name)
+                fbx_raids = []
         except HttpRequestError:
             self.supports_raid = False
-            _LOGGER.warning(
-                "Router %s API does not support RAID",
-                self.name,
-            )
+            _LOGGER.warning("Router %s API does not support RAID", self.name)
             return
 
         for fbx_raid in fbx_raids:
@@ -243,27 +252,39 @@ class FreeboxRouter:
             return
 
         try:
-            home_nodes: list[Any] = await self.home.get_home_nodes() or []
-        except HttpRequestError:
+            home_nodes: list[dict[str, Any]] = await self.home.get_home_nodes()
+            if home_nodes is None:
+                _LOGGER.debug("No home nodes returned by API for %s", self.name)
+                home_nodes = []
+        except HttpRequestError as e:
             self.home_granted = False
-            _LOGGER.warning("Home access is not granted")
+            _LOGGER.warning(
+                "Home access not granted for %s at %s:%s - %s",
+                self.name,
+                self._host,
+                self._port,
+                e,
+            )
             return
 
         new_device = False
         for home_node in home_nodes:
             if home_node["category"] in HOME_COMPATIBLE_CATEGORIES:
-                if self.home_devices.get(home_node["id"]) is None:
+                node_id = home_node["id"]
+                if node_id not in self.home_devices:
                     new_device = True
-                self.home_devices[home_node["id"]] = home_node
+                self.home_devices[node_id] = home_node
 
         async_dispatcher_send(self.hass, self.signal_home_device_update)
-
         if new_device:
             async_dispatcher_send(self.hass, self.signal_home_device_new)
 
     async def reboot(self) -> None:
         """Reboot the Freebox."""
-        await self._api.system.reboot()
+        try:
+            await self._api.system.reboot()
+        except HttpRequestError as e:
+            _LOGGER.error("Failed to reboot %s: %s", self.name, e)
 
     async def close(self) -> None:
         """Close the connection."""
@@ -315,15 +336,15 @@ class FreeboxRouter:
 
     @property
     def call(self) -> Call:
-        """Return the call."""
+        """Return the call API."""
         return self._api.call
 
     @property
     def wifi(self) -> Wifi:
-        """Return the wifi."""
+        """Return the wifi API."""
         return self._api.wifi
 
     @property
     def home(self) -> Home:
-        """Return the home."""
+        """Return the home API."""
         return self._api.home

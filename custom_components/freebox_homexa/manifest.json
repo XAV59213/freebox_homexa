@@ -1,14 +1,15 @@
 {
   "domain": "freebox_homexa",
-  "name": "Freebox Home",
+  "name": "Freebox Homexa",
   "after_dependencies": ["zeroconf"],
-  "codeowners": ["@gvigroux"],
+  "codeowners": ["@gvigroux", "@XAV59213", "@Steph73HB"],
   "config_flow": true,
-  "dependencies": ["generic","ffmpeg"],
-  "documentation": "https://github.com/gvigroux/freebox_home",
+  "dependencies": ["ffmpeg", "generic"],  
+  "documentation": "https://github.com/XAV59213/freebox_homexa/blob/main/README.md",
   "iot_class": "local_polling",
-  "issue_tracker": "https://github.com/gvigroux/freebox_home/issues",
-  "requirements": ["freebox-api"],
-  "version": "0.8.4",
+  "issue_tracker": "https://github.com/XAV59213/freebox_homexa/issues",
+  "quality_scale": "gold",
+  "requirements": ["freebox-api>=0.0.7"],
+  "version": "25.2.17",
   "zeroconf": ["_fbx-api._tcp.local."]
 }

@@ -1,146 +1,162 @@
 """Config flow to configure the Freebox integration."""
-import logging
 
-from freebox_api.exceptions import AuthorizationError, HttpRequestError, InsufficientPermissionsError
+import logging
+from typing import Any
+
+from freebox_api.exceptions import AuthorizationError, HttpRequestError
 import voluptuous as vol
 
-from homeassistant import config_entries
+from homeassistant.config_entries import ConfigFlow, ConfigFlowResult
 from homeassistant.const import CONF_HOST, CONF_PORT
-from homeassistant.data_entry_flow import AbortFlow
+from homeassistant.helpers.service_info.zeroconf import ZeroconfServiceInfo
+from homeassistant.helpers.storage import Store
 
 from .const import DOMAIN
-from .router import get_api
+from .router import get_api, get_hosts_list_if_supported
 
 _LOGGER = logging.getLogger(__name__)
 
-class FreeboxFlowHandler(config_entries.ConfigFlow, domain=DOMAIN):
-    """Handle a config flow."""
+STORAGE_VERSION = 1
+STORAGE_KEY = f"{DOMAIN}_config"
+
+DATA_SCHEMA = vol.Schema(
+    {
+        vol.Required(CONF_HOST): str,
+        vol.Required(CONF_PORT, default=80): vol.All(int, vol.Range(min=1, max=65535)),
+    }
+)
+
+
+class FreeboxFlowHandler(ConfigFlow, domain=DOMAIN):
+    """Handle the Freebox config flow."""
+
     VERSION = 1
-    CONNECTION_CLASS = config_entries.CONN_CLASS_LOCAL_POLL
 
-    def __init__(self):
-        """Initialize Freebox config flow."""
-        self._host = None
-        self._port = None
+    def __init__(self) -> None:
+        """Initialize the config flow."""
+        self._data: dict[str, Any] = {}
+        self._store: Store | None = None
 
-    def _show_setup_form(self, user_input=None, errors=None):
-        """Show the setup form to the user."""
+    async def async_step_user(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """Handle a flow initiated by the user.
 
-        return self.async_show_form(
-            step_id="user",
-            data_schema=vol.Schema(
-                {
-                    vol.Required(CONF_HOST, default=""): str,
-                    vol.Required(CONF_PORT, default=""): int,
-                }
-            ),
-            errors=errors or {},
-        )
+        Args:
+            user_input: User-provided configuration data, if any.
 
+        Returns:
+            ConfigFlowResult: The result of the configuration step.
+        """
+        self._store = Store(self.hass, STORAGE_VERSION, STORAGE_KEY)
 
-    async def async_step_user(self, user_input=None):
-        """Handle a flow initiated by the user."""
-        errors = {}
         if user_input is None:
-            return self._show_setup_form(user_input, errors)
+            stored_data = await self._store.async_load()
+            if stored_data:
+                _LOGGER.info("Restoring saved Freebox configuration for %s", stored_data.get(CONF_HOST))
+                return await self.async_step_user(stored_data)
+            return self.async_show_form(
+                step_id="user",
+                data_schema=DATA_SCHEMA,
+                errors={},
+            )
 
-        self._host = user_input[CONF_HOST]
-        self._port = user_input[CONF_PORT]
+        self._data = user_input
+        host = self._data[CONF_HOST]
+        port = self._data[CONF_PORT]
 
         # Check if already configured
-        await self.async_set_unique_id(self._host + "_freebox_home")
+        await self.async_set_unique_id(host)
         self._abort_if_unique_id_configured()
 
         return await self.async_step_link()
 
-
-    async def async_step_unignore(self, user_input):
-        raise AbortFlow("Nothing to do?")
-
-
-    async def async_step_link(self, user_input=None):
+    async def async_step_link(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
         """Attempt to link with the Freebox router.
 
-        Given a configured host, will ask the user to press the button
-        to connect to the router.
+        Prompts the user to authorize the connection on the Freebox device.
+
+        Args:
+            user_input: User confirmation, if any.
+
+        Returns:
+            ConfigFlowResult: The result of the linking step.
         """
+        host = self._data[CONF_HOST]
+        port = self._data[CONF_PORT]
+
         if user_input is None:
-            return self.async_show_form(step_id="link")
+            return self.async_show_form(
+                step_id="link",
+                data_schema=vol.Schema({}),
+                description_placeholders={
+                    "host": host,
+                    "instructions": "Press the button on your Freebox to authorize the connection."
+                },
+                errors={},
+            )
 
         errors = {}
-        
+        fbx = None
         try:
-            # Open connection, check authentication and permissions
-            fbx = await get_api(self.hass, self._host, self._port)
-            
-            # Wait
-            await fbx.system.get_config()
-            await self.hass.async_block_till_done()
+            fbx = await get_api(self.hass, host)
+            await fbx.open(host, port)
+            await fbx.system.get_config()  # Check permissions
+            await get_hosts_list_if_supported(fbx)  # Additional validation
 
-            # Close connection
-            await fbx.close()
+            # Save configuration
+            if self._store:
+                _LOGGER.info("Saving Freebox configuration for %s:%s", host, port)
+                await self._store.async_save(self._data)
 
-            return self.async_show_form(step_id="permission")
-            '''
-            return self.async_create_entry(
-                title=self._host,
-                data={CONF_HOST: self._host, CONF_PORT: self._port},
-            )
-            '''
+            return self.async_create_entry(title=host, data=self._data)
 
-        except AuthorizationError as error:
-            _LOGGER.error("AuthorizationError: %s", error)
+        except AuthorizationError as err:
+            _LOGGER.error("Authorization failed for %s:%s - %s", host, port, str(err))
             errors["base"] = "register_failed"
 
-        except HttpRequestError:
-            _LOGGER.error("Error connecting to the Freebox router at %s", self._host)
+        except HttpRequestError as err:
+            _LOGGER.error("Connection failed for %s:%s - %s", host, port, str(err))
             errors["base"] = "cannot_connect"
 
-        except Exception:  # pylint: disable=broad-except
-            _LOGGER.exception("Unknown error connecting with Freebox router at %s", self._host)
+        except Exception as err:
+            _LOGGER.exception("Unknown error connecting to %s:%s", host, port)
             errors["base"] = "unknown"
-        return self.async_show_form(step_id="link", errors=errors)
 
+        finally:
+            if fbx:
+                await fbx.close()
 
+        return self.async_show_form(
+            step_id="link",
+            data_schema=vol.Schema({}),
+            description_placeholders={
+                "host": host,
+                "instructions": "Press the button on your Freebox to authorize the connection."
+            },
+            errors=errors,
+        )
 
-    # Ask for HOME permission
-    async def async_step_permission(self, user_input=None):
-        errors = {}
+    async def async_step_zeroconf(
+        self, discovery_info: ZeroconfServiceInfo
+    ) -> ConfigFlowResult:
+        """Handle a flow initiated by Zeroconf discovery.
+
+        Args:
+            discovery_info: Zeroconf service information.
+
+        Returns:
+            ConfigFlowResult: The result of the Zeroconf step.
+        """
+        properties = discovery_info.properties
         try:
-            fbx = await get_api(self.hass, self._host, self._port)
-            await fbx.home.get_home_nodes()
+            host = properties["api_domain"]
+            port = int(properties["https_port"])
+        except (KeyError, ValueError) as err:
+            _LOGGER.warning("Invalid Zeroconf discovery data: %s", err)
+            return self.async_abort(reason="invalid_zeroconf_data")
 
-            return self.async_create_entry(
-                title=self._host,
-                data={CONF_HOST: self._host, CONF_PORT: self._port},
-            )
-
-        except InsufficientPermissionsError as error:
-            _LOGGER.error(error)
-            errors["base"] = "unknown"
-
-        except Exception:
-            _LOGGER.exception("Unknown error connecting with Freebox router at %s", self._host)
-            errors["base"] = "unknown"
-        finally: 
-            await fbx.close()
-
-        return self.async_show_form(step_id="permission", errors=errors)
-
-
-    async def async_step_import(self, user_input=None):
-        """Import a config entry."""
-        return await self.async_step_user(user_input)
-
-
-    async def async_step_zeroconf(self, discovery_info):
-        """Initialize step from zeroconf discovery."""
-        if( discovery_info.properties.get('device_type', None) == None):
-            raise AbortFlow("Invalid discovery info")
-        if( not discovery_info.properties.get('device_type').startswith("FreeboxServer7") ):
-            raise AbortFlow("Invalid Freebox discovered. This Addon is only working with the Freebox Delta")
-        self._host = discovery_info.properties.get('api_domain', None)
-        self._port = discovery_info.properties.get('https_port', None)
-        if(self._host == None or self._port == None):
-            raise AbortFlow("Invalid discovery info (missing domain or port)")
-        return await self.async_step_user({CONF_HOST: self._host, CONF_PORT: self._port})
+        _LOGGER.info("Discovered Freebox via Zeroconf at %s:%s", host, port)
+        return await self.async_step_user({CONF_HOST: host, CONF_PORT: port})

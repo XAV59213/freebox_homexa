@@ -1,198 +1,157 @@
+"""Support for Freebox camera entities with streaming and motion detection."""
+
+from __future__ import annotations
+
 import logging
-import json
-import asyncio
-import aiohttp
-import async_timeout
-import collections
+from typing import Any
+from urllib.parse import quote
 
-from typing import Dict
-from homeassistant.config_entries import ConfigEntry
-from homeassistant.core import callback
-from homeassistant.helpers.dispatcher import async_dispatcher_connect
-from homeassistant.helpers import config_validation as cv, entity_platform, service
-
+from homeassistant.components.camera import CameraEntityFeature
 from homeassistant.components.ffmpeg.camera import (
-    FFmpegCamera,
-    CONF_INPUT,
     CONF_EXTRA_ARGUMENTS,
-    DEFAULT_ARGUMENTS
+    CONF_INPUT,
+    DEFAULT_ARGUMENTS,
+    FFmpegCamera,
 )
+from homeassistant.config_entries import ConfigEntry
+from homeassistant.const import CONF_NAME
+from homeassistant.core import HomeAssistant, callback
+from homeassistant.helpers.dispatcher import async_dispatcher_connect
+from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
-from homeassistant.components.camera import (
-    DEFAULT_CONTENT_TYPE,
-    PLATFORM_SCHEMA,
-    CameraEntityFeature,
-    Camera,
-)
-from homeassistant.const import (
-    CONF_AUTHENTICATION,
-    CONF_NAME,
-    CONF_PASSWORD,
-    CONF_USERNAME,
-    CONF_VERIFY_SSL,
-    HTTP_BASIC_AUTHENTICATION,
-    HTTP_DIGEST_AUTHENTICATION,
-)
-
-from homeassistant.components.generic.camera import (
-    CONF_CONTENT_TYPE,
-    CONF_LIMIT_REFETCH_TO_URL_CHANGE,
-    CONF_STILL_IMAGE_URL,
-    CONF_STREAM_SOURCE,
-    CONF_FRAMERATE
-)
-
-from .base_class import FreeboxBaseClass
-from .const import DOMAIN, VALUE_NOT_SET
+from .const import ATTR_DETECTION, DOMAIN, FreeboxHomeCategory
+from .entity import FreeboxHomeEntity
 from .router import FreeboxRouter
-
 
 _LOGGER = logging.getLogger(__name__)
 
-'''
-async def async_setup_entry(hass, entry: ConfigEntry, async_add_entities) -> None:
-    router = hass.data[DOMAIN][entry.unique_id]
-    tracked = set()
+
+async def async_setup_entry(
+    hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback
+) -> None:
+    """Set up Freebox camera entities from a config entry."""
+    router: FreeboxRouter = hass.data[DOMAIN][entry.unique_id]
+    tracked: set[str] = set()
 
     @callback
-    def update_router():
+    def update_callback() -> None:
+        """Add new cameras when detected."""
         add_entities(hass, router, async_add_entities, tracked)
 
-    router.listeners.append(async_dispatcher_connect(hass, router.signal_device_new, update_router))
-    update_router()
-
-    platform = entity_platform.current_platform.get()
-    platform.async_register_entity_service("flip",{},"async_flip",)
+    router.listeners.append(
+        async_dispatcher_connect(hass, router.signal_home_device_new, update_callback)
+    )
+    update_callback()
 
 
 @callback
-def add_entities(hass, router, async_add_entities, tracked):
-    """Add new cover from the router."""
-    new_tracked = []
-    #_LOGGER.warning(router.nodes)
-    for nodeId, node in router.nodes.items():
-        if (node["category"]!="camera") or (node["id"] in tracked):
-            continue
-        new_tracked.append(FreeboxCamera(hass, router, node))
-        tracked.add(node["id"] )
-
+def add_entities(
+    hass: HomeAssistant,
+    router: FreeboxRouter,
+    async_add_entities: AddEntitiesCallback,
+    tracked: set[str],
+) -> None:
+    """Add new camera entities from the router."""
+    new_tracked = [
+        FreeboxCamera(hass, router, node)
+        for nodeid, node in router.home_devices.items()
+        if node["category"] == FreeboxHomeCategory.CAMERA and nodeid not in tracked
+    ]
     if new_tracked:
-        async_add_entities(new_tracked, True)
-'''
-
-async def async_setup_entry(hass, entry, async_add_entities):
-    router = hass.data[DOMAIN][entry.unique_id]
-    entities = []
-
-    for nodeId, node in router.nodes.items():
-        if node["category"]=="camera":
-            entities.append(FreeboxCamera(hass, router, node))
-
-    async_add_entities(entities, True)
-    platform = entity_platform.current_platform.get()
-    platform.async_register_entity_service("flip",{},"async_flip",)
+        async_add_entities(new_tracked, update_before_add=True)
+        tracked.update(node._id for node in new_tracked)
+        _LOGGER.debug(
+            "Added %d camera entities for %s (%s)",
+            len(new_tracked),
+            router.name,
+            router.mac,
+        )
 
 
-    
-class FreeboxCamera(FreeboxBaseClass, FFmpegCamera):
-    def __init__(self, hass, router, node):
-        """Initialize a camera."""
+class FreeboxCamera(FreeboxHomeEntity, FFmpegCamera):
+    """Representation of a Freebox camera with streaming and motion detection."""
+
+    def __init__(
+        self, hass: HomeAssistant, router: FreeboxRouter, node: dict[str, Any]
+    ) -> None:
+        """Initialize a Freebox camera entity."""
         super().__init__(hass, router, node)
+        self._attr_unique_id = f"{self._attr_unique_id}_camera"
 
-        device_info = {CONF_NAME: node["label"].strip(),CONF_INPUT: node["props"]["Stream"],CONF_EXTRA_ARGUMENTS: DEFAULT_ARGUMENTS }
+        # Prepare FFmpeg stream URL with encoded password
+        password = node["props"]["Pass"]
+        stream_url = node["props"]["Stream"].replace(password, quote(password, safe=""))
+        device_info = {
+            CONF_NAME: node["label"].strip(),
+            CONF_INPUT: str(stream_url),
+            CONF_EXTRA_ARGUMENTS: DEFAULT_ARGUMENTS,
+        }
         FFmpegCamera.__init__(self, hass, device_info)
-        
-        #self._supported_features = CameraEntityFeature.STREAM
-        self.update_parameters(node)
-        
-        self._command_flip              = self.get_command_id(node['show_endpoints'], "slot", "flip")
-        self._command_motion_detection  = self.get_command_id(node['type']['endpoints'], "slot", "detection")
 
-    async def async_flip(entity):
-        entity._flip = not entity._flip
-        await entity.set_home_endpoint_value(entity._command_flip, {"value": entity._flip})
+        self._attr_supported_features = (
+            CameraEntityFeature.ON_OFF | CameraEntityFeature.STREAM
+        )
+        self._command_motion_detection = self.get_command_id(
+            node["type"]["endpoints"], "slot", ATTR_DETECTION
+        )
+        self._attr_extra_state_attributes = {}
+        self._update_node(node)
+
+    async def async_enable_motion_detection(self) -> None:
+        """Enable motion detection on the camera."""
+        if self._command_motion_detection is None:
+            _LOGGER.error("Motion detection not supported for %s", self._node_id)
+            return
+        try:
+            await self.set_home_endpoint_value(self._command_motion_detection, True)
+            self._attr_motion_detection_enabled = True
+            self.async_write_ha_state()
+            _LOGGER.info("Motion detection enabled for %s", self._node_id)
+        except Exception as err:
+            _LOGGER.error("Failed to enable motion detection for %s: %s", self._node_id, err)
+
+    async def async_disable_motion_detection(self) -> None:
+        """Disable motion detection on the camera."""
+        if self._command_motion_detection is None:
+            _LOGGER.error("Motion detection not supported for %s", self._node_id)
+            return
+        try:
+            await self.set_home_endpoint_value(self._command_motion_detection, False)
+            self._attr_motion_detection_enabled = False
+            self.async_write_ha_state()
+            _LOGGER.info("Motion detection disabled for %s", self._node_id)
+        except Exception as err:
+            _LOGGER.error("Failed to disable motion detection for %s: %s", self._node_id, err)
+
+    async def async_update_signal(self) -> None:
+        """Update the camera state from the Freebox."""
+        node = self._router.home_devices.get(self._id)
+        if node is None:
+            _LOGGER.warning("Camera node %s not found in router data", self._id)
+            return
+        try:
+            self._update_node(node)
+            self.async_write_ha_state()
+        except Exception as err:
+            _LOGGER.error("Failed to update camera %s: %s", self._node_id, err)
+
+    def _update_node(self, node: dict[str, Any]) -> None:
+        """Update camera attributes from node data."""
+        self._attr_name = node["label"].strip()
+        self._attr_is_streaming = node["status"] == "active"
+
+        # Update extra state attributes from signal endpoints
+        for endpoint in filter(
+            lambda x: x["ep_type"] == "signal", node["show_endpoints"]
+        ):
+            self._attr_extra_state_attributes[endpoint["name"]] = endpoint["value"]
+
+        # Set motion detection status with default False if missing
+        self._attr_motion_detection_enabled = self._attr_extra_state_attributes.get(
+            ATTR_DETECTION, False
+        )
 
     @property
-    def state_attributes(self):
-        """Return the camera state attributes."""
-        attr = super().state_attributes
-        attr["motion_detection"]        = self.motion_detection_enabled
-        attr["high_quality_video"]      = self._high_quality_video
-        attr["flip_video"]              = self._flip
-        attr["motion_threshold"]        = self._motion_threshold
-        attr["motion_sensitivity"]      = self._motion_sensitivity
-        attr["activation_with_alarm"]   = self._activation_with_alarm
-        attr["timestamp"]           = self._timestamp
-        attr["volume_microphone"]   = self._volume_micro
-        attr["sound_detection"]     = self._sound_detection
-        attr["sound_trigger"]       = self._sound_trigger
-        attr["rtsp"]                = self._rtsp
-        attr["disk"]                = self._disk
-        return attr
-
-    @property
-    def motion_detection_enabled(self):
-        """Return the camera motion detection status."""
-        return self._motion_detection_enabled
-
-    async def async_enable_motion_detection(self):
-        """Enable motion detection in the camera."""
-        await self.set_home_endpoint_value(self._command_motion_detection, {"value": True})
-        self._motion_detection_enabled = True
-
-    async def async_disable_motion_detection(self):
-        """Disable motion detection in camera."""
-        await self.set_home_endpoint_value(self._command_motion_detection, {"value": False})
-        self._motion_detection_enabled = False
-
-    @property
-    def supported_features(self):
-        """Flag supported features."""
-        return CameraEntityFeature.STREAM #self._supported_features
-
-    async def async_update(self):
-        """Get the state & name and update it."""
-        self.update_parameters(self._router.nodes[self._id]);
-
-    @property
-    def should_poll(self):
-        """Return True if entity has to be polled for state."""
-        return True
-
-    def update_parameters(self, node):
-        self._name = node["label"].strip()
-
-        # Get status
-        #if( node["status"] == "active"):
-        #    self.is_streaming = True
-        #else:
-        #    self.is_streaming = False
-
-        #self.is_recording?
-
-        # Parse all endpoints values & needed commands
-        for endpoint in filter(lambda x:(x["ep_type"] == "signal"), node['show_endpoints']):
-            if( endpoint["name"] == "detection" ):
-                self._motion_detection_enabled = endpoint["value"]
-            elif( endpoint["name"] == "activation" ):
-                self._activation_with_alarm = endpoint["value"]
-            elif( endpoint["name"] == "quality" ):
-                self._high_quality_video = endpoint["value"]
-            elif( endpoint["name"] == "sensitivity" ):
-                self._motion_sensitivity = endpoint["value"]
-            elif( endpoint["name"] == "threshold" ):
-                self._motion_threshold = endpoint["value"]
-            elif( endpoint["name"] == "flip" ):
-                self._flip = endpoint["value"]
-            elif( endpoint["name"] == "timestamp" ):
-                self._timestamp = endpoint["value"]
-            elif( endpoint["name"] == "volume" ):
-                self._volume_micro = endpoint["value"]
-            elif( endpoint["name"] == "sound_detection" ):
-                self._sound_detection = endpoint["value"]
-            elif( endpoint["name"] == "sound_trigger" ):
-                self._sound_trigger = endpoint["value"]
-            elif( endpoint["name"] == "rtsp" ):
-                self._rtsp = endpoint["value"]
-            elif( endpoint["name"] == "disk" ):
-                self._disk = endpoint["value"]
+    def available(self) -> bool:
+        """Return True if the camera is available."""
+        return self._attr_is_streaming is not None

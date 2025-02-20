@@ -1,0 +1,37 @@
+{
+    "config": {
+        "step": {
+            "link": {
+                "description": "Click \"Submit\", then touch the right arrow on the router to register Freebox Home with Home Assistant.\n\n![Location of button on the router](/static/images/config_freebox.png)",
+                "title": "Link Freebox router"
+            },
+            "permission": {
+                "description": "You need to browse http://mafreebox.freebox.fr/#Fbx.os.app.settings.Accounts and grant the access policy: \"Gestion de l'alarme et maison connectée\"",
+                "title": "Permission is required"
+            },
+            "user": {
+                "description": "Please enter your freebox details.\nYou can check this link to obtain the values: http://mafreebox.freebox.fr/api_version",
+                "title": "Freebox",
+                "data": {
+                    "host": "Host",
+                    "port": "Port"
+                }
+            }
+        },
+        "abort": {
+            "already_configured": "Device is already configured"
+        },
+        "error": {
+            "cannot_connect": "Failed to connect",
+            "register_failed": "Failed to register, please try again",
+            "unknown": "Unexpected error"
+        }
+    },
+    "entity": {
+        "switch": {
+            "invert_switch": {
+                "name": "EN Mon Interrupteur Personnalisé"
+            }
+        }
+    }
+}

@@ -1,0 +1,5 @@
+{
+    "name": "Freebox Home",
+    "content_in_root": false,
+    "homeassistant": "2022.6.0"
+}

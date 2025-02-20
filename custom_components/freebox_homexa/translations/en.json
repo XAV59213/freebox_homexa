@@ -28,8 +28,7 @@
   "entity": {
     "switch": {
       "invert_switch": {
-        "name": "Invert Positioning",
-        "description": "Toggle to invert the positioning of the shutter or opener."
+        "name": "Invert Positioning"
       }
     }
   },

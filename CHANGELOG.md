@@ -10,4 +10,6 @@
 ```yaml
 -from homeassistant.components.device_tracker import SOURCE_TYPE_ROUTER, ScannerEntity
 +from homeassistant.components.device_tracker import SourceType, ScannerEntity
-```
+    _attr_source_type = SOURCE_TYPE_ROUTER
+    _attr_source_type = SourceType.ROUTER
+```    

@@ -8,6 +8,6 @@
 
 ## 2025.2.18 (modification structurelle)
 ```yaml
---from homeassistant.components.device_tracker import SOURCE_TYPE_ROUTER, ScannerEntity
--+from homeassistant.components.device_tracker import SourceType, ScannerEntity
+-from homeassistant.components.device_tracker import SOURCE_TYPE_ROUTER, ScannerEntity
++from homeassistant.components.device_tracker import SourceType, ScannerEntity
 ```

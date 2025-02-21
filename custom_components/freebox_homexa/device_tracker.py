@@ -6,7 +6,7 @@ import logging
 from datetime import datetime
 from typing import Any
 
-from homeassistant.components.device_tracker import SOURCE_TYPE_ROUTER, ScannerEntity
+from homeassistant.components.device_tracker import SourceType, ScannerEntity
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.dispatcher import async_dispatcher_connect
@@ -61,7 +61,7 @@ class FreeboxDevice(ScannerEntity):
     """Representation of a Freebox device tracker."""
 
     _attr_should_poll = False
-    _attr_source_type = SOURCE_TYPE_ROUTER
+    _attr_source_type = SourceType.ROUTER
 
     def __init__(self, router: FreeboxRouter, device: dict[str, Any]) -> None:
         """Initialize a Freebox device tracker."""

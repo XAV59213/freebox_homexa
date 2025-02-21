@@ -7,7 +7,7 @@
 - Optimisation du dépôt Git avec `.gitignore`
 
 ## 2025.2.18 (modification structurelle)
-'''code
+```yaml
 --from homeassistant.components.device_tracker import SOURCE_TYPE_ROUTER, ScannerEntity
 -+from homeassistant.components.device_tracker import SourceType, ScannerEntity
-'''
+```

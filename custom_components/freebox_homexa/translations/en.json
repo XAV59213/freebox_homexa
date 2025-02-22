@@ -36,6 +36,10 @@
     "reboot": {
       "name": "Reboot",
       "description": "Reboots the Freebox router."
+    },
+    "flip": {
+      "name": "Flip Camera",
+      "description": "Flips the camera image vertically."
     }
   }
 }

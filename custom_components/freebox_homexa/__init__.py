@@ -7,18 +7,29 @@ from functools import partial
 from freebox_api.exceptions import HttpRequestError
 
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.const import CONF_HOST, CONF_PORT, EVENT_HOMEASSISTANT_STOP
+from homeassistant.const import CONF_HOST, CONF_PORT, EVENT_HOMEASSISTANT_STOP, Platform
 from homeassistant.core import Event, HomeAssistant, ServiceCall
 from homeassistant.exceptions import ConfigEntryNotReady
 from homeassistant.helpers.event import async_track_time_interval
 
-from .const import DOMAIN, PLATFORMS, SERVICE_REBOOT
+from .const import DOMAIN, SERVICE_REBOOT
 from .router import FreeboxRouter, get_api
 
 SCAN_INTERVAL = timedelta(seconds=40)
 
 _LOGGER = logging.getLogger(__name__)
 
+PLATFORMS = [
+    Platform.ALARM_CONTROL_PANEL,
+    Platform.BINARY_SENSOR,
+    Platform.BUTTON,
+    Platform.CAMERA,
+    Platform.COVER,
+    Platform.DEVICE_TRACKER,
+    Platform.SENSOR,
+    Platform.SWITCH,
+    Platform.REMOTE,  # Ajout de la plateforme remote
+]
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up Freebox entry."""
@@ -44,8 +55,6 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     # Services
     async def async_reboot(call: ServiceCall) -> None:
         """Handle reboot service call."""
-        # The Freebox reboot service has been replaced by a
-        # dedicated button entity and marked as deprecated
         _LOGGER.warning(
             "The 'freebox.reboot' service is deprecated and "
             "replaced by a dedicated reboot button entity; please "
@@ -64,7 +73,6 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     )
 
     return True
-
 
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Unload a config entry."""

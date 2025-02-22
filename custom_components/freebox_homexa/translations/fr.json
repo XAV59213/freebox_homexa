@@ -2,12 +2,12 @@
   "config": {
     "step": {
       "link": {
-        "description": "Cliquez sur \"Soumettre\", puis appuyez sur la fléche droite du routeur pour enregistrer Freebox avec Home Assistant.\n\n![Emplacement du bouton sur le routeur](/static/images/config_freebox.png)",
+        "description": "Cliquez sur \"Soumettre\", puis appuyez sur la flèche droite du routeur pour enregistrer Freebox avec Home Assistant.\n\n![Emplacement du bouton sur le routeur](/static/images/config_freebox.png)",
         "title": "Lien routeur Freebox"
       },
       "permission": {
-        "description": "Ouvrez la page http://mafreebox.freebox.fr/#Fbx.os.app.settings.Accounts et donnez l'accés: \"Gestion de l'alarme et maison connectée\"",
-        "title": "Authorisation demandée"
+        "description": "Ouvrez la page http://mafreebox.freebox.fr/#Fbx.os.app.settings.Accounts et donnez l'accès: \"Gestion de l'alarme et maison connectée\"",
+        "title": "Autorisation demandée"
       },
       "user": {
         "description": "Entrez les informations de votre Freebox DELTA\nVous pouvez obtenir le détail ici: http://mafreebox.freebox.fr/api_version",
@@ -25,6 +25,13 @@
       "cannot_connect": "Impossible de se connecter, veuillez réessayer",
       "register_failed": "Échec de l'inscription, veuillez réessayer",
       "unknown": "Erreur inconnue: veuillez réessayer plus tard"
+    }
+  },
+  "entity": {
+    "remote": {
+      "player": {
+        "name": "Lecteur Freebox"
+      }
     }
   },
   "services": {

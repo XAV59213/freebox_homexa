@@ -1,3 +1,10 @@
 # Freebox service entries description.
 
 reboot:
+
+flip:
+  name: Flip camera
+  description: Flips the camera image vertically.
+  target:
+    entity:
+      domain: camera

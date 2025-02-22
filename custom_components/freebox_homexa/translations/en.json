@@ -52,7 +52,15 @@
       "fields": {
         "code": {
           "name": "Command Code",
-          "description": "The command code to send (e.g., power, play, pause)."
+          "description": "The command code to send (e.g., power, play, pause, vol_inc, etc.)."
+        },
+        "long_press": {
+          "name": "Long Press",
+          "description": "If true, the command is sent as a long press."
+        },
+        "repeat": {
+          "name": "Repeat Count",
+          "description": "Number of times to repeat the command (0 for no repeat)."
         }
       }
     }

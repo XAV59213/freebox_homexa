@@ -37,11 +37,19 @@
   "services": {
     "remote": {
       "name": "Envoyer une commande",
-      "description": "Envoie une commande au Freebox Player",
+      "description": "Envoie une commande au Freebox Player.",
       "fields": {
         "code": {
           "name": "Code de la commande",
-          "description": "Le code de la commande à envoyer (ex: power, play, pause)."
+          "description": "Le code de la commande à envoyer (ex: power, play, pause, vol_inc, etc.)."
+        },
+        "long_press": {
+          "name": "Appui long",
+          "description": "Si vrai, la commande est envoyée comme un appui long."
+        },
+        "repeat": {
+          "name": "Nombre de répétitions",
+          "description": "Nombre de fois où répéter la commande (0 pour aucune répétition)."
         }
       }
     },

@@ -8,3 +8,18 @@ flip:
   target:
     entity:
       domain: camera
+
+remote:
+  name: Send command
+  description: Sends a command to the Freebox Player.
+  target:
+    entity:
+      domain: remote
+  fields:
+    code:
+      name: Command code
+      description: The command code to send (e.g., power, play, pause).
+      example: "power"
+      required: true
+      selector:
+        text:

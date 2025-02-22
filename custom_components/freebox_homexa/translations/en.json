@@ -30,6 +30,11 @@
       "invert_switch": {
         "name": "Invert Positioning"
       }
+    },
+    "remote": {
+      "player": {
+        "name": "Freebox Player"
+      }
     }
   },
   "services": {

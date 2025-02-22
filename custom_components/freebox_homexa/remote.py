@@ -43,6 +43,8 @@ async def async_setup_entry(
     if entities:
         async_add_entities(entities, update_before_add=True)
         platform = entity_platform.async_get_current_platform()
+        
+        # Enregistrement du service générique 'remote'
         platform.async_register_entity_service(
             "remote",
             {
@@ -52,9 +54,22 @@ async def async_setup_entry(
             },
             "async_send_command",
         )
+        
+        # Enregistrement d'un service spécifique pour chaque commande
+        for cmd in VALID_COMMANDS:
+            platform.async_register_entity_service(
+                cmd,
+                {
+                    "long_press": {"type": bool, "default": False, "optional": True},
+                    "repeat": {"type": int, "default": 0, "optional": True},
+                },
+                lambda entity, cmd=cmd, **kwargs: entity.async_send_specific_command(cmd, **kwargs),
+            )
+        
         _LOGGER.debug(
-            "Added %d remote entities for %s (%s)",
+            "Added %d remote entities and %d command services for %s (%s)",
             len(entities),
+            len(VALID_COMMANDS),
             router.name,
             router.mac,
         )
@@ -88,34 +103,27 @@ class FreeboxRemote(FreeboxHomeEntity, RemoteEntity):
 
     async def async_turn_on(self, **kwargs: Any) -> None:
         """Turn on the Freebox Player."""
-        try:
-            await self._router._api.remote.send_key(
-                code="power", key="power", long_press=False
-            )
-            self._attr_is_on = True
-            self.async_write_ha_state()
-            _LOGGER.info("Turned on Freebox Player %s", self._player_id)
-        except Exception as err:
-            _LOGGER.error("Failed to turn on Player %s: %s", self._player_id, err)
+        await self.async_send_specific_command("power", long_press=False)
 
     async def async_turn_off(self, **kwargs: Any) -> None:
         """Turn off the Freebox Player."""
-        try:
-            await self._router._api.remote.send_key(
-                code="power", key="power", long_press=False
-            )
-            self._attr_is_on = False
-            self.async_write_ha_state()
-            _LOGGER.info("Turned off Freebox Player %s", self._player_id)
-        except Exception as err:
-            _LOGGER.error("Failed to turn off Player %s: %s", self._player_id, err)
+        await self.async_send_specific_command("power", long_press=False)
 
     async def async_send_command(self, command: list[str], **kwargs: Any) -> None:
-        """Send a command to the Freebox Player."""
+        """Send a command to the Freebox Player (generic service)."""
         commands = [kwargs.get("code")] if "code" in kwargs else command
         long_press = kwargs.get("long_press", False)
         repeat = kwargs.get("repeat", 0)
+        await self._send_commands(commands, long_press, repeat)
 
+    async def async_send_specific_command(self, command: str, **kwargs: Any) -> None:
+        """Send a specific command to the Freebox Player."""
+        long_press = kwargs.get("long_press", False)
+        repeat = kwargs.get("repeat", 0)
+        await self._send_commands([command], long_press, repeat)
+
+    async def _send_commands(self, commands: list[str], long_press: bool, repeat: int) -> None:
+        """Helper method to send commands."""
         for cmd in commands:
             if cmd not in VALID_COMMANDS:
                 _LOGGER.error("Invalid command '%s' for Player %s. Valid commands: %s", cmd, self._player_id, VALID_COMMANDS)
@@ -125,6 +133,9 @@ class FreeboxRemote(FreeboxHomeEntity, RemoteEntity):
                     code=cmd, key=cmd, long_press=long_press, repeat=repeat
                 )
                 _LOGGER.info("Sent command %s to Player %s (long_press=%s, repeat=%d)", cmd, self._player_id, long_press, repeat)
+                if cmd == "power":
+                    self._attr_is_on = not self._attr_is_on  # Mise à jour de l'état pour power
+                    self.async_write_ha_state()
             except Exception as err:
                 _LOGGER.error("Failed to send command %s to Player %s: %s", cmd, self._player_id, err)
 

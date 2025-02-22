@@ -45,6 +45,16 @@
     "flip": {
       "name": "Flip Camera",
       "description": "Flips the camera image vertically."
+    },
+    "remote": {
+      "name": "Send Command",
+      "description": "Sends a command to the Freebox Player.",
+      "fields": {
+        "code": {
+          "name": "Command Code",
+          "description": "The command code to send (e.g., power, play, pause)."
+        }
+      }
     }
   }
 }

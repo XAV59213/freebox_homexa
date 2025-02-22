@@ -7,6 +7,7 @@ from homeassistant.components.remote import RemoteEntity, RemoteEntityFeature
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
+from homeassistant.helpers import entity_platform
 
 from .const import DOMAIN
 from .entity import FreeboxHomeEntity
@@ -31,6 +32,15 @@ async def async_setup_entry(
     
     if entities:
         async_add_entities(entities, update_before_add=True)
+        # Enregistrement du service 'remote'
+        platform = entity_platform.async_get_current_platform()
+        platform.async_register_entity_service(
+            "remote",
+            {
+                "code": str,
+            },
+            "async_send_command",
+        )
         _LOGGER.debug(
             "Added %d remote entities for %s (%s)",
             len(entities),
@@ -68,7 +78,7 @@ class FreeboxRemote(FreeboxHomeEntity, RemoteEntity):
         """Turn on the Freebox Player."""
         try:
             await self._router._api.remote.send_key(
-                code="power", key="power", long_press=False, player_id=self._player_id
+                code="power", key="power", long_press=False
             )
             self._attr_is_on = True
             self.async_write_ha_state()
@@ -80,7 +90,7 @@ class FreeboxRemote(FreeboxHomeEntity, RemoteEntity):
         """Turn off the Freebox Player."""
         try:
             await self._router._api.remote.send_key(
-                code="power", key="power", long_press=False, player_id=self._player_id
+                code="power", key="power", long_press=False
             )
             self._attr_is_on = False
             self.async_write_ha_state()
@@ -90,10 +100,12 @@ class FreeboxRemote(FreeboxHomeEntity, RemoteEntity):
 
     async def async_send_command(self, command: list[str], **kwargs: Any) -> None:
         """Send a command to the Freebox Player."""
-        for cmd in command:
+        # Si 'code' est fourni dans kwargs (via le service), utiliser cette valeur
+        commands = [kwargs.get("code")] if "code" in kwargs else command
+        for cmd in commands:
             try:
                 await self._router._api.remote.send_key(
-                    code=cmd, key=cmd, long_press=False, player_id=self._player_id
+                    code=cmd, key=cmd, long_press=False
                 )
                 _LOGGER.info("Sent command %s to Player %s", cmd, self._player_id)
             except Exception as err:
@@ -103,7 +115,7 @@ class FreeboxRemote(FreeboxHomeEntity, RemoteEntity):
         """Update the remote state."""
         try:
             status = await self._router._api.player.get_player_status(self._player_id)
-           :self._attr_is_on = status.get("power_state") == "running"
+            self._attr_is_on = status.get("power_state") == "running"
             self.async_write_ha_state()
         except Exception as err:
             _LOGGER.error("Failed to update Player %s status: %s", self._player_id, err)

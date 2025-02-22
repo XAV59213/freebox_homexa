@@ -15,15 +15,25 @@ from .router import FreeboxRouter
 
 _LOGGER = logging.getLogger(__name__)
 
+# Liste des commandes valides pour la télécommande Freebox Player
+VALID_COMMANDS = {
+    "red", "green", "blue", "yellow", "power", "list", "tv", "1", "2", "3", "4", "5", "6", "7", "8", "9",
+    "back", "0", "swap", "info", "epg", "mail", "media", "help", "options", "pip", "vol_inc", "vol_dec",
+    "ok", "up", "right", "down", "left", "prgm_inc", "prgm_dec", "mute", "home", "rec", "bwd", "prev",
+    "play", "fwd", "next"
+}
+
 async def async_setup_entry(
     hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback
 ) -> None:
     """Set up Freebox remote entities from a config entry."""
     router: FreeboxRouter = hass.data[DOMAIN][entry.unique_id]
     
-    # Récupérer les players disponibles
+    _LOGGER.debug("Starting setup for Freebox Player remote entities")
+    
     try:
         players = await router._api.player.get_players()
+        _LOGGER.debug("Found %d Freebox Players: %s", len(players), players)
     except Exception as err:
         _LOGGER.error("Failed to fetch Freebox Players: %s", err)
         return
@@ -32,12 +42,13 @@ async def async_setup_entry(
     
     if entities:
         async_add_entities(entities, update_before_add=True)
-        # Enregistrement du service 'remote'
         platform = entity_platform.async_get_current_platform()
         platform.async_register_entity_service(
             "remote",
             {
                 "code": str,
+                "long_press": {"type": bool, "default": False, "optional": True},
+                "repeat": {"type": int, "default": 0, "optional": True},
             },
             "async_send_command",
         )
@@ -47,6 +58,8 @@ async def async_setup_entry(
             router.name,
             router.mac,
         )
+    else:
+        _LOGGER.warning("No Freebox Player entities added - no players detected")
 
 class FreeboxRemote(FreeboxHomeEntity, RemoteEntity):
     """Representation of a Freebox Player remote."""
@@ -59,7 +72,6 @@ class FreeboxRemote(FreeboxHomeEntity, RemoteEntity):
         self, hass: HomeAssistant, router: FreeboxRouter, player: dict[str, Any]
     ) -> None:
         """Initialize a Freebox remote."""
-        # Création d'un faux node pour compatibilité avec FreeboxHomeEntity
         node = {
             "id": player["id"],
             "label": player.get("name", f"Player {player['id']}"),
@@ -100,14 +112,19 @@ class FreeboxRemote(FreeboxHomeEntity, RemoteEntity):
 
     async def async_send_command(self, command: list[str], **kwargs: Any) -> None:
         """Send a command to the Freebox Player."""
-        # Si 'code' est fourni dans kwargs (via le service), utiliser cette valeur
         commands = [kwargs.get("code")] if "code" in kwargs else command
+        long_press = kwargs.get("long_press", False)
+        repeat = kwargs.get("repeat", 0)
+
         for cmd in commands:
+            if cmd not in VALID_COMMANDS:
+                _LOGGER.error("Invalid command '%s' for Player %s. Valid commands: %s", cmd, self._player_id, VALID_COMMANDS)
+                continue
             try:
                 await self._router._api.remote.send_key(
-                    code=cmd, key=cmd, long_press=False
+                    code=cmd, key=cmd, long_press=long_press, repeat=repeat
                 )
-                _LOGGER.info("Sent command %s to Player %s", cmd, self._player_id)
+                _LOGGER.info("Sent command %s to Player %s (long_press=%s, repeat=%d)", cmd, self._player_id, long_press, repeat)
             except Exception as err:
                 _LOGGER.error("Failed to send command %s to Player %s: %s", cmd, self._player_id, err)
 

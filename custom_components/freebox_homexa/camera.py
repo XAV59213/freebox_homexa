@@ -18,13 +18,13 @@ from homeassistant.const import CONF_NAME
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.dispatcher import async_dispatcher_connect
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
+from homeassistant.helpers import entity_platform
 
 from .const import ATTR_DETECTION, DOMAIN, FreeboxHomeCategory
 from .entity import FreeboxHomeEntity
 from .router import FreeboxRouter
 
 _LOGGER = logging.getLogger(__name__)
-
 
 async def async_setup_entry(
     hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback
@@ -43,6 +43,9 @@ async def async_setup_entry(
     )
     update_callback()
 
+    # Ajout du service flip
+    platform = entity_platform.async_get_current_platform()
+    platform.async_register_entity_service("flip", {}, "async_flip")
 
 @callback
 def add_entities(
@@ -67,7 +70,6 @@ def add_entities(
             router.mac,
         )
 
-
 class FreeboxCamera(FreeboxHomeEntity, FFmpegCamera):
     """Representation of a Freebox camera without TurboJPEG dependency."""
 
@@ -86,7 +88,6 @@ class FreeboxCamera(FreeboxHomeEntity, FFmpegCamera):
             CONF_INPUT: str(stream_url),
             CONF_EXTRA_ARGUMENTS: DEFAULT_ARGUMENTS,
         }
-        # Désactiver les instantanés pour éviter l'utilisation de TurboJPEG
         FFmpegCamera.__init__(self, hass, device_info, still_image_url=None)
 
         self._attr_supported_features = (
@@ -95,6 +96,10 @@ class FreeboxCamera(FreeboxHomeEntity, FFmpegCamera):
         self._command_motion_detection = self.get_command_id(
             node["type"]["endpoints"], "slot", ATTR_DETECTION
         )
+        self._command_flip = self.get_command_id(
+            node["type"]["endpoints"], "slot", "flip"
+        )
+        self._flip = self.get_value("signal", "flip") or False  # État initial du flip
         self._attr_extra_state_attributes = {}
         self._update_node(node)
 
@@ -129,6 +134,21 @@ class FreeboxCamera(FreeboxHomeEntity, FFmpegCamera):
         except Exception as err:
             _LOGGER.error("Failed to disable motion detection for %s: %s", self._node_id, err)
 
+    async def async_flip(self) -> None:
+        """Flip the camera image."""
+        if self._command_flip is None:
+            _LOGGER.error("Flip command not supported for %s", self._node_id)
+            return
+        try:
+            new_flip_state = not self._flip
+            await self.set_home_endpoint_value(self._command_flip, new_flip_state)
+            self._flip = new_flip_state
+            self._attr_extra_state_attributes["flip"] = self._flip
+            self.async_write_ha_state()
+            _LOGGER.info("Camera flipped to %s for %s", new_flip_state, self._node_id)
+        except Exception as err:
+            _LOGGER.error("Failed to flip camera %s: %s", self._node_id, err)
+
     async def async_update_signal(self) -> None:
         """Update the camera state from the Freebox."""
         node = self._router.home_devices.get(self._id)
@@ -152,7 +172,8 @@ class FreeboxCamera(FreeboxHomeEntity, FFmpegCamera):
         ):
             self._attr_extra_state_attributes[endpoint["name"]] = endpoint["value"]
 
-        # Set motion detection status with default False if missing
+        # Set flip and motion detection status with defaults if missing
+        self._flip = self._attr_extra_state_attributes.get("flip", False)
         self._attr_motion_detection_enabled = self._attr_extra_state_attributes.get(
             ATTR_DETECTION, False
         )

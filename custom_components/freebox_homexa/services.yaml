@@ -11,7 +11,7 @@ flip:
 
 remote:
   name: Send command
-  description: Sends a command to the Freebox Player.
+  description: Sends a generic command to the Freebox Player.
   target:
     entity:
       domain: remote
@@ -82,3 +82,53 @@ remote:
           min: 0
           max: 10
           step: 1
+
+# Services spécifiques pour chaque commande
+power:
+  name: Power
+  description: Sends the 'power' command to toggle the Freebox Player on/off.
+  target:
+    entity:
+      domain: remote
+  fields:
+    long_press:
+      name: Long press
+      description: If true, the command is sent as a long press.
+      default: false
+      selector:
+        boolean:
+    repeat:
+      name: Repeat count
+      description: Number of times to repeat the command (0 for no repeat).
+      default: 0
+      selector:
+        number:
+          min: 0
+          max: 10
+          step: 1
+
+play:
+  name: Play
+  description: Sends the 'play' command to start or pause playback on the Freebox Player.
+  target:
+    entity:
+      domain: remote
+  fields:
+    long_press:
+      name: Long press
+      description: If true, the command is sent as a long press.
+      default: false
+      selector:
+        boolean:
+    repeat:
+      name: Repeat count
+      description: Number of times to repeat the command (0 for no repeat).
+      default: 0
+      selector:
+        number:
+          min: 0
+          max: 10
+          step: 1
+
+# Ajoutez les autres commandes ici si vous voulez toutes les documenter explicitement
+# Sinon, elles seront disponibles automatiquement via le code

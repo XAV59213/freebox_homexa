@@ -37,6 +37,10 @@
           "description": "Le code de la commande à envoyer (ex: power, play, pause)."
         }
       }
+    },
+    "flip": {
+      "name": "Retourner la caméra",
+      "description": "Retourne l'image de la caméra verticalement."
     }
   }
 }

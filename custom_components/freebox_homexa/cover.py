@@ -167,7 +167,7 @@ class FreeboxShutter(FreeboxHomeEntity, CoverEntity):
     def _find_invert_switch(self) -> None:
         """Find the associated inversion switch entity."""
         for entity in self._entity_registry.entities.values():
-            if entity.unique_id == f"{self._node_id}_invert_switch":
+            if entity.unique_id == f"{self._router.mac}_home_{self._node_id}_invert_switch":
                 self._invert_entity_id = entity.entity_id
                 break
 
@@ -232,7 +232,7 @@ class FreeboxShutter(FreeboxHomeEntity, CoverEntity):
             return
         try:
             await self.set_home_endpoint_value(self._command_position, {"value": self._get_corrected_position(100)})
-            self._current_cover_position = 100
+            self._current_cover_position = self._get_corrected_position(100)
             self.async_write_ha_state()
         except Exception as err:
             _LOGGER.error("Failed to open cover %s: %s", self._node_id, err)
@@ -244,7 +244,7 @@ class FreeboxShutter(FreeboxHomeEntity, CoverEntity):
             return
         try:
             await self.set_home_endpoint_value(self._command_position, {"value": self._get_corrected_position(0)})
-            self._current_cover_position = 0
+            self._current_cover_position = self._get_corrected_position(0)
             self.async_write_ha_state()
         except Exception as err:
             _LOGGER.error("Failed to close cover %s: %s", self._node_id, err)

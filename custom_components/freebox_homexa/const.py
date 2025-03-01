@@ -1,3 +1,4 @@
+
 """Freebox component constants."""
 
 from __future__ import annotations
@@ -108,3 +109,4 @@ HOME_COMPATIBLE_CATEGORIES = [
     FreeboxHomeCategory.SHUTTER,
     FreeboxHomeCategory.BASIC_SHUTTER,
 ]
+

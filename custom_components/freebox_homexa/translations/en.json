@@ -1,66 +1,40 @@
 {
   "config": {
     "step": {
-      "user": {
-        "data": {
-          "host": "[%key:common::config_flow::data::host%]",
-          "port": "[%key:common::config_flow::data::port%]"
-        },
-        "data_description": {
-          "host": "The hostname or IP address of your Freebox router.",
-          "port": "The port number used to access your Freebox router (default is 80)."
-        }
-      },
       "link": {
-        "title": "Link Freebox Router",
-        "description": "Select **Submit**, then touch the right arrow on your Freebox router to register it with Home Assistant.\n\n![Location of button on the router](/static/images/config_freebox.png)"
+        "description": "Click \"Submit\", then touch the right arrow on the router to register Freebox Home with Home Assistant.\n\n![Location of button on the router](/static/images/config_freebox.png)",
+        "title": "Link Freebox router"
+      },
+      "permission": {
+        "description": "You need to browse http://mafreebox.freebox.fr/#Fbx.os.app.settings.Accounts and grant the access policy: \"Gestion de l'alarme et maison connectée\"",
+        "title": "Permission is required"
+      },
+      "user": {
+        "description": "Please enter your freebox details.\nYou can check this link to obtain the values: http://mafreebox.freebox.fr/api_version",
+        "title": "Freebox",
+        "data": {
+          "host": "Host",
+          "port": "Port"
+        }
       }
-    },
-    "error": {
-      "register_failed": "Failed to register, please try again",
-      "cannot_connect": "[%key:common::config_flow::error::cannot_connect%]",
-      "unknown": "[%key:common::config_flow::error::unknown%]"
     },
     "abort": {
-      "already_configured": "[%key:common::config_flow::abort::already_configured_device%]"
-    }
-  },
-  "entity": {
-    "switch": {
-      "invert_switch": {
-        "name": "Invert Positioning"
-      }
+      "already_configured": "Device is already configured"
     },
-    "remote": {
-      "player": {
-        "name": "Freebox Player"
-      }
+    "error": {
+      "cannot_connect": "Failed to connect",
+      "register_failed": "Failed to register, please try again",
+      "unknown": "Unexpected error"
     }
   },
   "services": {
-    "reboot": {
-      "name": "Reboot",
-      "description": "Reboots the Freebox router."
-    },
-    "flip": {
-      "name": "Flip Camera",
-      "description": "Flips the camera image vertically."
-    },
     "remote": {
-      "name": "Send Command",
-      "description": "Sends a command to the Freebox Player.",
+      "name": "Send remote command",
+      "description": "Send a remote command to Freebox Player",
       "fields": {
         "code": {
           "name": "Command Code",
-          "description": "The command code to send (e.g., power, play, pause, vol_inc, etc.)."
-        },
-        "long_press": {
-          "name": "Long Press",
-          "description": "If true, the command is sent as a long press."
-        },
-        "repeat": {
-          "name": "Repeat Count",
-          "description": "Number of times to repeat the command (0 for no repeat)."
+          "description": "The code of the command to send (e.g., power, play, pause)."
         }
       }
     }

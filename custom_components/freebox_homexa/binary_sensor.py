@@ -98,6 +98,7 @@ class FreeboxHomeBinarySensor(FreeboxHomeEntity, BinarySensorEntity):
             sub_node: Données optionnelles pour les sous-appareils (facultatif).
         """
         super().__init__(hass, router, node, sub_node)
+        self._node_id = node["id"]  # Ajout explicite de _node_id
         self._command_id = self.get_command_id(
             node["type"]["endpoints"], "signal", self._sensor_name
         )
@@ -164,6 +165,7 @@ class FreeboxCoverSensor(FreeboxHomeBinarySensor):
             router: Routeur Freebox.
             node: Données de l'appareil.
         """
+        self._node_id = node["id"]  # Ajout explicite de _node_id
         cover_node = next(
             (
                 ep

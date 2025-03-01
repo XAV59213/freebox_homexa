@@ -1,3 +1,7 @@
+"""Support pour les appareils Freebox (Freebox v6 et Freebox mini 4K)."""
+# DESCRIPTION: Fichier d'initialisation principal pour l'intégration Freebox dans Home Assistant
+# OBJECTIF: Configurer l'intégration Freebox, gérer les mises à jour périodiques, les services et la fermeture propre
+
 import logging
 import requests
 import voluptuous as vol
@@ -15,12 +19,13 @@ from freebox_api.exceptions import HttpRequestError
 from .const import DOMAIN, PLATFORMS, SERVICE_REBOOT
 from .router import FreeboxRouter, get_api
 
+# SECTION: Constantes globales
 SCAN_INTERVAL = timedelta(seconds=40)
 STORAGE_VERSION = 1
 STORAGE_KEY = f"{DOMAIN}_config"
-
 PLAYER_PATH_TEMPLATE = "http://{host}/pub/remote_control?code={remote_code}&key={key}"
 
+# SECTION: Schémas de validation
 CONFIG_SCHEMA = vol.Schema(
     {
         DOMAIN: vol.Schema(
@@ -41,34 +46,56 @@ REMOTE_SCHEMA = vol.Schema(
 
 _LOGGER = logging.getLogger(__name__)
 
+# SECTION: Configuration de l'entrée
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
-    """Set up Freebox entry."""
-    
+    """Configure une entrée Freebox dans Home Assistant.
+
+    Initialise la connexion à l'API Freebox, configure les mises à jour périodiques,
+    enregistre les services et gère la sauvegarde des données de configuration.
+
+    Args:
+        hass: Instance de Home Assistant.
+        entry: Entrée de configuration pour l'intégration Freebox.
+
+    Returns:
+        bool: True si la configuration réussit, False sinon.
+
+    Raises:
+        ConfigEntryNotReady: Si la connexion à la Freebox échoue.
+    """
     hass.data.setdefault(DOMAIN, {})
 
+    # Initialisation du stockage pour la configuration
     store = Store(hass, STORAGE_VERSION, STORAGE_KEY)
     stored_data = await store.async_load()
     if stored_data is None:
-        _LOGGER.info("No existing Freebox_HomeXa configuration found. Creating a new one.")
+        _LOGGER.info("Aucune configuration Freebox existante trouvée. Création d'une nouvelle configuration.")
         stored_data = {}
-    
+
     hass.data[DOMAIN]["config"] = stored_data
     hass.data[DOMAIN]["store"] = store
 
     async def save_data():
-        """Sauvegarde des données de configuration avant l'arrêt."""
-        _LOGGER.info("Saving Freebox_HomeXa configuration data...")
+        """Sauvegarde les données de configuration avant l'arrêt de Home Assistant."""
+        _LOGGER.debug("Sauvegarde des données de configuration Freebox en cours...")
         await store.async_save(hass.data[DOMAIN]["config"])
-    
+        _LOGGER.info("Données de configuration Freebox sauvegardées avec succès.")
+
+    # Connexion à l'API Freebox
     api = await get_api(hass, entry.data[CONF_HOST])
     try:
         await api.open(entry.data[CONF_HOST], entry.data.get("port", 80))
+        _LOGGER.debug(f"Connexion établie avec la Freebox à {entry.data[CONF_HOST]}.")
     except HttpRequestError as err:
+        _LOGGER.error(f"Erreur lors de la connexion à la Freebox {entry.data[CONF_HOST]}: {err}")
         raise ConfigEntryNotReady from err
 
+    # Récupération des informations système de la Freebox
     freebox_config = await api.system.get_config()
     router = FreeboxRouter(hass, entry, api, freebox_config)
     await router.update_all()
+
+    # Mise à jour périodique des données
     entry.async_on_unload(
         async_track_time_interval(hass, router.update_all, SCAN_INTERVAL)
     )
@@ -76,43 +103,68 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     hass.data[DOMAIN][entry.unique_id] = router
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
 
+    # SECTION: Services
     async def async_reboot(call: ServiceCall) -> None:
-        """Handle reboot service call."""
+        """Gère le service de redémarrage de la Freebox.
+
+        Args:
+            call: Appel de service contenant les données éventuelles.
+        """
         _LOGGER.warning(
-            "The 'freebox.reboot' service is deprecated and "
-            "replaced by a dedicated reboot button entity; please "
-            "use that entity to reboot the Freebox instead"
+            "Le service 'freebox.reboot' est déprécié et remplacé par une entité bouton dédiée ; "
+            "veuillez utiliser cette entité pour redémarrer la Freebox."
         )
         await router.reboot()
         await save_data()
+        _LOGGER.info("Redémarrage de la Freebox effectué avec succès.")
 
     hass.services.async_register(DOMAIN, SERVICE_REBOOT, async_reboot)
 
+    # SECTION: Gestion de la fermeture
     async def async_close_connection(event: Event) -> None:
-        """Close Freebox connection on HA Stop."""
+        """Ferme la connexion à la Freebox lors de l'arrêt de Home Assistant.
+
+        Args:
+            event: Événement déclenché lors de l'arrêt.
+        """
+        _LOGGER.debug("Fermeture de la connexion à la Freebox en cours...")
         await router.close()
         await save_data()
+        _LOGGER.info("Connexion Freebox fermée proprement.")
 
     entry.async_on_unload(
         hass.bus.async_listen_once(EVENT_HOMEASSISTANT_STOP, async_close_connection)
     )
 
-    async def async_freebox_player_remote(call):
-        """Handle Freebox Player remote control."""
+    # SECTION: Service de télécommande pour Freebox Player
+    async def async_freebox_player_remote(call: ServiceCall) -> None:
+        """Gère le contrôle à distance du Freebox Player.
+
+        Envoie des commandes HTTP au Freebox Player en utilisant les codes fournis.
+
+        Args:
+            call: Appel de service contenant les codes de commande.
+        """
         code_list = call.data.get("code", "")
         if not code_list:
-            _LOGGER.warning("No code provided for Freebox Player remote control.")
+            _LOGGER.warning("Aucun code fourni pour la télécommande du Freebox Player.")
             return
 
         for code in code_list.split(','):
-            url = PLAYER_PATH_TEMPLATE.format(host=entry.data[CONF_HOST], remote_code=entry.data["remote_code"], key=code.strip())
+            url = PLAYER_PATH_TEMPLATE.format(
+                host=entry.data[CONF_HOST],
+                remote_code=entry.data["remote_code"],
+                key=code.strip()
+            )
             try:
                 response = await hass.async_add_executor_job(requests.get, url, {'verify': False})
                 if response.status_code != 200:
-                    _LOGGER.error("Failed to send command %s: HTTP %s", code, response.status_code)
+                    _LOGGER.error(f"Échec de l'envoi de la commande '{code}' : HTTP {response.status_code}")
+                else:
+                    _LOGGER.debug(f"Commande '{code}' envoyée avec succès au Freebox Player.")
             except requests.RequestException as err:
-                _LOGGER.error("Error sending command %s: %s", code, err)
+                _LOGGER.error(f"Erreur lors de l'envoi de la commande '{code}' : {err}")
 
     hass.services.async_register(DOMAIN, "remote", async_freebox_player_remote)
-    _LOGGER.info("Freebox Player component has been set up successfully.")
+    _LOGGER.info("L'intégration Freebox a été configurée avec succès.")
     return True

@@ -24,7 +24,6 @@ from .router import FreeboxRouter
 
 _LOGGER = logging.getLogger(__name__)
 
-# SECTION: Définitions des capteurs binaires RAID
 RAID_SENSORS: tuple[BinarySensorEntityDescription, ...] = (
     BinarySensorEntityDescription(
         key="raid_degraded",
@@ -34,17 +33,10 @@ RAID_SENSORS: tuple[BinarySensorEntityDescription, ...] = (
     ),
 )
 
-# SECTION: Configuration des entités
 async def async_setup_entry(
     hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback
 ) -> None:
-    """Configure les entités de capteurs binaires Freebox.
-
-    Args:
-        hass: Instance de Home Assistant.
-        entry: Entrée de configuration pour l'intégration Freebox.
-        async_add_entities: Fonction pour ajouter des entités à Home Assistant.
-    """
+    """Configure les entités de capteurs binaires Freebox."""
     router: FreeboxRouter = hass.data[DOMAIN][entry.unique_id]
 
     _LOGGER.debug(f"{router.name} - {router.mac} - {len(router.raids)} raid(s)")
@@ -73,14 +65,9 @@ async def async_setup_entry(
 
     async_add_entities(binary_entities, True)
 
-# SECTION: Classe de base pour les capteurs binaires Freebox Home
 class FreeboxHomeBinarySensor(FreeboxHomeEntity, BinarySensorEntity):
-    """Représentation de base d'un capteur binaire Freebox Home.
-
-    Hérite de FreeboxHomeEntity et BinarySensorEntity pour gérer les capteurs binaires.
-    """
-
-    _sensor_name = "trigger"  # Nom par défaut du capteur
+    """Représentation de base d'un capteur binaire Freebox Home."""
+    _sensor_name = "trigger"
 
     def __init__(
         self,
@@ -89,16 +76,12 @@ class FreeboxHomeBinarySensor(FreeboxHomeEntity, BinarySensorEntity):
         node: dict[str, Any],
         sub_node: dict[str, Any] | None = None,
     ) -> None:
-        """Initialise un capteur binaire Freebox.
-
-        Args:
-            hass: Instance de Home Assistant.
-            router: Routeur Freebox gérant cette entité.
-            node: Données de l'appareil Freebox.
-            sub_node: Données optionnelles pour les sous-appareils (facultatif).
-        """
+        """Initialise un capteur binaire Freebox."""
         super().__init__(hass, router, node, sub_node)
-        self._node_id = node["id"]  # Ajout explicite de _node_id
+        self._node_id = node.get("id")
+        if self._node_id is None:
+            _LOGGER.error("L'appareil Freebox n'a pas d'ID valide")
+            raise ValueError("L'appareil Freebox n'a pas d'ID valide")
         self._command_id = self.get_command_id(
             node["type"]["endpoints"], "signal", self._sensor_name
         )
@@ -106,10 +89,7 @@ class FreeboxHomeBinarySensor(FreeboxHomeEntity, BinarySensorEntity):
         _LOGGER.debug(f"Capteur binaire initialisé pour {self._node_id}: état={self._attr_is_on}")
 
     async def async_update_signal(self) -> None:
-        """Met à jour l'état du capteur.
-
-        Récupère la valeur actuelle via l'API et ajuste l'état selon le type de capteur.
-        """
+        """Met à jour l'état du capteur."""
         try:
             value = await self.get_home_endpoint_value(self._command_id)
             self._attr_is_on = self._edit_state(value)
@@ -120,36 +100,23 @@ class FreeboxHomeBinarySensor(FreeboxHomeEntity, BinarySensorEntity):
             self._attr_is_on = None
 
     def _edit_state(self, state: bool | None) -> bool | None:
-        """Ajuste l'état en fonction du type de capteur.
-
-        Pour les capteurs 'trigger', l'état est inversé.
-
-        Args:
-            state: État brut récupéré de l'API.
-
-        Returns:
-            bool | None: État ajusté ou None si indisponible.
-        """
+        """Ajuste l'état en fonction du type de capteur."""
         if state is None:
             return None
         if self._sensor_name == "trigger":
             return not state
         return state
 
-# SECTION: Classes spécifiques pour chaque type de capteur
 class FreeboxPirSensor(FreeboxHomeBinarySensor):
     """Représentation d'un capteur de mouvement Freebox (PIR)."""
-
     _attr_device_class = BinarySensorDeviceClass.MOTION
 
 class FreeboxDwsSensor(FreeboxHomeBinarySensor):
     """Représentation d'un capteur d'ouverture de porte Freebox (DWS)."""
-
     _attr_device_class = BinarySensorDeviceClass.DOOR
 
 class FreeboxCoverSensor(FreeboxHomeBinarySensor):
-    """Représentation d'un capteur de couverture (état de sécurité) pour certains appareils Freebox."""
-
+    """Représentation d'un capteur de couverture pour certains appareils Freebox."""
     _attr_device_class = BinarySensorDeviceClass.SAFETY
     _attr_entity_category = EntityCategory.DIAGNOSTIC
     _attr_entity_registry_enabled_default = False
@@ -158,14 +125,11 @@ class FreeboxCoverSensor(FreeboxHomeBinarySensor):
     def __init__(
         self, hass: HomeAssistant, router: FreeboxRouter, node: dict[str, Any]
     ) -> None:
-        """Initialise un capteur de couverture pour un appareil Freebox.
-
-        Args:
-            hass: Instance de Home Assistant.
-            router: Routeur Freebox.
-            node: Données de l'appareil.
-        """
-        self._node_id = node["id"]  # Ajout explicite de _node_id
+        """Initialise un capteur de couverture pour un appareil Freebox."""
+        self._node_id = node.get("id")
+        if self._node_id is None:
+            _LOGGER.error("L'appareil Freebox n'a pas d'ID valide pour le capteur de couverture")
+            raise ValueError("L'appareil Freebox n'a pas d'ID valide")
         cover_node = next(
             (
                 ep
@@ -178,11 +142,7 @@ class FreeboxCoverSensor(FreeboxHomeBinarySensor):
         _LOGGER.debug(f"Capteur de couverture initialisé pour {self._node_id}")
 
 class FreeboxRaidDegradedSensor(BinarySensorEntity):
-    """Représentation d'un capteur RAID dégradé Freebox.
-
-    Surveille l'état de dégradation des arrays RAID.
-    """
-
+    """Représentation d'un capteur RAID dégradé Freebox."""
     _attr_should_poll = False
     _attr_has_entity_name = True
 
@@ -192,13 +152,7 @@ class FreeboxRaidDegradedSensor(BinarySensorEntity):
         raid: dict[str, Any],
         description: BinarySensorEntityDescription,
     ) -> None:
-        """Initialise un capteur RAID dégradé.
-
-        Args:
-            router: Routeur Freebox.
-            raid: Données du RAID.
-            description: Description de l'entité capteur.
-        """
+        """Initialise un capteur RAID dégradé."""
         self.entity_description = description
         self._router = router
         self._attr_device_info = router.device_info

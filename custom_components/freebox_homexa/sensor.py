@@ -266,14 +266,23 @@ class FreeboxDiskSensor(FreeboxSensor):
             _LOGGER.warning(f"Partition {self._partition_id} non trouvée pour {self._attr_name}")
             self._attr_native_value = None
             return
-        total_bytes = partition.get("total_bytes", 0)
-        free_bytes = partition.get("free_bytes", 0)
-        if total_bytes > 0:
+
+        total_bytes = partition.get("total_bytes")
+        free_bytes = partition.get("free_bytes")
+
+        # Logs pour déboguer les valeurs
+        _LOGGER.debug(f"Total bytes pour {self._attr_name}: {total_bytes}")
+        _LOGGER.debug(f"Free bytes pour {self._attr_name}: {free_bytes}")
+
+        if total_bytes is None or total_bytes <= 0:
+            _LOGGER.warning(f"Taille totale indisponible ou invalide pour {self._attr_name}")
+            self._attr_native_value = None
+        elif free_bytes is None:
+            _LOGGER.warning(f"Espace libre indisponible pour {self._attr_name}")
+            self._attr_native_value = None
+        else:
             self._attr_native_value = round((free_bytes / total_bytes) * 100, 2)
             _LOGGER.debug(f"{self._attr_name}: {self._attr_native_value}% libre")
-        else:
-            _LOGGER.warning(f"Taille totale indisponible pour {self._attr_name}")
-            self._attr_native_value = None
 
 # SECTION: Classe pour les capteurs de batterie
 class FreeboxBatterySensor(FreeboxHomeEntity, SensorEntity):

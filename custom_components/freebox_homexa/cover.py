@@ -11,10 +11,10 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.helpers.dispatcher import async_dispatcher_connect
 from homeassistant.components.cover import CoverEntity, CoverDeviceClass, CoverState
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
+from homeassistant.helpers.entity_registry import async_get
 from .const import DOMAIN, FreeboxHomeCategory
 from .entity import FreeboxHomeEntity
 from .router import FreeboxRouter
-from homeassistant.helpers.entity_registry import async_get
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -42,8 +42,9 @@ async def async_setup_entry(
         elif node["category"] == FreeboxHomeCategory.OPENER:
             entities.append(FreeboxShutter(hass, router, node))
 
-    async_add_entities(entities, True)
-    _LOGGER.debug(f"{len(entities)} entités de volets ajoutées pour {router.name}")
+    if entities:
+        async_add_entities(entities, update_before_add=True)
+        _LOGGER.debug(f"{len(entities)} entités de volets ajoutées pour {router.name}")
 
 # SECTION: Classe pour les volets basiques
 class FreeboxBasicShutter(FreeboxHomeEntity, CoverEntity):
@@ -66,7 +67,7 @@ class FreeboxBasicShutter(FreeboxHomeEntity, CoverEntity):
         self._command_down = self.get_command_id(node['show_endpoints'], "slot", "down")
         self._command_state = self.get_command_id(node['show_endpoints'], "signal", "state")
         self._state = self.get_node_value(node['show_endpoints'], "signal", "state")
-        _LOGGER.debug(f"Volet basique {self._name} initialisé")
+        _LOGGER.debug(f"Volet basique {self._attr_name} initialisé")
 
     @property
     def device_class(self) -> str:
@@ -102,11 +103,11 @@ class FreeboxBasicShutter(FreeboxHomeEntity, CoverEntity):
         Envoie la commande d'ouverture via l'API Freebox.
         """
         if self._command_up is None:
-            _LOGGER.error(f"Commande d'ouverture non disponible pour {self._node_id}")
+            _LOGGER.error(f"Commande d'ouverture non disponible pour {self._attr_unique_id}")
             return
         await self.set_home_endpoint_value(self._command_up, {"value": None})
         self._state = CoverState.OPEN
-        _LOGGER.info(f"Volet {self._name} ouvert")
+        _LOGGER.info(f"Volet {self._attr_name} ouvert")
 
     async def async_close_cover(self, **kwargs) -> None:
         """Ferme le volet.
@@ -114,11 +115,11 @@ class FreeboxBasicShutter(FreeboxHomeEntity, CoverEntity):
         Envoie la commande de fermeture via l'API Freebox.
         """
         if self._command_down is None:
-            _LOGGER.error(f"Commande de fermeture non disponible pour {self._node_id}")
+            _LOGGER.error(f"Commande de fermeture non disponible pour {self._attr_unique_id}")
             return
         await self.set_home_endpoint_value(self._command_down, {"value": None})
         self._state = CoverState.CLOSED
-        _LOGGER.info(f"Volet {self._name} fermé")
+        _LOGGER.info(f"Volet {self._attr_name} fermé")
 
     async def async_stop_cover(self, **kwargs) -> None:
         """Arrête le volet.
@@ -126,11 +127,11 @@ class FreeboxBasicShutter(FreeboxHomeEntity, CoverEntity):
         Envoie la commande d'arrêt via l'API Freebox.
         """
         if self._command_stop is None:
-            _LOGGER.error(f"Commande d'arrêt non disponible pour {self._node_id}")
+            _LOGGER.error(f"Commande d'arrêt non disponible pour {self._attr_unique_id}")
             return
         await self.set_home_endpoint_value(self._command_stop, {"value": None})
         self._state = None
-        _LOGGER.info(f"Volet {self._name} arrêté")
+        _LOGGER.info(f"Volet {self._attr_name} arrêté")
 
     async def async_update(self) -> None:
         """Met à jour l'état du volet.
@@ -138,14 +139,14 @@ class FreeboxBasicShutter(FreeboxHomeEntity, CoverEntity):
         Récupère l'état actuel via l'API Freebox.
         """
         if self._command_state is None:
-            _LOGGER.error(f"Commande d'état non disponible pour {self._node_id}")
+            _LOGGER.error(f"Commande d'état non disponible pour {self._attr_unique_id}")
             self._state = None
             return
         try:
             self._state = await self.get_home_endpoint_value(self._command_state)
-            _LOGGER.debug(f"État du volet {self._name} mis à jour: {self._state}")
+            _LOGGER.debug(f"État du volet {self._attr_name} mis à jour: {self._state}")
         except Exception as err:
-            _LOGGER.error(f"Échec de la mise à jour de l'état pour {self._node_id}: {err}")
+            _LOGGER.error(f"Échec de la mise à jour de l'état pour {self._attr_unique_id}: {err}")
             self._state = None
 
     def convert_state(self, state: Any) -> str | None:
@@ -189,7 +190,7 @@ class FreeboxShutter(FreeboxHomeEntity, CoverEntity):
             if entity.unique_id == f"{self._attr_unique_id}_InvertSwitch":
                 self._invert_entity_id = entity.entity_id
                 break
-        _LOGGER.debug(f"Volet avec position {self._name} initialisé")
+        _LOGGER.debug(f"Volet avec position {self._attr_name} initialisé")
 
     def get_invert_status(self) -> bool:
         """Vérifie si l'inversion est activée via l'entité switch associée.
@@ -253,29 +254,29 @@ class FreeboxShutter(FreeboxHomeEntity, CoverEntity):
         """
         corrected_position = self.get_corrected_state(position)
         if self._command_position is None:
-            _LOGGER.error(f"Commande de position non disponible pour {self._node_id}")
+            _LOGGER.error(f"Commande de position non disponible pour {self._attr_unique_id}")
             return
         await self.set_home_endpoint_value(self._command_position, {"value": corrected_position})
         self._current_cover_position = corrected_position
-        _LOGGER.info(f"Position du volet {self._name} définie à {corrected_position}")
+        _LOGGER.info(f"Position du volet {self._attr_name} définie à {corrected_position}")
 
     async def async_open_cover(self, **kwargs) -> None:
         """Ouvre complètement le volet (position 0)."""
         if self._command_position is None:
-            _LOGGER.error(f"Commande d'ouverture non disponible pour {self._node_id}")
+            _LOGGER.error(f"Commande d'ouverture non disponible pour {self._attr_unique_id}")
             return
         await self.set_home_endpoint_value(self._command_position, {"value": 0})
         self._current_cover_position = 0
-        _LOGGER.info(f"Volet {self._name} ouvert")
+        _LOGGER.info(f"Volet {self._attr_name} ouvert")
 
     async def async_close_cover(self, **kwargs) -> None:
         """Ferme complètement le volet (position 100)."""
         if self._command_position is None:
-            _LOGGER.error(f"Commande de fermeture non disponible pour {self._node_id}")
+            _LOGGER.error(f"Commande de fermeture non disponible pour {self._attr_unique_id}")
             return
         await self.set_home_endpoint_value(self._command_position, {"value": 100})
         self._current_cover_position = 100
-        _LOGGER.info(f"Volet {self._name} fermé")
+        _LOGGER.info(f"Volet {self._attr_name} fermé")
 
     async def async_stop_cover(self, **kwargs) -> None:
         """Arrête le volet.
@@ -283,11 +284,11 @@ class FreeboxShutter(FreeboxHomeEntity, CoverEntity):
         Envoie la commande d'arrêt et met à jour la position.
         """
         if self._command_stop is None:
-            _LOGGER.error(f"Commande d'arrêt non disponible pour {self._node_id}")
+            _LOGGER.error(f"Commande d'arrêt non disponible pour {self._attr_unique_id}")
             return
         await self.set_home_endpoint_value(self._command_stop, {"value": None})
         await self.async_update()
-        _LOGGER.info(f"Volet {self._name} arrêté")
+        _LOGGER.info(f"Volet {self._attr_name} arrêté")
 
     async def async_update(self) -> None:
         """Met à jour la position actuelle du volet.
@@ -297,7 +298,7 @@ class FreeboxShutter(FreeboxHomeEntity, CoverEntity):
         try:
             position = self.get_value("signal", "position_set")
             self._current_cover_position = self.get_corrected_state(position)
-            _LOGGER.debug(f"Position du volet {self._name} mise à jour: {self._current_cover_position}")
+            _LOGGER.debug(f"Position du volet {self._attr_name} mise à jour: {self._current_cover_position}")
         except Exception as err:
-            _LOGGER.error(f"Échec de la mise à jour de la position pour {self._node_id}: {err}")
+            _LOGGER.error(f"Échec de la mise à jour de la position pour {self._attr_unique_id}: {err}")
             self._current_cover_position = None

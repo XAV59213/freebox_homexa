@@ -5,6 +5,7 @@
 import logging
 import json
 from typing import Any
+from datetime import timedelta
 from homeassistant.util import slugify
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.config_entries import ConfigEntry
@@ -17,6 +18,9 @@ from .entity import FreeboxHomeEntity
 from .router import FreeboxRouter
 
 _LOGGER = logging.getLogger(__name__)
+
+# Intervalle de mise à jour automatique des volets (en secondes)
+SCAN_INTERVAL = timedelta(seconds=30)
 
 # SECTION: Configuration des entités
 async def async_setup_entry(
@@ -52,6 +56,9 @@ class FreeboxBasicShutter(FreeboxHomeEntity, CoverEntity):
 
     Permet seulement d'ouvrir, fermer ou arrêter le volet.
     """
+
+    _attr_should_poll = True  # Activer le polling pour mise à jour automatique
+    _attr_scan_interval = SCAN_INTERVAL  # Intervalle de mise à jour
 
     def __init__(self, hass: HomeAssistant, router: FreeboxRouter, node: dict[str, Any]) -> None:
         """Initialise un volet basique Freebox.
@@ -170,6 +177,9 @@ class FreeboxShutter(FreeboxHomeEntity, CoverEntity):
 
     Permet de contrôler la position précise du volet.
     """
+
+    _attr_should_poll = True  # Activer le polling pour mise à jour automatique
+    _attr_scan_interval = SCAN_INTERVAL  # Intervalle de mise à jour
 
     def __init__(self, hass: HomeAssistant, router: FreeboxRouter, node: dict[str, Any]) -> None:
         """Initialise un volet Freebox avec position.

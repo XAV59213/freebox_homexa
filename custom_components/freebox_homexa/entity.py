@@ -13,6 +13,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.dispatcher import async_dispatcher_connect
 from homeassistant.helpers.entity import Entity
+from freebox_api.exceptions import HttpRequestError
 
 from .const import CATEGORY_TO_MODEL, DOMAIN, FreeboxHomeCategory
 from .router import FreeboxRouter
@@ -94,15 +95,19 @@ class FreeboxHomeEntity(Entity):
         Returns:
             bool: True si la commande réussit, False sinon.
         """
-        if command_id is None:
-            _LOGGER.error(f"Impossible de définir une valeur via l'API pour {self._id}. La commande est None")
+        if self._id is None or command_id is None:
+            _LOGGER.error(f"Impossible de définir une valeur via l'API. ID ou command_id manquant.")
             return False
         try:
+            _LOGGER.debug(f"Tentative de définir la valeur {value} pour endpoint {command_id} sur nœud {self._id}")
             await self._router.home.set_home_endpoint_value(self._id, command_id, value)
             _LOGGER.debug(f"Valeur {value} définie pour l'endpoint {command_id} sur {self._id}")
             return True
+        except HttpRequestError as err:
+            _LOGGER.error(f"Erreur HTTP lors de la définition de la valeur pour nœud {self._id}, endpoint {command_id}: {err}")
+            return False
         except Exception as err:
-            _LOGGER.error(f"Échec de la définition de la valeur pour {self._id}, endpoint {command_id}: {err}")
+            _LOGGER.error(f"Échec inattendu lors de la définition de la valeur pour nœud {self._id}, endpoint {command_id}: {err}")
             return False
 
     async def get_home_endpoint_value(self, command_id: int | None) -> Any | None:
@@ -114,16 +119,23 @@ class FreeboxHomeEntity(Entity):
         Returns:
             Any | None: Valeur de l'endpoint ou None si non disponible.
         """
-        if command_id is None:
-            _LOGGER.error(f"Impossible de récupérer une valeur via l'API pour {self._id}. La commande est None")
+        if self._id is None or command_id is None:
+            _LOGGER.error(f"Impossible de récupérer une valeur via l'API. ID ou command_id manquant.")
             return None
         try:
+            _LOGGER.debug(f"Tentative de récupération de la valeur pour endpoint {command_id} sur nœud {self._id}")
             node = await self._router.home.get_home_endpoint_value(self._id, command_id)
             value = node.get("value")
             _LOGGER.debug(f"Valeur récupérée pour l'endpoint {command_id} sur {self._id}: {value}")
             return value
+        except HttpRequestError as err:
+            _LOGGER.error(f"Erreur HTTP lors de la récupération de la valeur pour nœud {self._id}, endpoint {command_id}: {err}")
+            return None
+        except KeyError as err:
+            _LOGGER.error(f"Clé manquante dans la réponse pour nœud {self._id}, endpoint {command_id}: {err}")
+            return None
         except Exception as err:
-            _LOGGER.error(f"Échec de la récupération de la valeur pour {self._id}, endpoint {command_id}: {err}")
+            _LOGGER.error(f"Échec inattendu lors de la récupération de la valeur pour nœud {self._id}, endpoint {command_id}: {err}")
             return None
 
     # SECTION: Méthodes utilitaires pour récupérer des valeurs
@@ -139,12 +151,12 @@ class FreeboxHomeEntity(Entity):
             int | None: Identifiant de la commande ou None si non trouvé.
         """
         node = next(
-            (x for x in nodes if x["name"] == name and x["ep_type"] == ep_type), None
+            (x for x in nodes if x.get("name") == name and x.get("ep_type") == ep_type), None
         )
         if not node:
             _LOGGER.warning(f"L'appareil Freebox Home n'a pas de commande pour: {name}/{ep_type}")
             return None
-        return node["id"]
+        return node.get("id")
 
     def get_node_value(self, nodes: list, ep_type: str, name: str) -> Any | None:
         """Récupère la valeur d'un endpoint spécifique.
@@ -158,7 +170,7 @@ class FreeboxHomeEntity(Entity):
             Any | None: Valeur de l'endpoint ou None si non trouvée.
         """
         node = next(
-            (x for x in nodes if x["name"] == name and x["ep_type"] == ep_type), None
+            (x for x in nodes if x.get("name") == name and x.get("ep_type") == ep_type), None
         )
         if node is None:
             _LOGGER.warning(f"L'appareil Freebox Home n'a pas de valeur pour: {ep_type}/{name}")
@@ -171,6 +183,9 @@ class FreeboxHomeEntity(Entity):
 
         Récupère les dernières données de l'appareil et met à jour l'état dans Home Assistant.
         """
+        if self._id not in self._router.home_devices:
+            _LOGGER.error(f"Appareil {self._id} non trouvé dans les données du routeur")
+            return
         try:
             self._node = self._router.home_devices[self._id]
             if self._sub_node is None:
@@ -179,10 +194,10 @@ class FreeboxHomeEntity(Entity):
                 self._attr_name = f"{self._node['label'].strip()} {self._sub_node['label'].strip()}"
             self.async_write_ha_state()
             _LOGGER.debug(f"Entité {self._attr_name} mise à jour avec succès")
-        except KeyError:
-            _LOGGER.error(f"Appareil {self._id} non trouvé dans les données du routeur")
+        except KeyError as err:
+            _LOGGER.error(f"Clé manquante lors de la mise à jour de l'entité {self._attr_name}: {err}")
         except Exception as err:
-            _LOGGER.error(f"Échec de la mise à jour de l'entité {self._attr_name}: {err}")
+            _LOGGER.error(f"Échec inattendu lors de la mise à jour de l'entité {self._attr_name}: {err}")
 
     # SECTION: Cycle de vie de l'entité dans Home Assistant
     async def async_added_to_hass(self) -> None:
@@ -221,8 +236,8 @@ class FreeboxHomeEntity(Entity):
         node = next(
             (
                 endpoint
-                for endpoint in self._node["show_endpoints"]
-                if endpoint["name"] == name and endpoint["ep_type"] == ep_type
+                for endpoint in self._node.get("show_endpoints", [])
+                if endpoint.get("name") == name and endpoint.get("ep_type") == ep_type
             ),
             None,
         )

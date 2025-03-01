@@ -147,12 +147,11 @@ class FreeboxShutterInvertSwitchEntity(FreeboxHomeEntity, SwitchEntity):
         self._attr_unique_id = f"{self._attr_unique_id}_InvertSwitch"
         self._attr_icon = "mdi:directions-fork"
         self._attr_name = "Inversion Positionnement"
-        self._state = False
 
         # Chemin du fichier de configuration pour l'état d'inversion
         freebox_path = Store(hass, STORAGE_VERSION, STORAGE_KEY).path
         if not os.path.exists(freebox_path):
-            os.makedirs(freebox_path)
+            os.makedirs(freebox_path, exist_ok=True)
         self._path = Path(f"{freebox_path}/{slugify(self._attr_unique_id)}.conf")
 
         # Chargement initial de l'état
@@ -201,12 +200,12 @@ class FreeboxShutterInvertSwitchEntity(FreeboxHomeEntity, SwitchEntity):
     def _load_state(self) -> None:
         """Charge l'état de l'inversion à partir du fichier de configuration."""
         try:
-            value = self._path.read_text().strip()
-            self._state = value == "1"
+            if self._path.exists():
+                value = self._path.read_text().strip()
+                self._state = value == "1"
+            else:
+                self._state = False  # État par défaut si le fichier n'existe pas
             _LOGGER.debug(f"État de l'inversion chargé: {'activé' if self._state else 'désactivé'}")
-        except FileNotFoundError:
-            _LOGGER.debug(f"Fichier de configuration pour {self._attr_name} non trouvé, état par défaut: désactivé")
-            self._state = False
         except OSError as err:
             _LOGGER.error(f"Erreur lors de la lecture du fichier pour {self._attr_name}: {err}")
             self._state = False

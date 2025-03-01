@@ -3,6 +3,7 @@
 # OBJECTIF: Permettre l'armement, le désarmement et le déclenchement de l'alarme Freebox
 
 from typing import Any
+import logging
 
 from homeassistant.components.alarm_control_panel import (
     AlarmControlPanelEntity,
@@ -17,7 +18,6 @@ from .const import DOMAIN, FreeboxHomeCategory
 from .entity import FreeboxHomeEntity
 from .router import FreeboxRouter
 
-import logging
 _LOGGER = logging.getLogger(__name__)
 
 # SECTION: Mapping des états de l'alarme Freebox aux états Home Assistant
@@ -46,14 +46,13 @@ async def async_setup_entry(
     router: FreeboxRouter = hass.data[DOMAIN][entry.unique_id]
 
     # Ajoute les entités d'alarme pour chaque appareil de catégorie 'alarm'
-    async_add_entities(
-        [
-            FreeboxAlarm(hass, router, node)
-            for node in router.home_devices.values()
-            if node["category"] == FreeboxHomeCategory.ALARM
-        ],
-        True,
-    )
+    entities = [
+        FreeboxAlarm(hass, router, node)
+        for node in router.home_devices.values()
+        if node["category"] == FreeboxHomeCategory.ALARM
+    ]
+    if entities:
+        async_add_entities(entities, update_before_add=True)
 
 # SECTION: Classe de l'entité Alarme
 class FreeboxAlarm(FreeboxHomeEntity, AlarmControlPanelEntity):
@@ -76,6 +75,11 @@ class FreeboxAlarm(FreeboxHomeEntity, AlarmControlPanelEntity):
             node: Données de l'appareil d'alarme Freebox.
         """
         super().__init__(hass, router, node)
+        # Définition explicite de _node_id à partir des données du node
+        self._node_id = node.get("id")
+        if self._node_id is None:
+            _LOGGER.error("L'appareil d'alarme Freebox n'a pas d'ID valide")
+            raise ValueError("L'appareil d'alarme Freebox n'a pas d'ID valide")
 
         # Récupération des identifiants de commande pour les actions d'alarme
         self._command_trigger = self.get_command_id(

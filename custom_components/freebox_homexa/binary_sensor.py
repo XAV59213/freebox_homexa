@@ -1,4 +1,6 @@
-"""Support for Freebox devices (Freebox v6 and Freebox mini 4K)."""
+"""Support pour les appareils Freebox (Freebox v6 et Freebox mini 4K)."""
+# DESCRIPTION: Gestion des capteurs binaires pour les appareils Freebox dans Home Assistant
+# OBJECTIF: Détecter des états tels que mouvement, ouverture de porte, état RAID dégradé, etc.
 
 from __future__ import annotations
 
@@ -22,24 +24,30 @@ from .router import FreeboxRouter
 
 _LOGGER = logging.getLogger(__name__)
 
-
+# SECTION: Définitions des capteurs binaires RAID
 RAID_SENSORS: tuple[BinarySensorEntityDescription, ...] = (
     BinarySensorEntityDescription(
         key="raid_degraded",
-        name="degraded",
+        name="degradé",
         device_class=BinarySensorDeviceClass.PROBLEM,
         entity_category=EntityCategory.DIAGNOSTIC,
     ),
 )
 
-
+# SECTION: Configuration des entités
 async def async_setup_entry(
     hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback
 ) -> None:
-    """Set up binary sensors."""
+    """Configure les entités de capteurs binaires Freebox.
+
+    Args:
+        hass: Instance de Home Assistant.
+        entry: Entrée de configuration pour l'intégration Freebox.
+        async_add_entities: Fonction pour ajouter des entités à Home Assistant.
+    """
     router: FreeboxRouter = hass.data[DOMAIN][entry.unique_id]
 
-    _LOGGER.debug("%s - %s - %s raid(s)", router.name, router.mac, len(router.raids))
+    _LOGGER.debug(f"{router.name} - {router.mac} - {len(router.raids)} raid(s)")
 
     binary_entities: list[BinarySensorEntity] = [
         FreeboxRaidDegradedSensor(router, raid, description)
@@ -65,11 +73,14 @@ async def async_setup_entry(
 
     async_add_entities(binary_entities, True)
 
-
+# SECTION: Classe de base pour les capteurs binaires Freebox Home
 class FreeboxHomeBinarySensor(FreeboxHomeEntity, BinarySensorEntity):
-    """Representation of a Freebox binary sensor."""
+    """Représentation de base d'un capteur binaire Freebox Home.
 
-    _sensor_name = "trigger"
+    Hérite de FreeboxHomeEntity et BinarySensorEntity pour gérer les capteurs binaires.
+    """
+
+    _sensor_name = "trigger"  # Nom par défaut du capteur
 
     def __init__(
         self,
@@ -78,66 +89,97 @@ class FreeboxHomeBinarySensor(FreeboxHomeEntity, BinarySensorEntity):
         node: dict[str, Any],
         sub_node: dict[str, Any] | None = None,
     ) -> None:
-        """Initialize a Freebox binary sensor."""
+        """Initialise un capteur binaire Freebox.
+
+        Args:
+            hass: Instance de Home Assistant.
+            router: Routeur Freebox gérant cette entité.
+            node: Données de l'appareil Freebox.
+            sub_node: Données optionnelles pour les sous-appareils (facultatif).
+        """
         super().__init__(hass, router, node, sub_node)
         self._command_id = self.get_command_id(
             node["type"]["endpoints"], "signal", self._sensor_name
         )
         self._attr_is_on = self._edit_state(self.get_value("signal", self._sensor_name))
+        _LOGGER.debug(f"Capteur binaire initialisé pour {self._node_id}: état={self._attr_is_on}")
 
     async def async_update_signal(self) -> None:
-        """Update name & state."""
-        self._attr_is_on = self._edit_state(
-            await self.get_home_endpoint_value(self._command_id)
-        )
-        await FreeboxHomeEntity.async_update_signal(self)
+        """Met à jour l'état du capteur.
+
+        Récupère la valeur actuelle via l'API et ajuste l'état selon le type de capteur.
+        """
+        try:
+            value = await self.get_home_endpoint_value(self._command_id)
+            self._attr_is_on = self._edit_state(value)
+            _LOGGER.debug(f"Mise à jour du capteur {self._node_id}: état={self._attr_is_on}")
+            await super().async_update_signal()
+        except Exception as err:
+            _LOGGER.error(f"Échec de la mise à jour du capteur {self._node_id}: {err}")
+            self._attr_is_on = None
 
     def _edit_state(self, state: bool | None) -> bool | None:
-        """Edit state depending on sensor name."""
+        """Ajuste l'état en fonction du type de capteur.
+
+        Pour les capteurs 'trigger', l'état est inversé.
+
+        Args:
+            state: État brut récupéré de l'API.
+
+        Returns:
+            bool | None: État ajusté ou None si indisponible.
+        """
         if state is None:
             return None
         if self._sensor_name == "trigger":
             return not state
         return state
 
-
+# SECTION: Classes spécifiques pour chaque type de capteur
 class FreeboxPirSensor(FreeboxHomeBinarySensor):
-    """Representation of a Freebox motion binary sensor."""
+    """Représentation d'un capteur de mouvement Freebox (PIR)."""
 
     _attr_device_class = BinarySensorDeviceClass.MOTION
 
-
 class FreeboxDwsSensor(FreeboxHomeBinarySensor):
-    """Representation of a Freebox door opener binary sensor."""
+    """Représentation d'un capteur d'ouverture de porte Freebox (DWS)."""
 
     _attr_device_class = BinarySensorDeviceClass.DOOR
 
-
 class FreeboxCoverSensor(FreeboxHomeBinarySensor):
-    """Representation of a cover Freebox plastic removal cover binary sensor (for some sensors: motion detector, door opener detector...)."""
+    """Représentation d'un capteur de couverture (état de sécurité) pour certains appareils Freebox."""
 
     _attr_device_class = BinarySensorDeviceClass.SAFETY
     _attr_entity_category = EntityCategory.DIAGNOSTIC
     _attr_entity_registry_enabled_default = False
-
     _sensor_name = "cover"
 
     def __init__(
         self, hass: HomeAssistant, router: FreeboxRouter, node: dict[str, Any]
     ) -> None:
-        """Initialize a cover for another device."""
+        """Initialise un capteur de couverture pour un appareil Freebox.
+
+        Args:
+            hass: Instance de Home Assistant.
+            router: Routeur Freebox.
+            node: Données de l'appareil.
+        """
         cover_node = next(
-            filter(
-                lambda x: (x["name"] == self._sensor_name and x["ep_type"] == "signal"),
-                node["type"]["endpoints"],
+            (
+                ep
+                for ep in node["type"]["endpoints"]
+                if ep["name"] == self._sensor_name and ep["ep_type"] == "signal"
             ),
             None,
         )
         super().__init__(hass, router, node, cover_node)
-
+        _LOGGER.debug(f"Capteur de couverture initialisé pour {self._node_id}")
 
 class FreeboxRaidDegradedSensor(BinarySensorEntity):
-    """Representation of a Freebox raid sensor."""
+    """Représentation d'un capteur RAID dégradé Freebox.
+
+    Surveille l'état de dégradation des arrays RAID.
+    """
 
     _attr_should_poll = False
     _attr_has_entity_name = True
@@ -148,34 +190,45 @@ class FreeboxRaidDegradedSensor(BinarySensorEntity):
         raid: dict[str, Any],
         description: BinarySensorEntityDescription,
     ) -> None:
-        """Initialize a Freebox raid degraded sensor."""
+        """Initialise un capteur RAID dégradé.
+
+        Args:
+            router: Routeur Freebox.
+            raid: Données du RAID.
+            description: Description de l'entité capteur.
+        """
         self.entity_description = description
         self._router = router
         self._attr_device_info = router.device_info
         self._raid = raid
-        self._attr_name = f"Raid array {raid['id']} {description.name}"
-        self._attr_unique_id = (
-            f"{router.mac} {description.key} {raid['name']} {raid['id']}"
-        )
+        self._attr_name = f"Array RAID {raid['id']} {description.name}"
+        self._attr_unique_id = f"{router.mac}_{description.key}_{raid['name']}_{raid['id']}"
+        _LOGGER.debug(f"Capteur RAID initialisé pour {self._attr_name}")
 
     @callback
     def async_update_state(self) -> None:
-        """Update the Freebox Raid sensor."""
-        self._raid = self._router.raids[self._raid["id"]]
+        """Met à jour l'état du capteur RAID à partir des données du routeur."""
+        self._raid = self._router.raids.get(self._raid["id"])
+        if self._raid is None:
+            _LOGGER.warning(f"RAID {self._raid['id']} non trouvé dans les données du routeur")
+            self._attr_is_on = None
+        else:
+            self._attr_is_on = self._raid.get("degraded", False)
+            _LOGGER.debug(f"Mise à jour du capteur RAID {self._raid['id']}: état={self._attr_is_on}")
 
     @property
-    def is_on(self) -> bool:
-        """Return true if degraded."""
-        return self._raid["degraded"]
+    def is_on(self) -> bool | None:
+        """Retourne True si le RAID est dégradé."""
+        return self._attr_is_on
 
     @callback
     def async_on_demand_update(self) -> None:
-        """Update state."""
+        """Met à jour l'état à la demande et écrit l'état dans Home Assistant."""
         self.async_update_state()
         self.async_write_ha_state()
 
     async def async_added_to_hass(self) -> None:
-        """Register state update callback."""
+        """Enregistre les callbacks lors de l'ajout de l'entité à Home Assistant."""
         self.async_update_state()
         self.async_on_remove(
             async_dispatcher_connect(
@@ -184,3 +237,4 @@ class FreeboxRaidDegradedSensor(BinarySensorEntity):
                 self.async_on_demand_update,
             )
         )
+        _LOGGER.debug(f"Capteur RAID {self._raid['id']} ajouté à Home Assistant")

@@ -158,7 +158,8 @@ class FreeboxSensor(SensorEntity):
             _LOGGER.warning(f"Donnée manquante pour {self.entity_description.name}")
             self._attr_native_value = None
         elif self.native_unit_of_measurement == UnitOfDataRate.KILOBYTES_PER_SECOND:
-            self._attr_native_value = round(state / 1000, 2)  # Conversion bits/s en Ko/s
+            # Conversion de bits/s en Ko/s (1 Ko = 1000 octets, 1 octet = 8 bits)
+            self._attr_native_value = round(state / 8000, 2)
         else:
             self._attr_native_value = state
         _LOGGER.debug(f"Capteur {self.entity_description.name} mis à jour: {self._attr_native_value}")
@@ -202,7 +203,7 @@ class FreeboxCallSensor(FreeboxSensor):
         """Met à jour le nombre d'appels pour le type spécifié."""
         self._call_list_for_type = [
             call for call in self._router.call_list or []
-            if call["new"] and self.entity_description.key == call["type"]
+            if call.get("new", False) and self.entity_description.key == call.get("type")
         ]
         self._attr_native_value = len(self._call_list_for_type)
         _LOGGER.debug(f"{self.entity_description.name}: {self._attr_native_value} appel(s)")
@@ -256,14 +257,19 @@ class FreeboxDiskSensor(FreeboxSensor):
     def async_update_state(self) -> None:
         """Met à jour l'espace libre sur la partition."""
         disk = self._router.disks.get(self._disk_id)
-        if not disk or self._partition_id not in disk["partitions"]:
-            _LOGGER.warning(f"Données disque/partition manquantes pour {self._attr_name}")
+        if disk is None:
+            _LOGGER.warning(f"Disque {self._disk_id} non trouvé pour {self._attr_name}")
             self._attr_native_value = None
             return
-        partition = disk["partitions"][self._partition_id]
+        partition = disk["partitions"].get(self._partition_id)
+        if partition is None:
+            _LOGGER.warning(f"Partition {self._partition_id} non trouvée pour {self._attr_name}")
+            self._attr_native_value = None
+            return
         total_bytes = partition.get("total_bytes", 0)
+        free_bytes = partition.get("free_bytes", 0)
         if total_bytes > 0:
-            self._attr_native_value = round((partition["free_bytes"] / total_bytes) * 100, 2)
+            self._attr_native_value = round((free_bytes / total_bytes) * 100, 2)
             _LOGGER.debug(f"{self._attr_name}: {self._attr_native_value}% libre")
         else:
             _LOGGER.warning(f"Taille totale indisponible pour {self._attr_name}")

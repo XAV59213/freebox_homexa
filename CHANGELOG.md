@@ -1,6 +1,12 @@
 # Changelog
 
-## 2025.4.0 (Dernière mise à jour)
+
+## 25.4.0 (Dernière mise à jour)
+- Correction des problèmes pour la soumission à HACS
+- Mise à jour de la documentation
+- Actions de workflow réussies
+
+## 2025.3.2 (Dernière mise à jour)
 - Intégration HACS
 
 

@@ -1,3 +1,4 @@
+# custom_components/freebox_homexa/router.py
 """Représentation du routeur Freebox et de ses appareils et capteurs dans Home Assistant."""
 # DESCRIPTION: Ce fichier définit la classe FreeboxRouter, qui gère la connexion à la Freebox,
 #              la mise à jour des données des appareils, capteurs et services associés.
@@ -216,12 +217,18 @@ class FreeboxRouter:
             for sensor_key in CONNECTION_SENSORS_KEYS:
                 self.sensors_connection[sensor_key] = connection_datas.get(sensor_key, 0.0)
 
+            uptime_val = syst_datas.get("uptime_val", 0)
+            if uptime_val == 0:
+                _LOGGER.warning("Uptime val is 0 or None, setting to 0 seconds")
+            uptime_seconds = uptime_val
+            self.sensors_connection["uptime"] = uptime_seconds
+
             self._attrs = {
                 "IPv4": connection_datas.get("ipv4"),
                 "IPv6": connection_datas.get("ipv6"),
                 "connection_type": connection_datas.get("media"),
                 "uptime": datetime.fromtimestamp(
-                    round(datetime.now().timestamp()) - syst_datas["uptime_val"]
+                    round(datetime.now().timestamp()) - uptime_seconds
                 ),
                 "firmware_version": self._sw_v,
                 "serial": syst_datas["serial"],

@@ -49,6 +49,13 @@ CONNECTION_SENSORS: tuple[SensorEntityDescription, ...] = (
         name="IP Externe Freebox",
         icon="mdi:ip-network",
     ),
+    SensorEntityDescription(
+        key="uptime",
+        name="Temps de fonctionnement Freebox",
+        device_class=SensorDeviceClass.DURATION,
+        native_unit_of_measurement="s",
+        icon="mdi:clock-outline",
+    ),
 )
 
 CALL_SENSORS: tuple[SensorEntityDescription, ...] = (
@@ -161,6 +168,8 @@ class FreeboxSensor(SensorEntity):
         """
         if self.entity_description.key in ["ipv4"]:
             state = self._router._attrs.get("IPv4")
+        elif self.entity_description.key == "uptime":
+            state = self._router.sensors_connection.get("uptime")
         else:
             state = self._router.sensors.get(self.entity_description.key)
         if state is None:

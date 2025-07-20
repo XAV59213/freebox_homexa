@@ -71,8 +71,9 @@ class FreeboxBasicShutter(FreeboxHomeEntity, CoverEntity):
         self._command_stop = self.get_command_id(node['show_endpoints'], "slot", "stop")
         self._command_down = self.get_command_id(node['show_endpoints'], "slot", "down")
         self._command_state = self.get_command_id(node['show_endpoints'], "signal", "state")
-        self._state = self.get_node_value(node['show_endpoints'], "signal", "state")
-        _LOGGER.debug(f"Volet basique {self._attr_name} initialisé")
+        raw_state = self.get_node_value(node['show_endpoints'], "signal", "state")
+        self._state = self.convert_state(raw_state)
+        _LOGGER.debug(f"Volet basique {self._attr_name} initialisé avec état brut {raw_state} converti en {self._state}")
 
     @property
     def device_class(self) -> str:
@@ -148,8 +149,9 @@ class FreeboxBasicShutter(FreeboxHomeEntity, CoverEntity):
             self._state = None
             return
         try:
-            self._state = await self.get_home_endpoint_value(self._command_state)
-            _LOGGER.debug(f"État du volet {self._attr_name} mis à jour: {self._state}")
+            raw_state = await self.get_home_endpoint_value(self._command_state)
+            self._state = self.convert_state(raw_state)
+            _LOGGER.debug(f"État du volet {self._attr_name} mis à jour : brut {raw_state} converti en {self._state}")
         except Exception as err:
             _LOGGER.error(f"Échec de la mise à jour de l'état pour {self._attr_unique_id}: {err}")
             self._state = None
@@ -163,11 +165,12 @@ class FreeboxBasicShutter(FreeboxHomeEntity, CoverEntity):
         Returns:
             str | None: État converti ou None si inconnu.
         """
+        if state is None:
+            return None
         if state:
             return CoverState.CLOSED
-        elif state is not None:
+        else:
             return CoverState.OPEN
-        return None
 
 # SECTION: Classe pour les volets avec position
 class FreeboxShutter(FreeboxHomeEntity, CoverEntity):

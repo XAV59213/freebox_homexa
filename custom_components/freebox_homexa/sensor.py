@@ -1,3 +1,4 @@
+# custom_components/freebox_homexa/sensor.py
 """Support pour les appareils Freebox (Freebox v6 et Freebox mini 4K) dans Home Assistant."""
 # DESCRIPTION: Ce fichier définit des capteurs pour surveiller différents aspects de la Freebox, tels que la vitesse de connexion,
 #              les appels manqués, l'espace disque disponible et le niveau de batterie des appareils domestiques.
@@ -42,6 +43,11 @@ CONNECTION_SENSORS: tuple[SensorEntityDescription, ...] = (
         device_class=SensorDeviceClass.DATA_RATE,
         native_unit_of_measurement=UnitOfDataRate.KILOBYTES_PER_SECOND,
         icon="mdi:upload-network",
+    ),
+    SensorEntityDescription(
+        key="ipv4",
+        name="IP Externe Freebox",
+        icon="mdi:ip-network",
     ),
 )
 
@@ -153,7 +159,10 @@ class FreeboxSensor(SensorEntity):
 
         Ajuste la valeur selon l'unité (ex. conversion des débits en Ko/s).
         """
-        state = self._router.sensors.get(self.entity_description.key)
+        if self.entity_description.key in ["ipv4"]:
+            state = self._router._attrs.get("IPv4")
+        else:
+            state = self._router.sensors.get(self.entity_description.key)
         if state is None:
             _LOGGER.warning(f"Donnée manquante pour {self.entity_description.name}")
             self._attr_native_value = None
@@ -275,8 +284,8 @@ class FreeboxDiskSensor(FreeboxSensor):
         _LOGGER.debug(f"Free bytes pour {self._attr_name}: {free_bytes}")
 
         if total_bytes is None or total_bytes <= 0:
-            _LOGGER.warning(f"Taille totale indisponible ou invalide pour {self._attr_name}")
-            self._attr_native_value = None
+            # _LOGGER.warning(f"Taille totale indisponible ou invalide pour {self._attr_name}")  # Commenté pour supprimer l'avertissement
+            self._attr_native_value = 0  # Valeur par défaut à 0% au lieu de None
         elif free_bytes is None:
             _LOGGER.warning(f"Espace libre indisponible pour {self._attr_name}")
             self._attr_native_value = None

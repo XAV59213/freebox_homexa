@@ -422,3 +422,4 @@ class FreeboxRouter:
             Home: Instance de l'API Home.
         """
         return self._api.home
+

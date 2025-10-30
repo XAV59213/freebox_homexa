@@ -100,3 +100,4 @@ class FreeboxAlarm(FreeboxHomeEntity, AlarmControlPanelEntity):
             self._attr_alarm_state = FREEBOX_TO_STATUS.get(state)
         else:
             self._attr_alarm_state = None
+

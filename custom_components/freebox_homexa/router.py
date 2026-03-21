@@ -34,7 +34,7 @@ from .const import DOMAIN, API_VERSION, APP_DESC, CONNECTION_SENSORS_KEYS, HOME_
 
 _LOGGER = logging.getLogger(__name__)
 
-SCAN_INTERVAL = timedelta(minutes=2)    # ou seconds=120  # Changé à 10s pour refresh plus fréquent (améliore les transitions d'alarme)
+SCAN_INTERVAL = timedelta(seconds=120)    # ou seconds=120  # Changé à 10s pour refresh plus fréquent (améliore les transitions d'alarme)
 
 STORAGE_VERSION = 1
 STORAGE_KEY = f"{DOMAIN}_config"
@@ -42,6 +42,8 @@ STORAGE_KEY = f"{DOMAIN}_config"
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up Freebox Homexa from a config entry."""
     hass.data.setdefault(DOMAIN, {})
+
+
 
     store = Store(hass, STORAGE_VERSION, STORAGE_KEY)
     stored_data = await store.async_load()

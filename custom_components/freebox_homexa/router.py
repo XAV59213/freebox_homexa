@@ -34,7 +34,7 @@ from .const import DOMAIN, API_VERSION, APP_DESC, CONNECTION_SENSORS_KEYS, HOME_
 
 _LOGGER = logging.getLogger(__name__)
 
-SCAN_INTERVAL = timedelta(seconds=10)  # Changé à 10s pour refresh plus fréquent (améliore les transitions d'alarme)
+SCAN_INTERVAL = timedelta(minutes=2)    # ou seconds=120  # Changé à 10s pour refresh plus fréquent (améliore les transitions d'alarme)
 
 STORAGE_VERSION = 1
 STORAGE_KEY = f"{DOMAIN}_config"

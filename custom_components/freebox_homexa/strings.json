@@ -18,7 +18,8 @@
     "error": {
       "register_failed": "Failed to register, please try again",
       "cannot_connect": "[%key:common::config_flow::error::cannot_connect%]",
-      "unknown": "[%key:common::config_flow::error::unknown%]"
+      "unknown": "[%key:common::config_flow::error::unknown%]",
+      "invalid_token": "Invalid or expired token. It has been automatically deleted. Press the right arrow button on your Freebox to re-authorize Home Assistant."
     },
     "abort": {
       "already_configured": "[%key:common::config_flow::abort::already_configured_device%]"

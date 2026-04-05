@@ -33,20 +33,21 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     hass.data[DOMAIN]["store"] = store
 
     async def save_data():
+        """Sauvegarde les données de configuration."""
         await store.async_save(hass.data[DOMAIN]["config"])
 
     api = await get_api(hass, entry.data[CONF_HOST])
     try:
         await api.open(entry.data[CONF_HOST], entry.data.get("port", 80))
     except HttpRequestError as err:
-        _LOGGER.error(f"Erreur de connexion à la Freebox: {err}")
+        _LOGGER.error(f"Erreur lors de la connexion à la Freebox {entry.data[CONF_HOST]}: {err}")
         raise ConfigEntryNotReady from err
 
     freebox_config = await api.system.get_config()
 
-    # === CRÉATION ROBUSTE DU DEVICE PARENT (HUB) ===
+    # === CRÉATION ROBUSTE DU DEVICE PARENT (HUB FREEBOX) ===
     device_registry = dr.async_get(hass)
-    hub_device = device_registry.async_get_or_create(
+    hub = device_registry.async_get_or_create(
         config_entry_id=entry.entry_id,
         identifiers={(DOMAIN, freebox_config["mac"])},
         connections={(dr.CONNECTION_NETWORK_MAC, freebox_config["mac"])},
@@ -56,8 +57,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         sw_version=freebox_config["firmware_version"],
         entry_type=dr.DeviceEntryType.SERVICE,
     )
-    hass.data[DOMAIN]["hub_device_info"] = hub_device
-    # ===============================================
+    hass.data[DOMAIN]["hub_device_info"] = hub
+    # ======================================================
 
     router = FreeboxRouter(hass, entry, api, freebox_config)
     await router.update_all()
@@ -69,8 +70,42 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
 
-    # Services existants (reboot, remote, etc.)
-    # ... (le reste du code reste identique à ta version actuelle)
+    # === Services existants ===
+    async def async_reboot(call: ServiceCall) -> None:
+        _LOGGER.warning("Le service 'freebox.reboot' est déprécié, utilisez l'entité bouton.")
+        await router.reboot()
+        await save_data()
+
+    hass.services.async_register(DOMAIN, SERVICE_REBOOT, async_reboot)
+
+    async def async_close_connection(event: Event) -> None:
+        await router.close()
+        await save_data()
+
+    entry.async_on_unload(
+        hass.bus.async_listen_once(EVENT_HOMEASSISTANT_STOP, async_close_connection)
+    )
+
+    # Service remote (Freebox Player)
+    async def async_freebox_player_remote(call: ServiceCall) -> None:
+        code_list = call.data.get("code", "")
+        if not code_list:
+            return
+        async with aiohttp.ClientSession() as session:
+            for code in code_list.split(','):
+                url = PLAYER_PATH_TEMPLATE.format(
+                    host=entry.data[CONF_HOST],
+                    remote_code=entry.data.get("remote_code", ""),
+                    key=code.strip()
+                )
+                try:
+                    async with session.get(url, ssl=False) as response:
+                        if response.status != 200:
+                            _LOGGER.error(f"Échec commande '{code}'")
+                except Exception as err:
+                    _LOGGER.error(f"Erreur remote: {err}")
+
+    hass.services.async_register(DOMAIN, "remote", async_freebox_player_remote)
 
     _LOGGER.info("L'intégration Freebox Homexa a été configurée avec succès.")
     return True

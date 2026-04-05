@@ -24,7 +24,8 @@
     "error": {
       "cannot_connect": "Impossible de se connecter, veuillez réessayer",
       "register_failed": "Échec de l'inscription, veuillez réessayer",
-      "unknown": "Erreur inconnue: veuillez réessayer plus tard"
+      "unknown": "Erreur inconnue: veuillez réessayer plus tard",
+      "invalid_token": "Token invalide ou expiré. Il a été supprimé automatiquement. Appuyez sur la flèche droite de la Freebox pour réautoriser Home Assistant."
     }
   },
   "services": {

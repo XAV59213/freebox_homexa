@@ -2,9 +2,11 @@
 
 import logging
 import os
+import re
+import json
 from pathlib import Path
 from datetime import timedelta
-from typing import Any, Mapping
+from typing import Any
 
 from freebox_api import Freepybox
 from freebox_api.exceptions import HttpRequestError
@@ -34,8 +36,23 @@ async def get_api(hass: HomeAssistant, host: str, port: int = 80):
     return api
 
 
+async def get_hosts_list_if_supported(fbx_api: Freepybox):
+    """Récupère la liste des hôtes si supportée (utilisée dans config_flow)."""
+    try:
+        devices = await fbx_api.lan.get_hosts_list() or []
+        return True, devices
+    except HttpRequestError as err:
+        if "nodev" in str(err):
+            _LOGGER.debug("Liste des hôtes non disponible")
+            return False, []
+        raise
+    except Exception as err:
+        _LOGGER.warning("Erreur lors de la récupération des hôtes : %s", err)
+        return False, []
+
+
 class FreeboxRouter:
-    """Classe principale du routeur Freebox."""
+    """Représentation du routeur Freebox."""
 
     def __init__(
         self,
@@ -74,4 +91,4 @@ class FreeboxRouter:
             self._name = self._model
             self._mac = config.get("mac")
         except Exception as err:
-            _LOGGER.error("Erreur lors de la mise à jour du routeur : %s", err)
+            _LOGGER.error("Erreur mise à jour routeur : %s", err)

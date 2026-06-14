@@ -32,7 +32,6 @@ class FreeboxFlowHandler(ConfigFlow, domain=DOMAIN):
     async def async_step_user(
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
-        """Étape de configuration manuelle."""
         if user_input is None:
             store = Store(self.hass, STORAGE_VERSION, STORAGE_KEY_CONFIG)
             stored_data = await store.async_load()
@@ -53,7 +52,6 @@ class FreeboxFlowHandler(ConfigFlow, domain=DOMAIN):
         return await self.async_step_link()
 
     async def _cleanup_invalid_token(self) -> None:
-        """Nettoyage du token invalide."""
         try:
             token_dir = Store(self.hass, STORAGE_VERSION, f"{DOMAIN}_tokens").path
             token_file = Path(f"{token_dir}/{slugify(self._data[CONF_HOST])}.conf")
@@ -65,7 +63,6 @@ class FreeboxFlowHandler(ConfigFlow, domain=DOMAIN):
     async def async_step_link(
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
-        """Étape de liaison avec la Freebox."""
         if user_input is None:
             return self.async_show_form(step_id="link")
 
@@ -78,7 +75,6 @@ class FreeboxFlowHandler(ConfigFlow, domain=DOMAIN):
             await get_hosts_list_if_supported(fbx)
             await fbx.close()
 
-            # Sauvegarde de la configuration
             store = Store(self.hass, STORAGE_VERSION, STORAGE_KEY_CONFIG)
             await store.async_save(self._data)
 
@@ -96,7 +92,7 @@ class FreeboxFlowHandler(ConfigFlow, domain=DOMAIN):
             errors["base"] = "cannot_connect"
 
         except Exception as err:
-            _LOGGER.exception("Erreur inconnue lors de la connexion")
+            _LOGGER.exception("Erreur inconnue")
             errors["base"] = "unknown"
 
         return self.async_show_form(step_id="link", errors=errors)
@@ -104,7 +100,6 @@ class FreeboxFlowHandler(ConfigFlow, domain=DOMAIN):
     async def async_step_zeroconf(
         self, discovery_info: ZeroconfServiceInfo
     ) -> ConfigFlowResult:
-        """Découverte automatique via Zeroconf."""
         host = discovery_info.properties.get("api_domain") or discovery_info.host
         port = discovery_info.properties.get("https_port") or 80
         return await self.async_step_user({CONF_HOST: host, CONF_PORT: int(port)})

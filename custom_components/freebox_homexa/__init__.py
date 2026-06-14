@@ -1,104 +1,52 @@
-"""Flux de configuration pour l'intégration Freebox dans Home Assistant."""
+"""Support pour l'intégration Freebox Homexa."""
 
 import logging
-from typing import Any
+from datetime import timedelta
 
-from freebox_api.exceptions import AuthorizationError, HttpRequestError
-import voluptuous as vol
+from homeassistant.config_entries import ConfigEntry
+from homeassistant.core import HomeAssistant
+from homeassistant.exceptions import ConfigEntryNotReady
+from homeassistant.helpers.event import async_track_time_interval
 
-from homeassistant.config_entries import ConfigFlow, ConfigFlowResult
-from homeassistant.const import CONF_HOST, CONF_PORT
-from homeassistant.helpers.service_info.zeroconf import ZeroconfServiceInfo
-from homeassistant.helpers.storage import Store
-from homeassistant.util import slugify
-from pathlib import Path
-
-from .const import DOMAIN, STORAGE_VERSION
-from .router import get_api, get_hosts_list_if_supported
+from .const import DOMAIN, PLATFORMS
+from .router import FreeboxRouter, get_api
 
 _LOGGER = logging.getLogger(__name__)
-
-# Clé de stockage différente pour éviter le conflit avec le dossier des tokens
-STORAGE_KEY_CONFIG = f"{DOMAIN}_config"
+SCAN_INTERVAL = timedelta(seconds=120)
 
 
-class FreeboxFlowHandler(ConfigFlow, domain=DOMAIN):
-    """Gère le flux de configuration pour l'intégration Freebox."""
+async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
+    """Configuration de l'entrée Freebox Homexa."""
+    hass.data.setdefault(DOMAIN, {})
 
-    VERSION = 1
+    try:
+        port = entry.data.get("port", 80)
+        api = await get_api(hass, entry.data["host"], port)
 
-    def __init__(self) -> None:
-        self._data: dict[str, Any] = {}
+        router = FreeboxRouter(hass, entry, api)
+        await router.async_update()
 
-    async def async_step_user(
-        self, user_input: dict[str, Any] | None = None
-    ) -> ConfigFlowResult:
-        """Étape utilisateur."""
-        if user_input is None:
-            store = Store(self.hass, STORAGE_VERSION, STORAGE_KEY_CONFIG)
-            stored_data = await store.async_load()
-            if stored_data:
-                _LOGGER.info("Configuration Freebox précédente restaurée.")
-                user_input = stored_data
-            else:
-                return self.async_show_form(
-                    step_id="user",
-                    data_schema=vol.Schema(
-                        {
-                            vol.Required(CONF_HOST): str,
-                            vol.Required(CONF_PORT, default=80): int,
-                        }
-                    ),
-                    errors={},
-                )
+        # Mise à jour périodique
+        entry.async_on_unload(
+            async_track_time_interval(hass, router.async_update, SCAN_INTERVAL)
+        )
 
-        self._data = user_input or {}
-        await self.async_set_unique_id(self._data[CONF_HOST])
-        self._abort_if_unique_id_configured()
-        return await self.async_step_link()
+        hass.data[DOMAIN][entry.entry_id] = router
 
-    async def _cleanup_invalid_token(self) -> None:
-        """Nettoyage automatique du token invalide."""
-        try:
-            token_dir = Store(self.hass, STORAGE_VERSION, f"{DOMAIN}_tokens").path
-            token_file = Path(f"{token_dir}/{slugify(self._data[CONF_HOST])}.conf")
-            if token_file.exists():
-                await self.hass.async_add_executor_job(token_file.unlink)
-                _LOGGER.info(f"Token invalide supprimé automatiquement : {token_file.name}")
-        except Exception as err:
-            _LOGGER.debug(f"Impossible de supprimer le token : {err}")
+        # Chargement des plateformes
+        await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
 
-    async def async_step_link(
-        self, user_input: dict[str, Any] | None = None
-    ) -> ConfigFlowResult:
-        """Étape de liaison avec la Freebox."""
-        if user_input is None:
-            return self.async_show_form(step_id="link")
+        _LOGGER.info("Freebox Homexa configurée avec succès pour %s", entry.data["host"])
+        return True
 
-        errors = {}
-        try:
-            port = self._data.get(CONF_PORT, 80)
-            fbx = await get_api(self.hass, self._data[CONF_HOST])
+    except Exception as err:
+        _LOGGER.error("Erreur lors de la configuration de Freebox Homexa : %s", err)
+        raise ConfigEntryNotReady from err
 
-            # Connexion sans paramètre https (compatibilité avec la bibliothèque)
-            await fbx.open(self._data[CONF_HOST], port)
 
-            await fbx.system.get_config()
-            await get_hosts_list_if_supported(fbx)
-            await fbx.close()
-
-            # Sauvegarde de la config
-            store = Store(self.hass, STORAGE_VERSION, STORAGE_KEY_CONFIG)
-            await store.async_save(self._data)
-
-            return self.async_create_entry(
-                title=self._data[CONF_HOST],
-                data=self._data,
-            )
-
-        except AuthorizationError:
-            _LOGGER.warning("Token invalide ou autorisation refusée")
-            await self._cleanup_invalid_token()
-            errors["base"] = "invalid_token"
-
-        except HttpRequest
+async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
+    """Déchargement de l'entrée."""
+    unload_ok = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
+    if unload_ok:
+        hass.data[DOMAIN].pop(entry.entry_id, None)
+    return unload_ok

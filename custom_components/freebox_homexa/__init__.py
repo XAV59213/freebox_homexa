@@ -16,36 +16,36 @@ SCAN_INTERVAL = timedelta(seconds=120)
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
-    """Configuration de l'entrée Freebox Homexa."""
+    """Configuration de l'entrée Freebox."""
     hass.data.setdefault(DOMAIN, {})
 
     try:
-        port = entry.data.get("port", 80)
-        api = await get_api(hass, entry.data["host"], port)
+        port = entry.data.get(CONF_PORT, 80)
+        api = await get_api(hass, entry.data[CONF_HOST], port)
 
         router = FreeboxRouter(hass, entry, api)
         await router.async_update()
 
-        # Mise à jour périodique
+        # Mise à jour toutes les 2 minutes
         entry.async_on_unload(
             async_track_time_interval(hass, router.async_update, SCAN_INTERVAL)
         )
 
         hass.data[DOMAIN][entry.entry_id] = router
 
-        # Chargement des plateformes
+        # Chargement de toutes les plateformes (volets, switch, sensor, etc.)
         await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
 
-        _LOGGER.info("Freebox Homexa configurée avec succès pour %s", entry.data["host"])
+        _LOGGER.info("✅ Freebox Homexa chargée avec succès pour %s", entry.data[CONF_HOST])
         return True
 
     except Exception as err:
-        _LOGGER.error("Erreur lors de la configuration de Freebox Homexa : %s", err)
+        _LOGGER.error("Erreur lors du setup de Freebox Homexa : %s", err)
         raise ConfigEntryNotReady from err
 
 
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
-    """Déchargement de l'entrée."""
+    """Déchargement."""
     unload_ok = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
     if unload_ok:
         hass.data[DOMAIN].pop(entry.entry_id, None)

@@ -2,8 +2,10 @@
 
 import logging
 from typing import Any
+
 from freebox_api.exceptions import AuthorizationError, HttpRequestError
 import voluptuous as vol
+
 from homeassistant.config_entries import ConfigFlow, ConfigFlowResult
 from homeassistant.const import CONF_HOST, CONF_PORT
 from homeassistant.helpers.service_info.zeroconf import ZeroconfServiceInfo
@@ -44,7 +46,7 @@ class FreeboxFlowHandler(ConfigFlow, domain=DOMAIN):
                     data_schema=vol.Schema(
                         {
                             vol.Required(CONF_HOST): str,
-                            vol.Required(CONF_PORT, default=80): int,
+                            vol.Required(CONF_PORT, default=80): int,   # ← Correction ici
                         }
                     ),
                     errors={},
@@ -62,7 +64,7 @@ class FreeboxFlowHandler(ConfigFlow, domain=DOMAIN):
             token_file = Path(f"{token_dir}/{slugify(self._data[CONF_HOST])}.conf")
             if token_file.exists():
                 await self.hass.async_add_executor_job(token_file.unlink)
-                _LOGGER.info(f"✅ Token invalide supprimé automatiquement : {token_file.name}")
+                _LOGGER.info(f"Token invalide supprimé automatiquement : {token_file.name}")
         except Exception as err:
             _LOGGER.debug(f"Impossible de supprimer le token : {err}")
 
@@ -75,8 +77,12 @@ class FreeboxFlowHandler(ConfigFlow, domain=DOMAIN):
 
         errors = {}
         try:
+            port = self._data.get(CONF_PORT, 80)
             fbx = await get_api(self.hass, self._data[CONF_HOST])
-            await fbx.open(self._data[CONF_HOST], self._data.get(CONF_PORT, 80))
+
+            # === CORRECTION SSL pour Freebox Revolution (port 80) ===
+            use_https = port != 80
+            await fbx.open(self._data[CONF_HOST], port, https=use_https)
 
             await fbx.system.get_config()
             await get_hosts_list_if_supported(fbx)

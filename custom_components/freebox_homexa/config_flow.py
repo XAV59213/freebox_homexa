@@ -14,7 +14,7 @@ from homeassistant.util import slugify
 from pathlib import Path
 
 from .const import DOMAIN, STORAGE_VERSION
-from .router import get_api, get_hosts_list_if_supported
+from .router import get_api, get_hosts_list_if_supported   # ← Import correct
 
 _LOGGER = logging.getLogger(__name__)
 

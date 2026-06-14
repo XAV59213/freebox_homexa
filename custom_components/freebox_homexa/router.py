@@ -96,7 +96,7 @@ class FreeboxRouter:
     ) -> None:
         self.hass = hass
         self._host = entry.data[CONF_HOST]
-        self._port = entry.data.get(CONF_PORT, 80)   # ← Correction ajoutée ici
+        self._port = entry.data.get(CONF_PORT, 80)   # ← Correction ajoutée
         self._api = api
         self._sw_v: str | None = None
         self._model: str | None = None
@@ -117,5 +117,6 @@ class FreeboxRouter:
             sw_version=self._sw_v,
         )
 
-    # === Ajoute ici le reste de ta classe FreeboxRouter (propriétés, méthodes, etc.) ===
-    # name, model, mac, async_update, etc. restent inchangés
+    # === Ajoute ici tout le reste de ta classe FreeboxRouter ===
+    # (propriétés name, model, mac, async_update, capteurs, etc.)
+    # Le code que tu avais déjà peut rester tel quel.

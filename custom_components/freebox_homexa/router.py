@@ -2,10 +2,8 @@
 
 import logging
 import os
-import re
-import json
 from pathlib import Path
-from datetime import datetime, timedelta
+from datetime import timedelta
 from typing import Any, Mapping
 
 from freebox_api import Freepybox
@@ -15,7 +13,6 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_HOST, CONF_PORT
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.device_registry import CONNECTION_NETWORK_MAC, DeviceInfo
-from homeassistant.helpers.event import async_track_time_interval
 from homeassistant.helpers.storage import Store
 from homeassistant.util import slugify
 
@@ -25,7 +22,7 @@ _LOGGER = logging.getLogger(__name__)
 SCAN_INTERVAL = timedelta(seconds=120)
 
 
-async def get_api(hass: HomeAssistant, host: str, port: int):
+async def get_api(hass: HomeAssistant, host: str, port: int = 80):
     """Obtient l'API Freebox."""
     storage_dir = hass.config.path(".storage", "freebox_homexa")
     Path(storage_dir).mkdir(parents=True, exist_ok=True)
@@ -33,25 +30,18 @@ async def get_api(hass: HomeAssistant, host: str, port: int):
     token_file = str(Path(storage_dir) / f"{slugify(host)}.conf")
     api = Freepybox(APP_DESC, token_file, api_version=API_VERSION)
 
-    try:
-        await api.open(host, port)
-        await api.system.get_config()
-    except Exception as err:
-        _LOGGER.error("Erreur lors de l'ouverture de l'API : %s", err)
-        raise
-
+    await api.open(host, port)
     return api
 
 
 class FreeboxRouter:
-    """Représentation du routeur Freebox."""
+    """Classe principale du routeur Freebox."""
 
     def __init__(
         self,
         hass: HomeAssistant,
         entry: ConfigEntry,
         api: Freepybox,
-        freebox_config: Mapping[str, Any],
     ) -> None:
         self.hass = hass
         self._host = entry.data[CONF_HOST]
@@ -76,6 +66,7 @@ class FreeboxRouter:
         )
 
     async def async_update(self) -> None:
+        """Mise à jour des informations du routeur."""
         try:
             config = await self._api.system.get_config()
             self._sw_v = config.get("firmware_version")
@@ -83,4 +74,4 @@ class FreeboxRouter:
             self._name = self._model
             self._mac = config.get("mac")
         except Exception as err:
-            _LOGGER.error("Erreur mise à jour routeur : %s", err)
+            _LOGGER.error("Erreur lors de la mise à jour du routeur : %s", err)

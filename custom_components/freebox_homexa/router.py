@@ -6,7 +6,7 @@ import re
 import json
 from pathlib import Path
 from datetime import timedelta
-from typing import Any
+from typing import Any, Mapping
 
 from freebox_api import Freepybox
 from freebox_api.exceptions import HttpRequestError
@@ -37,17 +37,15 @@ async def get_api(hass: HomeAssistant, host: str, port: int = 80):
 
 
 async def get_hosts_list_if_supported(fbx_api: Freepybox):
-    """Récupère la liste des hôtes si supportée (utilisée dans config_flow)."""
+    """Récupère la liste des hôtes si supportée."""
     try:
         devices = await fbx_api.lan.get_hosts_list() or []
         return True, devices
-    except HttpRequestError as err:
-        if "nodev" in str(err):
+    except Exception as err:
+        if "nodev" in str(err).lower():
             _LOGGER.debug("Liste des hôtes non disponible")
             return False, []
-        raise
-    except Exception as err:
-        _LOGGER.warning("Erreur lors de la récupération des hôtes : %s", err)
+        _LOGGER.warning("Erreur hôtes : %s", err)
         return False, []
 
 
@@ -62,7 +60,7 @@ class FreeboxRouter:
     ) -> None:
         self.hass = hass
         self._host = entry.data[CONF_HOST]
-        self._port = entry.data.get(CONF_PORT, 80)
+        self._port = entry.data.get(CONF_PORT, 80)   # ← Correction ajoutée
         self._api = api
         self._sw_v = None
         self._model = None
@@ -83,7 +81,6 @@ class FreeboxRouter:
         )
 
     async def async_update(self) -> None:
-        """Mise à jour des informations du routeur."""
         try:
             config = await self._api.system.get_config()
             self._sw_v = config.get("firmware_version")

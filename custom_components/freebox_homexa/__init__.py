@@ -1,111 +1,104 @@
-"""Support pour les appareils Freebox (Freebox v6 et Freebox mini 4K)."""
-import logging
-import voluptuous as vol
-import homeassistant.helpers.config_validation as cv
-from homeassistant.helpers.aiohttp_client import async_create_clientsession
-from homeassistant.const import CONF_HOST, EVENT_HOMEASSISTANT_STOP
-from datetime import timedelta
-from homeassistant.config_entries import ConfigEntry
-from homeassistant.core import Event, HomeAssistant, ServiceCall
-from homeassistant.exceptions import ConfigEntryNotReady
-from homeassistant.helpers.event import async_track_time_interval
-from homeassistant.helpers.storage import Store
-from freebox_api.exceptions import HttpRequestError
-import aiohttp
-import homeassistant.helpers.device_registry as dr
-from .const import DOMAIN, PLATFORMS, SERVICE_REBOOT
-from .router import FreeboxRouter, get_api
+"""Flux de configuration pour l'intégration Freebox dans Home Assistant."""
 
-SCAN_INTERVAL = timedelta(seconds=40)
-STORAGE_VERSION = 1
-STORAGE_KEY = f"{DOMAIN}_config"
-PLAYER_PATH_TEMPLATE = "http://{host}/pub/remote_control?code={remote_code}&key={key}"
+import logging
+from typing import Any
+
+from freebox_api.exceptions import AuthorizationError, HttpRequestError
+import voluptuous as vol
+
+from homeassistant.config_entries import ConfigFlow, ConfigFlowResult
+from homeassistant.const import CONF_HOST, CONF_PORT
+from homeassistant.helpers.service_info.zeroconf import ZeroconfServiceInfo
+from homeassistant.helpers.storage import Store
+from homeassistant.util import slugify
+from pathlib import Path
+
+from .const import DOMAIN, STORAGE_VERSION
+from .router import get_api, get_hosts_list_if_supported
 
 _LOGGER = logging.getLogger(__name__)
 
-async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
-    """Set up Freebox Homexa from a config entry."""
-    hass.data.setdefault(DOMAIN, {})
+# Clé de stockage différente pour éviter le conflit avec le dossier des tokens
+STORAGE_KEY_CONFIG = f"{DOMAIN}_config"
 
-    store = Store(hass, STORAGE_VERSION, STORAGE_KEY)
-    stored_data = await store.async_load() or {}
-    hass.data[DOMAIN]["config"] = stored_data
-    hass.data[DOMAIN]["store"] = store
 
-    async def save_data():
-        """Sauvegarde les données de configuration."""
-        await store.async_save(hass.data[DOMAIN]["config"])
+class FreeboxFlowHandler(ConfigFlow, domain=DOMAIN):
+    """Gère le flux de configuration pour l'intégration Freebox."""
 
-    api = await get_api(hass, entry.data[CONF_HOST])
-    try:
-        await api.open(entry.data[CONF_HOST], entry.data.get("port", 80))
-    except HttpRequestError as err:
-        _LOGGER.error(f"Erreur lors de la connexion à la Freebox {entry.data[CONF_HOST]}: {err}")
-        raise ConfigEntryNotReady from err
+    VERSION = 1
 
-    freebox_config = await api.system.get_config()
+    def __init__(self) -> None:
+        self._data: dict[str, Any] = {}
 
-    # === CRÉATION ROBUSTE DU DEVICE PARENT (HUB FREEBOX) ===
-    device_registry = dr.async_get(hass)
-    hub = device_registry.async_get_or_create(
-        config_entry_id=entry.entry_id,
-        identifiers={(DOMAIN, freebox_config["mac"])},
-        connections={(dr.CONNECTION_NETWORK_MAC, freebox_config["mac"])},
-        manufacturer="Freebox SAS",
-        name="Freebox Server",
-        model=freebox_config["model_info"]["pretty_name"],
-        sw_version=freebox_config["firmware_version"],
-        entry_type=dr.DeviceEntryType.SERVICE,
-    )
-    hass.data[DOMAIN]["hub_device_info"] = hub
-    # ======================================================
-
-    router = FreeboxRouter(hass, entry, api, freebox_config)
-    await router.async_update()   # ← Corrigé (était update_all)
-
-    entry.async_on_unload(
-        async_track_time_interval(hass, router.async_update, SCAN_INTERVAL)
-    )
-    hass.data[DOMAIN][entry.unique_id] = router
-
-    await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
-
-    # === Services existants ===
-    async def async_reboot(call: ServiceCall) -> None:
-        _LOGGER.warning("Le service 'freebox.reboot' est déprécié, utilisez l'entité bouton.")
-        await router.reboot()
-        await save_data()
-
-    hass.services.async_register(DOMAIN, SERVICE_REBOOT, async_reboot)
-
-    async def async_close_connection(event: Event) -> None:
-        await router.close()
-        await save_data()
-
-    entry.async_on_unload(
-        hass.bus.async_listen_once(EVENT_HOMEASSISTANT_STOP, async_close_connection)
-    )
-
-    # Service remote (Freebox Player)
-    async def async_freebox_player_remote(call: ServiceCall) -> None:
-        code_list = call.data.get("code", "")
-        if not code_list:
-            return
-        async with aiohttp.ClientSession() as session:
-            for code in call.data.get("code", "").split(','):
-                url = PLAYER_PATH_TEMPLATE.format(
-                    host=entry.data[CONF_HOST],
-                    remote_code=entry.data.get("remote_code", ""),
-                    key=code.strip()
+    async def async_step_user(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """Étape utilisateur."""
+        if user_input is None:
+            store = Store(self.hass, STORAGE_VERSION, STORAGE_KEY_CONFIG)
+            stored_data = await store.async_load()
+            if stored_data:
+                _LOGGER.info("Configuration Freebox précédente restaurée.")
+                user_input = stored_data
+            else:
+                return self.async_show_form(
+                    step_id="user",
+                    data_schema=vol.Schema(
+                        {
+                            vol.Required(CONF_HOST): str,
+                            vol.Required(CONF_PORT, default=80): int,
+                        }
+                    ),
+                    errors={},
                 )
-                try:
-                    async with session.get(url, ssl=False) as response:
-                        if response.status != 200:
-                            _LOGGER.error(f"Échec commande '{code}'")
-                except Exception as err:
-                    _LOGGER.error(f"Erreur remote: {err}")
 
-    hass.services.async_register(DOMAIN, "remote", async_freebox_player_remote)
+        self._data = user_input or {}
+        await self.async_set_unique_id(self._data[CONF_HOST])
+        self._abort_if_unique_id_configured()
+        return await self.async_step_link()
 
-    _LOGGER.info("L'intégration Freebox Homexa a été configurée avec succès.")
-    return True
+    async def _cleanup_invalid_token(self) -> None:
+        """Nettoyage automatique du token invalide."""
+        try:
+            token_dir = Store(self.hass, STORAGE_VERSION, f"{DOMAIN}_tokens").path
+            token_file = Path(f"{token_dir}/{slugify(self._data[CONF_HOST])}.conf")
+            if token_file.exists():
+                await self.hass.async_add_executor_job(token_file.unlink)
+                _LOGGER.info(f"Token invalide supprimé automatiquement : {token_file.name}")
+        except Exception as err:
+            _LOGGER.debug(f"Impossible de supprimer le token : {err}")
+
+    async def async_step_link(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """Étape de liaison avec la Freebox."""
+        if user_input is None:
+            return self.async_show_form(step_id="link")
+
+        errors = {}
+        try:
+            port = self._data.get(CONF_PORT, 80)
+            fbx = await get_api(self.hass, self._data[CONF_HOST])
+
+            # Connexion sans paramètre https (compatibilité avec la bibliothèque)
+            await fbx.open(self._data[CONF_HOST], port)
+
+            await fbx.system.get_config()
+            await get_hosts_list_if_supported(fbx)
+            await fbx.close()
+
+            # Sauvegarde de la config
+            store = Store(self.hass, STORAGE_VERSION, STORAGE_KEY_CONFIG)
+            await store.async_save(self._data)
+
+            return self.async_create_entry(
+                title=self._data[CONF_HOST],
+                data=self._data,
+            )
+
+        except AuthorizationError:
+            _LOGGER.warning("Token invalide ou autorisation refusée")
+            await self._cleanup_invalid_token()
+            errors["base"] = "invalid_token"
+
+        except HttpRequest

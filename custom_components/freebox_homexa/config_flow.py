@@ -1,4 +1,4 @@
-"""Flux de configuration pour l'intégration Freebox dans Home Assistant."""
+"""Flux de configuration pour l'intégration Freebox Homexa."""
 
 import logging
 from typing import Any
@@ -32,6 +32,7 @@ class FreeboxFlowHandler(ConfigFlow, domain=DOMAIN):
     async def async_step_user(
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
+        """Étape de configuration manuelle."""
         if user_input is None:
             store = Store(self.hass, STORAGE_VERSION, STORAGE_KEY_CONFIG)
             stored_data = await store.async_load()
@@ -51,19 +52,33 @@ class FreeboxFlowHandler(ConfigFlow, domain=DOMAIN):
         self._abort_if_unique_id_configured()
         return await self.async_step_link()
 
-    async def async_step_link(self, user_input=None) -> ConfigFlowResult:
+    async def _cleanup_invalid_token(self) -> None:
+        """Nettoyage du token invalide."""
+        try:
+            token_dir = Store(self.hass, STORAGE_VERSION, f"{DOMAIN}_tokens").path
+            token_file = Path(f"{token_dir}/{slugify(self._data[CONF_HOST])}.conf")
+            if token_file.exists():
+                await self.hass.async_add_executor_job(token_file.unlink)
+        except Exception as err:
+            _LOGGER.debug("Impossible de supprimer le token : %s", err)
+
+    async def async_step_link(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """Étape de liaison avec la Freebox."""
         if user_input is None:
             return self.async_show_form(step_id="link")
 
         errors = {}
         try:
             port = self._data.get(CONF_PORT, 80)
-            fbx = await get_api(self.hass, self._data[CONF_HOST], port)  # ← port passé ici
+            fbx = await get_api(self.hass, self._data[CONF_HOST], port)
 
             await fbx.system.get_config()
             await get_hosts_list_if_supported(fbx)
             await fbx.close()
 
+            # Sauvegarde de la configuration
             store = Store(self.hass, STORAGE_VERSION, STORAGE_KEY_CONFIG)
             await store.async_save(self._data)
 
@@ -73,16 +88,23 @@ class FreeboxFlowHandler(ConfigFlow, domain=DOMAIN):
             )
 
         except AuthorizationError:
+            _LOGGER.warning("Token invalide ou autorisation refusée")
+            await self._cleanup_invalid_token()
             errors["base"] = "invalid_token"
+
         except HttpRequestError:
             errors["base"] = "cannot_connect"
+
         except Exception as err:
-            _LOGGER.exception("Erreur inconnue")
+            _LOGGER.exception("Erreur inconnue lors de la connexion")
             errors["base"] = "unknown"
 
         return self.async_show_form(step_id="link", errors=errors)
 
-    async def async_step_zeroconf(self, discovery_info: ZeroconfServiceInfo) -> ConfigFlowResult:
+    async def async_step_zeroconf(
+        self, discovery_info: ZeroconfServiceInfo
+    ) -> ConfigFlowResult:
+        """Découverte automatique via Zeroconf."""
         host = discovery_info.properties.get("api_domain") or discovery_info.host
         port = discovery_info.properties.get("https_port") or 80
         return await self.async_step_user({CONF_HOST: host, CONF_PORT: int(port)})

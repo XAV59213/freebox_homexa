@@ -61,10 +61,10 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     # ======================================================
 
     router = FreeboxRouter(hass, entry, api, freebox_config)
-    await router.update_all()
+    await router.async_update()   # ← Corrigé (était update_all)
 
     entry.async_on_unload(
-        async_track_time_interval(hass, router.update_all, SCAN_INTERVAL)
+        async_track_time_interval(hass, router.async_update, SCAN_INTERVAL)
     )
     hass.data[DOMAIN][entry.unique_id] = router
 
@@ -92,7 +92,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         if not code_list:
             return
         async with aiohttp.ClientSession() as session:
-            for code in code_list.split(','):
+            for code in call.data.get("code", "").split(','):
                 url = PLAYER_PATH_TEMPLATE.format(
                     host=entry.data[CONF_HOST],
                     remote_code=entry.data.get("remote_code", ""),

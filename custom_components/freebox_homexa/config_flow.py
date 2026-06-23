@@ -68,8 +68,9 @@ class FreeboxFlowHandler(ConfigFlow, domain=DOMAIN):
 
         errors = {}
         try:
-            port = self._data.get(CONF_PORT, 80)
-            fbx = await get_api(self.hass, self._data[CONF_HOST], port)
+            # APRÈS (corrigé) 
+            fbx = await get_api(self.hass, self._data[CONF_HOST])
+por
 
             await fbx.system.get_config()
             await get_hosts_list_if_supported(fbx)

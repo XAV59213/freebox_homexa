@@ -69,15 +69,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     host = entry.data[CONF_HOST]
     port = entry.data.get(CONF_PORT, 80)
 
-    # Forcer https=False pour les connexions locales en IP + port 80
-    # → Résout l'erreur SSL sur Freebox Révolution (issue #6)
-    use_https = not (port == 80 and host.replace(".", "").isdigit())
-
     try:
-        await api.open(host, port, https=use_https)
-        _LOGGER.debug(
-            f"Connexion établie avec la Freebox à {host} (port={port}, https={use_https})"
-        )
+        await api.open(host, port)
+        _LOGGER.debug(f"Connexion établie avec la Freebox à {host} (port={port})")
     except HttpRequestError as err:
         _LOGGER.error(f"Erreur lors de la connexion à la Freebox {host}: {err}")
         raise ConfigEntryNotReady from err

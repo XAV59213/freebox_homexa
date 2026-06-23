@@ -101,6 +101,7 @@ class FreeboxRouter:
     ) -> None:
         self.hass = hass
         self._host = entry.data[CONF_HOST]
+        self._port = entry.data.get(CONF_PORT, 80)
         self._api = api
         self.name: str = freebox_config["model_info"]["pretty_name"]
         self.mac: str = freebox_config["mac"]

@@ -70,7 +70,6 @@ class FreeboxFlowHandler(ConfigFlow, domain=DOMAIN):
         try:
             # APRÈS (corrigé) 
             fbx = await get_api(self.hass, self._data[CONF_HOST])
-por
 
             await fbx.system.get_config()
             await get_hosts_list_if_supported(fbx)

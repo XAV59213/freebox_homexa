@@ -67,9 +67,15 @@ class FreeboxFlowHandler(ConfigFlow, domain=DOMAIN):
             return self.async_show_form(step_id="link")
 
         errors = {}
+        fbx = await get_api(self.hass, self._data[CONF_HOST])
         try:
-            # APRÈS (corrigé) 
-            fbx = await get_api(self.hass, self._data[CONF_HOST])
+            # Ouvrir la connexion API (nécessaire pour initialiser les modules system, lan, etc.)
+            # get_api() ne fait que créer l'instance Freepybox ; open() est obligatoire
+            # avant d'accéder à fbx.system / fbx.lan (cf. __init__.py et issue #14)
+            await fbx.open(
+                self._data[CONF_HOST],
+                self._data.get(CONF_PORT, 80),
+            )
 
             await fbx.system.get_config()
             await get_hosts_list_if_supported(fbx)

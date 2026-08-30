@@ -15,6 +15,7 @@ SERVICE_REBOOT = "reboot"  # Nom du service pour redémarrer la Freebox
 # SECTION: Valeurs par défaut
 VALUE_NOT_SET = -1  # Valeur utilisée lorsque aucune valeur n'est définie
 DEFAULT_DEVICE_NAME = "Unknown device"  # Nom par défaut pour un appareil non identifié
+REPEATER_MODEL = "F-RP01A"
 
 # SECTION: Description de l'application
 APP_DESC = {
@@ -54,12 +55,13 @@ DEVICE_ICONS = {
     "freebox_hd": "mdi:television-guide",
     "freebox_mini": "mdi:television-guide",
     "freebox_player": "mdi:television-guide",
+    "freebox_wifi": "mdi:wifi-sync",
     "ip_camera": "mdi:cctv",
     "ip_phone": "mdi:phone-voip",
     "laptop": "mdi:laptop",
     "multimedia_device": "mdi:play-network",
     "nas": "mdi:nas",
-    "networking_device": "mdi:network",
+    "networking_device": "mdi:wifi-sync",
     "printer": "mdi:printer",
     "router": "mdi:router-wireless",
     "smartphone": "mdi:cellphone",

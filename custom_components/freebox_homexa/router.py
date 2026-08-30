@@ -33,6 +33,7 @@ from .const import (
     APP_DESC,
     CONNECTION_SENSORS_KEYS,
     HOME_COMPATIBLE_CATEGORIES,
+    REPEATER_MODEL,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -40,13 +41,30 @@ _LOGGER = logging.getLogger(__name__)
 SCAN_INTERVAL = timedelta(seconds=120)
 
 
-async def get_api(hass: HomeAssistant, host: str) -> Freepybox:
-    """Obtient l'API Freebox avec un dossier de stockage sécurisé.
+def normalize_mac(mac: str | None) -> str:
+    """Normalize a MAC address for comparisons."""
+    return (mac or "").upper().replace(":", "").replace("-", "")
 
-    Cette version corrige définitivement le NotADirectoryError :
-    - Crée un vrai dossier
-    - Supprime automatiquement tout fichier bloquant du même nom
-    """
+
+def is_freebox_repeater(device: dict[str, Any], router_mac: str) -> bool:
+    """Return True if the LAN host looks like a Free Wi-Fi repeater."""
+    mac = normalize_mac((device.get("l2ident") or {}).get("id"))
+    if not mac or mac == normalize_mac(router_mac):
+        return False
+
+    name = (device.get("primary_name") or "").lower()
+    host_type = device.get("host_type") or ""
+    vendor = (device.get("vendor_name") or "").lower()
+
+    if any(token in name for token in ("répét", "repet", "repeater", "rp01")):
+        return True
+    if host_type in {"networking_device", "freebox_wifi"} and "free" in vendor:
+        return True
+    return False
+
+
+async def get_api(hass: HomeAssistant, host: str) -> Freepybox:
+    """Obtient l'API Freebox avec un dossier de stockage sécurisé."""
     storage_dir = hass.config.path(".storage", "freebox_homexa")
 
     def _ensure_directory():
@@ -112,6 +130,7 @@ class FreeboxRouter:
 
         self.supports_hosts = True
         self.devices: dict[str, dict[str, Any]] = {}
+        self.repeaters: dict[str, dict[str, Any]] = {}
         self.disks: dict[int, dict[str, Any]] = {}
         self.supports_raid = True
         self.raids: dict[int, dict[str, Any]] = {}
@@ -123,6 +142,28 @@ class FreeboxRouter:
         self.listeners: list = []
 
         _LOGGER.debug(f"Routeur Freebox {self.name} initialisé")
+
+    def _refresh_repeaters(self) -> None:
+        """Build the repeater map and count Wi-Fi clients per repeater."""
+        repeaters: dict[str, dict[str, Any]] = {}
+        for mac, device in self.devices.items():
+            if not is_freebox_repeater(device, self.mac):
+                continue
+            norm = normalize_mac(mac)
+            clients = 0
+            for other in self.devices.values():
+                access_point = other.get("access_point") or {}
+                if access_point.get("type") != "repeater":
+                    continue
+                if normalize_mac(access_point.get("mac")) == norm:
+                    clients += 1
+            enriched = dict(device)
+            enriched["client_count"] = clients
+            enriched["model"] = device.get("model") or REPEATER_MODEL
+            repeaters[mac] = enriched
+        self.repeaters = repeaters
+        if repeaters:
+            _LOGGER.info("Répéteurs Wi-Fi détectés : %s", list(repeaters.keys()))
 
     async def update_all(self, now: datetime | None = None) -> None:
         await self.update_device_trackers()
@@ -151,6 +192,7 @@ class FreeboxRouter:
                 new_device = True
             self.devices[device_mac] = fbx_device
 
+        self._refresh_repeaters()
         async_dispatcher_send(self.hass, self.signal_device_update)
         if new_device:
             async_dispatcher_send(self.hass, self.signal_device_new)

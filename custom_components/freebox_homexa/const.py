@@ -1,32 +1,26 @@
 """Constantes pour l'intégration Freebox dans Home Assistant."""
-# DESCRIPTION: Ce fichier contient les constantes utilisées dans l'intégration Freebox.
-# OBJECTIF: Centraliser les valeurs constantes pour une gestion facile et cohérente.
 
 from __future__ import annotations
 import enum
 import socket
 from homeassistant.const import Platform
-from homeassistant.components.alarm_control_panel import AlarmControlPanelState  # Ajout pour ARMED_NIGHT
+from homeassistant.components.alarm_control_panel import AlarmControlPanelState  # noqa: F401
 
-# SECTION: Domaines et services
-DOMAIN = "freebox_homexa"  # Domaine de l'intégration dans Home Assistant
-SERVICE_REBOOT = "reboot"  # Nom du service pour redémarrer la Freebox
+DOMAIN = "freebox_homexa"
+SERVICE_REBOOT = "reboot"
 
-# SECTION: Valeurs par défaut
-VALUE_NOT_SET = -1  # Valeur utilisée lorsque aucune valeur n'est définie
-DEFAULT_DEVICE_NAME = "Unknown device"  # Nom par défaut pour un appareil non identifié
+VALUE_NOT_SET = -1
+DEFAULT_DEVICE_NAME = "Unknown device"
 REPEATER_MODEL = "F-RP01A"
 
-# SECTION: Description de l'application
 APP_DESC = {
-    "app_id": "hass",  # Identifiant de l'application
-    "app_name": "Home Assistant",  # Nom de l'application
-    "app_version": "0.106",  # Version de l'application
-    "device_name": socket.gethostname(),  # Nom de l'appareil hôte
+    "app_id": "hass",
+    "app_name": "Home Assistant",
+    "app_version": "0.106",
+    "device_name": socket.gethostname(),
 }
-API_VERSION = "v6"  # Version de l'API Freebox utilisée
+API_VERSION = "v6"
 
-# SECTION: Plateformes supportées
 PLATFORMS = [
     Platform.ALARM_CONTROL_PANEL,
     Platform.BINARY_SENSOR,
@@ -34,22 +28,20 @@ PLATFORMS = [
     Platform.CAMERA,
     Platform.COVER,
     Platform.DEVICE_TRACKER,
+    Platform.MEDIA_PLAYER,
+    Platform.REMOTE,
     Platform.SENSOR,
     Platform.SWITCH,
-]  # Liste des plateformes Home Assistant supportées par l'intégration
+]
 
-# SECTION: Stockage
-STORAGE_KEY = DOMAIN  # Clé de stockage pour les données de configuration
-STORAGE_VERSION = 1  # Version du stockage
+STORAGE_KEY = DOMAIN
+STORAGE_VERSION = 1
 
-# SECTION: Attributs
-ATTR_MODEL = "model"  # Attribut pour le modèle de l'appareil
-ATTR_DETECTION = "detection"  # Attribut pour la détection de mouvement
+ATTR_MODEL = "model"
+ATTR_DETECTION = "detection"
 
-# SECTION: Capteurs de connexion
-CONNECTION_SENSORS_KEYS = {"rate_down", "rate_up"}  # Clés des capteurs de vitesse de connexion (débit descendant et montant)
+CONNECTION_SENSORS_KEYS = {"rate_down", "rate_up"}
 
-# SECTION: Icônes des appareils
 DEVICE_ICONS = {
     "freebox_delta": "mdi:television-guide",
     "freebox_hd": "mdi:television-guide",
@@ -69,11 +61,9 @@ DEVICE_ICONS = {
     "television": "mdi:television",
     "vg_console": "mdi:gamepad-variant",
     "workstation": "mdi:desktop-tower-monitor",
-}  # Dictionnaire associant les types d'appareils à leurs icônes Material Design
+}
 
-# SECTION: Catégories Freebox Home
 class FreeboxHomeCategory(enum.StrEnum):
-    """Énumération des catégories d'appareils Freebox Home."""
     ALARM = "alarm"
     CAMERA = "camera"
     DWS = "dws"
@@ -96,7 +86,7 @@ CATEGORY_TO_MODEL = {
     FreeboxHomeCategory.SHUTTER: "Volet roulant",
     FreeboxHomeCategory.BASIC_SHUTTER: "Volet roulant basic",
     FreeboxHomeCategory.OPENER: "Ouvrant,Porte",
-}  # Mapping des catégories aux modèles d'appareils pour l'affichage dans Home Assistant
+}
 
 HOME_COMPATIBLE_CATEGORIES = [
     FreeboxHomeCategory.ALARM,
@@ -109,4 +99,4 @@ HOME_COMPATIBLE_CATEGORIES = [
     FreeboxHomeCategory.OPENER,
     FreeboxHomeCategory.SHUTTER,
     FreeboxHomeCategory.BASIC_SHUTTER,
-]  # Liste des catégories compatibles avec Freebox Home
+]

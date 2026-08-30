@@ -27,7 +27,7 @@ FREEBOX_TO_STATUS = {
     "alarm1_arming": AlarmControlPanelState.ARMING,
     "alarm2_arming": AlarmControlPanelState.ARMING,
     "alarm1_armed": AlarmControlPanelState.ARMED_AWAY,
-    "alarm2_armed": AlarmControlPanelState.ARMED_NIGHT,  # Changé en ARMED_NIGHT pour précision (comme working)
+    "alarm2_armed": AlarmControlPanelState.ARMED_HOME,
     "alarm1_alert_timer": AlarmControlPanelState.TRIGGERED,
     "alarm2_alert_timer": AlarmControlPanelState.TRIGGERED,
     "alert": AlarmControlPanelState.TRIGGERED,
@@ -62,7 +62,6 @@ class FreeboxAlarm(FreeboxHomeEntity, AlarmControlPanelEntity):
         """Initialize an alarm."""
         super().__init__(hass, router, node)
 
-        # Commands
         self._command_trigger = self.get_command_id(
             node["type"]["endpoints"], "slot", "trigger"
         )
@@ -79,30 +78,39 @@ class FreeboxAlarm(FreeboxHomeEntity, AlarmControlPanelEntity):
             node["type"]["endpoints"], "signal", "state"
         )
 
-        self._unsub_watcher = None  # Watcher pour polling pendant transitions
-        self._freebox_alarm_state = "idle"  # État interne
+        self._unsub_watcher = None
+        self._freebox_alarm_state = "idle"
 
-        # Détection alarm2 et features (comme dans working)
-        self._supported_features = AlarmControlPanelEntityFeature.ARM_AWAY | AlarmControlPanelEntityFeature.TRIGGER
-        self.update_parameters(node)  # Met à jour features et attrs
+        # Absent always available. Présent if the alarm2 slot exists on the panel.
+        self._supported_features = AlarmControlPanelEntityFeature.ARM_AWAY
+        if self._command_arm_home:
+            self._supported_features |= AlarmControlPanelEntityFeature.ARM_HOME
+        if self._command_trigger:
+            self._supported_features |= AlarmControlPanelEntityFeature.TRIGGER
+
+        self.update_parameters(node)
 
     async def async_alarm_disarm(self, code: str | None = None) -> None:
         """Send disarm command."""
         await self.set_home_endpoint_value(self._command_disarm)
-        await asyncio.sleep(1)  # Délai pour laisser l'API updater
+        await asyncio.sleep(1)
         await self.async_update()
 
     async def async_alarm_arm_away(self, code: str | None = None) -> None:
-        """Send arm away command."""
+        """Send arm away command (Absent)."""
         await self.set_home_endpoint_value(self._command_arm_away)
         await asyncio.sleep(1)
-        self._unsub_watcher = async_track_time_interval(self.hass, self.async_update_during_arming, timedelta(seconds=1))
+        self._unsub_watcher = async_track_time_interval(
+            self.hass, self.async_update_during_arming, timedelta(seconds=1)
+        )
 
     async def async_alarm_arm_home(self, code: str | None = None) -> None:
-        """Send arm home command."""
+        """Send arm home command (Présent)."""
         await self.set_home_endpoint_value(self._command_arm_home)
         await asyncio.sleep(1)
-        self._unsub_watcher = async_track_time_interval(self.hass, self.async_update_during_arming, timedelta(seconds=1))
+        self._unsub_watcher = async_track_time_interval(
+            self.hass, self.async_update_during_arming, timedelta(seconds=1)
+        )
 
     async def async_alarm_trigger(self, code: str | None = None) -> None:
         """Send alarm trigger command."""
@@ -121,33 +129,17 @@ class FreeboxAlarm(FreeboxHomeEntity, AlarmControlPanelEntity):
             self._freebox_alarm_state = state
             self._attr_alarm_state = FREEBOX_TO_STATUS.get(state)
             if self._freebox_alarm_state == "idle" and self._unsub_watcher is not None:
-                self._unsub_watcher()  # Stop polling si idle
+                self._unsub_watcher()
                 self._unsub_watcher = None
         else:
             self._attr_alarm_state = None
 
     def update_parameters(self, node):
-        """Update parameters and supported features (comme dans working)."""
-        # Update name
+        """Update name and extra attributes."""
         self._attr_name = node["label"].strip()
 
-        # Search if Alarm2 (zone home/night)
-        has_alarm2 = False
-        for local_node in self._router.home_devices.values():
-            alarm2 = next(
-                (ep for ep in local_node['show_endpoints'] if ep["name"] == "alarm2" and ep["ep_type"] == "signal"),
-                None
-            )
-            if alarm2 and alarm2["value"]:
-                has_alarm2 = True
-                break
-
-        if has_alarm2 and self._command_arm_home:
-            self._supported_features |= AlarmControlPanelEntityFeature.ARM_HOME | AlarmControlPanelEntityFeature.ARM_NIGHT
-
-        # Parse signal endpoints for extras, never expose the alarm PIN.
         self._attr_extra_state_attributes = {}
-        for endpoint in filter(lambda x: x["ep_type"] == "signal", node['show_endpoints']):
+        for endpoint in filter(lambda x: x["ep_type"] == "signal", node["show_endpoints"]):
             name = endpoint["name"]
             if name in HIDDEN_SIGNAL_ATTRIBUTES:
                 continue

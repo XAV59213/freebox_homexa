@@ -1,5 +1,6 @@
 name: Validate
 
+# Re-enabled after GitHub disabled it for inactivity.
 on:
   push:
   pull_request:
@@ -11,6 +12,7 @@ permissions: {}
 
 jobs:
   validate-hacs:
+    name: HACS
     runs-on: "ubuntu-latest"
     steps:
       - name: HACS validation

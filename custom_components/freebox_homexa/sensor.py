@@ -79,15 +79,7 @@ DISK_PARTITION_SENSORS: tuple[SensorEntityDescription, ...] = (
 async def async_setup_entry(
     hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback
 ) -> None:
-    """Configure les entités de capteurs pour la Freebox.
-
-    Initialise les capteurs pour la température, la connexion, les appels, les disques et la batterie.
-
-    Args:
-        hass: Instance de Home Assistant.
-        entry: Entrée de configuration pour l'intégration Freebox.
-        async_add_entities: Fonction pour ajouter des entités à Home Assistant.
-    """
+    """Configure les entités de capteurs pour la Freebox."""
     router: FreeboxRouter = hass.data[DOMAIN][entry.unique_id]
     entities: list[SensorEntity] = []
 
@@ -139,21 +131,12 @@ async def async_setup_entry(
 
 # SECTION: Classe de capteur générique
 class FreeboxSensor(SensorEntity):
-    """Représentation de base d'un capteur Freebox.
-
-    Gère les capteurs de données système et réseau.
-    """
-    _attr_should_poll = False  # Pas de polling manuel, mises à jour via signaux
+    """Représentation de base d'un capteur Freebox."""
+    _attr_should_poll = False
 
     def __init__(
         self, router: FreeboxRouter, description: SensorEntityDescription
     ) -> None:
-        """Initialise un capteur Freebox.
-
-        Args:
-            router: Routeur Freebox associé.
-            description: Description du capteur.
-        """
         self.entity_description = description
         self._router = router
         self._attr_unique_id = f"{router.mac} {description.name}"
@@ -162,10 +145,6 @@ class FreeboxSensor(SensorEntity):
 
     @callback
     def async_update_state(self) -> None:
-        """Met à jour l'état du capteur.
-
-        Ajuste la valeur selon l'unité (ex. conversion des débits en Ko/s).
-        """
         if self.entity_description.key in ["ipv4"]:
             state = self._router._attrs.get("IPv4")
         elif self.entity_description.key == "uptime":
@@ -176,7 +155,6 @@ class FreeboxSensor(SensorEntity):
             _LOGGER.warning(f"Donnée manquante pour {self.entity_description.name}")
             self._attr_native_value = None
         elif self.native_unit_of_measurement == UnitOfDataRate.KILOBYTES_PER_SECOND:
-            # Conversion de bits/s en Ko/s (1 Ko = 1000 octets, 1 octet = 8 bits)
             self._attr_native_value = round(state / 8000, 2)
         else:
             self._attr_native_value = state
@@ -184,12 +162,10 @@ class FreeboxSensor(SensorEntity):
 
     @callback
     def async_on_demand_update(self) -> None:
-        """Met à jour l'état à la demande et écrit dans Home Assistant."""
         self.async_update_state()
         self.async_write_ha_state()
 
     async def async_added_to_hass(self) -> None:
-        """Ajoute le capteur à Home Assistant et enregistre les mises à jour."""
         self.async_update_state()
         self.async_on_remove(
             async_dispatcher_connect(
@@ -207,18 +183,11 @@ class FreeboxCallSensor(FreeboxSensor):
     def __init__(
         self, router: FreeboxRouter, description: SensorEntityDescription
     ) -> None:
-        """Initialise un capteur d'appels.
-
-        Args:
-            router: Routeur Freebox.
-            description: Description du capteur.
-        """
         super().__init__(router, description)
         self._call_list_for_type: list[dict[str, Any]] = []
 
     @callback
     def async_update_state(self) -> None:
-        """Met à jour le nombre d'appels pour le type spécifié."""
         self._call_list_for_type = [
             call for call in self._router.call_list or []
             if call.get("new", False) and self.entity_description.key == call.get("type")
@@ -228,11 +197,6 @@ class FreeboxCallSensor(FreeboxSensor):
 
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
-        """Retourne les attributs supplémentaires des appels.
-
-        Returns:
-            dict: Liste des appels avec timestamp et nom.
-        """
         return {
             dt_util.utc_from_timestamp(call["datetime"]).isoformat(): call["name"]
             for call in self._call_list_for_type
@@ -249,31 +213,24 @@ class FreeboxDiskSensor(FreeboxSensor):
         partition: dict[str, Any],
         description: SensorEntityDescription,
     ) -> None:
-        """Initialise un capteur de disque.
-
-        Args:
-            router: Routeur Freebox.
-            disk: Données du disque.
-            partition: Données de la partition.
-            description: Description du capteur.
-        """
         super().__init__(router, description)
         self._disk_id = disk["id"]
         self._partition_id = partition["id"]
         self._attr_name = f"{partition['label']} {description.name}"
         self._attr_unique_id = f"{router.mac} {description.key} {disk['id']} {partition['id']}"
-        self._attr_device_info = DeviceInfo(
-            identifiers={(DOMAIN, disk["id"])},
-            model=disk["model"],
-            name=f"Disque {disk['id']}",
-            sw_version=disk["firmware"],
-            via_device=(DOMAIN, router.mac),
-        )
+        device_info: dict[str, Any] = {
+            "identifiers": {(DOMAIN, disk["id"])},
+            "model": disk["model"],
+            "name": f"Disque {disk['id']}",
+            "sw_version": disk["firmware"],
+        }
+        if router.device_id:
+            device_info["via_device_id"] = router.device_id
+        self._attr_device_info = DeviceInfo(**device_info)
         _LOGGER.debug(f"Capteur de disque {self._attr_name} initialisé")
 
     @callback
     def async_update_state(self) -> None:
-        """Met à jour l'espace libre sur la partition."""
         disk = self._router.disks.get(self._disk_id)
         if disk is None:
             _LOGGER.warning(f"Disque {self._disk_id} non trouvé pour {self._attr_name}")
@@ -288,13 +245,11 @@ class FreeboxDiskSensor(FreeboxSensor):
         total_bytes = partition.get("total_bytes")
         free_bytes = partition.get("free_bytes")
 
-        # Logs pour déboguer les valeurs
         _LOGGER.debug(f"Total bytes pour {self._attr_name}: {total_bytes}")
         _LOGGER.debug(f"Free bytes pour {self._attr_name}: {free_bytes}")
 
         if total_bytes is None or total_bytes <= 0:
-            # _LOGGER.warning(f"Taille totale indisponible ou invalide pour {self._attr_name}")  # Commenté pour supprimer l'avertissement
-            self._attr_native_value = 0  # Valeur par défaut à 0% au lieu de None
+            self._attr_native_value = 0
         elif free_bytes is None:
             _LOGGER.warning(f"Espace libre indisponible pour {self._attr_name}")
             self._attr_native_value = None
@@ -311,11 +266,6 @@ class FreeboxBatterySensor(FreeboxHomeEntity, SensorEntity):
 
     @property
     def native_value(self) -> int | None:
-        """Retourne le niveau de batterie.
-
-        Returns:
-            int | None: Pourcentage de batterie ou None si indisponible.
-        """
         value = self.get_value("signal", "battery")
         if value is not None:
             _LOGGER.debug(f"Batterie {self._attr_name}: {value}%")

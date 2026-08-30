@@ -42,7 +42,9 @@ async def async_setup_entry(
 class FreeboxRemote(RemoteEntity):
     """Télécommande du Freebox Player."""
 
-    _attr_supported_features = RemoteEntityFeature.TURN_ON | RemoteEntityFeature.TURN_OFF
+    # RemoteEntityFeature only exposes LEARN_COMMAND / DELETE_COMMAND / ACTIVITY.
+    # Power is provided by ToggleEntity (async_turn_on / async_turn_off).
+    _attr_supported_features = RemoteEntityFeature(0)
     _attr_has_entity_name = True
     _attr_name = "Télécommande"
 

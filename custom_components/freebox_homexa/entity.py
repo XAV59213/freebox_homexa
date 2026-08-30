@@ -53,14 +53,16 @@ class FreeboxHomeEntity(Entity):
                 self._manufacturer = "Somfy"
                 self._model = CATEGORY_TO_MODEL[FreeboxHomeCategory.IOHOME]
 
-        self._attr_device_info = DeviceInfo(
-            identifiers={(DOMAIN, self._id)},
-            manufacturer=self._manufacturer,
-            model=self._model,
-            name=self._device_name,
-            sw_version=self._firmware,
-            via_device=(DOMAIN, router.mac),
-        )
+        device_info: dict[str, Any] = {
+            "identifiers": {(DOMAIN, self._id)},
+            "manufacturer": self._manufacturer,
+            "model": self._model,
+            "name": self._device_name,
+            "sw_version": self._firmware,
+        }
+        if router.device_id:
+            device_info["via_device_id"] = router.device_id
+        self._attr_device_info = DeviceInfo(**device_info)
 
     # ===================================================================
     # Méthodes API avec gestion du timeout (correction principale)

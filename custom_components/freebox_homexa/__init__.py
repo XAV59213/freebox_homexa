@@ -78,9 +78,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
     freebox_config = await api.system.get_config()
 
-    # Création explicite du device parent (hub Freebox) pour éviter l'erreur via_device
+    # Création explicite du device parent (hub Freebox)
     device_registry = dr.async_get(hass)
-    device_registry.async_get_or_create(
+    parent_device = device_registry.async_get_or_create(
         config_entry_id=entry.entry_id,
         identifiers={(DOMAIN, freebox_config["mac"])},
         connections={(dr.CONNECTION_NETWORK_MAC, freebox_config["mac"])},
@@ -91,6 +91,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     )
 
     router = FreeboxRouter(hass, entry, api, freebox_config)
+    router.device_id = parent_device.id
     await router.update_all()
 
     entry.async_on_unload(

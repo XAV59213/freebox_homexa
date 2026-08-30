@@ -78,7 +78,7 @@ async def get_hosts_list_if_supported(
         fbx_devices = await fbx_api.lan.get_hosts_list() or []
     except HttpRequestError as err:
         if (
-            (matcher := re.search(r"Request failed \(APIResponse: (.+)\)", str(err)))
+            (matcher := re.search(r"Request failed \\(APIResponse: (.+)\\)", str(err)))
             and (json_str := matcher.group(1))
             and (json_resp := json.loads(json_str)).get("error_code") == "nodev"
         ):
@@ -108,6 +108,7 @@ class FreeboxRouter:
         self.model: str = freebox_config["model_info"]["name"]
         self._sw_v: str = freebox_config["firmware_version"]
         self._attrs: dict[str, Any] = {}
+        self.device_id: str | None = None
 
         self.supports_hosts = True
         self.devices: dict[str, dict[str, Any]] = {}

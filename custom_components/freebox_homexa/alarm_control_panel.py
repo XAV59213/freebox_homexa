@@ -1,5 +1,8 @@
 """Support for Freebox alarms."""
 
+from __future__ import annotations
+
+import asyncio
 from typing import Any
 
 from homeassistant.components.alarm_control_panel import (
@@ -16,6 +19,9 @@ from datetime import datetime, timedelta
 from .const import DOMAIN, FreeboxHomeCategory
 from .entity import FreeboxHomeEntity
 from .router import FreeboxRouter
+
+# Signal endpoints that must never be exposed in Home Assistant attributes.
+HIDDEN_SIGNAL_ATTRIBUTES = frozenset({"pin"})
 
 FREEBOX_TO_STATUS = {
     "alarm1_arming": AlarmControlPanelState.ARMING,
@@ -139,10 +145,13 @@ class FreeboxAlarm(FreeboxHomeEntity, AlarmControlPanelEntity):
         if has_alarm2 and self._command_arm_home:
             self._supported_features |= AlarmControlPanelEntityFeature.ARM_HOME | AlarmControlPanelEntityFeature.ARM_NIGHT
 
-        # Parse all endpoints values for extras (pin, sound, etc.)
-        self._extra_state_attributes = {}
+        # Parse signal endpoints for extras, never expose the alarm PIN.
+        self._attr_extra_state_attributes = {}
         for endpoint in filter(lambda x: x["ep_type"] == "signal", node['show_endpoints']):
-            self._extra_state_attributes[endpoint["name"]] = endpoint["value"]
+            name = endpoint["name"]
+            if name in HIDDEN_SIGNAL_ATTRIBUTES:
+                continue
+            self._attr_extra_state_attributes[name] = endpoint["value"]
 
     async def async_will_remove_from_hass(self) -> None:
         """Cleanup when entity is removed."""

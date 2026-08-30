@@ -2,25 +2,30 @@
 
 This integration allows you to integrate **Freebox Home** devices into Home Assistant under the name `freebox_homexa`.
 
+**Version:** 28.8.0 — requires Home Assistant **2026.8.0** or newer (`via_device_id`).
+
 ## 🚀 Installation
 
 1. Use **HACS** to install automatically or manually copy this repository into your `custom_components/freebox_homexa` directory.
 2. Restart Home Assistant.
 3. Add the integration via the UI.
 
-## 🎛️ Features
+## 🎧 Features
 
 This integration supports:
 
 - 📡 **Automatic detection of Freebox Home devices**
-- 🎛️ **Control of connected switches**
+- 🎧 **Control of connected switches**
 - 📷 **Access to Freebox Home cameras**
 - 🚪 **Shutter control**
-- 🚨 **Full integration with the Freebox Home alarm system (alarm panel, motion detectors, door opener detectors, remote control, etc.)**
+- 🚨 **Freebox Home alarm** (Présent / Absent / Désarmé, detectors, remote)
 - 📍 **Tracking of Wi-Fi connected devices**
+- 📡 **Free Wi-Fi repeaters (F-RP01A)** as connectivity sensors
+- 📺 **Freebox Player Devialet / Mini 4K / Pop** as media players
+- 📹 **Player remote + sources TV / HDMI (CEC) / YouTube / Netflix**
 - 🔔 **Notifications for motion detection**
 
-## ⚙️ Configuration
+## ⚡ Configuration
 
 Add this to your `configuration.yaml`:
 
@@ -29,6 +34,8 @@ freebox_homexa:
   host: "192.168.X.X"
   token: "YOUR_TOKEN"
 ```
+
+HDMI on the Player is the **output toward the TV** (CEC One Touch Play), not a TV HDMI input switch.
 
 ## 📖 Granting Access Rights
 
@@ -55,6 +62,7 @@ Here is a preview of the Freebox OS interface showing where to enable permission
 - **Enable the Freebox Home API** in your Freebox settings.
 - **Use Home Assistant automations** to trigger actions based on sensor states.
 - **Regularly update this component** to benefit from the latest improvements.
+- Player remote code: on the Player go to **Réglages → Système → Informations**.
 
 ## 🛠️ Troubleshooting
 
@@ -71,4 +79,3 @@ Contributions are welcome! Fork the project, add your improvements, and submit a
 ## 📜 License
 
 MIT - Free use under the condition of mentioning the original project.
-

@@ -36,18 +36,22 @@ PLAYER_FEATURES = (
     | MediaPlayerEntityFeature.PLAY_MEDIA
 )
 
-# Sources ouvertes via POST .../control/open
-# HDMI n'est pas une entrée du Player : c'est la sortie vers la TV (CEC).
-COMMON_SOURCES: dict[str, str] = {
-    "TV": "tv:",
-    "HDMI": "tv:",
-    "YouTube": "https://www.youtube.com",
-    "Netflix": "https://www.netflix.com",
-    "Navigateur": "https://www.google.com",
+# url: opened via POST .../control/open
+# remote: IR/network key via Freebox remote API (Mini 4K / CEC wake)
+COMMON_SOURCES: dict[str, dict[str, str]] = {
+    "TV": {"url": "tv:", "remote": "tv"},
+    "HDMI (CEC)": {"url": "tv:", "remote": "tv"},
+    "YouTube": {"url": "https://www.youtube.com"},
+    "Netflix": {"url": "https://www.netflix.com"},
+    "Navigateur": {"url": "https://www.google.com"},
 }
+
+MINI_4K_SOURCES = ["TV", "HDMI (CEC)", "YouTube", "Navigateur"]
+DEVIALET_SOURCES = ["TV", "HDMI (CEC)", "YouTube", "Netflix", "Navigateur"]
 
 MINI_4K_MODELS = {"fbx6lc", "freebox_mini", "mini4k", "mini_4k", "stb_mini"}
 DEVIALET_MODELS = {"fbx7hd-delta", "stb_v7", "fbx7hd-one"}
+API_VERSION_FALLBACKS = ("v6", "v8", "v7", "v5")
 
 
 def _normalize_api_version(raw: Any) -> str:
@@ -58,14 +62,25 @@ def _normalize_api_version(raw: Any) -> str:
     return f"v{major}"
 
 
-def _player_model(player: dict[str, Any]) -> str:
-    model = str(player.get("device_model") or player.get("stb_type") or "player").lower()
+def _player_kind(player: dict[str, Any]) -> str:
+    model = str(player.get("device_model") or player.get("stb_type") or "").lower()
     name = str(player.get("device_name") or player.get("name") or "").lower()
     if model in DEVIALET_MODELS or "delta" in model or "devialet" in name:
-        return "Freebox Player Devialet"
+        return "devialet"
     if model in MINI_4K_MODELS or "mini" in model or "mini 4k" in name or "mini4k" in name:
-        return "Freebox Mini 4K"
+        return "mini4k"
     if "pop" in model or "pop" in name:
+        return "pop"
+    return "player"
+
+
+def _player_model(player: dict[str, Any]) -> str:
+    kind = _player_kind(player)
+    if kind == "devialet":
+        return "Freebox Player Devialet"
+    if kind == "mini4k":
+        return "Freebox Mini 4K"
+    if kind == "pop":
         return "Freebox Player Pop"
     return player.get("device_model") or player.get("stb_type") or "Freebox Player"
 
@@ -96,7 +111,10 @@ async def async_setup_entry(
         _LOGGER.warning("Impossible de lister les Freebox Player : %s", err)
         return
 
-    entities = [FreeboxPlayerMediaPlayer(router, player) for player in players]
+    entities = [
+        FreeboxPlayerMediaPlayer(router, player, entry.data.get("remote_code"))
+        for player in players
+    ]
     if entities:
         async_add_entities(entities, True)
         _LOGGER.info("%s Freebox Player(s) ajouté(s)", len(entities))
@@ -112,24 +130,43 @@ class FreeboxPlayerMediaPlayer(MediaPlayerEntity):
     _attr_has_entity_name = True
     _attr_name = None
     _attr_volume_step = 0.05
-    _attr_source_list = list(COMMON_SOURCES)
 
-    def __init__(self, router: FreeboxRouter, player: dict[str, Any]) -> None:
+    def __init__(
+        self,
+        router: FreeboxRouter,
+        player: dict[str, Any],
+        remote_code: str | None = None,
+    ) -> None:
         self._router = router
         self._player = player
         self._player_id = player["id"]
+        self._remote_code = remote_code
+        self._kind = _player_kind(player)
         self._api_version = _normalize_api_version(player.get("api_version"))
         self._attr_unique_id = f"{router.mac}_player_{self._player_id}"
         self._attr_device_info = player_device_info(router, player)
         self._attr_available = bool(player.get("reachable", True))
         self._attr_source = None
+        if self._kind == "mini4k":
+            self._attr_source_list = list(MINI_4K_SOURCES)
+        else:
+            self._attr_source_list = list(DEVIALET_SOURCES)
 
-    def _path(self, suffix: str) -> str:
-        return f"player/{self._player_id}/api/{self._api_version}/{suffix}"
+    def _path(self, suffix: str, version: str | None = None) -> str:
+        return f"player/{self._player_id}/api/{version or self._api_version}/{suffix}"
 
     @property
     def _access(self):
         return self._router._api.player._access
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        return {
+            "player_id": self._player_id,
+            "api_version": self._api_version,
+            "player_model": _player_model(self._player),
+            "hdmi_note": "HDMI (CEC) réveille la TV sur la sortie du Player, ce n'est pas une entrée HDMI de la TV.",
+        }
 
     async def _get(self, suffix: str) -> Any:
         return await self._access.get(self._path(suffix))
@@ -149,12 +186,34 @@ class FreeboxPlayerMediaPlayer(MediaPlayerEntity):
             except Exception as err:
                 _LOGGER.error("Commande %s échouée sur Player %s : %s", name, self._player_id, err)
 
-    async def async_update(self) -> None:
+    async def _send_remote(self, key: str) -> None:
+        if not self._remote_code:
+            return
         try:
-            status = await self._get("status/") or {}
+            await self._router._api.remote.send_key(code=str(self._remote_code), key=key)
         except Exception as err:
-            # Mini 4K / Pop: retry with the version advertised by the player list.
-            _LOGGER.debug("Statut Player %s (%s) indisponible : %s", self._player_id, self._api_version, err)
+            _LOGGER.debug("Touche remote %s indisponible : %s", key, err)
+
+    async def async_update(self) -> None:
+        status: dict[str, Any] | None = None
+        last_err: Exception | None = None
+        versions = [self._api_version] + [v for v in API_VERSION_FALLBACKS if v != self._api_version]
+        for version in versions:
+            try:
+                status = await self._access.get(self._path("status/", version)) or {}
+                self._api_version = version
+                break
+            except Exception as err:
+                last_err = err
+                status = None
+
+        if status is None:
+            _LOGGER.debug(
+                "Statut Player %s (%s) indisponible : %s",
+                self._player_id,
+                self._api_version,
+                last_err,
+            )
             self._attr_available = bool(self._player.get("reachable"))
             return
 
@@ -232,12 +291,15 @@ class FreeboxPlayerMediaPlayer(MediaPlayerEntity):
         await self._command("prev")
 
     async def async_select_source(self, source: str) -> None:
-        url = COMMON_SOURCES.get(source)
-        if not url:
+        spec = COMMON_SOURCES.get(source)
+        if not spec:
             _LOGGER.warning("Source inconnue : %s", source)
             return
         try:
-            await self._post("control/open", {"url": url})
+            if spec.get("url"):
+                await self._post("control/open", {"url": spec["url"]})
+            if spec.get("remote"):
+                await self._send_remote(spec["remote"])
             self._attr_source = source
             self.async_write_ha_state()
         except Exception as err:
@@ -253,7 +315,7 @@ class FreeboxPlayerMediaPlayer(MediaPlayerEntity):
         if self.state == MediaPlayerState.OFF:
             await self._try_power()
             # One Touch Play : la TV bascule souvent sur l'entrée HDMI du Player (CEC).
-            await self.async_select_source("TV")
+            await self.async_select_source("HDMI (CEC)")
 
     async def async_turn_off(self) -> None:
         if self.state != MediaPlayerState.OFF:
@@ -264,7 +326,4 @@ class FreeboxPlayerMediaPlayer(MediaPlayerEntity):
             await self._command("play_pause")
         except Exception:
             pass
-        try:
-            await self._router._api.remote.send_key(code="power", key="power")
-        except Exception as err:
-            _LOGGER.debug("Touche power indisponible : %s", err)
+        await self._send_remote("power")

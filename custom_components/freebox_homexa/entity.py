@@ -16,6 +16,13 @@ from .router import FreeboxRouter
 _LOGGER = logging.getLogger(__name__)
 
 
+def _home_endpoint_payload(value: Any | None) -> dict[str, Any]:
+    """Build the JSON body expected by Freebox Home PUT /home/endpoints."""
+    if isinstance(value, dict) and "value" in value:
+        return value
+    return {"value": value}
+
+
 class FreeboxHomeEntity(Entity):
     """Représentation de base d'une entité Freebox Home dans Home Assistant."""
 
@@ -64,17 +71,15 @@ class FreeboxHomeEntity(Entity):
             device_info["via_device_id"] = router.device_id
         self._attr_device_info = DeviceInfo(**device_info)
 
-    # ===================================================================
-    # Méthodes API avec gestion du timeout (correction principale)
-    # ===================================================================
     async def set_home_endpoint_value(
         self, command_id: int | None, value: Any | None = None
     ) -> bool:
         if self._id is None or command_id is None:
             return False
+        payload = _home_endpoint_payload(value)
         try:
             await asyncio.wait_for(
-                self._router.home.set_home_endpoint_value(self._id, command_id, value),
+                self._router.home.set_home_endpoint_value(self._id, command_id, payload),
                 timeout=10.0,
             )
             return True
@@ -92,7 +97,7 @@ class FreeboxHomeEntity(Entity):
         try:
             node = await asyncio.wait_for(
                 self._router.home.get_home_endpoint_value(self._id, command_id),
-                timeout=8.0,          # Timeout raisonnable
+                timeout=8.0,
             )
             return node.get("value")
         except asyncio.TimeoutError:
@@ -105,9 +110,6 @@ class FreeboxHomeEntity(Entity):
             _LOGGER.warning(f"Erreur inattendue sur endpoint {command_id} (appareil {self._id}): {err}")
             return None
 
-    # ===================================================================
-    # Méthodes utilitaires (inchangées)
-    # ===================================================================
     def get_command_id(self, nodes: list, ep_type: str, name: str) -> int | None:
         node = next(
             (x for x in nodes if x.get("name") == name and x.get("ep_type") == ep_type), None
@@ -138,9 +140,6 @@ class FreeboxHomeEntity(Entity):
             return None
         return node.get("value")
 
-    # ===================================================================
-    # Mise à jour signal
-    # ===================================================================
     async def async_update_signal(self) -> None:
         if self._id not in self._router.home_devices:
             return
@@ -154,9 +153,6 @@ class FreeboxHomeEntity(Entity):
         except Exception as err:
             _LOGGER.error(f"Échec mise à jour entité {self._attr_name}: {err}")
 
-    # ===================================================================
-    # Cycle de vie
-    # ===================================================================
     async def async_added_to_hass(self) -> None:
         self._remove_signal_update = async_dispatcher_connect(
             self._hass,

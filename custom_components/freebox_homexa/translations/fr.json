@@ -2,15 +2,15 @@
   "config": {
     "step": {
       "link": {
-        "description": "Cliquez sur \"Soumettre\", puis appuyez sur la fléche droite du routeur pour enregistrer Freebox avec Home Assistant.\n\n![Emplacement du bouton sur le routeur](/static/images/config_freebox.png)",
+        "description": "Cliquez sur \"Soumettre\", puis appuyez sur la flèche droite du routeur pour enregistrer Freebox avec Home Assistant.",
         "title": "Lien routeur Freebox"
       },
       "permission": {
-        "description": "Ouvrez la page http://mafreebox.freebox.fr/#Fbx.os.app.settings.Accounts et donnez l'accés: \"Gestion de l'alarme et maison connectée\"",
-        "title": "Authorisation demandée"
+        "description": "Ouvrez {accounts_url} et donnez l'accès : \"Gestion de l'alarme et maison connectée\".",
+        "title": "Autorisation demandée"
       },
       "user": {
-        "description": "Entrez les informations de votre Freebox DELTA\nVous pouvez obtenir le détail ici: http://mafreebox.freebox.fr/api_version",
+        "description": "Entrez les informations de votre Freebox.\nDétail des valeurs : {api_url}",
         "title": "Freebox",
         "data": {
           "host": "Nom d'hôte ou adresse IP",

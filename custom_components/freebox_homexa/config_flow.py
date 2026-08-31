@@ -1,6 +1,7 @@
 """Flux de configuration pour l'intégration Freebox Homexa."""
 
 import logging
+from pathlib import Path
 from typing import Any
 
 from freebox_api.exceptions import AuthorizationError, HttpRequestError
@@ -11,7 +12,6 @@ from homeassistant.const import CONF_HOST, CONF_PORT
 from homeassistant.helpers.service_info.zeroconf import ZeroconfServiceInfo
 from homeassistant.helpers.storage import Store
 from homeassistant.util import slugify
-from pathlib import Path
 
 from .const import DOMAIN, STORAGE_VERSION
 from .router import get_api, get_hosts_list_if_supported
@@ -19,6 +19,14 @@ from .router import get_api, get_hosts_list_if_supported
 _LOGGER = logging.getLogger(__name__)
 
 STORAGE_KEY_CONFIG = f"{DOMAIN}_config"
+
+FREEBOX_ACCOUNTS_URL = "http://mafreebox.freebox.fr/#Fbx.os.app.settings.Accounts"
+FREEBOX_API_URL = "http://mafreebox.freebox.fr/api_version"
+
+_PLACEHOLDERS = {
+    "accounts_url": FREEBOX_ACCOUNTS_URL,
+    "api_url": FREEBOX_API_URL,
+}
 
 
 class FreeboxFlowHandler(ConfigFlow, domain=DOMAIN):
@@ -40,10 +48,13 @@ class FreeboxFlowHandler(ConfigFlow, domain=DOMAIN):
             else:
                 return self.async_show_form(
                     step_id="user",
-                    data_schema=vol.Schema({
-                        vol.Required(CONF_HOST): str,
-                        vol.Required(CONF_PORT, default=80): int,
-                    }),
+                    data_schema=vol.Schema(
+                        {
+                            vol.Required(CONF_HOST): str,
+                            vol.Required(CONF_PORT, default=80): int,
+                        }
+                    ),
+                    description_placeholders=_PLACEHOLDERS,
                 )
 
         self._data = user_input or {}
@@ -64,7 +75,10 @@ class FreeboxFlowHandler(ConfigFlow, domain=DOMAIN):
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
         if user_input is None:
-            return self.async_show_form(step_id="link")
+            return self.async_show_form(
+                step_id="link",
+                description_placeholders=_PLACEHOLDERS,
+            )
 
         errors = {}
         fbx = await get_api(self.hass, self._data[CONF_HOST])
@@ -97,11 +111,15 @@ class FreeboxFlowHandler(ConfigFlow, domain=DOMAIN):
         except HttpRequestError:
             errors["base"] = "cannot_connect"
 
-        except Exception as err:
+        except Exception:
             _LOGGER.exception("Erreur inconnue")
             errors["base"] = "unknown"
 
-        return self.async_show_form(step_id="link", errors=errors)
+        return self.async_show_form(
+            step_id="link",
+            errors=errors,
+            description_placeholders=_PLACEHOLDERS,
+        )
 
     async def async_step_zeroconf(
         self, discovery_info: ZeroconfServiceInfo

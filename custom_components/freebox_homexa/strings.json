@@ -2,6 +2,8 @@
   "config": {
     "step": {
       "user": {
+        "title": "Freebox",
+        "description": "Please enter your Freebox details.\nYou can check this link to obtain the values: {api_url}",
         "data": {
           "host": "[%key:common::config_flow::data::host%]",
           "port": "[%key:common::config_flow::data::port%]"
@@ -12,7 +14,11 @@
       },
       "link": {
         "title": "Link Freebox router",
-        "description": "Select **Submit**, then touch the right arrow on the router to register Freebox with Home Assistant.\n\n![Location of button on the router](/static/images/config_freebox.png)"
+        "description": "Select **Submit**, then touch the right arrow on the router to register Freebox with Home Assistant."
+      },
+      "permission": {
+        "title": "Permission is required",
+        "description": "Open {accounts_url} and grant the access policy: \"Gestion de l'alarme et maison connectée\"."
       }
     },
     "error": {
@@ -29,6 +35,16 @@
     "reboot": {
       "name": "Reboot",
       "description": "Reboots the Freebox."
+    },
+    "remote": {
+      "name": "Send remote command",
+      "description": "Send a remote command to Freebox Player",
+      "fields": {
+        "code": {
+          "name": "Command Code",
+          "description": "The code of the command to send (e.g., power, play, pause)."
+        }
+      }
     }
   }
 }

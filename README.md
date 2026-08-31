@@ -4,7 +4,7 @@
 
 Intégration **Home Assistant** pour la Freebox Server, Freebox Home, les répéteurs Wi-Fi Free et le Freebox Player.
 
-**Version actuelle :** [28.8.1](https://github.com/XAV59213/freebox_homexa/releases/tag/28.8.1) · Home Assistant **2026.8.0+**
+**Version actuelle :** [28.8.2](https://github.com/XAV59213/freebox_homexa/releases/tag/28.8.2) · Home Assistant **2026.8.0+**
 
 Wiki : [Documentation](https://github.com/XAV59213/freebox_homexa/wiki)
 
@@ -70,7 +70,7 @@ HACS → Freebox Homexa → **Mettre à jour** → redémarrer Home Assistant.
 | Symptôme | Piste |
 |---|---|
 | L’intégration ne démarre pas | HA 2026.8.0+ requis (`via_device_id`) |
-| `bad_json` sur l’alarme | Mets à jour en **28.8.1** (payload `{"value": ...}`) |
+| `bad_json` sur l’alarme | Version **28.8.2** (payload `{"value": ...}`) |
 | Seulement 2 boutons d’alarme | 28.8+ expose Présent / Absent / Désarmé |
 | Répéteur invisible | Redémarre HA ; le F-RP01A est détecté via les hôtes LAN |
 | Player absent | Droits Player dans Freebox OS + redémarrage |

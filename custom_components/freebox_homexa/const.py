@@ -16,7 +16,7 @@ REPEATER_MODEL = "F-RP01A"
 APP_DESC = {
     "app_id": "hass",
     "app_name": "Home Assistant",
-    "app_version": "28.8.1",
+    "app_version": "28.8.2",
     "device_name": socket.gethostname(),
 }
 API_VERSION = "v6"

@@ -1,21 +1,33 @@
 name: Validate
 
-# Re-enabled after GitHub disabled it for inactivity.
 on:
   push:
+    branches: [main]
+    paths:
+      - "custom_components/freebox_homexa/**"
+      - "hacs.json"
+      - ".github/workflows/validate.yaml"
   pull_request:
+    branches: [main]
   schedule:
-    - cron: "0 0 * * *"
+    # Lundi 03:17 UTC — évite le pic minuit des crons :00
+    - cron: "17 3 * * 1"
   workflow_dispatch:
 
-permissions: {}
+concurrency:
+  group: hacs-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
 
 jobs:
-  validate-hacs:
+  hacs:
     name: HACS
-    runs-on: "ubuntu-latest"
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - name: HACS validation
-        uses: "hacs/action@main"
+        uses: hacs/action@main
         with:
-          category: "integration"
+          category: integration

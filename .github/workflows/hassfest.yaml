@@ -2,14 +2,30 @@ name: Validate with hassfest
 
 on:
   push:
+    branches: [main]
+    paths:
+      - "custom_components/freebox_homexa/**"
+      - ".github/workflows/hassfest.yaml"
   pull_request:
+    branches: [main]
   schedule:
-    - cron: "0 0 * * *"
+    - cron: "23 3 * * 1"
   workflow_dispatch:
 
+concurrency:
+  group: hassfest-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
 jobs:
-  validate:
-    runs-on: "ubuntu-latest"
+  hassfest:
+    name: hassfest
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
-      - uses: "actions/checkout@v4"
-      - uses: home-assistant/actions/hassfest@master
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: hassfest
+        uses: home-assistant/actions/hassfest@master

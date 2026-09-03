@@ -2,17 +2,19 @@
 # DESCRIPTION: Fichier d'initialisation principal pour l'intégration Freebox dans Home Assistant
 # OBJECTIF: Configurer l'intégration Freebox, gérer les mises à jour périodiques, les services et la fermeture propre
 
+from pathlib import Path
 import logging
 import voluptuous as vol
 import homeassistant.helpers.config_validation as cv
 from homeassistant.const import CONF_HOST, CONF_PORT, EVENT_HOMEASSISTANT_STOP
 from datetime import timedelta
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.core import Event, HomeAssistant, ServiceCall, callback
-from homeassistant.exceptions import ConfigEntryNotReady
+from homeassistant.core import Event, HomeAssistant, ServiceCall
+from homeassistant.exceptions import ConfigEntryAuthFailed, ConfigEntryNotReady
 from homeassistant.helpers.event import async_track_time_interval
 from homeassistant.helpers.storage import Store
-from freebox_api.exceptions import HttpRequestError
+from homeassistant.util import slugify
+from freebox_api.exceptions import AuthorizationError, HttpRequestError
 import aiohttp
 import homeassistant.helpers.device_registry as dr
 
@@ -51,6 +53,11 @@ def _router_keys(hass: HomeAssistant) -> list[str]:
     return [key for key in hass.data.get(DOMAIN, {}) if key not in _RESERVED_DATA_KEYS]
 
 
+def token_file_path(hass: HomeAssistant, host: str) -> Path:
+    """Return the on-disk Freebox token path used by freebox_api."""
+    return Path(hass.config.path(".storage", "freebox_homexa")) / f"{slugify(host)}.conf"
+
+
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up Freebox Homexa from a config entry."""
     hass.data.setdefault(DOMAIN, {})
@@ -70,14 +77,24 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         await store.async_save(hass.data[DOMAIN]["config"])
         _LOGGER.info("Données de configuration Freebox sauvegardées avec succès.")
 
-    api = await get_api(hass, entry.data[CONF_HOST])
-
     host = entry.data[CONF_HOST]
     port = entry.data.get(CONF_PORT, 80)
+
+    if not token_file_path(hass, host).exists():
+        raise ConfigEntryAuthFailed(
+            "Token Freebox introuvable. Rouvre l'intégration et appuie sur la flèche droite de la Freebox."
+        )
+
+    api = await get_api(hass, host)
 
     try:
         await api.open(host, port)
         _LOGGER.debug("Connexion établie avec la Freebox à %s (port=%s)", host, port)
+    except AuthorizationError as err:
+        _LOGGER.error("Autorisation Freebox refusée ou expirée pour %s: %s", host, err)
+        raise ConfigEntryAuthFailed(
+            "Autorisation Freebox expirée. Appuie sur la flèche droite du Server pour réautoriser Home Assistant."
+        ) from err
     except HttpRequestError as err:
         _LOGGER.error("Erreur lors de la connexion à la Freebox %s: %s", host, err)
         raise ConfigEntryNotReady from err

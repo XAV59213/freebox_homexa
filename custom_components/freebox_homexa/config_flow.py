@@ -7,7 +7,7 @@ from typing import Any
 from freebox_api.exceptions import AuthorizationError, HttpRequestError
 import voluptuous as vol
 
-from homeassistant.config_entries import ConfigFlow, ConfigFlowResult
+from homeassistant.config_entries import SOURCE_REAUTH, ConfigFlow, ConfigFlowResult
 from homeassistant.const import CONF_HOST, CONF_PORT
 from homeassistant.helpers.service_info.zeroconf import ZeroconfServiceInfo
 from homeassistant.helpers.storage import Store
@@ -37,6 +37,10 @@ class FreeboxFlowHandler(ConfigFlow, domain=DOMAIN):
     def __init__(self) -> None:
         self._data: dict[str, Any] = {}
 
+    def _token_file(self) -> Path:
+        host = self._data.get(CONF_HOST, "")
+        return Path(self.hass.config.path(".storage", "freebox_homexa")) / f"{slugify(host)}.conf"
+
     async def async_step_user(
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
@@ -59,13 +63,28 @@ class FreeboxFlowHandler(ConfigFlow, domain=DOMAIN):
 
         self._data = user_input or {}
         await self.async_set_unique_id(self._data[CONF_HOST])
-        self._abort_if_unique_id_configured()
+        if self.source != SOURCE_REAUTH:
+            self._abort_if_unique_id_configured()
         return await self.async_step_link()
+
+    async def async_step_reauth(self, entry_data: dict[str, Any]) -> ConfigFlowResult:
+        """Restart pairing when the Freebox token is missing or expired."""
+        self._data = dict(entry_data)
+        return await self.async_step_reauth_confirm()
+
+    async def async_step_reauth_confirm(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        if user_input is None:
+            return self.async_show_form(
+                step_id="reauth_confirm",
+                description_placeholders=_PLACEHOLDERS,
+            )
+        return await self.async_step_link(user_input)
 
     async def _cleanup_invalid_token(self) -> None:
         try:
-            token_dir = Store(self.hass, STORAGE_VERSION, f"{DOMAIN}_tokens").path
-            token_file = Path(f"{token_dir}/{slugify(self._data[CONF_HOST])}.conf")
+            token_file = self._token_file()
             if token_file.exists():
                 await self.hass.async_add_executor_job(token_file.unlink)
         except Exception as err:
@@ -83,9 +102,6 @@ class FreeboxFlowHandler(ConfigFlow, domain=DOMAIN):
         errors = {}
         fbx = await get_api(self.hass, self._data[CONF_HOST])
         try:
-            # Ouvrir la connexion API (nécessaire pour initialiser les modules system, lan, etc.)
-            # get_api() ne fait que créer l'instance Freepybox ; open() est obligatoire
-            # avant d'accéder à fbx.system / fbx.lan (cf. __init__.py et issue #14)
             await fbx.open(
                 self._data[CONF_HOST],
                 self._data.get(CONF_PORT, 80),
@@ -98,13 +114,19 @@ class FreeboxFlowHandler(ConfigFlow, domain=DOMAIN):
             store = Store(self.hass, STORAGE_VERSION, STORAGE_KEY_CONFIG)
             await store.async_save(self._data)
 
+            if self.source == SOURCE_REAUTH:
+                return self.async_update_reload_and_abort(
+                    self._get_reauth_entry(),
+                    data=self._data,
+                )
+
             return self.async_create_entry(
                 title=self._data[CONF_HOST],
                 data=self._data,
             )
 
         except AuthorizationError:
-            _LOGGER.warning("Token invalide ou autorisation refusée")
+            _LOGGER.warning("Token invalide ou autorisation refusée / expirée")
             await self._cleanup_invalid_token()
             errors["base"] = "invalid_token"
 

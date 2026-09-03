@@ -5,6 +5,10 @@
         "description": "Cliquez sur \"Soumettre\", puis appuyez sur la flèche droite du routeur pour enregistrer Freebox avec Home Assistant.",
         "title": "Lien routeur Freebox"
       },
+      "reauth_confirm": {
+        "title": "Réautoriser la Freebox",
+        "description": "Le token Freebox a expiré ou est introuvable. Cliquez sur Soumettre, puis appuyez sur la flèche droite du Freebox Server."
+      },
       "permission": {
         "description": "Ouvrez {accounts_url} et donnez l'accès : \"Gestion de l'alarme et maison connectée\".",
         "title": "Autorisation demandée"
@@ -19,7 +23,8 @@
       }
     },
     "abort": {
-      "already_configured": "Hôte déjà configuré"
+      "already_configured": "Hôte déjà configuré",
+      "reauth_successful": "Réautorisation réussie"
     },
     "error": {
       "cannot_connect": "Impossible de se connecter, veuillez réessayer",

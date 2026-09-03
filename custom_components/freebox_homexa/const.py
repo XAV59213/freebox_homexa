@@ -10,6 +10,7 @@ DOMAIN = "freebox_homexa"
 SERVICE_REBOOT = "reboot"
 SERVICE_RELOAD = "reload"
 SERVICE_REMOTE = "remote"
+SERVICE_TV_GUIDE = "tv_guide"
 
 VALUE_NOT_SET = -1
 DEFAULT_DEVICE_NAME = "Unknown device"
@@ -18,7 +19,7 @@ REPEATER_MODEL = "F-RP01A"
 APP_DESC = {
     "app_id": "hass",
     "app_name": "Home Assistant",
-    "app_version": "28.8.4",
+    "app_version": "28.8.6",
     "device_name": socket.gethostname(),
 }
 API_VERSION = "v6"
@@ -27,6 +28,7 @@ PLATFORMS = [
     Platform.ALARM_CONTROL_PANEL,
     Platform.BINARY_SENSOR,
     Platform.BUTTON,
+    Platform.CALENDAR,
     Platform.CAMERA,
     Platform.COVER,
     Platform.DEVICE_TRACKER,

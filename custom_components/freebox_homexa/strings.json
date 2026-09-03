@@ -16,6 +16,10 @@
         "title": "Link Freebox router",
         "description": "Select **Submit**, then touch the right arrow on the router to register Freebox with Home Assistant."
       },
+      "reauth_confirm": {
+        "title": "Re-authorize Freebox",
+        "description": "The Freebox token expired or is missing. Select **Submit**, then press the right arrow on the Freebox Server."
+      },
       "permission": {
         "title": "Permission is required",
         "description": "Open {accounts_url} and grant the access policy: \"Gestion de l'alarme et maison connectée\"."
@@ -28,7 +32,8 @@
       "invalid_token": "Invalid or expired token. It has been automatically deleted. Press the right arrow button on your Freebox to re-authorize Home Assistant."
     },
     "abort": {
-      "already_configured": "[%key:common::config_flow::abort::already_configured_device%]"
+      "already_configured": "[%key:common::config_flow::abort::already_configured_device%]",
+      "reauth_successful": "Re-authorization successful"
     }
   },
   "services": {

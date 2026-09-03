@@ -14,3 +14,11 @@ remote:
     code:
       description: Code Number
       example: 'power'
+
+tv_guide:
+  name: "Guide TV"
+  description: "Lit le guide TV Freebox (programmes en cours)."
+  fields:
+    channel:
+      description: Nom ou UUID de chaîne (optionnel). Vide = aperçu général.
+      example: "France 2"

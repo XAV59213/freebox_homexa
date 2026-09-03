@@ -1,7 +1,6 @@
 """Flux de configuration pour l'intégration Freebox Homexa."""
 
 import logging
-from pathlib import Path
 from typing import Any
 
 from freebox_api.exceptions import AuthorizationError, HttpRequestError
@@ -11,10 +10,9 @@ from homeassistant.config_entries import SOURCE_REAUTH, ConfigFlow, ConfigFlowRe
 from homeassistant.const import CONF_HOST, CONF_PORT
 from homeassistant.helpers.service_info.zeroconf import ZeroconfServiceInfo
 from homeassistant.helpers.storage import Store
-from homeassistant.util import slugify
 
 from .const import DOMAIN, STORAGE_VERSION
-from .router import get_api, get_hosts_list_if_supported
+from .router import get_api, get_hosts_list_if_supported, resolve_token_file
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -36,10 +34,6 @@ class FreeboxFlowHandler(ConfigFlow, domain=DOMAIN):
 
     def __init__(self) -> None:
         self._data: dict[str, Any] = {}
-
-    def _token_file(self) -> Path:
-        host = self._data.get(CONF_HOST, "")
-        return Path(self.hass.config.path(".storage", "freebox_homexa")) / f"{slugify(host)}.conf"
 
     async def async_step_user(
         self, user_input: dict[str, Any] | None = None
@@ -68,7 +62,7 @@ class FreeboxFlowHandler(ConfigFlow, domain=DOMAIN):
         return await self.async_step_link()
 
     async def async_step_reauth(self, entry_data: dict[str, Any]) -> ConfigFlowResult:
-        """Restart pairing when the Freebox token is missing or expired."""
+        """Restart pairing when the Freebox token is missing or revoked."""
         self._data = dict(entry_data)
         return await self.async_step_reauth_confirm()
 
@@ -84,7 +78,7 @@ class FreeboxFlowHandler(ConfigFlow, domain=DOMAIN):
 
     async def _cleanup_invalid_token(self) -> None:
         try:
-            token_file = self._token_file()
+            token_file = resolve_token_file(self.hass, self._data.get(CONF_HOST, ""))
             if token_file.exists():
                 await self.hass.async_add_executor_job(token_file.unlink)
         except Exception as err:
@@ -125,10 +119,15 @@ class FreeboxFlowHandler(ConfigFlow, domain=DOMAIN):
                 data=self._data,
             )
 
-        except AuthorizationError:
-            _LOGGER.warning("Token invalide ou autorisation refusée / expirée")
-            await self._cleanup_invalid_token()
-            errors["base"] = "invalid_token"
+        except AuthorizationError as err:
+            message = str(err).lower()
+            if "denied" in message or "revoked" in message or "invalid" in message:
+                _LOGGER.warning("Token Freebox révoqué : %s", err)
+                await self._cleanup_invalid_token()
+                errors["base"] = "invalid_token"
+            else:
+                _LOGGER.warning("Autorisation Freebox en attente / timeout, token conservé : %s", err)
+                errors["base"] = "register_failed"
 
         except HttpRequestError:
             errors["base"] = "cannot_connect"

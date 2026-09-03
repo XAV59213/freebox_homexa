@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 import enum
-import socket
 from homeassistant.const import Platform
 from homeassistant.components.alarm_control_panel import AlarmControlPanelState  # noqa: F401
 
@@ -16,11 +15,13 @@ VALUE_NOT_SET = -1
 DEFAULT_DEVICE_NAME = "Unknown device"
 REPEATER_MODEL = "F-RP01A"
 
+# Must stay stable. freebox-api requests a new pairing if this dict differs
+# from the saved token file (app_version / hostname used to change every restart).
 APP_DESC = {
     "app_id": "hass",
     "app_name": "Home Assistant",
-    "app_version": "28.8.6",
-    "device_name": socket.gethostname(),
+    "app_version": "28.8",
+    "device_name": "Home Assistant",
 }
 API_VERSION = "v6"
 

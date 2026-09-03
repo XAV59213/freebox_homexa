@@ -4,6 +4,10 @@ reboot:
   name: "Restart Freebox"
   description: "Reboots the Freebox router."
 
+reload:
+  name: "Reload Freebox Homexa"
+  description: "Reload the integration, reconnect to the Freebox and rediscover Home devices."
+
 remote:
   description: Call remote code to the Freebox Player
   fields:

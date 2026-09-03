@@ -23,8 +23,6 @@ from homeassistant.const import CONF_HOST, CONF_PORT
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.device_registry import CONNECTION_NETWORK_MAC, DeviceInfo
 from homeassistant.helpers.dispatcher import async_dispatcher_send
-from homeassistant.helpers.event import async_track_time_interval
-from homeassistant.helpers.storage import Store
 from homeassistant.util import slugify
 
 from .const import (
@@ -63,27 +61,62 @@ def is_freebox_repeater(device: dict[str, Any], router_mac: str) -> bool:
     return False
 
 
+def _token_candidates(hass: HomeAssistant, host: str) -> list[Path]:
+    slug = slugify(host)
+    storage_root = Path(hass.config.path(".storage"))
+    return [
+        storage_root / "freebox_homexa" / f"{slug}.conf",
+        storage_root / "freebox" / f"{slug}.conf",
+        storage_root / DOMAIN / f"{slug}.conf",
+    ]
+
+
+def resolve_token_file(hass: HomeAssistant, host: str) -> Path:
+    """Return an existing token file, or the canonical Homexa path."""
+    for candidate in _token_candidates(hass, host):
+        if candidate.is_file():
+            return candidate
+    return _token_candidates(hass, host)[0]
+
+
+def _app_desc_from_token(token_file: Path) -> dict[str, str]:
+    """Keep the descriptor stored with the token so freebox-api does not re-pair."""
+    app_desc = dict(APP_DESC)
+    try:
+        data = json.loads(token_file.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return app_desc
+    if not data.get("app_token"):
+        return app_desc
+    for key in ("app_id", "app_name", "app_version", "device_name"):
+        if data.get(key):
+            app_desc[key] = str(data[key])
+    return app_desc
+
+
 async def get_api(hass: HomeAssistant, host: str) -> Freepybox:
-    """Obtient l'API Freebox avec un dossier de stockage sécurisé."""
-    storage_dir = hass.config.path(".storage", "freebox_homexa")
+    """Obtient l'API Freebox en réutilisant le token déjà enregistré."""
+    token_file = resolve_token_file(hass, host)
+    storage_dir = token_file.parent
 
     def _ensure_directory():
-        if os.path.isfile(storage_dir):
+        if storage_dir.is_file():
+            backup = storage_dir.with_suffix(".bak")
             try:
-                os.remove(storage_dir)
-                _LOGGER.warning(
-                    "Fichier bloquant '%s' supprimé automatiquement (cause du NotADirectoryError)",
-                    storage_dir,
-                )
-            except Exception as err:
-                _LOGGER.error("Impossible de supprimer le fichier bloquant : %s", err)
-
-        Path(storage_dir).mkdir(parents=True, exist_ok=True)
+                storage_dir.replace(backup)
+                _LOGGER.warning("Fichier bloquant '%s' déplacé vers %s", storage_dir, backup)
+            except OSError as err:
+                _LOGGER.error("Impossible de déplacer le fichier bloquant : %s", err)
+        storage_dir.mkdir(parents=True, exist_ok=True)
 
     await hass.async_add_executor_job(_ensure_directory)
 
-    token_file = str(Path(storage_dir) / f"{slugify(host)}.conf")
-    return Freepybox(APP_DESC, token_file, API_VERSION)
+    app_desc = APP_DESC
+    if token_file.is_file():
+        app_desc = await hass.async_add_executor_job(_app_desc_from_token, token_file)
+        _LOGGER.info("Token Freebox réutilisé : %s", token_file)
+
+    return Freepybox(app_desc, str(token_file), API_VERSION)
 
 
 async def get_hosts_list_if_supported(

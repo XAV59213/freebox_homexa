@@ -5,25 +5,25 @@
 import logging
 import voluptuous as vol
 import homeassistant.helpers.config_validation as cv
-from homeassistant.helpers.aiohttp_client import async_create_clientsession
 from homeassistant.const import CONF_HOST, CONF_PORT, EVENT_HOMEASSISTANT_STOP
 from datetime import timedelta
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.core import Event, HomeAssistant, ServiceCall
+from homeassistant.core import Event, HomeAssistant, ServiceCall, callback
 from homeassistant.exceptions import ConfigEntryNotReady
 from homeassistant.helpers.event import async_track_time_interval
 from homeassistant.helpers.storage import Store
 from freebox_api.exceptions import HttpRequestError
 import aiohttp
-import homeassistant.helpers.device_registry as dr  # Ajout pour le registre des devices
+import homeassistant.helpers.device_registry as dr
 
-from .const import DOMAIN, PLATFORMS, SERVICE_REBOOT
+from .const import DOMAIN, PLATFORMS, SERVICE_REBOOT, SERVICE_RELOAD, SERVICE_REMOTE
 from .router import FreeboxRouter, get_api
 
 SCAN_INTERVAL = timedelta(seconds=40)
 STORAGE_VERSION = 1
 STORAGE_KEY = f"{DOMAIN}_config"
 PLAYER_PATH_TEMPLATE = "http://{host}/pub/remote_control?code={remote_code}&key={key}"
+_RESERVED_DATA_KEYS = {"config", "store"}
 
 CONFIG_SCHEMA = vol.Schema(
     {
@@ -44,6 +44,12 @@ REMOTE_SCHEMA = vol.Schema(
 )
 
 _LOGGER = logging.getLogger(__name__)
+
+
+def _router_keys(hass: HomeAssistant) -> list[str]:
+    """Return stored router keys for this domain."""
+    return [key for key in hass.data.get(DOMAIN, {}) if key not in _RESERVED_DATA_KEYS]
+
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up Freebox Homexa from a config entry."""
@@ -71,14 +77,13 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
     try:
         await api.open(host, port)
-        _LOGGER.debug(f"Connexion établie avec la Freebox à {host} (port={port})")
+        _LOGGER.debug("Connexion établie avec la Freebox à %s (port=%s)", host, port)
     except HttpRequestError as err:
-        _LOGGER.error(f"Erreur lors de la connexion à la Freebox {host}: {err}")
+        _LOGGER.error("Erreur lors de la connexion à la Freebox %s: %s", host, err)
         raise ConfigEntryNotReady from err
 
     freebox_config = await api.system.get_config()
 
-    # Création explicite du device parent (hub Freebox)
     device_registry = dr.async_get(hass)
     parent_device = device_registry.async_get_or_create(
         config_entry_id=entry.entry_id,
@@ -111,7 +116,10 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         await save_data()
         _LOGGER.info("Redémarrage de la Freebox effectué avec succès.")
 
-    hass.services.async_register(DOMAIN, SERVICE_REBOOT, async_reboot)
+    async def async_reload_config(call: ServiceCall) -> None:
+        """Recharge la configuration et redécouvre les appareils Freebox Home."""
+        _LOGGER.info("Rechargement de la configuration Freebox Homexa demandé.")
+        await hass.config_entries.async_reload(entry.entry_id)
 
     async def async_close_connection(event: Event) -> None:
         """Ferme la connexion à la Freebox lors de l'arrêt de Home Assistant."""
@@ -132,21 +140,63 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             return
 
         async with aiohttp.ClientSession() as session:
-            for code in code_list.split(','):
+            for code in code_list.split(","):
                 url = PLAYER_PATH_TEMPLATE.format(
                     host=entry.data[CONF_HOST],
                     remote_code=entry.data["remote_code"],
-                    key=code.strip()
+                    key=code.strip(),
                 )
                 try:
                     async with session.get(url, ssl=False) as response:
                         if response.status != 200:
-                            _LOGGER.error(f"Échec de l'envoi de la commande '{code}' : HTTP {response.status}")
+                            _LOGGER.error(
+                                "Échec de l'envoi de la commande '%s' : HTTP %s",
+                                code,
+                                response.status,
+                            )
                         else:
-                            _LOGGER.debug(f"Commande '{code}' envoyée avec succès au Freebox Player.")
+                            _LOGGER.debug(
+                                "Commande '%s' envoyée avec succès au Freebox Player.",
+                                code,
+                            )
                 except aiohttp.ClientError as err:
-                    _LOGGER.error(f"Erreur lors de l'envoi de la commande '{code}' : {err}")
+                    _LOGGER.error("Erreur lors de l'envoi de la commande '%s' : %s", code, err)
 
-    hass.services.async_register(DOMAIN, "remote", async_freebox_player_remote)
+    if not hass.services.has_service(DOMAIN, SERVICE_REBOOT):
+        hass.services.async_register(DOMAIN, SERVICE_REBOOT, async_reboot)
+    if not hass.services.has_service(DOMAIN, SERVICE_RELOAD):
+        hass.services.async_register(DOMAIN, SERVICE_RELOAD, async_reload_config)
+    if not hass.services.has_service(DOMAIN, SERVICE_REMOTE):
+        hass.services.async_register(DOMAIN, SERVICE_REMOTE, async_freebox_player_remote)
+
     _LOGGER.info("L'intégration Freebox a été configurée avec succès.")
     return True
+
+
+async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
+    """Unload a config entry and enable the HA Reload button."""
+    unload_ok = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
+    if not unload_ok:
+        _LOGGER.error("Impossible de décharger les plateformes Freebox Homexa")
+        return False
+
+    router = hass.data[DOMAIN].pop(entry.unique_id, None)
+    if router is not None:
+        await router.close()
+
+    store = hass.data[DOMAIN].get("store")
+    if store is not None and "config" in hass.data[DOMAIN]:
+        await store.async_save(hass.data[DOMAIN]["config"])
+
+    if not _router_keys(hass):
+        for service in (SERVICE_REBOOT, SERVICE_RELOAD, SERVICE_REMOTE):
+            if hass.services.has_service(DOMAIN, service):
+                hass.services.async_remove(DOMAIN, service)
+
+    _LOGGER.info("Entrée Freebox Homexa déchargée, prête à être rechargée")
+    return True
+
+
+async def async_reload_entry(hass: HomeAssistant, entry: ConfigEntry) -> None:
+    """Reload config entry after options or manual reload."""
+    await hass.config_entries.async_reload(entry.entry_id)

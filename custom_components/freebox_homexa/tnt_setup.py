@@ -1,9 +1,4 @@
-"""Bundle Programme TNT FR inside Freebox Homexa (MIT, cyclope205).
-
-Registers the official card URL/element so
-`type: custom:programme-tnt-fr-card` works without a second integration.
-Skips itself if programme_tnt_fr is already installed.
-"""
+"""Bundle Programme TNT FR inside Freebox Homexa (MIT, cyclope205)."""
 from __future__ import annotations
 
 import logging
@@ -21,15 +16,19 @@ _LOGGER = logging.getLogger(__name__)
 
 CARD_FILENAME = "programme-tnt-fr-card.js"
 CARD_URL_PATH = f"/programme_tnt_fr/{CARD_FILENAME}"
-CARD_VERSION = "2.2.3-homexa"
+CARD_CDN = (
+    "https://cdn.jsdelivr.net/gh/cyclope205/programme-tnt-fr@cedaceadd"
+    "b0b97bbb2a3e1fe9057ae4594f703d9/custom_components/programme_tnt_fr/www/"
+    + CARD_FILENAME
+)
 _CARD_KEY = "freebox_homexa_tnt_card"
 _WS_KEY = "freebox_homexa_tnt_ws"
 
 
 async def async_setup_bundled_tnt(hass: HomeAssistant) -> ProgrammeTntFrCoordinator | None:
-    """Start XMLTV coordinator + Lovelace card, or reuse an existing TNT install."""
     if hass.config_entries.async_entries(TNT_DOMAIN):
         _LOGGER.info("Programme TNT FR est déjà installé, bundle Homexa ignoré")
+        await _async_register_card(hass)
         return None
 
     await _async_register_card(hass)
@@ -52,24 +51,26 @@ async def _async_register_card(hass: HomeAssistant) -> None:
         return
     www_dir = Path(__file__).parent / "www"
     card_path = www_dir / CARD_FILENAME
-    if not card_path.exists():
-        _LOGGER.error("Carte TNT introuvable : %s", card_path)
-        return
-    await hass.http.async_register_static_paths(
-        [StaticPathConfig(CARD_URL_PATH, str(card_path), cache_headers=False)]
-    )
-    add_extra_js_url(hass, f"{CARD_URL_PATH}?v={CARD_VERSION}")
+    script_url = CARD_CDN
+    if card_path.exists():
+        try:
+            await hass.http.async_register_static_paths(
+                [StaticPathConfig(CARD_URL_PATH, str(card_path), cache_headers=False)]
+            )
+            script_url = CARD_URL_PATH + "?v=2.2.3-homexa"
+        except Exception as err:  # noqa: BLE001
+            _LOGGER.debug("Static TNT card path skipped: %s", err)
+    add_extra_js_url(hass, script_url)
     hass.data[_CARD_KEY] = True
-    await _async_sync_lovelace_resource(hass)
-    _LOGGER.info("Carte programme-tnt-fr-card enregistrée par Freebox Homexa")
+    await _async_sync_lovelace_resource(hass, script_url)
+    _LOGGER.info("Carte programme-tnt-fr-card enregistrée (%s)", script_url)
 
 
-async def _async_sync_lovelace_resource(hass: HomeAssistant) -> None:
+async def _async_sync_lovelace_resource(hass: HomeAssistant, script_url: str) -> None:
     lovelace_data = hass.data.get("lovelace")
     resources = getattr(lovelace_data, "resources", None)
     if resources is None or not hasattr(resources, "async_create_item"):
         return
-    target_url = f"{CARD_URL_PATH}?v={CARD_VERSION}"
     try:
         if not getattr(resources, "loaded", False):
             await resources.async_load()
@@ -77,13 +78,13 @@ async def _async_sync_lovelace_resource(hass: HomeAssistant) -> None:
             (
                 item
                 for item in resources.async_items()
-                if str(item.get("url", "")).split("?", 1)[0] == CARD_URL_PATH
+                if "programme-tnt-fr-card.js" in str(item.get("url", ""))
             ),
             None,
         )
         if existing is None:
-            await resources.async_create_item({"res_type": "module", "url": target_url})
-        elif existing.get("url") != target_url:
-            await resources.async_update_item(existing["id"], {"url": target_url})
+            await resources.async_create_item({"res_type": "module", "url": script_url})
+        elif existing.get("url") != script_url:
+            await resources.async_update_item(existing["id"], {"url": script_url})
     except Exception:  # noqa: BLE001
         _LOGGER.debug("Ressource Lovelace TNT non synchronisée", exc_info=True)

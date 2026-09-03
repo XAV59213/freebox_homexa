@@ -22,3 +22,11 @@ tv_guide:
     channel:
       description: Nom ou UUID de chaîne (optionnel). Vide = aperçu général.
       example: "France 2"
+
+play_channel:
+  name: "Ouvrir une chaîne sur le Player"
+  description: "Ouvre une chaîne TNT sur le Freebox Player (n'entre pas en conflit avec Programme TNT FR)."
+  fields:
+    channel:
+      description: Nom (France 2) ou numéro (2)
+      example: "France 2"

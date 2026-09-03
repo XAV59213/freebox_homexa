@@ -1,4 +1,4 @@
-"""Calendrier Guide TV Freebox (EPG)."""
+"""Calendrier Guide TV Freebox (EPG), enrichi si Programme TNT FR est présent."""
 
 from __future__ import annotations
 
@@ -14,6 +14,7 @@ from homeassistant.util import dt as dt_util
 
 from .const import DOMAIN
 from .router import FreeboxRouter
+from .tv_guide import summarize_guide
 
 _LOGGER = logging.getLogger(__name__)
 MAX_EVENTS = 80
@@ -77,7 +78,7 @@ def _program_to_event(program: dict[str, Any], channel_name: str) -> CalendarEve
 
 
 class FreeboxTvGuideCalendar(CalendarEntity):
-    """Programmes TV en cours et à venir (bouquet Freebox)."""
+    """Programmes TV en cours et à venir."""
 
     _attr_has_entity_name = True
     _attr_name = "Guide TV"
@@ -89,10 +90,22 @@ class FreeboxTvGuideCalendar(CalendarEntity):
         self._attr_device_info = router.device_info
         self._event: CalendarEvent | None = None
         self._channels: dict[str, dict[str, Any]] = {}
+        self._summary: dict[str, Any] = {}
+        self._snippets: list[dict[str, Any]] = []
 
     @property
     def event(self) -> CalendarEvent | None:
         return self._event
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        return {
+            "guide_source": self._summary.get("source", "freebox"),
+            "tnt_available": self._summary.get("tnt_available", False),
+            "current": self._summary.get("current", []),
+            "prime_time": self._summary.get("prime_time", []),
+            "second_part": self._summary.get("second_part", []),
+        }
 
     async def async_get_events(
         self,
@@ -101,6 +114,7 @@ class FreeboxTvGuideCalendar(CalendarEntity):
         end_date: datetime,
     ) -> list[CalendarEvent]:
         events: list[CalendarEvent] = []
+        self._snippets = []
         try:
             api_tv = self._router._api.tv
             channels = await api_tv.get_tv_channels() or {}
@@ -108,10 +122,7 @@ class FreeboxTvGuideCalendar(CalendarEntity):
                 self._channels = channels
             now_ts = int(dt_util.now().timestamp())
             programs = await api_tv.get_tv_programs_by_date(now_ts) or {}
-            if isinstance(programs, dict):
-                iterable = programs.values()
-            else:
-                iterable = programs or []
+            iterable = programs.values() if isinstance(programs, dict) else programs or []
             for program in iterable:
                 if not isinstance(program, dict):
                     continue
@@ -126,6 +137,17 @@ class FreeboxTvGuideCalendar(CalendarEntity):
                 event = _program_to_event(program, str(channel_name))
                 if event is None:
                     continue
+                self._snippets.append(
+                    {
+                        "channel": channel_name,
+                        "title": program.get("title") or program.get("name"),
+                        "category": program.get("category_name") or program.get("category"),
+                        "start": event.start,
+                        "stop": event.end,
+                        "_start": event.start,
+                        "_end": event.end,
+                    }
+                )
                 if event.end < start_date or event.start > end_date:
                     continue
                 events.append(event)
@@ -133,8 +155,8 @@ class FreeboxTvGuideCalendar(CalendarEntity):
                     break
         except Exception as err:
             _LOGGER.warning("Impossible de lire le guide TV Freebox : %s", err)
-            return []
 
+        self._summary = summarize_guide(hass, self._snippets)
         events.sort(key=lambda item: item.start)
         now = dt_util.now()
         self._event = next((item for item in events if item.start <= now <= item.end), events[0] if events else None)

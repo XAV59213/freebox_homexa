@@ -49,6 +49,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     store = Store(hass, STORAGE_VERSION, STORAGE_KEY)
     stored_data = await store.async_load()
     if stored_data is None:
+        _LOGGER.info("Aucune configuration Freebox stockée, démarrage avec un cache vide")
         stored_data = {}
 
     hass.data[DOMAIN]["config"] = stored_data
@@ -63,16 +64,20 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
     try:
         await api.open(host, port)
+        _LOGGER.debug("Connexion Freebox établie %s:%s", host, port)
     except AuthorizationError as err:
         message = str(err).lower()
         if "timed out" in message:
+            _LOGGER.warning("Autorisation Freebox en attente pour %s : %s", host, err)
             raise ConfigEntryNotReady(
                 "En attente de la flèche droite sur la Freebox (token déjà enregistré conservé)"
             ) from err
+        _LOGGER.error("Autorisation Freebox refusée pour %s: %s", host, err)
         raise ConfigEntryAuthFailed(
-            "Autorisation Freebox refusée ou révoquée."
+            "Autorisation Freebox refusée ou révoquée. Réautorise depuis Freebox OS."
         ) from err
     except HttpRequestError as err:
+        _LOGGER.error("Erreur réseau Freebox %s: %s", host, err)
         raise ConfigEntryNotReady from err
 
     freebox_config = await api.system.get_config()
@@ -92,15 +97,13 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     router.device_id = parent_device.id
     await router.update_all()
 
-    entry.async_on_unload(
-        async_track_time_interval(hass, router.update_all, SCAN_INTERVAL)
-    )
+    entry.async_on_unload(async_track_time_interval(hass, router.update_all, SCAN_INTERVAL))
 
     hass.data[DOMAIN][entry.unique_id] = router
     try:
         hass.data[DOMAIN]["tnt_coordinator"] = await async_setup_bundled_tnt(hass)
     except Exception:
-        _LOGGER.exception("Impossible d'initialiser le guide TNT embarqué")
+        _LOGGER.exception("Guide TNT embarqué indisponible")
         hass.data[DOMAIN]["tnt_coordinator"] = None
 
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
@@ -144,6 +147,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         hass.services.async_register(DOMAIN, SERVICE_RELOAD, async_reload_config)
     if not hass.services.has_service(DOMAIN, SERVICE_REMOTE):
         hass.services.async_register(DOMAIN, SERVICE_REMOTE, async_freebox_player_remote)
+
+    _LOGGER.info("Freebox Homexa prêt")
     return True
 
 
@@ -154,6 +159,9 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     router = hass.data[DOMAIN].pop(entry.unique_id, None)
     if router is not None:
         await router.close()
+    store = hass.data[DOMAIN].get("store")
+    if store is not None and "config" in hass.data[DOMAIN]:
+        await store.async_save(hass.data[DOMAIN]["config"])
     if not _router_keys(hass):
         for service in (SERVICE_REBOOT, SERVICE_RELOAD, SERVICE_REMOTE):
             if hass.services.has_service(DOMAIN, service):

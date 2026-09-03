@@ -106,8 +106,7 @@ async def async_setup_entry(
     if coordinator is not None:
         channels = list(coordinator.data or DEFAULT_CHANNELS)
         entities.extend(
-            HomexaTntSensor(coordinator, router.device_info, channel_id, router.mac)
-            for channel_id in channels
+            HomexaTntSensor(coordinator, channel_id, router.mac) for channel_id in channels
         )
 
     if entities:

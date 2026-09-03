@@ -8,6 +8,8 @@ from homeassistant.components.alarm_control_panel import AlarmControlPanelState 
 
 DOMAIN = "freebox_homexa"
 SERVICE_REBOOT = "reboot"
+SERVICE_RELOAD = "reload"
+SERVICE_REMOTE = "remote"
 
 VALUE_NOT_SET = -1
 DEFAULT_DEVICE_NAME = "Unknown device"
@@ -16,7 +18,7 @@ REPEATER_MODEL = "F-RP01A"
 APP_DESC = {
     "app_id": "hass",
     "app_name": "Home Assistant",
-    "app_version": "28.8.2",
+    "app_version": "28.8.4",
     "device_name": socket.gethostname(),
 }
 API_VERSION = "v6"

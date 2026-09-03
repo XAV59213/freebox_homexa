@@ -29,6 +29,14 @@
     }
   },
   "services": {
+    "reboot": {
+      "name": "Redémarrer",
+      "description": "Redémarre la Freebox."
+    },
+    "reload": {
+      "name": "Recharger",
+      "description": "Recharge Freebox Homexa, reconnecte la box et redécouvre les appareils."
+    },
     "remote": {
       "name": "Envoyer une commande",
       "description": "Envoie une commande au Freebox Player",

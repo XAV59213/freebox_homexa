@@ -36,6 +36,10 @@
       "name": "Reboot",
       "description": "Reboots the Freebox."
     },
+    "reload": {
+      "name": "Reload",
+      "description": "Reload Freebox Homexa, reconnect and rediscover devices."
+    },
     "remote": {
       "name": "Send remote command",
       "description": "Send a remote command to Freebox Player",

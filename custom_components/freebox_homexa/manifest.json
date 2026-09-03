@@ -2,7 +2,9 @@
   "domain": "freebox_homexa",
   "name": "Freebox Homexa",
   "after_dependencies": [
-    "zeroconf"
+    "zeroconf",
+    "http",
+    "frontend"
   ],
   "codeowners": [
     "@gvigroux",
@@ -11,7 +13,7 @@
   ],
   "config_flow": true,
   "dependencies": [
-      "ffmpeg"
+    "ffmpeg"
   ],
   "documentation": "https://github.com/XAV59213/freebox_homexa",
   "iot_class": "local_polling",
@@ -20,7 +22,7 @@
   "requirements": [
     "freebox-api"
   ],
-  "version": "28.8.10",
+  "version": "28.8.11",
   "zeroconf": [
     "_fbx-api._tcp.local."
   ]

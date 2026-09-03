@@ -2,7 +2,8 @@
   "domain": "freebox_homexa",
   "name": "Freebox Homexa",
   "after_dependencies": [
-    "zeroconf"
+    "zeroconf",
+    "programme_tnt_fr"
   ],
   "codeowners": [
     "@gvigroux",
@@ -20,7 +21,7 @@
   "requirements": [
     "freebox-api"
   ],
-  "version": "28.8.7",
+  "version": "28.8.8",
   "zeroconf": [
     "_fbx-api._tcp.local."
   ]

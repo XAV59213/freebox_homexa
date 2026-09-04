@@ -1,6 +1,4 @@
 """Support pour les appareils Freebox (Freebox v6 et Freebox mini 4K) dans Home Assistant."""
-# DESCRIPTION: Gestion du suivi des appareils connectés au réseau Freebox
-# OBJECTIF: Surveiller la présence des appareils sur le réseau Freebox et fournir leur état dans Home Assistant
 
 from __future__ import annotations
 from datetime import datetime
@@ -10,11 +8,12 @@ import logging
 from homeassistant.components.device_tracker import ScannerEntity
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, callback
+from homeassistant.helpers.device_registry import CONNECTION_NETWORK_MAC, DeviceInfo
 from homeassistant.helpers.dispatcher import async_dispatcher_connect
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from .const import DEFAULT_DEVICE_NAME, DEVICE_ICONS, DOMAIN
-from .router import FreeboxRouter
+from .router import FreeboxRouter, is_freebox_repeater
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -22,13 +21,11 @@ _LOGGER = logging.getLogger(__name__)
 async def async_setup_entry(
     hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback
 ) -> None:
-    """Configure les entités de suivi des appareils pour l'intégration Freebox."""
     router: FreeboxRouter = hass.data[DOMAIN][entry.unique_id]
     tracked: set[str] = set()
 
     @callback
     def update_router() -> None:
-        """Met à jour les données du routeur et ajoute les nouveaux appareils détectés."""
         add_entities(router, async_add_entities, tracked)
 
     entry.async_on_unload(
@@ -41,7 +38,6 @@ async def async_setup_entry(
 def add_entities(
     router: FreeboxRouter, async_add_entities: AddEntitiesCallback, tracked: set[str]
 ) -> None:
-    """Ajoute de nouvelles entités de suivi des appareils à partir des données du routeur."""
     new_tracked = []
 
     for mac, device in router.devices.items():
@@ -49,11 +45,6 @@ def add_entities(
             continue
         new_tracked.append(FreeboxDevice(router, device))
         tracked.add(mac)
-        _LOGGER.debug(
-            "Appareil %s (%s) ajouté pour le suivi",
-            device.get("primary_name", "Inconnu"),
-            mac,
-        )
 
     if new_tracked:
         async_add_entities(new_tracked, True)
@@ -63,6 +54,7 @@ class FreeboxDevice(ScannerEntity):
     """Représentation d'un appareil Freebox dans Home Assistant."""
 
     _attr_should_poll = False
+    _attr_has_entity_name = False
 
     def __init__(self, router: FreeboxRouter, device: dict[str, Any]) -> None:
         self._router = router
@@ -72,18 +64,41 @@ class FreeboxDevice(ScannerEntity):
         self._attr_icon = icon_for_freebox_device(device)
         self._active = False
         self._attr_extra_state_attributes: dict[str, Any] = {}
-        _LOGGER.debug("Appareil %s (%s) initialisé pour le suivi", self._name, self._mac)
+        self._attr_device_info = self._build_device_info(device)
+
+    def _build_device_info(self, device: dict[str, Any]) -> DeviceInfo:
+        if device.get("attrs") is not None:
+            return self._router.device_info
+
+        if is_freebox_repeater(device, self._router.mac):
+            return DeviceInfo(
+                identifiers={(DOMAIN, f"repeater_{self._mac}")},
+                connections={(CONNECTION_NETWORK_MAC, self._mac)},
+                manufacturer=device.get("vendor_name") or "Freebox SAS",
+                model=device.get("model") or "F-RP01A",
+                name=self._name,
+                via_device=(DOMAIN, self._router.mac),
+            )
+
+        parent = device.get("wifi_parent") or {}
+        identifier = parent.get("identifier") or self._router.mac
+        return DeviceInfo(
+            connections={(CONNECTION_NETWORK_MAC, self._mac)},
+            manufacturer=self._manufacturer,
+            name=self._name,
+            via_device=(DOMAIN, identifier),
+        )
 
     @callback
     def async_update_state(self) -> None:
         device = self._router.devices.get(self._mac)
         if not device:
-            _LOGGER.warning("Appareil %s non trouvé dans les données du routeur", self._mac)
             self._active = False
             self._attr_extra_state_attributes = {}
             return
 
         self._active = device.get("active", False)
+        self._attr_device_info = self._build_device_info(device)
 
         if device.get("attrs") is None:
             last_reachable = device.get("last_time_reachable")
@@ -97,10 +112,13 @@ class FreeboxDevice(ScannerEntity):
                 ),
             }
             attributes.update(device.get("wifi") or {})
+            parent = device.get("wifi_parent") or {}
+            if parent.get("name"):
+                attributes["connecte_sur"] = parent["name"]
+                attributes["ap_kind"] = parent.get("kind")
             self._attr_extra_state_attributes = attributes
         else:
             self._attr_extra_state_attributes = device.get("attrs", {})
-        _LOGGER.debug("Mise à jour de l'appareil %s: actif=%s", self._name, self._active)
 
     @property
     def mac_address(self) -> str:
@@ -128,9 +146,7 @@ class FreeboxDevice(ScannerEntity):
                 self.async_on_demand_update,
             )
         )
-        _LOGGER.debug("Appareil %s ajouté à Home Assistant", self._name)
 
 
 def icon_for_freebox_device(device: dict[str, Any]) -> str:
-    """Retourne une icône basée sur le type de l'appareil."""
     return DEVICE_ICONS.get(device.get("host_type", ""), "mdi:help-network")

@@ -29,6 +29,13 @@ def is_freebox_repeater(device: dict[str, Any], router_mac: str) -> bool:
     return False
 
 
+def parent_identifier(access_point: dict[str, Any], router_mac: str) -> str:
+    """HA device identifier for the AP that owns this client."""
+    if access_point.get("kind") == "gateway":
+        return router_mac
+    return f"repeater_{access_point.get('mac') or access_point.get('id')}"
+
+
 def _client_summary(device: dict[str, Any]) -> dict[str, Any]:
     wifi = device.get("wifi") or {}
     ident = device.get("l2ident") or {}
@@ -69,6 +76,30 @@ def _gateway_state(radio_status: list[dict[str, Any]]) -> str:
     if states:
         return str(states[0])
     return "unknown"
+
+
+def annotate_wifi_parents(
+    devices: dict[str, dict[str, Any]],
+    wifi_aps: dict[str, dict[str, Any]],
+    router_mac: str,
+) -> None:
+    """Stamp each LAN host with the AP it is associated to."""
+    for access_point in wifi_aps.values():
+        identifier = parent_identifier(access_point, router_mac)
+        parent = {
+            "kind": access_point.get("kind"),
+            "ap_id": access_point.get("id"),
+            "name": access_point.get("name"),
+            "identifier": identifier,
+        }
+        for client in access_point.get("clients") or []:
+            mac = client.get("mac")
+            if not mac:
+                continue
+            device = devices.get(mac) or devices.get(str(mac).upper()) or devices.get(str(mac).lower())
+            if device is None:
+                continue
+            device["wifi_parent"] = parent
 
 
 def build_wifi_aps(
@@ -177,4 +208,5 @@ def build_wifi_aps(
         repeaters[display_mac] = payload
         wifi_aps[display_mac] = payload
 
+    annotate_wifi_parents(devices, wifi_aps, router_mac)
     return wifi_aps, repeaters

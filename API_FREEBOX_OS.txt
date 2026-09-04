@@ -1,0 +1,356 @@
+API FREEBOX OS ET USAGE DANS FREEBOX HOMEXA
+============================================
+Depot : https://github.com/XAV59213/freebox_homexa
+Doc officielle : https://dev.freebox.fr/sdk/os/
+Librairie Python : freebox-api  (https://github.com/hacf-fr/freebox-api)
+
+Base URL locale  : https://mafreebox.freebox.fr/api/v{N}/
+Base URL distante: https://{id}.fbxos.fr/api/v{N}/
+Auth             : POST /login/authorize  puis  POST /login/session  (token app)
+
+Ce fichier liste :
+  1) les API utilisees par Freebox Homexa (avec descriptif et fichiers HA)
+  2) les autres API Freebox OS disponibles mais non utilisees aujourd'hui
+
+Les chemins sont relatifs a /api/v{N}/  (N = version negociee par la box).
+
+
+===========================================================================
+1. API UTILISEES PAR FREEBOX HOMEXA
+===========================================================================
+
+--------------------------------------------------------------------------
+LOGIN / SESSION
+--------------------------------------------------------------------------
+GET  /api_version
+GET  /login/
+POST /login/authorize/
+POST /login/session/
+POST /login/logout/
+
+Descriptif : appairage de l'application Home Assistant et ouverture de session.
+Usage Homexa : config_flow.py, __init__.py  (bibliotheque freebox-api.open).
+Droit Freebox OS : accorde a la premiere validation sur l'ecran de la box.
+
+
+--------------------------------------------------------------------------
+SYSTEM  (/system/)
+--------------------------------------------------------------------------
+GET  /system/
+POST /system/reboot/
+
+Descriptif : identite de la box (modele, MAC, firmware, temperatures,
+ventilateur, uptime) et redemarrage.
+Usage Homexa :
+  - router.py           system.get_config()
+  - sensor.py           temperatures, ventilateur, firmware
+  - button.py           bouton "Redemarrer Freebox" via system.reboot()
+Entites : capteurs diagnostiques de la Freebox Server.
+
+
+--------------------------------------------------------------------------
+CONNECTION  (/connection/)
+--------------------------------------------------------------------------
+GET  /connection/
+
+Descriptif : etat de la connexion Internet (debit montant/descendant,
+IPv4/IPv6, type xDSL/FTTH, etat up/down).
+Usage Homexa :
+  - router.py           connection.get_status()
+  - sensor.py           debit, etat ligne
+Non utilise encore : /connection/config/, /connection/xdsl/, /connection/ftth/,
+                     /connection/ipv6/config/, aggregation, backup LTE.
+
+
+--------------------------------------------------------------------------
+LAN BROWSER  (/lan/)
+--------------------------------------------------------------------------
+GET  /lan/browser/interfaces/
+GET  /lan/browser/{interface}/          ex. /lan/browser/pub/
+GET  /lan/browser/{interface}/{host_id}
+POST /lan/wol/{interface}/              (non utilise)
+GET  /lan/config/                       (non utilise)
+
+Descriptif : liste des hotes du reseau local. Chaque hote contient :
+  primary_name, vendor_name, host_type, active, last_activity,
+  l2ident.id (MAC), access_point (type=gateway|repeater, mac),
+  access_point.wifi_information.signal (RSSI dBm), connectivity_type.
+Usage Homexa :
+  - router.py           lan.get_hosts_list()
+  - device_tracker.py   presence des appareils
+  - wifi_ap.py          groupement clients par box / repeteur
+  - binary_sensor.py    etat des repeteurs F-RP01A
+C'est l'API principale pour le mesh Wi-Fi v7 (les clients des repeteurs
+ne sont PAS dans /wifi/ap/*/stations/, seulement dans lan/browser).
+
+
+--------------------------------------------------------------------------
+WIFI  (/wifi/)
+--------------------------------------------------------------------------
+GET  /wifi/config/
+PUT  /wifi/config/
+GET  /wifi/ap/
+GET  /wifi/ap/{ap_id}/
+GET  /wifi/ap/{ap_id}/stations/
+GET  /wifi/bss/                         (non utilise)
+GET  /wifi/planning/                    (non utilise)
+GET  /wifi/mac_filter/                  (non utilise)
+GET  /wifi/custom_key/                  (non utilise)
+
+Descriptif : configuration globale Wi-Fi, points d'acces radio de la box,
+stations associees a la box, RSSI, bande, debit PHY.
+Usage Homexa :
+  - router.py           wifi.get_ap_list(), wifi.get_station_list(ap_id)
+                        (enrichissement RSSI / bande / BSSID)
+  - switch.py           wifi.get_global_config() / set_global_config()
+                        interrupteur Wi-Fi on/off
+  - sensor.py           capteurs RSSI par client
+  - wifi_ap_sensors.py  synthese box + repeteurs + listes de clients
+Limite API : /wifi/ap/*/stations/ ne voit que les clients de la box,
+pas ceux des repeteurs. Homexa complete avec lan/browser.access_point.
+
+
+--------------------------------------------------------------------------
+STORAGE  (/storage/)
+--------------------------------------------------------------------------
+GET  /storage/disk/
+GET  /storage/raid/
+
+Descriptif : disques internes (temperature, partition, statut) et volumes RAID.
+Usage Homexa :
+  - router.py           storage.get_disks(), storage.get_raids()
+  - sensor.py           temperatures disques
+  - binary_sensor.py    RAID degrade
+
+
+--------------------------------------------------------------------------
+CALL / TELEPHONIE  (/call/)
+--------------------------------------------------------------------------
+GET  /call/log/
+PUT  /call/log/mark_all_as_read/
+DELETE /call/log/{id}                   (non utilise)
+
+Descriptif : journal des appels de la ligne fixe Freebox.
+Usage Homexa :
+  - router.py           call.get_calls_log()
+  - sensor.py           dernier appelant, nombre d'appels manques
+  - button.py           "Marquer les appels comme lus"
+Non utilise : /phone/, /contact/.
+
+
+--------------------------------------------------------------------------
+HOME  (/home/)   [API instable / peu documentee publiquement]
+--------------------------------------------------------------------------
+GET  /home/nodes
+GET  /home/nodes/{node_id}
+GET  /home/adapters
+GET  /home/endpoints/{node_id}/{endpoint_id}
+PUT  /home/endpoints/{node_id}/{endpoint_id}     body {"value": ...}
+GET  /home/links                                (non utilise)
+
+Descriptif : Freebox Home (alarm, PIR, ouverture, volets, prises,
+cameras, telecommandes RTS/IO).
+Usage Homexa :
+  - router.py           home.get_home_nodes()
+  - entity.py           get/set_home_endpoint_value()
+  - alarm_control_panel.py   modes Present / Absent / Desarme
+  - binary_sensor.py    PIR, porte/fenetre, cover safety
+  - cover.py            volets / stores
+  - switch.py           prises / actionneurs Home
+  - camera.py           flux + detection de mouvement
+Droit Freebox OS requis : Home.
+
+
+--------------------------------------------------------------------------
+PLAYER  (/player/)
+--------------------------------------------------------------------------
+GET  /player/
+GET  /player/{id}/
+GET  /player/{id}/api/v6/status/
+POST /player/{id}/api/v6/control/mediactrl      {"cmd": play|pause|stop|next|prev}
+PUT  /player/{id}/api/v6/control/volume         {"volume": int, "mute": bool}
+POST /player/{id}/api/v6/control/open           {"url": "..."}
+
+Descriptif : Freebox Player (Devialet, Mini 4K, Pop) : etat, volume,
+lecture, ouverture d'une source (tv:, YouTube, Netflix, HDMI CEC).
+Usage Homexa :
+  - media_player.py     controle media + sources
+  - remote.py           liste des players et statut
+Droit Freebox OS requis : Player.
+
+
+--------------------------------------------------------------------------
+REMOTE  (/remote/)
+--------------------------------------------------------------------------
+GET  /remote/
+POST /remote/key/            (code player + touche IR reseau)
+
+Descriptif : emulation de la telecommande du Player (power, ok, home,
+vol_inc, HDMI via CEC One Touch Play, etc.).
+Usage Homexa :
+  - remote.py           remote.send_key(code, key)
+  - media_player.py     power on / choix de source TV-HDMI
+
+
+--------------------------------------------------------------------------
+TV  (/tv/)
+--------------------------------------------------------------------------
+GET  /tv/channels/
+GET  /tv/channels/{id}/programs ou programmes par date
+
+Descriptif : bouquet TV Freebox et guide des programmes cote box.
+Usage Homexa :
+  - calendar.py         tv.get_tv_channels(), tv.get_tv_programs_by_date()
+Complement hors API box :
+  - tnt_coordinator.py  guide TNT externe (XMLTV), pas une API Freebox.
+
+
+===========================================================================
+2. API FREEBOX OS DISPONIBLES MAIS NON UTILISEES PAR HOMEXA
+===========================================================================
+
+AIRMEDIA          /airmedia/
+  Receivers AirMedia, envoi d'une URL photo/video/audio vers un ecran.
+
+CONTACTS          /contact/
+  Carnet d'adresses de la box (lie a la telephonie).
+
+DHCP              /dhcp/
+  Config DHCP, baux statiques, baux dynamiques.
+  Utile pour reserver une IP / lier un nom a une MAC.
+
+DOWNLOAD          /downloads/
+  File de telechargements (HTTP, FTP, torrent, magnet, Usenet),
+  stats, fichiers, feed RSS.
+
+FIREWALL / NAT    /fw/
+  Redirections de ports, ping, DMZ, règles pare-feu.
+
+FREEPLUG          /freeplug/
+  Adaptateurs CPL Freeplug (etat, debit, pairing).
+
+FS / FICHIERS     /fs/
+  Explorateur du stockage (list, info, mkdir, mv, rm, tasks).
+
+FTP               /ftp/
+  Activation et configuration du serveur FTP de la box.
+
+LCD               /lcd/
+  Luminosite / orientation de l'ecran de la Freebox Server,
+  masquage LED sur modeles compatibles.
+
+NETSHARE          /netshare/  (Samba / AFP)
+  Partages reseau Windows / Mac.
+
+NOTIFICATIONS     /notif/
+  Abonnement aux evenements (appel, telechargement, home...).
+
+PARENTAL          /parental/
+  Controle parental par profil / plage horaire.
+
+PHONE             /phone/
+  Etat de la ligne telephonique, dect, config, VM.
+
+RRD               /rrd/
+  Historique de mesures (debit, temperature) pour graphes.
+
+SWITCH ETHERNET   /switch/
+  Ports Ethernet de la box (lien, debit, status LED).
+
+UPNP AV           /upnpav/
+  Serveur media UPnP / DLNA.
+
+UPNP IGD          /upnpigd/
+  Redirections UPnP IGD.
+
+VPN               /vpn/  et  /vpn_client/
+  Serveur VPN Freebox et client VPN (OpenVPN / WireGuard selon firmware).
+
+WEBSOCKET         /ws/
+  Flux evenementiel temps reel (remplace une partie du polling).
+
+WIFI avance (non utilise)
+  /wifi/bss/            identifiants BSS / SSID secondaires
+  /wifi/planning/       plages horaires Wi-Fi
+  /wifi/mac_filter/     liste blanche / noire
+  /wifi/custom_key/     cle Wi-Fi temporaire invite
+  /wifi/wps/            session WPS
+  /wifi/ap/{id}/allowed_sta_list/
+
+VM / VIRTUALISATION  (modeles compatibles, API recente)
+  Machines virtuelles hebergees sur la Freebox.
+
+LAN avance (non utilise)
+  PUT  /lan/config/
+  POST /lan/wol/{iface}/     Wake-on-LAN depuis la box
+  GET  /lan/browser/types    categories d'hotes
+
+CONNECTION avance (non utilise)
+  /connection/config/
+  /connection/xdsl/
+  /connection/ftth/
+  /connection/ipv6/config/
+  etat agregat / backup 4G-5G selon offre.
+
+
+===========================================================================
+3. CORRESPONDANCE DROITS FREEBOX OS <-> HOMEXA
+===========================================================================
+
+A accorder dans Freebox OS > Parametres > Applications :
+
+  Acces settings / modification   session, reboot
+  Premiere connexion              login/authorize
+  Settings                        system, connection (lecture)
+  LAN                             lan/browser  (presence, RSSI, mesh)
+  Wi-Fi                           wifi/config, wifi/ap, stations
+  Appels                          call/log
+  Downloader                      (non utilise)
+  Explorer                        (non utilise)
+  Parental                        (non utilise)
+  Home                            nodes, endpoints, cameras, alarme
+  Player                          player + remote
+
+Sans le droit LAN : pas de device_tracker, pas de RSSI, pas de mesh.
+Sans le droit Wi-Fi : interrupteur Wi-Fi et fallback stations indisponibles.
+Sans le droit Home : alarme, volets, PIR, cameras absents.
+Sans le droit Player : media_player / remote absents.
+
+
+===========================================================================
+4. FICHIERS HOMEXA QUI PARLENT A L'API
+===========================================================================
+
+custom_components/freebox_homexa/
+  router.py              orchestrateur : system, connection, lan, wifi,
+                         storage, call, home
+  wifi_ap.py             regroupement clients box / repeteurs (lan + wifi)
+  wifi_ap_sensors.py     capteurs synthese mesh
+  device_tracker.py      presence (lan)
+  sensor.py              debit, temp, appels, RSSI
+  binary_sensor.py       RAID, PIR, DWS, etat AP / repeteur
+  switch.py              Wi-Fi global + actionneurs Home
+  button.py              reboot, appels lus
+  alarm_control_panel.py home endpoints alarme
+  cover.py               home endpoints volets
+  camera.py              home cameras
+  entity.py              get/set home endpoints
+  media_player.py        player control + open + volume
+  remote.py              remote.send_key + liste players
+  calendar.py            tv channels / programmes
+  tnt_coordinator.py     XMLTV externe (hors API Freebox)
+  config_flow.py         login / authorize
+
+
+===========================================================================
+5. REFERENCES
+===========================================================================
+
+https://dev.freebox.fr/sdk/os/
+https://dev.freebox.fr/sdk/os/lan/
+https://dev.freebox.fr/sdk/os/wifi/
+https://dev.freebox.fr/sdk/os/system/
+https://dev.freebox.fr/sdk/os/connection/
+https://dev.freebox.fr/sdk/os/download/
+https://github.com/hacf-fr/freebox-api
+https://github.com/XAV59213/freebox_homexa

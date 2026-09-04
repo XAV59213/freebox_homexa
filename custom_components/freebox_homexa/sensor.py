@@ -7,16 +7,23 @@ from homeassistant.components.sensor import (
     SensorDeviceClass,
     SensorEntity,
     SensorEntityDescription,
+    SensorStateClass,
 )
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.const import PERCENTAGE, UnitOfDataRate, UnitOfTemperature
+from homeassistant.const import (
+    PERCENTAGE,
+    SIGNAL_STRENGTH_DECIBELS_MILLIWATT,
+    EntityCategory,
+    UnitOfDataRate,
+    UnitOfTemperature,
+)
 from homeassistant.core import HomeAssistant, callback
-from homeassistant.helpers.device_registry import DeviceInfo
+from homeassistant.helpers.device_registry import CONNECTION_NETWORK_MAC, DeviceInfo
 from homeassistant.helpers.dispatcher import async_dispatcher_connect
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.util import dt as dt_util
 
-from .const import DOMAIN
+from .const import DEFAULT_DEVICE_NAME, DOMAIN
 from .entity import FreeboxHomeEntity
 from .router import FreeboxRouter
 from .tnt_const import DEFAULT_CHANNELS
@@ -111,6 +118,33 @@ async def async_setup_entry(
 
     if entities:
         async_add_entities(entities, True)
+
+    tracked_wifi: set[str] = set()
+
+    @callback
+    def add_wifi_signal_sensors() -> None:
+        new_sensors: list[FreeboxWifiSignalSensor] = []
+        for mac, device in router.devices.items():
+            if mac in tracked_wifi:
+                continue
+            if device.get("attrs") is not None:
+                continue
+            wifi = device.get("wifi") or {}
+            if "wifi_signal_dbm" not in wifi and wifi.get("connectivity") != "wifi":
+                continue
+            new_sensors.append(FreeboxWifiSignalSensor(router, device))
+            tracked_wifi.add(mac)
+        if new_sensors:
+            async_add_entities(new_sensors, True)
+            _LOGGER.info("%s capteur(s) RSSI Wi-Fi ajouté(s)", len(new_sensors))
+
+    entry.async_on_unload(
+        async_dispatcher_connect(hass, router.signal_device_new, add_wifi_signal_sensors)
+    )
+    entry.async_on_unload(
+        async_dispatcher_connect(hass, router.signal_device_update, add_wifi_signal_sensors)
+    )
+    add_wifi_signal_sensors()
 
 
 class FreeboxSensor(SensorEntity):
@@ -217,3 +251,64 @@ class FreeboxBatterySensor(FreeboxHomeEntity, SensorEntity):
     @property
     def native_value(self) -> int | None:
         return self.get_value("signal", "battery")
+
+
+class FreeboxWifiSignalSensor(SensorEntity):
+    """Force du signal Wi-Fi (RSSI) d'un client vu par la Freebox."""
+
+    _attr_should_poll = False
+    _attr_has_entity_name = True
+    _attr_name = "Signal Wi-Fi"
+    _attr_device_class = SensorDeviceClass.SIGNAL_STRENGTH
+    _attr_state_class = SensorStateClass.MEASUREMENT
+    _attr_native_unit_of_measurement = SIGNAL_STRENGTH_DECIBELS_MILLIWATT
+    _attr_entity_category = EntityCategory.DIAGNOSTIC
+    _attr_icon = "mdi:wifi-strength-2"
+
+    def __init__(self, router: FreeboxRouter, device: dict[str, Any]) -> None:
+        self._router = router
+        self._mac = device["l2ident"]["id"]
+        name = (device.get("primary_name") or "").strip() or DEFAULT_DEVICE_NAME
+        device_info: dict[str, Any] = {
+            "connections": {(CONNECTION_NETWORK_MAC, self._mac)},
+            "manufacturer": device.get("vendor_name") or "Inconnu",
+            "name": name,
+        }
+        if router.device_id:
+            device_info["via_device_id"] = router.device_id
+        self._attr_device_info = DeviceInfo(**device_info)
+        self._attr_unique_id = f"{router.mac}_{self._mac}_wifi_signal"
+        self._attr_extra_state_attributes: dict[str, Any] = {}
+        self._attr_native_value = None
+
+    @callback
+    def async_update_state(self) -> None:
+        device = self._router.devices.get(self._mac)
+        if not device:
+            self._attr_native_value = None
+            self._attr_extra_state_attributes = {}
+            self._attr_available = False
+            return
+        wifi = device.get("wifi") or {}
+        self._attr_available = True
+        self._attr_native_value = wifi.get("wifi_signal_dbm")
+        self._attr_extra_state_attributes = {
+            key: value
+            for key, value in wifi.items()
+            if key != "wifi_signal_dbm"
+        }
+
+    @callback
+    def async_on_demand_update(self) -> None:
+        self.async_update_state()
+        self.async_write_ha_state()
+
+    async def async_added_to_hass(self) -> None:
+        self.async_update_state()
+        self.async_on_remove(
+            async_dispatcher_connect(
+                self.hass,
+                self._router.signal_device_update,
+                self.async_on_demand_update,
+            )
+        )

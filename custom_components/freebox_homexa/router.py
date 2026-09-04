@@ -38,6 +38,13 @@ _LOGGER = logging.getLogger(__name__)
 
 SCAN_INTERVAL = timedelta(seconds=120)
 
+WIFI_BAND_LABELS = {
+    "2d4g": "2.4 GHz",
+    "2.4g": "2.4 GHz",
+    "5g": "5 GHz",
+    "6g": "6 GHz",
+}
+
 
 def normalize_mac(mac: str | None) -> str:
     """Normalize a MAC address for comparisons."""
@@ -59,6 +66,63 @@ def is_freebox_repeater(device: dict[str, Any], router_mac: str) -> bool:
     if host_type in {"networking_device", "freebox_wifi"} and "free" in vendor:
         return True
     return False
+
+
+def extract_wifi_details(device: dict[str, Any]) -> dict[str, Any]:
+    """Build a stable Wi-Fi quality dict from LAN host + optional station data."""
+    details: dict[str, Any] = {}
+    access_point = device.get("access_point") or {}
+    wifi_info = access_point.get("wifi_information") or {}
+    station = device.get("_wifi_station") or {}
+
+    signal = wifi_info.get("signal")
+    if signal is None:
+        signal = station.get("signal")
+    if signal is not None:
+        try:
+            details["wifi_signal_dbm"] = int(signal)
+        except (TypeError, ValueError):
+            pass
+
+    if wifi_info.get("ssid"):
+        details["wifi_ssid"] = wifi_info["ssid"]
+
+    band = wifi_info.get("band")
+    if band:
+        details["wifi_band"] = band
+        details["wifi_band_label"] = WIFI_BAND_LABELS.get(str(band).lower(), str(band))
+
+    bssid = wifi_info.get("bssid") or station.get("bssid")
+    if bssid:
+        details["wifi_bssid"] = bssid
+
+    standard = wifi_info.get("standard")
+    if standard:
+        details["wifi_standard"] = standard
+
+    phy_rx = wifi_info.get("phy_rx_rate")
+    phy_tx = wifi_info.get("phy_tx_rate")
+    if phy_rx is not None:
+        details["wifi_phy_rx_rate_mbps"] = phy_rx
+    if phy_tx is not None:
+        details["wifi_phy_tx_rate_mbps"] = phy_tx
+
+    ap_mac = access_point.get("mac")
+    if ap_mac:
+        details["ap_mac"] = ap_mac
+    ap_kind = access_point.get("type") or access_point.get("connectivity_type")
+    if ap_kind:
+        details["ap_type"] = ap_kind
+    if station.get("_ap_name"):
+        details["ap_name"] = station["_ap_name"]
+
+    connectivity = access_point.get("connectivity_type")
+    if not connectivity and (wifi_info or station):
+        connectivity = "wifi"
+    if connectivity:
+        details["connectivity"] = connectivity
+
+    return details
 
 
 def _token_candidates(hass: HomeAssistant, host: str) -> list[Path]:
@@ -198,6 +262,48 @@ class FreeboxRouter:
         if repeaters:
             _LOGGER.info("Répéteurs Wi-Fi détectés : %s", list(repeaters.keys()))
 
+    async def _enrich_wifi_stations(self) -> None:
+        """Merge /wifi/ap/{id}/stations signal data onto LAN hosts."""
+        try:
+            access_points = await self._api.wifi.get_ap_list() or []
+        except HttpRequestError as err:
+            _LOGGER.debug("Liste des AP Wi-Fi indisponible : %s", err)
+            access_points = []
+        except Exception as err:  # noqa: BLE001 — API wifi absente selon firmware
+            _LOGGER.debug("API Wi-Fi stations non utilisable : %s", err)
+            access_points = []
+
+        stations_by_mac: dict[str, dict[str, Any]] = {}
+        for access_point in access_points:
+            ap_id = access_point.get("id")
+            if ap_id is None:
+                continue
+            try:
+                stations = await self._api.wifi.get_station_list(ap_id) or []
+            except HttpRequestError as err:
+                _LOGGER.debug("Stations de l'AP %s indisponibles : %s", ap_id, err)
+                continue
+            except Exception as err:  # noqa: BLE001
+                _LOGGER.debug("Stations de l'AP %s illisibles : %s", ap_id, err)
+                continue
+            for station in stations:
+                mac = (station.get("mac") or "").upper()
+                if not mac:
+                    host = station.get("host") or {}
+                    mac = ((host.get("l2ident") or {}).get("id") or "").upper()
+                if not mac:
+                    continue
+                merged = dict(station)
+                merged["_ap_id"] = ap_id
+                merged["_ap_name"] = access_point.get("name")
+                stations_by_mac[mac] = merged
+
+        for mac, device in self.devices.items():
+            station = stations_by_mac.get(str(mac).upper())
+            if station:
+                device["_wifi_station"] = station
+            device["wifi"] = extract_wifi_details(device)
+
     async def update_all(self, now: datetime | None = None) -> None:
         await self.update_device_trackers()
         await self.update_sensors()
@@ -225,6 +331,7 @@ class FreeboxRouter:
                 new_device = True
             self.devices[device_mac] = fbx_device
 
+        await self._enrich_wifi_stations()
         self._refresh_repeaters()
         async_dispatcher_send(self.hass, self.signal_device_update)
         if new_device:

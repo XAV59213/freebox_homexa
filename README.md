@@ -4,7 +4,7 @@
 
 Intégration **Home Assistant** pour la Freebox Server, Freebox Home, les répéteurs Wi-Fi Free et le Freebox Player.
 
-**Version actuelle :** [28.8.2](https://github.com/XAV59213/freebox_homexa/releases/tag/28.8.2) · Home Assistant **2026.8.0+**
+**Version actuelle :** [28.8.13](https://github.com/XAV59213/freebox_homexa/releases/tag/28.8.13) · Home Assistant **2026.8.0+**
 
 Wiki : [Documentation](https://github.com/XAV59213/freebox_homexa/wiki)
 
@@ -19,7 +19,7 @@ Wiki : [Documentation](https://github.com/XAV59213/freebox_homexa/wiki)
 | Freebox Server | État, réseau, Wi-Fi, capteurs connexion |
 | Freebox Home | Détection auto : interrupteurs, caméras, volets |
 | Alarme | 3 modes comme l’app Free : **Présent / Absent / Désarmé** |
-| Appareils Wi-Fi | Suivi des clients connectés |
+| Appareils Wi-Fi | Suivi des clients + **RSSI (dBm)**, bande, SSID, AP / répéteur |
 | Répéteurs Free | F-RP01A : capteur *En ligne* + clients |
 | Player | Devialet, Mini 4K, Pop : volume, play/pause, sources |
 | Télécommande | Entité `remote` + sources TV / HDMI (CEC) / YouTube / Netflix |
@@ -75,6 +75,7 @@ HACS → Freebox Homexa → **Mettre à jour** → redémarrer Home Assistant.
 | Répéteur invisible | Redémarre HA ; le F-RP01A est détecté via les hôtes LAN |
 | Player absent | Droits Player dans Freebox OS + redémarrage |
 | HDMI ne change pas l’entrée TV | Normal : CEC réveille la TV, ça ne sélectionne pas HDMI 1/2/3 |
+| Pas de RSSI Wi-Fi | Client Ethernet, ou droit LAN / Wi-Fi manquant dans Freebox OS |
 
 Logs : **Paramètres → Système → Journaux**, filtre `freebox_homexa`.
 

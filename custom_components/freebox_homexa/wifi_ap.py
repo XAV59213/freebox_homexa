@@ -5,7 +5,28 @@ from __future__ import annotations
 from typing import Any
 
 from .const import DEFAULT_DEVICE_NAME, REPEATER_MODEL
-from .router import is_freebox_repeater, normalize_mac
+
+
+def normalize_mac(mac: str | None) -> str:
+    """Normalize a MAC address for comparisons."""
+    return (mac or "").upper().replace(":", "").replace("-", "")
+
+
+def is_freebox_repeater(device: dict[str, Any], router_mac: str) -> bool:
+    """Return True if the LAN host looks like a Free Wi-Fi repeater."""
+    mac = normalize_mac((device.get("l2ident") or {}).get("id"))
+    if not mac or mac == normalize_mac(router_mac):
+        return False
+
+    name = (device.get("primary_name") or "").lower()
+    host_type = device.get("host_type") or ""
+    vendor = (device.get("vendor_name") or "").lower()
+
+    if any(token in name for token in ("répét", "repet", "repeater", "rp01")):
+        return True
+    if host_type in {"networking_device", "freebox_wifi"} and "free" in vendor:
+        return True
+    return False
 
 
 def _client_summary(device: dict[str, Any]) -> dict[str, Any]:
@@ -101,10 +122,10 @@ def build_wifi_aps(
         norm = normalize_mac(mac)
         clients = list(repeater_clients.get(norm, []))
         if not clients:
-            for ap_mac, grouped in repeater_clients.items():
-                if ap_mac.endswith(norm[-6:]) or norm.endswith(ap_mac[-6:]):
+            for other_mac, grouped in repeater_clients.items():
+                if other_mac.endswith(norm[-6:]) or norm.endswith(other_mac[-6:]):
                     clients = list(grouped)
-                    matched.add(ap_mac)
+                    matched.add(other_mac)
                     break
         else:
             matched.add(norm)
@@ -133,7 +154,11 @@ def build_wifi_aps(
             continue
         if any(normalize_mac(key) == ap_mac for key in wifi_aps):
             continue
-        display_mac = ":".join(ap_mac[i : i + 2] for i in range(0, len(ap_mac), 2)) if len(ap_mac) == 12 else ap_mac
+        display_mac = (
+            ":".join(ap_mac[i : i + 2] for i in range(0, len(ap_mac), 2))
+            if len(ap_mac) == 12
+            else ap_mac
+        )
         payload = {
             "id": display_mac,
             "kind": "repeater",

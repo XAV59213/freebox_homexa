@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
+from homeassistant.components.sensor import SensorEntity, SensorStateClass
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import EntityCategory
 from homeassistant.core import callback
@@ -11,7 +12,6 @@ from homeassistant.helpers.device_registry import CONNECTION_NETWORK_MAC, Device
 from homeassistant.helpers.dispatcher import async_dispatcher_connect
 from homeassistant.helpers.entity import Entity
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
-from homeassistant.components.sensor import SensorEntity, SensorStateClass
 
 from .const import DOMAIN, REPEATER_MODEL
 from .router import FreeboxRouter
@@ -40,7 +40,6 @@ class FreeboxRepeaterCountSensor(SensorEntity):
     _attr_icon = "mdi:wifi-sync"
     _attr_state_class = SensorStateClass.MEASUREMENT
     _attr_entity_category = EntityCategory.DIAGNOSTIC
-    _attr_native_unit_of_measurement = "répéteurs"
 
     def __init__(self, router: FreeboxRouter) -> None:
         self._router = router
@@ -56,9 +55,7 @@ class FreeboxRepeaterCountSensor(SensorEntity):
         self._attr_extra_state_attributes = {
             "points_acces": len(self._router.wifi_aps),
             "repeteurs": [item.get("name") for item in repeaters],
-            "etats": {
-                item.get("name"): item.get("state") for item in repeaters
-            },
+            "etats": {item.get("name"): item.get("state") for item in repeaters},
         }
 
     @callback
@@ -82,7 +79,6 @@ class FreeboxWifiClientCountSensor(SensorEntity):
     _attr_icon = "mdi:account-multiple"
     _attr_state_class = SensorStateClass.MEASUREMENT
     _attr_entity_category = EntityCategory.DIAGNOSTIC
-    _attr_native_unit_of_measurement = "appareils"
 
     def __init__(self, router: FreeboxRouter, ap_id: str) -> None:
         self._router = router
@@ -93,7 +89,6 @@ class FreeboxWifiClientCountSensor(SensorEntity):
             self._attr_name = "Clients Wi-Fi box"
             self._attr_unique_id = f"{router.mac}_wifi_clients_gateway"
         else:
-            self._attr_name = "Clients Wi-Fi"
             mac = access_point.get("mac") or ap_id
             self._attr_unique_id = f"{router.mac}_wifi_clients_{mac}"
         self._attr_device_info = _ap_device_info(router, access_point or {"kind": "gateway"})
@@ -132,7 +127,6 @@ class FreeboxWifiTotalClientSensor(SensorEntity):
     _attr_icon = "mdi:wifi"
     _attr_state_class = SensorStateClass.MEASUREMENT
     _attr_entity_category = EntityCategory.DIAGNOSTIC
-    _attr_native_unit_of_measurement = "appareils"
 
     def __init__(self, router: FreeboxRouter) -> None:
         self._router = router
@@ -173,10 +167,7 @@ def async_setup_wifi_ap_sensors(
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     async_add_entities(
-        [
-            FreeboxRepeaterCountSensor(router),
-            FreeboxWifiTotalClientSensor(router),
-        ],
+        [FreeboxRepeaterCountSensor(router), FreeboxWifiTotalClientSensor(router)],
         True,
     )
     tracked: set[str] = set()
@@ -193,9 +184,9 @@ def async_setup_wifi_ap_sensors(
             async_add_entities(new_entities, True)
 
     entry.async_on_unload(
-        async_dispatcher_connect(hass=router.hass, signal=router.signal_device_new, target=add_ap_client_sensors)
+        async_dispatcher_connect(router.hass, router.signal_device_new, add_ap_client_sensors)
     )
     entry.async_on_unload(
-        async_dispatcher_connect(hass=router.hass, signal=router.signal_device_update, target=add_ap_client_sensors)
+        async_dispatcher_connect(router.hass, router.signal_device_update, add_ap_client_sensors)
     )
     add_ap_client_sensors()

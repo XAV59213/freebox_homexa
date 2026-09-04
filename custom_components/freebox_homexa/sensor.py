@@ -28,6 +28,7 @@ from .entity import FreeboxHomeEntity
 from .router import FreeboxRouter
 from .tnt_const import DEFAULT_CHANNELS
 from .tnt_sensor import HomexaTntSensor
+from .wifi_ap_sensors import async_setup_wifi_ap_sensors
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -145,6 +146,7 @@ async def async_setup_entry(
         async_dispatcher_connect(hass, router.signal_device_update, add_wifi_signal_sensors)
     )
     add_wifi_signal_sensors()
+    async_setup_wifi_ap_sensors(router, entry, async_add_entities)
 
 
 class FreeboxSensor(SensorEntity):

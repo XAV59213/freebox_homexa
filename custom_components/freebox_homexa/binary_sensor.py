@@ -32,6 +32,19 @@ RAID_SENSORS: tuple[BinarySensorEntityDescription, ...] = (
     ),
 )
 
+
+def _ap_attributes(access_point: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "type": access_point.get("kind"),
+        "etat": access_point.get("state"),
+        "mac": access_point.get("mac"),
+        "clients": access_point.get("client_count", 0),
+        "appareils": access_point.get("client_names") or [],
+        "detail_appareils": access_point.get("clients") or [],
+        "radios": access_point.get("radios") or [],
+    }
+
+
 async def async_setup_entry(
     hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback
 ) -> None:
@@ -60,24 +73,27 @@ async def async_setup_entry(
             )
         )
 
-    tracked_repeaters: set[str] = set()
+    tracked_aps: set[str] = set()
 
     @callback
-    def add_repeaters() -> None:
-        new_repeaters: list[FreeboxRepeaterSensor] = []
-        for mac, device in router.repeaters.items():
-            if mac in tracked_repeaters:
+    def add_wifi_aps() -> None:
+        new_entities: list[FreeboxWifiApSensor] = []
+        for ap_id, access_point in router.wifi_aps.items():
+            if ap_id in tracked_aps:
                 continue
-            new_repeaters.append(FreeboxRepeaterSensor(router, device))
-            tracked_repeaters.add(mac)
-        if new_repeaters:
-            async_add_entities(new_repeaters, True)
-            _LOGGER.info("%s répéteur(s) Wi-Fi ajouté(s)", len(new_repeaters))
+            new_entities.append(FreeboxWifiApSensor(router, ap_id, access_point))
+            tracked_aps.add(ap_id)
+        if new_entities:
+            async_add_entities(new_entities, True)
+            _LOGGER.info("%s point(s) d'accès Wi-Fi ajouté(s)", len(new_entities))
 
     entry.async_on_unload(
-        async_dispatcher_connect(hass, router.signal_device_new, add_repeaters)
+        async_dispatcher_connect(hass, router.signal_device_new, add_wifi_aps)
     )
-    add_repeaters()
+    entry.async_on_unload(
+        async_dispatcher_connect(hass, router.signal_device_update, add_wifi_aps)
+    )
+    add_wifi_aps()
 
     if binary_entities:
         async_add_entities(binary_entities, True)
@@ -152,50 +168,50 @@ class FreeboxCoverSensor(FreeboxHomeBinarySensor):
         super().__init__(hass, router, node, cover_node)
 
 
-class FreeboxRepeaterSensor(BinarySensorEntity):
-    """Répéteur Wi-Fi Free (F-RP01A) : en ligne + nombre de clients."""
+class FreeboxWifiApSensor(BinarySensorEntity):
+    """État d'un point d'accès Wi-Fi : box ou répéteur."""
 
     _attr_should_poll = False
     _attr_has_entity_name = True
-    _attr_name = "En ligne"
     _attr_device_class = BinarySensorDeviceClass.CONNECTIVITY
-    _attr_icon = "mdi:wifi-sync"
+    _attr_icon = "mdi:wifi"
 
-    def __init__(self, router: FreeboxRouter, device: dict[str, Any]) -> None:
+    def __init__(self, router: FreeboxRouter, ap_id: str, access_point: dict[str, Any]) -> None:
         self._router = router
-        self._mac = device["l2ident"]["id"]
-        name = (device.get("primary_name") or "").strip() or f"Répéteur Wi-Fi {self._mac[-5:]}"
-        device_info: dict[str, Any] = {
-            "identifiers": {(DOMAIN, f"repeater_{self._mac}")},
-            "connections": {(CONNECTION_NETWORK_MAC, self._mac)},
-            "manufacturer": device.get("vendor_name") or "Freebox SAS",
-            "model": device.get("model") or REPEATER_MODEL,
-            "name": name,
-        }
-        if router.device_id:
-            device_info["via_device_id"] = router.device_id
-        self._attr_device_info = DeviceInfo(**device_info)
-        self._attr_unique_id = f"{router.mac}_repeater_{self._mac}"
-        self._attr_is_on = bool(device.get("active"))
-        self._attr_extra_state_attributes = {
-            "mac": self._mac,
-            "clients": device.get("client_count", 0),
-            "host_type": device.get("host_type"),
-        }
+        self._ap_id = ap_id
+        kind = access_point.get("kind") or "repeater"
+        if kind == "gateway":
+            self._attr_name = "Wi-Fi Freebox"
+            self._attr_device_info = router.device_info
+            self._attr_unique_id = f"{router.mac}_wifi_ap_gateway"
+        else:
+            mac = access_point.get("mac") or ap_id
+            name = access_point.get("name") or f"Répéteur Wi-Fi {str(mac)[-5:]}"
+            device_info: dict[str, Any] = {
+                "identifiers": {(DOMAIN, f"repeater_{mac}")},
+                "connections": {(CONNECTION_NETWORK_MAC, mac)},
+                "manufacturer": access_point.get("vendor_name") or "Freebox SAS",
+                "model": access_point.get("model") or REPEATER_MODEL,
+                "name": name,
+            }
+            if router.device_id:
+                device_info["via_device_id"] = router.device_id
+            self._attr_name = "En ligne"
+            self._attr_device_info = DeviceInfo(**device_info)
+            self._attr_unique_id = f"{router.mac}_repeater_{mac}"
+            self._attr_icon = "mdi:wifi-sync"
+        self._attr_is_on = bool(access_point.get("online"))
+        self._attr_extra_state_attributes = _ap_attributes(access_point)
 
     @callback
     def async_update_state(self) -> None:
-        device = self._router.repeaters.get(self._mac) or self._router.devices.get(self._mac)
-        if device is None:
+        access_point = self._router.wifi_aps.get(self._ap_id)
+        if access_point is None:
             self._attr_is_on = False
-            self._attr_extra_state_attributes = {"mac": self._mac, "clients": 0}
+            self._attr_extra_state_attributes = {"clients": 0, "appareils": []}
             return
-        self._attr_is_on = bool(device.get("active"))
-        self._attr_extra_state_attributes = {
-            "mac": self._mac,
-            "clients": device.get("client_count", 0),
-            "host_type": device.get("host_type"),
-        }
+        self._attr_is_on = bool(access_point.get("online"))
+        self._attr_extra_state_attributes = _ap_attributes(access_point)
 
     @callback
     def async_on_demand_update(self) -> None:

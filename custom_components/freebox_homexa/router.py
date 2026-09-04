@@ -33,6 +33,7 @@ from .const import (
     HOME_COMPATIBLE_CATEGORIES,
     REPEATER_MODEL,
 )
+from .wifi_ap import build_wifi_aps
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -228,6 +229,8 @@ class FreeboxRouter:
         self.supports_hosts = True
         self.devices: dict[str, dict[str, Any]] = {}
         self.repeaters: dict[str, dict[str, Any]] = {}
+        self.wifi_aps: dict[str, dict[str, Any]] = {}
+        self.wifi_radio_status: list[dict[str, Any]] = []
         self.disks: dict[int, dict[str, Any]] = {}
         self.supports_raid = True
         self.raids: dict[int, dict[str, Any]] = {}
@@ -241,26 +244,16 @@ class FreeboxRouter:
         _LOGGER.debug(f"Routeur Freebox {self.name} initialisé")
 
     def _refresh_repeaters(self) -> None:
-        """Build the repeater map and count Wi-Fi clients per repeater."""
-        repeaters: dict[str, dict[str, Any]] = {}
-        for mac, device in self.devices.items():
-            if not is_freebox_repeater(device, self.mac):
-                continue
-            norm = normalize_mac(mac)
-            clients = 0
-            for other in self.devices.values():
-                access_point = other.get("access_point") or {}
-                if access_point.get("type") != "repeater":
-                    continue
-                if normalize_mac(access_point.get("mac")) == norm:
-                    clients += 1
-            enriched = dict(device)
-            enriched["client_count"] = clients
-            enriched["model"] = device.get("model") or REPEATER_MODEL
-            repeaters[mac] = enriched
-        self.repeaters = repeaters
-        if repeaters:
-            _LOGGER.info("Répéteurs Wi-Fi détectés : %s", list(repeaters.keys()))
+        """Build gateway + repeater maps and attach Wi-Fi clients."""
+        self.wifi_aps, self.repeaters = build_wifi_aps(
+            router_mac=self.mac,
+            router_name=self.name,
+            router_model=self.model,
+            devices=self.devices,
+            radio_status=self.wifi_radio_status,
+        )
+        if self.repeaters:
+            _LOGGER.info("Répéteurs Wi-Fi détectés : %s", list(self.repeaters.keys()))
 
     async def _enrich_wifi_stations(self) -> None:
         """Merge /wifi/ap/{id}/stations signal data onto LAN hosts."""
@@ -273,8 +266,17 @@ class FreeboxRouter:
             _LOGGER.debug("API Wi-Fi stations non utilisable : %s", err)
             access_points = []
 
+        self.wifi_radio_status = []
         stations_by_mac: dict[str, dict[str, Any]] = {}
         for access_point in access_points:
+            status = access_point.get("status") or {}
+            self.wifi_radio_status.append(
+                {
+                    "id": access_point.get("id"),
+                    "name": access_point.get("name"),
+                    "state": status.get("state"),
+                }
+            )
             ap_id = access_point.get("id")
             if ap_id is None:
                 continue

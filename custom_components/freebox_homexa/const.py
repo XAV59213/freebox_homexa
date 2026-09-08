@@ -4,6 +4,7 @@ from __future__ import annotations
 import enum
 from homeassistant.const import Platform
 from homeassistant.components.alarm_control_panel import AlarmControlPanelState  # noqa: F401
+from homeassistant.config_entries import ConfigEntry
 
 DOMAIN = "freebox_homexa"
 SERVICE_REBOOT = "reboot"
@@ -14,6 +15,15 @@ SERVICE_TV_GUIDE = "tv_guide"
 VALUE_NOT_SET = -1
 DEFAULT_DEVICE_NAME = "Unknown device"
 REPEATER_MODEL = "F-RP01A"
+
+# Options (Paramètres → Intégration → Configurer)
+CONF_TRACK_LAN_CLIENTS = "track_lan_clients"
+CONF_CREATE_WIFI_SENSORS = "create_wifi_sensors"
+CONF_CREATE_LAN_DEVICES = "create_lan_devices"
+
+DEFAULT_TRACK_LAN_CLIENTS = True
+DEFAULT_CREATE_WIFI_SENSORS = True
+DEFAULT_CREATE_LAN_DEVICES = True
 
 # Must stay stable. freebox-api requests a new pairing if this dict differs
 # from the saved token file (app_version / hostname used to change every restart).
@@ -68,6 +78,7 @@ DEVICE_ICONS = {
     "workstation": "mdi:desktop-tower-monitor",
 }
 
+
 class FreeboxHomeCategory(enum.StrEnum):
     ALARM = "alarm"
     CAMERA = "camera"
@@ -79,6 +90,7 @@ class FreeboxHomeCategory(enum.StrEnum):
     RTS = "rts"
     BASIC_SHUTTER = "basic_shutter"
     SHUTTER = "shutter"
+
 
 CATEGORY_TO_MODEL = {
     FreeboxHomeCategory.PIR: "F-HAPIR01A",
@@ -105,3 +117,8 @@ HOME_COMPATIBLE_CATEGORIES = [
     FreeboxHomeCategory.SHUTTER,
     FreeboxHomeCategory.BASIC_SHUTTER,
 ]
+
+
+def option_enabled(entry: ConfigEntry, key: str, default: bool = True) -> bool:
+    """Lit une option booléenne de la config entry."""
+    return bool(entry.options.get(key, default))

@@ -6,12 +6,28 @@ from typing import Any
 from freebox_api.exceptions import AuthorizationError, HttpRequestError
 import voluptuous as vol
 
-from homeassistant.config_entries import SOURCE_REAUTH, ConfigFlow, ConfigFlowResult
+from homeassistant.config_entries import (
+    SOURCE_REAUTH,
+    ConfigEntry,
+    ConfigFlow,
+    ConfigFlowResult,
+    OptionsFlow,
+)
 from homeassistant.const import CONF_HOST, CONF_PORT
+from homeassistant.core import callback
 from homeassistant.helpers.service_info.zeroconf import ZeroconfServiceInfo
 from homeassistant.helpers.storage import Store
 
-from .const import DOMAIN, STORAGE_VERSION
+from .const import (
+    CONF_CREATE_LAN_DEVICES,
+    CONF_CREATE_WIFI_SENSORS,
+    CONF_TRACK_LAN_CLIENTS,
+    DEFAULT_CREATE_LAN_DEVICES,
+    DEFAULT_CREATE_WIFI_SENSORS,
+    DEFAULT_TRACK_LAN_CLIENTS,
+    DOMAIN,
+    STORAGE_VERSION,
+)
 from .router import get_api, get_hosts_list_if_supported, resolve_token_file
 
 _LOGGER = logging.getLogger(__name__)
@@ -34,6 +50,11 @@ class FreeboxFlowHandler(ConfigFlow, domain=DOMAIN):
 
     def __init__(self) -> None:
         self._data: dict[str, Any] = {}
+
+    @staticmethod
+    @callback
+    def async_get_options_flow(config_entry: ConfigEntry) -> OptionsFlow:
+        return FreeboxOptionsFlowHandler()
 
     async def async_step_user(
         self, user_input: dict[str, Any] | None = None
@@ -148,3 +169,40 @@ class FreeboxFlowHandler(ConfigFlow, domain=DOMAIN):
         host = discovery_info.properties.get("api_domain") or discovery_info.host
         port = discovery_info.properties.get("https_port") or 80
         return await self.async_step_user({CONF_HOST: host, CONF_PORT: int(port)})
+
+
+class FreeboxOptionsFlowHandler(OptionsFlow):
+    """Options : suivi LAN, capteurs RSSI, rattachement aux devices."""
+
+    async def async_step_init(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        if user_input is not None:
+            return self.async_create_entry(title="", data=user_input)
+
+        options = self.config_entry.options
+        return self.async_show_form(
+            step_id="init",
+            data_schema=vol.Schema(
+                {
+                    vol.Required(
+                        CONF_TRACK_LAN_CLIENTS,
+                        default=options.get(
+                            CONF_TRACK_LAN_CLIENTS, DEFAULT_TRACK_LAN_CLIENTS
+                        ),
+                    ): bool,
+                    vol.Required(
+                        CONF_CREATE_WIFI_SENSORS,
+                        default=options.get(
+                            CONF_CREATE_WIFI_SENSORS, DEFAULT_CREATE_WIFI_SENSORS
+                        ),
+                    ): bool,
+                    vol.Required(
+                        CONF_CREATE_LAN_DEVICES,
+                        default=options.get(
+                            CONF_CREATE_LAN_DEVICES, DEFAULT_CREATE_LAN_DEVICES
+                        ),
+                    ): bool,
+                }
+            ),
+        )

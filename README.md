@@ -17,7 +17,7 @@ Wiki : [Documentation](https://github.com/XAV59213/freebox_homexa/wiki)
 | Domaine | Ce que ça fait |
 |---|---|
 | Freebox Server | État, réseau, Wi-Fi, capteurs connexion |
-| Freebox Home | Détection auto : interrupteurs, caméras, volets |
+| Freebox Home | Détection auto : interrupteurs, caméras, volets, PIR, contacts |
 | Alarme | 3 modes comme l’app Free : **Présent / Absent / Désarmé** |
 | Appareils Wi-Fi | Suivi des clients + **RSSI (dBm)**, bande, SSID, AP / répéteur |
 | Répéteurs Free | F-RP01A : capteur *En ligne* + clients |
@@ -53,6 +53,20 @@ Installation manuelle : copie le dossier `custom_components/freebox_homexa` dans
 
 Pas besoin de coller un token dans `configuration.yaml` : tout passe par l’interface.
 
+### Options (clients LAN)
+
+Après installation : **Paramètres → Appareils et services → Freebox Homexa → Configurer**.
+
+| Option | Défaut | Intérêt |
+|---|---|---|
+| Suivre les clients LAN | oui | `device_tracker` des téléphones / PC / objets |
+| Créer les capteurs RSSI Wi-Fi | oui | Signal en dBm dès que le client est vu en Wi-Fi |
+| Créer un device Homexa par client LAN | oui | Désactivez pour éviter les doublons depuis HA 2026.8 |
+
+Le Server, les répéteurs et le pack Home (alarme, PIR, caméras, volets) gardent toujours leurs devices.
+
+Si vous désactivez « device par client » après coup, rechargez l’intégration puis supprimez à la main les anciens devices Homexa devenus vides.
+
 ### Player (télécommande)
 
 Sur le Player : **Réglages → Système → Informations** → note le code télécommande si l’intégration le demande.
@@ -76,6 +90,8 @@ HACS → Freebox Homexa → **Mettre à jour** → redémarrer Home Assistant.
 | Player absent | Droits Player dans Freebox OS + redémarrage |
 | HDMI ne change pas l’entrée TV | Normal : CEC réveille la TV, ça ne sélectionne pas HDMI 1/2/3 |
 | Pas de RSSI Wi-Fi | Client Ethernet, ou droit LAN / Wi-Fi manquant dans Freebox OS |
+| Devices en doublon (HA 2026.8) | Désactivez « Créer un device Homexa pour chaque client LAN » |
+| PIR décalé vs intégration officielle | Les deux pollent la même API : laissez l’officielle désactivée |
 
 Logs : **Paramètres → Système → Journaux**, filtre `freebox_homexa`.
 

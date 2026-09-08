@@ -36,6 +36,24 @@
       "reauth_successful": "Re-authorization successful"
     }
   },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Freebox Homexa options",
+        "description": "LAN clients are phones, PCs and IoT hosts seen by the Freebox. Freebox Server, repeaters and Home devices are not affected. Since Home Assistant 2026.8, devices are no longer merged across integrations.",
+        "data": {
+          "track_lan_clients": "Track LAN clients (device trackers)",
+          "create_wifi_sensors": "Create Wi-Fi RSSI sensors",
+          "create_lan_devices": "Create a Homexa device for each LAN client"
+        },
+        "data_description": {
+          "track_lan_clients": "Disable this if presence is already handled by another integration.",
+          "create_wifi_sensors": "RSSI is added when a client is seen on Wi-Fi, including after the first setup.",
+          "create_lan_devices": "Turn off to keep tracker and RSSI as standalone entities and avoid duplicate devices."
+        }
+      }
+    }
+  },
   "services": {
     "reboot": {
       "name": "Reboot",

@@ -98,6 +98,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     await router.update_all()
 
     entry.async_on_unload(async_track_time_interval(hass, router.update_all, SCAN_INTERVAL))
+    entry.async_on_unload(entry.add_update_listener(async_reload_entry))
 
     hass.data[DOMAIN][entry.unique_id] = router
     try:

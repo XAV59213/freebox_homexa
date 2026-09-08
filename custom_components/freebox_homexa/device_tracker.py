@@ -12,10 +12,26 @@ from homeassistant.helpers.device_registry import CONNECTION_NETWORK_MAC, Device
 from homeassistant.helpers.dispatcher import async_dispatcher_connect
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
-from .const import DEFAULT_DEVICE_NAME, DEVICE_ICONS, DOMAIN
+from .const import (
+    CONF_CREATE_LAN_DEVICES,
+    CONF_TRACK_LAN_CLIENTS,
+    DEFAULT_CREATE_LAN_DEVICES,
+    DEFAULT_DEVICE_NAME,
+    DEFAULT_TRACK_LAN_CLIENTS,
+    DEVICE_ICONS,
+    DOMAIN,
+    option_enabled,
+)
 from .router import FreeboxRouter, is_freebox_repeater
 
 _LOGGER = logging.getLogger(__name__)
+
+
+def _is_lan_client(device: dict[str, Any], router_mac: str) -> bool:
+    """True pour un hôte LAN (pas le Server, pas un répéteur)."""
+    if device.get("attrs") is not None:
+        return False
+    return not is_freebox_repeater(device, router_mac)
 
 
 async def async_setup_entry(
@@ -23,10 +39,14 @@ async def async_setup_entry(
 ) -> None:
     router: FreeboxRouter = hass.data[DOMAIN][entry.unique_id]
     tracked: set[str] = set()
+    track_lan = option_enabled(entry, CONF_TRACK_LAN_CLIENTS, DEFAULT_TRACK_LAN_CLIENTS)
+    create_devices = option_enabled(
+        entry, CONF_CREATE_LAN_DEVICES, DEFAULT_CREATE_LAN_DEVICES
+    )
 
     @callback
     def update_router() -> None:
-        add_entities(router, async_add_entities, tracked)
+        add_entities(router, async_add_entities, tracked, track_lan, create_devices)
 
     entry.async_on_unload(
         async_dispatcher_connect(hass, router.signal_device_new, update_router)
@@ -36,14 +56,20 @@ async def async_setup_entry(
 
 @callback
 def add_entities(
-    router: FreeboxRouter, async_add_entities: AddEntitiesCallback, tracked: set[str]
+    router: FreeboxRouter,
+    async_add_entities: AddEntitiesCallback,
+    tracked: set[str],
+    track_lan: bool,
+    create_devices: bool,
 ) -> None:
     new_tracked = []
 
     for mac, device in router.devices.items():
         if mac in tracked:
             continue
-        new_tracked.append(FreeboxDevice(router, device))
+        if not track_lan and _is_lan_client(device, router.mac):
+            continue
+        new_tracked.append(FreeboxDevice(router, device, create_devices))
         tracked.add(mac)
 
     if new_tracked:
@@ -56,17 +82,21 @@ class FreeboxDevice(ScannerEntity):
     _attr_should_poll = False
     _attr_has_entity_name = False
 
-    def __init__(self, router: FreeboxRouter, device: dict[str, Any]) -> None:
+    def __init__(
+        self, router: FreeboxRouter, device: dict[str, Any], create_lan_devices: bool
+    ) -> None:
         self._router = router
+        self._create_lan_devices = create_lan_devices
         self._name = device["primary_name"].strip() or DEFAULT_DEVICE_NAME
         self._mac = device["l2ident"]["id"]
         self._manufacturer = device.get("vendor_name", "Inconnu")
         self._attr_icon = icon_for_freebox_device(device)
+        self._attr_unique_id = f"{router.mac}_{self._mac}"
         self._active = False
         self._attr_extra_state_attributes: dict[str, Any] = {}
         self._attr_device_info = self._build_device_info(device)
 
-    def _build_device_info(self, device: dict[str, Any]) -> DeviceInfo:
+    def _build_device_info(self, device: dict[str, Any]) -> DeviceInfo | None:
         if device.get("attrs") is not None:
             return self._router.device_info
 
@@ -79,6 +109,9 @@ class FreeboxDevice(ScannerEntity):
                 name=self._name,
                 via_device=(DOMAIN, self._router.mac),
             )
+
+        if not self._create_lan_devices:
+            return None
 
         parent = device.get("wifi_parent") or {}
         identifier = parent.get("identifier") or self._router.mac

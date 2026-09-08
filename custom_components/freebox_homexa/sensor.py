@@ -23,9 +23,17 @@ from homeassistant.helpers.dispatcher import async_dispatcher_connect
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.util import dt as dt_util
 
-from .const import DEFAULT_DEVICE_NAME, DOMAIN
+from .const import (
+    CONF_CREATE_LAN_DEVICES,
+    CONF_CREATE_WIFI_SENSORS,
+    DEFAULT_CREATE_LAN_DEVICES,
+    DEFAULT_CREATE_WIFI_SENSORS,
+    DEFAULT_DEVICE_NAME,
+    DOMAIN,
+    option_enabled,
+)
 from .entity import FreeboxHomeEntity
-from .router import FreeboxRouter
+from .router import FreeboxRouter, is_freebox_repeater
 from .tnt_const import DEFAULT_CHANNELS
 from .tnt_sensor import HomexaTntSensor
 from .wifi_ap_sensors import async_setup_wifi_ap_sensors
@@ -75,11 +83,28 @@ DISK_PARTITION_SENSORS: tuple[SensorEntityDescription, ...] = (
 )
 
 
+def _is_lan_client(device: dict[str, Any], router_mac: str) -> bool:
+    if device.get("attrs") is not None:
+        return False
+    return not is_freebox_repeater(device, router_mac)
+
+
+def _is_wifi_client(device: dict[str, Any]) -> bool:
+    wifi = device.get("wifi") or {}
+    return "wifi_signal_dbm" in wifi or wifi.get("connectivity") == "wifi"
+
+
 async def async_setup_entry(
     hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback
 ) -> None:
     router: FreeboxRouter = hass.data[DOMAIN][entry.unique_id]
     entities: list[SensorEntity] = []
+    create_wifi = option_enabled(
+        entry, CONF_CREATE_WIFI_SENSORS, DEFAULT_CREATE_WIFI_SENSORS
+    )
+    create_devices = option_enabled(
+        entry, CONF_CREATE_LAN_DEVICES, DEFAULT_CREATE_LAN_DEVICES
+    )
 
     entities.extend(
         FreeboxSensor(
@@ -124,16 +149,17 @@ async def async_setup_entry(
 
     @callback
     def add_wifi_signal_sensors() -> None:
+        if not create_wifi:
+            return
         new_sensors: list[FreeboxWifiSignalSensor] = []
         for mac, device in router.devices.items():
             if mac in tracked_wifi:
                 continue
             if device.get("attrs") is not None:
                 continue
-            wifi = device.get("wifi") or {}
-            if "wifi_signal_dbm" not in wifi and wifi.get("connectivity") != "wifi":
+            if not _is_wifi_client(device):
                 continue
-            new_sensors.append(FreeboxWifiSignalSensor(router, device))
+            new_sensors.append(FreeboxWifiSignalSensor(router, device, create_devices))
             tracked_wifi.add(mac)
         if new_sensors:
             async_add_entities(new_sensors, True)
@@ -259,29 +285,53 @@ class FreeboxWifiSignalSensor(SensorEntity):
     """Force du signal Wi-Fi (RSSI) d'un client vu par la Freebox."""
 
     _attr_should_poll = False
-    _attr_has_entity_name = True
-    _attr_name = "Signal Wi-Fi"
     _attr_device_class = SensorDeviceClass.SIGNAL_STRENGTH
     _attr_state_class = SensorStateClass.MEASUREMENT
     _attr_native_unit_of_measurement = SIGNAL_STRENGTH_DECIBELS_MILLIWATT
     _attr_entity_category = EntityCategory.DIAGNOSTIC
     _attr_icon = "mdi:wifi-strength-2"
 
-    def __init__(self, router: FreeboxRouter, device: dict[str, Any]) -> None:
+    def __init__(
+        self, router: FreeboxRouter, device: dict[str, Any], create_lan_devices: bool
+    ) -> None:
         self._router = router
+        self._create_lan_devices = create_lan_devices
         self._mac = device["l2ident"]["id"]
         name = (device.get("primary_name") or "").strip() or DEFAULT_DEVICE_NAME
-        device_info: dict[str, Any] = {
-            "connections": {(CONNECTION_NETWORK_MAC, self._mac)},
-            "manufacturer": device.get("vendor_name") or "Inconnu",
-            "name": name,
-        }
-        if router.device_id:
-            device_info["via_device_id"] = router.device_id
-        self._attr_device_info = DeviceInfo(**device_info)
         self._attr_unique_id = f"{router.mac}_{self._mac}_wifi_signal"
         self._attr_extra_state_attributes: dict[str, Any] = {}
         self._attr_native_value = None
+        self._apply_device_info(device, name)
+
+    def _apply_device_info(self, device: dict[str, Any], name: str) -> None:
+        if is_freebox_repeater(device, self._router.mac):
+            self._attr_has_entity_name = True
+            self._attr_name = "Signal Wi-Fi"
+            self._attr_device_info = DeviceInfo(
+                identifiers={(DOMAIN, f"repeater_{self._mac}")},
+                connections={(CONNECTION_NETWORK_MAC, self._mac)},
+                manufacturer=device.get("vendor_name") or "Freebox SAS",
+                name=name,
+                via_device=(DOMAIN, self._router.mac),
+            )
+            return
+
+        if self._create_lan_devices:
+            self._attr_has_entity_name = True
+            self._attr_name = "Signal Wi-Fi"
+            device_info: dict[str, Any] = {
+                "connections": {(CONNECTION_NETWORK_MAC, self._mac)},
+                "manufacturer": device.get("vendor_name") or "Inconnu",
+                "name": name,
+            }
+            if self._router.device_id:
+                device_info["via_device_id"] = self._router.device_id
+            self._attr_device_info = DeviceInfo(**device_info)
+            return
+
+        self._attr_has_entity_name = False
+        self._attr_name = f"{name} Signal Wi-Fi"
+        self._attr_device_info = None
 
     @callback
     def async_update_state(self) -> None:

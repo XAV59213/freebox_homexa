@@ -4,7 +4,7 @@
 
 Intégration **Home Assistant** pour la Freebox Server, Freebox Home, les répéteurs Wi-Fi Free et le Freebox Player.
 
-**Version actuelle :** [28.8.13](https://github.com/XAV59213/freebox_homexa/releases/tag/28.8.13) · Home Assistant **2026.8.0+**
+**Version actuelle :** [28.8.18](https://github.com/XAV59213/freebox_homexa/releases/tag/28.8.18) · Home Assistant **2026.8.0+**
 
 Wiki : [Documentation](https://github.com/XAV59213/freebox_homexa/wiki)
 
@@ -55,7 +55,7 @@ Pas besoin de coller un token dans `configuration.yaml` : tout passe par l’int
 
 ### Options (clients LAN)
 
-Après installation : **Paramètres → Appareils et services → Freebox Homexa → Configurer**.
+Dès l’installation, ou ensuite : **Paramètres → Appareils et services → Freebox Homexa → Configurer**.
 
 | Option | Défaut | Intérêt |
 |---|---|---|
@@ -91,7 +91,7 @@ HACS → Freebox Homexa → **Mettre à jour** → redémarrer Home Assistant.
 | HDMI ne change pas l’entrée TV | Normal : CEC réveille la TV, ça ne sélectionne pas HDMI 1/2/3 |
 | Pas de RSSI Wi-Fi | Client Ethernet, ou droit LAN / Wi-Fi manquant dans Freebox OS |
 | Devices en doublon (HA 2026.8) | Désactivez « Créer un device Homexa pour chaque client LAN » |
-| PIR décalé vs intégration officielle | Les deux pollent la même API : laissez l’officielle désactivée |
+| PIR décalé vs intégration officielle | L’officielle désactivée + poll Home à 15 s |
 
 Logs : **Paramètres → Système → Journaux**, filtre `freebox_homexa`.
 

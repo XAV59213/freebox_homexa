@@ -2,7 +2,7 @@
 
 Intégration Home Assistant pour Freebox Server, Freebox Home, répéteurs Wi-Fi Free et Freebox Player.
 
-**Version :** 28.8.2 · Home Assistant **2026.8.0+**
+**Version :** 28.8.18 · Home Assistant **2026.8.0+**
 
 Doc complète : [Wiki](https://github.com/XAV59213/freebox_homexa/wiki)
 
@@ -14,7 +14,7 @@ Doc complète : [Wiki](https://github.com/XAV59213/freebox_homexa/wiki)
 
 ## Fonctionnalités
 
-- Détection Freebox Home (interrupteurs, caméras, volets)
+- Détection Freebox Home (interrupteurs, caméras, volets, PIR, contacts)
 - Alarme **Présent / Absent / Désarmé**
 - Suivi des clients Wi-Fi
 - Répéteurs Free **F-RP01A**

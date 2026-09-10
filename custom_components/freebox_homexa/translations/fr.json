@@ -20,6 +20,20 @@
           "host": "Nom d'hôte ou adresse IP",
           "port": "Port"
         }
+      },
+      "lan_options": {
+        "title": "Clients LAN",
+        "description": "Faites ces choix **avant** que Home Assistant n'affiche la liste des appareils. Le Server, les répéteurs et le pack Home (alarme, PIR, caméras, volets) sont toujours créés.\n\nDécochez « Créer un device Homexa pour chaque client LAN » pour éviter les doublons depuis HA 2026.8.\nDécochez « Suivre les clients LAN » si la présence est déjà gérée ailleurs.",
+        "data": {
+          "track_lan_clients": "Suivre les clients LAN (device trackers)",
+          "create_wifi_sensors": "Créer les capteurs RSSI Wi-Fi",
+          "create_lan_devices": "Créer un device Homexa pour chaque client LAN"
+        },
+        "data_description": {
+          "track_lan_clients": "Téléphones, PC et objets vus par la Freebox.",
+          "create_wifi_sensors": "Force du signal en dBm quand le client est en Wi-Fi.",
+          "create_lan_devices": "Si décoché, tracker et RSSI restent des entités seules (pas de device en plus)."
+        }
       }
     },
     "abort": {

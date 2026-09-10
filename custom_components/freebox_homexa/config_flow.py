@@ -43,6 +43,30 @@ _PLACEHOLDERS = {
 }
 
 
+def _lan_options_schema(defaults: dict[str, Any] | None = None) -> vol.Schema:
+    defaults = defaults or {}
+    return vol.Schema(
+        {
+            vol.Required(
+                CONF_TRACK_LAN_CLIENTS,
+                default=defaults.get(CONF_TRACK_LAN_CLIENTS, DEFAULT_TRACK_LAN_CLIENTS),
+            ): bool,
+            vol.Required(
+                CONF_CREATE_WIFI_SENSORS,
+                default=defaults.get(
+                    CONF_CREATE_WIFI_SENSORS, DEFAULT_CREATE_WIFI_SENSORS
+                ),
+            ): bool,
+            vol.Required(
+                CONF_CREATE_LAN_DEVICES,
+                default=defaults.get(
+                    CONF_CREATE_LAN_DEVICES, DEFAULT_CREATE_LAN_DEVICES
+                ),
+            ): bool,
+        }
+    )
+
+
 class FreeboxFlowHandler(ConfigFlow, domain=DOMAIN):
     """Gère le flux de configuration pour l'intégration Freebox."""
 
@@ -50,6 +74,7 @@ class FreeboxFlowHandler(ConfigFlow, domain=DOMAIN):
 
     def __init__(self) -> None:
         self._data: dict[str, Any] = {}
+        self._options: dict[str, Any] = {}
 
     @staticmethod
     @callback
@@ -76,7 +101,10 @@ class FreeboxFlowHandler(ConfigFlow, domain=DOMAIN):
                     description_placeholders=_PLACEHOLDERS,
                 )
 
-        self._data = user_input or {}
+        self._data = {
+            CONF_HOST: (user_input or {}).get(CONF_HOST),
+            CONF_PORT: (user_input or {}).get(CONF_PORT, 80),
+        }
         await self.async_set_unique_id(self._data[CONF_HOST])
         if self.source != SOURCE_REAUTH:
             self._abort_if_unique_id_configured()
@@ -135,10 +163,7 @@ class FreeboxFlowHandler(ConfigFlow, domain=DOMAIN):
                     data=self._data,
                 )
 
-            return self.async_create_entry(
-                title=self._data[CONF_HOST],
-                data=self._data,
-            )
+            return await self.async_step_lan_options()
 
         except AuthorizationError as err:
             message = str(err).lower()
@@ -163,6 +188,27 @@ class FreeboxFlowHandler(ConfigFlow, domain=DOMAIN):
             description_placeholders=_PLACEHOLDERS,
         )
 
+    async def async_step_lan_options(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """Choix LAN avant création des devices / entités."""
+        if user_input is None:
+            return self.async_show_form(
+                step_id="lan_options",
+                data_schema=_lan_options_schema(),
+            )
+
+        self._options = {
+            CONF_TRACK_LAN_CLIENTS: user_input[CONF_TRACK_LAN_CLIENTS],
+            CONF_CREATE_WIFI_SENSORS: user_input[CONF_CREATE_WIFI_SENSORS],
+            CONF_CREATE_LAN_DEVICES: user_input[CONF_CREATE_LAN_DEVICES],
+        }
+        return self.async_create_entry(
+            title=self._data[CONF_HOST],
+            data=self._data,
+            options=self._options,
+        )
+
     async def async_step_zeroconf(
         self, discovery_info: ZeroconfServiceInfo
     ) -> ConfigFlowResult:
@@ -180,29 +226,7 @@ class FreeboxOptionsFlowHandler(OptionsFlow):
         if user_input is not None:
             return self.async_create_entry(title="", data=user_input)
 
-        options = self.config_entry.options
         return self.async_show_form(
             step_id="init",
-            data_schema=vol.Schema(
-                {
-                    vol.Required(
-                        CONF_TRACK_LAN_CLIENTS,
-                        default=options.get(
-                            CONF_TRACK_LAN_CLIENTS, DEFAULT_TRACK_LAN_CLIENTS
-                        ),
-                    ): bool,
-                    vol.Required(
-                        CONF_CREATE_WIFI_SENSORS,
-                        default=options.get(
-                            CONF_CREATE_WIFI_SENSORS, DEFAULT_CREATE_WIFI_SENSORS
-                        ),
-                    ): bool,
-                    vol.Required(
-                        CONF_CREATE_LAN_DEVICES,
-                        default=options.get(
-                            CONF_CREATE_LAN_DEVICES, DEFAULT_CREATE_LAN_DEVICES
-                        ),
-                    ): bool,
-                }
-            ),
+            data_schema=_lan_options_schema(dict(self.config_entry.options)),
         )

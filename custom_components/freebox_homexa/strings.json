@@ -23,6 +23,20 @@
       "permission": {
         "title": "Permission is required",
         "description": "Open {accounts_url} and grant the access policy: \"Gestion de l'alarme et maison connectée\"."
+      },
+      "lan_options": {
+        "title": "LAN clients",
+        "description": "Choose this **before** Home Assistant lists devices. Freebox Server, repeaters and Home devices (alarm, PIR, cameras, shutters) are always created.\n\nUncheck \u00ab Create a Homexa device for each LAN client \u00bb to avoid duplicate devices since HA 2026.8.\nUncheck \u00ab Track LAN clients \u00bb if presence is already handled by another integration.",
+        "data": {
+          "track_lan_clients": "Track LAN clients (device trackers)",
+          "create_wifi_sensors": "Create Wi-Fi RSSI sensors",
+          "create_lan_devices": "Create a Homexa device for each LAN client"
+        },
+        "data_description": {
+          "track_lan_clients": "Phones, PCs and IoT hosts seen by the Freebox.",
+          "create_wifi_sensors": "Signal strength in dBm when the client is on Wi-Fi.",
+          "create_lan_devices": "If off, trackers and RSSI stay standalone entities (no extra device)."
+        }
       }
     },
     "error": {

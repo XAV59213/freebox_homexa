@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import os
 import re
@@ -225,6 +226,7 @@ class FreeboxRouter:
         self._sw_v: str = freebox_config["firmware_version"]
         self._attrs: dict[str, Any] = {}
         self.device_id: str | None = None
+        self._home_update_lock = asyncio.Lock()
 
         self.supports_hosts = True
         self.devices: dict[str, dict[str, Any]] = {}
@@ -309,7 +311,6 @@ class FreeboxRouter:
     async def update_all(self, now: datetime | None = None) -> None:
         await self.update_device_trackers()
         await self.update_sensors()
-        await self.update_home_devices()
 
     async def update_device_trackers(self) -> None:
         new_device = False
@@ -399,26 +400,32 @@ class FreeboxRouter:
             self.supports_raid = False
             _LOGGER.warning("L'API du routeur %s ne supporte pas les RAID", self.name)
 
-    async def update_home_devices(self) -> None:
+    async def update_home_devices(self, now: datetime | None = None) -> None:
         if not self.home_granted:
             return
-        try:
-            home_nodes: list[dict[str, Any]] = await self.home.get_home_nodes() or []
-            new_device = False
-            for home_node in home_nodes:
-                if home_node["category"] in HOME_COMPATIBLE_CATEGORIES:
-                    node_id = home_node["id"]
-                    if node_id not in self.home_devices:
-                        new_device = True
-                    self.home_devices[node_id] = home_node
+        if self._home_update_lock.locked():
+            _LOGGER.debug("Poll Home déjà en cours, cycle ignoré")
+            return
+        async with self._home_update_lock:
+            try:
+                home_nodes: list[dict[str, Any]] = await self.home.get_home_nodes() or []
+                new_device = False
+                for home_node in home_nodes:
+                    if home_node["category"] in HOME_COMPATIBLE_CATEGORIES:
+                        node_id = home_node["id"]
+                        if node_id not in self.home_devices:
+                            new_device = True
+                        self.home_devices[node_id] = home_node
 
-            async_dispatcher_send(self.hass, self.signal_home_device_update)
-            if new_device:
-                async_dispatcher_send(self.hass, self.signal_home_device_new)
-            _LOGGER.debug("Mise à jour des appareils domestiques terminée")
-        except HttpRequestError:
-            self.home_granted = False
-            _LOGGER.warning("L'accès aux appareils domestiques n'est pas autorisé")
+                async_dispatcher_send(self.hass, self.signal_home_device_update)
+                if new_device:
+                    async_dispatcher_send(self.hass, self.signal_home_device_new)
+                _LOGGER.debug("Mise à jour des appareils domestiques terminée")
+            except TimeoutError:
+                _LOGGER.debug("Timeout API home/nodes — prochain poll dans 15 s")
+            except HttpRequestError:
+                self.home_granted = False
+                _LOGGER.warning("L'accès aux appareils domestiques n'est pas autorisé")
 
     async def reboot(self) -> None:
         try:

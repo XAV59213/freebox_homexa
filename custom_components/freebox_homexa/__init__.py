@@ -4,7 +4,7 @@ import logging
 import voluptuous as vol
 import homeassistant.helpers.config_validation as cv
 from homeassistant.const import CONF_HOST, CONF_PORT, EVENT_HOMEASSISTANT_STOP
-from datetime import timedelta
+from datetime import datetime, timedelta
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import Event, HomeAssistant, ServiceCall
 from homeassistant.exceptions import ConfigEntryAuthFailed, ConfigEntryNotReady
@@ -19,6 +19,7 @@ from .router import FreeboxRouter, get_api
 from .tnt_setup import async_setup_bundled_tnt
 
 SCAN_INTERVAL = timedelta(seconds=40)
+SCAN_INTERVAL_HOME = timedelta(seconds=15)
 STORAGE_VERSION = 1
 STORAGE_KEY = f"{DOMAIN}_config"
 PLAYER_PATH_TEMPLATE = "http://{host}/pub/remote_control?code={remote_code}&key={key}"
@@ -97,7 +98,11 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     router.device_id = parent_device.id
     await router.update_all()
 
+    async def _poll_home(_now: datetime | None = None) -> None:
+        await router.update_home_devices()
+
     entry.async_on_unload(async_track_time_interval(hass, router.update_all, SCAN_INTERVAL))
+    entry.async_on_unload(async_track_time_interval(hass, _poll_home, SCAN_INTERVAL_HOME))
     entry.async_on_unload(entry.add_update_listener(async_reload_entry))
 
     hass.data[DOMAIN][entry.unique_id] = router

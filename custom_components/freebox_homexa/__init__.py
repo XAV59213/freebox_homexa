@@ -97,9 +97,13 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     router = FreeboxRouter(hass, entry, api, freebox_config)
     router.device_id = parent_device.id
     await router.update_all()
+    await router.update_home_devices()
 
     async def _poll_home(_now: datetime | None = None) -> None:
-        await router.update_home_devices()
+        try:
+            await router.update_home_devices()
+        except Exception:
+            _LOGGER.debug("Poll Home ignoré (API lente ou occupée)", exc_info=True)
 
     entry.async_on_unload(async_track_time_interval(hass, router.update_all, SCAN_INTERVAL))
     entry.async_on_unload(async_track_time_interval(hass, _poll_home, SCAN_INTERVAL_HOME))

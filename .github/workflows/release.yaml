@@ -28,16 +28,23 @@ jobs:
       - name: Create GitHub Release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ inputs.tag }}
+          TARGET: ${{ inputs.target }}
         run: |
           set -euo pipefail
-          TAG="${{ inputs.tag }}"
-          NOTES="## What's Changed\n"
-          NOTES+="* feat: poll Home (PIR, contacts, alarme) toutes les 15 s (#42)\n"
-          NOTES+="* chore: version 28.8.18 alignée HACS / GitHub Release (#43)\n\n"
-          NOTES+="HACS lit le tag GitHub + `manifest.json`. Cette release aligne les deux sur **${TAG}**.\n\n"
-          NOTES+="**Full Changelog**: https://github.com/XAV59213/freebox_homexa/compare/28.8.17...${TAG}"
+          NOTES=$(cat <<EOF
+          ## What's Changed
+          * feat: poll Home (PIR, contacts, alarme) toutes les 15 s (#42)
+          * chore: version 28.8.18 alignee HACS / GitHub Release (#43)
+
+          HACS lit le tag GitHub et le champ version du manifest. Cette release aligne les deux sur ${TAG}.
+
+          **Full Changelog**: https://github.com/XAV59213/freebox_homexa/compare/28.8.17...${TAG}
+          EOF
+          )
+          NOTES=$(echo "$NOTES" | sed 's/^[[:space:]]//')
           if gh release view "$TAG" >/dev/null 2>&1; then
             gh release edit "$TAG" --title "$TAG" --notes "$NOTES"
           else
-            gh release create "$TAG" --target "${{ inputs.target }}" --title "$TAG" --notes "$NOTES"
+            gh release create "$TAG" --target "$TARGET" --title "$TAG" --notes "$NOTES"
           fi

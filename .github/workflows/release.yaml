@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: Tag / version HACS (ex. 28.8.18)
+        description: Tag / version HACS (ex. 28.8.19)
         required: true
         type: string
       target:
@@ -34,12 +34,12 @@ jobs:
           set -euo pipefail
           NOTES=$(cat <<EOF
           ## What's Changed
-          * feat: poll Home (PIR, contacts, alarme) toutes les 15 s (#42)
-          * chore: version 28.8.18 alignee HACS / GitHub Release (#43)
+          * fix: timeout poll Home 15 s sans log HA (#45)
+          * chore: version ${TAG} alignee HACS / GitHub Release
 
           HACS lit le tag GitHub et le champ version du manifest. Cette release aligne les deux sur ${TAG}.
 
-          **Full Changelog**: https://github.com/XAV59213/freebox_homexa/compare/28.8.17...${TAG}
+          **Full Changelog**: https://github.com/XAV59213/freebox_homexa/compare/28.8.18...${TAG}
           EOF
           )
           NOTES=$(echo "$NOTES" | sed 's/^[[:space:]]//')

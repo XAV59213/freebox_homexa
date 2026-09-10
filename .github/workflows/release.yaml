@@ -1,0 +1,43 @@
+name: Publish Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Tag / version HACS (ex. 28.8.18)
+        required: true
+        type: string
+      target:
+        description: Branche ou SHA cible
+        required: true
+        default: main
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.target }}
+
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          TAG="${{ inputs.tag }}"
+          NOTES="## What's Changed\n"
+          NOTES+="* feat: poll Home (PIR, contacts, alarme) toutes les 15 s (#42)\n"
+          NOTES+="* chore: version 28.8.18 alignée HACS / GitHub Release (#43)\n\n"
+          NOTES+="HACS lit le tag GitHub + `manifest.json`. Cette release aligne les deux sur **${TAG}**.\n\n"
+          NOTES+="**Full Changelog**: https://github.com/XAV59213/freebox_homexa/compare/28.8.17...${TAG}"
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release edit "$TAG" --title "$TAG" --notes "$NOTES"
+          else
+            gh release create "$TAG" --target "${{ inputs.target }}" --title "$TAG" --notes "$NOTES"
+          fi

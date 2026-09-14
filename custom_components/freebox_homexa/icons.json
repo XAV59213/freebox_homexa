@@ -12,5 +12,12 @@
     "sensor_temperature": {
       "service": "mdi:thermometer"
     }
+  },
+  "entity": {
+    "button": {
+      "accueil": {
+        "default": "mdi:home"
+      }
+    }
   }
 }

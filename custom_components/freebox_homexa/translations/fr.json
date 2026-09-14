@@ -23,20 +23,28 @@
       },
       "lan_options": {
         "title": "Clients LAN",
-        "description": "Faites ces choix **avant** que Home Assistant n'affiche la liste des appareils. Le Server, les répéteurs et le pack Home (alarme, PIR, caméras, volets) sont toujours créés.\n\nDécochez « Créer un device Homexa pour chaque client LAN » pour éviter les doublons depuis HA 2026.8.\nDécochez « Suivre les clients LAN » si la présence est déjà gérée ailleurs.\nLe code Player est optionnel (Révolution / Delta / Devialet). Laissez vide sans Player.",
+        "description": "Faites ces choix **avant** que Home Assistant n'affiche la liste des appareils. Le Server, les répéteurs et le pack Home (alarme, PIR, caméras, volets) sont toujours créés.\n\nDécochez « Créer un device Homexa pour chaque client LAN » pour éviter les doublons depuis HA 2026.8.\nDécochez « Suivre les clients LAN » si la présence est déjà gérée ailleurs.",
         "data": {
           "track_lan_clients": "Suivre les clients LAN (device trackers)",
           "create_wifi_sensors": "Créer les capteurs RSSI Wi-Fi",
           "create_lan_devices": "Créer un device Homexa pour chaque client LAN",
-          "home_poll_interval": "Intervalle Home (secondes)",
-          "remote_code": "Code télécommande réseau du Player"
+          "home_poll_interval": "Intervalle Home (secondes)"
         },
         "data_description": {
           "track_lan_clients": "Téléphones, PC et objets vus par la Freebox.",
           "create_wifi_sensors": "Force du signal en dBm quand le client est en Wi-Fi.",
           "create_lan_devices": "Si décoché, tracker et RSSI restent des entités seules (pas de device en plus).",
-          "home_poll_interval": "Fréquence PIR, contacts, alarme et volets. 5 s se rapproche de l'officielle si celle-ci est désactivée.",
-          "remote_code": "8 chiffres. Sur le Player : Réglages → Système → Informations. Utile pour power / TV / chiffres. Mini 4K / Pop passent souvent par Android TV Remote."
+          "home_poll_interval": "Fréquence PIR, contacts, alarme et volets. 5 s se rapproche de l'officielle si celle-ci est désactivée."
+        }
+      },
+      "remotes": {
+        "title": "Télécommandes Player",
+        "description": "Code télécommande réseau (8 chiffres) : sur le Player, Réglages → Système → Informations.\nDétectés : {players}\n\nLe code commun sert si un Player n'a pas le sien. Laissez vide sans Player, ou pour Mini 4K / Pop (Android TV Remote).",
+        "data": {
+          "remote_code": "Code télécommande commun"
+        },
+        "data_description": {
+          "remote_code": "Utilisé par défaut. Un champ par Player détecté s'ajoute en dessous."
         }
       }
     },
@@ -60,15 +68,23 @@
           "track_lan_clients": "Suivre les clients LAN (device trackers)",
           "create_wifi_sensors": "Créer les capteurs RSSI Wi-Fi",
           "create_lan_devices": "Créer un device Homexa pour chaque client LAN",
-          "home_poll_interval": "Intervalle Home (secondes)",
-          "remote_code": "Code télécommande réseau du Player"
+          "home_poll_interval": "Intervalle Home (secondes)"
         },
         "data_description": {
           "track_lan_clients": "Désactivez si la présence est déjà gérée par une autre intégration.",
           "create_wifi_sensors": "Le RSSI est ajouté dès qu'un client est vu en Wi-Fi, y compris après la première config.",
           "create_lan_devices": "Désactivez pour garder tracker et RSSI en entités seules, sans doublon de device.",
-          "home_poll_interval": "PIR, contacts, alarme et volets. Désactivez l'intégration officielle Freebox avant de passer à 5 s.",
-          "remote_code": "8 chiffres. Player : Réglages → Système → Informations. Laissez vide sans Player."
+          "home_poll_interval": "PIR, contacts, alarme et volets. Désactivez l'intégration officielle Freebox avant de passer à 5 s."
+        }
+      },
+      "remotes": {
+        "title": "Télécommandes Player",
+        "description": "Code télécommande réseau (8 chiffres) : Réglages → Système → Informations sur le Player.\nDétectés : {players}\n\nLe code commun sert si un Player n'a pas le sien.",
+        "data": {
+          "remote_code": "Code télécommande commun"
+        },
+        "data_description": {
+          "remote_code": "Utilisé par défaut par toutes les entités remote. Un champ par Player détecté s'ajoute en dessous."
         }
       }
     }

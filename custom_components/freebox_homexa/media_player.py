@@ -16,7 +16,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
-from .const import DOMAIN
+from .const import DOMAIN, option_remote_code
 from .router import FreeboxRouter
 
 _LOGGER = logging.getLogger(__name__)
@@ -36,8 +36,6 @@ PLAYER_FEATURES = (
     | MediaPlayerEntityFeature.PLAY_MEDIA
 )
 
-# url: opened via POST .../control/open
-# remote: IR/network key via Freebox remote API (Mini 4K / CEC wake)
 COMMON_SOURCES: dict[str, dict[str, str]] = {
     "TV": {"url": "tv:", "remote": "tv"},
     "HDMI (CEC)": {"url": "tv:", "remote": "tv"},
@@ -111,8 +109,9 @@ async def async_setup_entry(
         _LOGGER.warning("Impossible de lister les Freebox Player : %s", err)
         return
 
+    remote_code = option_remote_code(entry)
     entities = [
-        FreeboxPlayerMediaPlayer(router, player, entry.data.get("remote_code"))
+        FreeboxPlayerMediaPlayer(router, player, remote_code)
         for player in players
     ]
     if entities:
@@ -314,7 +313,6 @@ class FreeboxPlayerMediaPlayer(MediaPlayerEntity):
     async def async_turn_on(self) -> None:
         if self.state == MediaPlayerState.OFF:
             await self._try_power()
-            # One Touch Play : la TV bascule souvent sur l'entrée HDMI du Player (CEC).
             await self.async_select_source("HDMI (CEC)")
 
     async def async_turn_off(self) -> None:

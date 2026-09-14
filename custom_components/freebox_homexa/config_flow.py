@@ -32,7 +32,6 @@ from .const import (
     DOMAIN,
     HOME_POLL_INTERVAL_OPTIONS,
     STORAGE_VERSION,
-    option_remote_code,
     remote_code_field,
 )
 from .router import get_api, get_hosts_list_if_supported, resolve_token_file
@@ -69,52 +68,31 @@ def _player_label(player: dict[str, Any]) -> str:
     return str(name)
 
 
-def _lan_options_schema(defaults: dict[str, Any] | None = None) -> vol.Schema:
-    defaults = defaults or {}
-    return vol.Schema(
-        {
-            vol.Required(
-                CONF_TRACK_LAN_CLIENTS,
-                default=defaults.get(CONF_TRACK_LAN_CLIENTS, DEFAULT_TRACK_LAN_CLIENTS),
-            ): bool,
-            vol.Required(
-                CONF_CREATE_WIFI_SENSORS,
-                default=defaults.get(
-                    CONF_CREATE_WIFI_SENSORS, DEFAULT_CREATE_WIFI_SENSORS
-                ),
-            ): bool,
-            vol.Required(
-                CONF_CREATE_LAN_DEVICES,
-                default=defaults.get(
-                    CONF_CREATE_LAN_DEVICES, DEFAULT_CREATE_LAN_DEVICES
-                ),
-            ): bool,
-            vol.Required(
-                CONF_HOME_POLL_INTERVAL,
-                default=_coerce_home_poll_interval(
-                    defaults.get(CONF_HOME_POLL_INTERVAL, DEFAULT_HOME_POLL_INTERVAL)
-                ),
-            ): vol.In(HOME_POLL_INTERVAL_OPTIONS),
-        }
-    )
-
-
-def _lan_options_from_input(user_input: dict[str, Any]) -> dict[str, Any]:
-    return {
-        CONF_TRACK_LAN_CLIENTS: user_input[CONF_TRACK_LAN_CLIENTS],
-        CONF_CREATE_WIFI_SENSORS: user_input[CONF_CREATE_WIFI_SENSORS],
-        CONF_CREATE_LAN_DEVICES: user_input[CONF_CREATE_LAN_DEVICES],
-        CONF_HOME_POLL_INTERVAL: _coerce_home_poll_interval(
-            user_input.get(CONF_HOME_POLL_INTERVAL, DEFAULT_HOME_POLL_INTERVAL)
-        ),
-    }
-
-
-def _remotes_schema(
-    defaults: dict[str, Any],
-    players: list[dict[str, Any]],
+def _options_schema(
+    defaults: dict[str, Any] | None = None,
+    players: list[dict[str, Any]] | None = None,
 ) -> vol.Schema:
+    defaults = defaults or {}
+    players = players or []
     fields: dict[Any, Any] = {
+        vol.Required(
+            CONF_TRACK_LAN_CLIENTS,
+            default=defaults.get(CONF_TRACK_LAN_CLIENTS, DEFAULT_TRACK_LAN_CLIENTS),
+        ): bool,
+        vol.Required(
+            CONF_CREATE_WIFI_SENSORS,
+            default=defaults.get(CONF_CREATE_WIFI_SENSORS, DEFAULT_CREATE_WIFI_SENSORS),
+        ): bool,
+        vol.Required(
+            CONF_CREATE_LAN_DEVICES,
+            default=defaults.get(CONF_CREATE_LAN_DEVICES, DEFAULT_CREATE_LAN_DEVICES),
+        ): bool,
+        vol.Required(
+            CONF_HOME_POLL_INTERVAL,
+            default=_coerce_home_poll_interval(
+                defaults.get(CONF_HOME_POLL_INTERVAL, DEFAULT_HOME_POLL_INTERVAL)
+            ),
+        ): vol.In(HOME_POLL_INTERVAL_OPTIONS),
         vol.Optional(
             CONF_REMOTE_CODE,
             default=_coerce_remote_code(defaults.get(CONF_REMOTE_CODE)),
@@ -133,11 +111,13 @@ def _remotes_schema(
     return vol.Schema(fields)
 
 
-def _remotes_from_input(
-    user_input: dict[str, Any], players: list[dict[str, Any]]
+def _options_from_input(
+    user_input: dict[str, Any], players: list[dict[str, Any]] | None = None
 ) -> dict[str, Any]:
+    players = players or []
     shared = _coerce_remote_code(user_input.get(CONF_REMOTE_CODE))
     per_player: dict[str, str] = {}
+    extra: dict[str, str] = {}
     for player in players:
         pid = player.get("id")
         if pid is None:
@@ -145,10 +125,18 @@ def _remotes_from_input(
         code = _coerce_remote_code(user_input.get(remote_code_field(pid)))
         if code:
             per_player[str(pid)] = code
-    result: dict[str, Any] = {CONF_REMOTE_CODE: shared, CONF_REMOTE_CODES: per_player}
-    for pid, code in per_player.items():
-        result[remote_code_field(pid)] = code
-    return result
+            extra[remote_code_field(pid)] = code
+    return {
+        CONF_TRACK_LAN_CLIENTS: user_input[CONF_TRACK_LAN_CLIENTS],
+        CONF_CREATE_WIFI_SENSORS: user_input[CONF_CREATE_WIFI_SENSORS],
+        CONF_CREATE_LAN_DEVICES: user_input[CONF_CREATE_LAN_DEVICES],
+        CONF_HOME_POLL_INTERVAL: _coerce_home_poll_interval(
+            user_input.get(CONF_HOME_POLL_INTERVAL, DEFAULT_HOME_POLL_INTERVAL)
+        ),
+        CONF_REMOTE_CODE: shared,
+        CONF_REMOTE_CODES: per_player,
+        **extra,
+    }
 
 
 class FreeboxFlowHandler(ConfigFlow, domain=DOMAIN):
@@ -218,21 +206,6 @@ class FreeboxFlowHandler(ConfigFlow, domain=DOMAIN):
         except Exception as err:
             _LOGGER.debug("Impossible de supprimer le token : %s", err)
 
-    async def _list_players(self) -> list[dict[str, Any]]:
-        fbx = await get_api(self.hass, self._data[CONF_HOST])
-        try:
-            await fbx.open(self._data[CONF_HOST], self._data.get(CONF_PORT, 80))
-            players = await fbx.player.get_players() or []
-            await fbx.close()
-            return list(players)
-        except Exception as err:
-            _LOGGER.debug("Liste Player indisponible au setup : %s", err)
-            try:
-                await fbx.close()
-            except Exception:
-                pass
-            return []
-
     async def async_step_link(
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
@@ -295,33 +268,19 @@ class FreeboxFlowHandler(ConfigFlow, domain=DOMAIN):
     async def async_step_lan_options(
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
-        """Choix LAN + poll Home avant création des devices."""
-        if user_input is None:
-            return self.async_show_form(
-                step_id="lan_options",
-                data_schema=_lan_options_schema(),
-            )
-
-        self._options = _lan_options_from_input(user_input)
-        return await self.async_step_remotes()
-
-    async def async_step_remotes(
-        self, user_input: dict[str, Any] | None = None
-    ) -> ConfigFlowResult:
-        """Codes télécommande réseau des Players."""
+        """LAN, intervalle Home et code télécommande avant création des devices."""
         players = self._players or []
         if user_input is None:
             names = ", ".join(_player_label(p) for p in players) or "aucun Player détecté"
             return self.async_show_form(
-                step_id="remotes",
-                data_schema=_remotes_schema({}, players),
+                step_id="lan_options",
+                data_schema=_options_schema({}, players),
                 description_placeholders={"players": names},
             )
 
-        remote_opts = _remotes_from_input(user_input, players)
-        self._options.update(remote_opts)
-        if remote_opts.get(CONF_REMOTE_CODE):
-            self._data[CONF_REMOTE_CODE] = remote_opts[CONF_REMOTE_CODE]
+        self._options = _options_from_input(user_input, players)
+        if self._options.get(CONF_REMOTE_CODE):
+            self._data[CONF_REMOTE_CODE] = self._options[CONF_REMOTE_CODE]
         return self.async_create_entry(
             title=self._data[CONF_HOST],
             data=self._data,
@@ -337,10 +296,9 @@ class FreeboxFlowHandler(ConfigFlow, domain=DOMAIN):
 
 
 class FreeboxOptionsFlowHandler(OptionsFlow):
-    """Options : LAN, intervalle Home, puis télécommandes."""
+    """Options : LAN, intervalle Home et télécommandes Player sur le même écran."""
 
     def __init__(self) -> None:
-        self._pending: dict[str, Any] = {}
         self._players: list[dict[str, Any]] = []
 
     async def _list_players(self) -> list[dict[str, Any]]:
@@ -356,18 +314,6 @@ class FreeboxOptionsFlowHandler(OptionsFlow):
     async def async_step_init(
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
-        if user_input is not None:
-            self._pending = _lan_options_from_input(user_input)
-            return await self.async_step_remotes()
-
-        return self.async_show_form(
-            step_id="init",
-            data_schema=_lan_options_schema(dict(self.config_entry.options)),
-        )
-
-    async def async_step_remotes(
-        self, user_input: dict[str, Any] | None = None
-    ) -> ConfigFlowResult:
         if not self._players:
             self._players = await self._list_players()
         players = self._players
@@ -376,7 +322,7 @@ class FreeboxOptionsFlowHandler(OptionsFlow):
             defaults[CONF_REMOTE_CODE] = self.config_entry.data.get(CONF_REMOTE_CODE) or ""
 
         if user_input is not None:
-            options = {**self._pending, **_remotes_from_input(user_input, players)}
+            options = _options_from_input(user_input, players)
             new_data = dict(self.config_entry.data)
             shared = options.get(CONF_REMOTE_CODE)
             if shared:
@@ -388,7 +334,7 @@ class FreeboxOptionsFlowHandler(OptionsFlow):
 
         names = ", ".join(_player_label(p) for p in players) or "aucun Player détecté"
         return self.async_show_form(
-            step_id="remotes",
-            data_schema=_remotes_schema(defaults, players),
+            step_id="init",
+            data_schema=_options_schema(defaults, players),
             description_placeholders={"players": names},
         )

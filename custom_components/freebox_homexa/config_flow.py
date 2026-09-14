@@ -22,6 +22,7 @@ from .const import (
     CONF_CREATE_LAN_DEVICES,
     CONF_CREATE_WIFI_SENSORS,
     CONF_HOME_POLL_INTERVAL,
+    CONF_REMOTE_CODE,
     CONF_TRACK_LAN_CLIENTS,
     DEFAULT_CREATE_LAN_DEVICES,
     DEFAULT_CREATE_WIFI_SENSORS,
@@ -56,6 +57,10 @@ def _coerce_home_poll_interval(value: Any) -> int:
     return DEFAULT_HOME_POLL_INTERVAL
 
 
+def _coerce_remote_code(value: Any) -> str:
+    return str(value or "").strip()
+
+
 def _lan_options_schema(defaults: dict[str, Any] | None = None) -> vol.Schema:
     defaults = defaults or {}
     return vol.Schema(
@@ -82,6 +87,10 @@ def _lan_options_schema(defaults: dict[str, Any] | None = None) -> vol.Schema:
                     defaults.get(CONF_HOME_POLL_INTERVAL, DEFAULT_HOME_POLL_INTERVAL)
                 ),
             ): vol.In(HOME_POLL_INTERVAL_OPTIONS),
+            vol.Optional(
+                CONF_REMOTE_CODE,
+                default=_coerce_remote_code(defaults.get(CONF_REMOTE_CODE)),
+            ): str,
         }
     )
 
@@ -94,6 +103,7 @@ def _options_from_input(user_input: dict[str, Any]) -> dict[str, Any]:
         CONF_HOME_POLL_INTERVAL: _coerce_home_poll_interval(
             user_input.get(CONF_HOME_POLL_INTERVAL, DEFAULT_HOME_POLL_INTERVAL)
         ),
+        CONF_REMOTE_CODE: _coerce_remote_code(user_input.get(CONF_REMOTE_CODE)),
     }
 
 
@@ -221,7 +231,7 @@ class FreeboxFlowHandler(ConfigFlow, domain=DOMAIN):
     async def async_step_lan_options(
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
-        """Choix LAN + poll Home avant création des devices / entités."""
+        """Choix LAN, poll Home et code Player avant création des devices."""
         if user_input is None:
             return self.async_show_form(
                 step_id="lan_options",
@@ -229,6 +239,9 @@ class FreeboxFlowHandler(ConfigFlow, domain=DOMAIN):
             )
 
         self._options = _options_from_input(user_input)
+        code = self._options.get(CONF_REMOTE_CODE)
+        if code:
+            self._data[CONF_REMOTE_CODE] = code
         return self.async_create_entry(
             title=self._data[CONF_HOST],
             data=self._data,
@@ -244,15 +257,26 @@ class FreeboxFlowHandler(ConfigFlow, domain=DOMAIN):
 
 
 class FreeboxOptionsFlowHandler(OptionsFlow):
-    """Options : suivi LAN, capteurs RSSI, devices, intervalle Home."""
+    """Options : LAN, intervalle Home, code Player."""
 
     async def async_step_init(
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
         if user_input is not None:
-            return self.async_create_entry(title="", data=_options_from_input(user_input))
+            options = _options_from_input(user_input)
+            new_data = dict(self.config_entry.data)
+            code = options.get(CONF_REMOTE_CODE)
+            if code:
+                new_data[CONF_REMOTE_CODE] = code
+            else:
+                new_data.pop(CONF_REMOTE_CODE, None)
+            self.hass.config_entries.async_update_entry(self.config_entry, data=new_data)
+            return self.async_create_entry(title="", data=options)
 
+        defaults = dict(self.config_entry.options)
+        if not _coerce_remote_code(defaults.get(CONF_REMOTE_CODE)):
+            defaults[CONF_REMOTE_CODE] = self.config_entry.data.get(CONF_REMOTE_CODE) or ""
         return self.async_show_form(
             step_id="init",
-            data_schema=_lan_options_schema(dict(self.config_entry.options)),
+            data_schema=_lan_options_schema(defaults),
         )

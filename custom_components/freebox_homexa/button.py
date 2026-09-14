@@ -1,4 +1,4 @@
-"""Boutons Freebox : box + touches télécommande Player."""
+"""Boutons Freebox : box + télécommande et apps Player."""
 
 from __future__ import annotations
 
@@ -81,6 +81,26 @@ PLAYER_REMOTE_BUTTONS: tuple[tuple[str, str, str, bool], ...] = (
     ("9", "9", "mdi:numeric-9", False),
 )
 
+# Apps ouvertes via POST player/.../control/open (pas besoin du code télécommande).
+PLAYER_APP_BUTTONS: tuple[tuple[str, str, str, str, bool], ...] = (
+    ("youtube", "YouTube", "mdi:youtube", "https://www.youtube.com", True),
+    ("netflix", "Netflix", "mdi:netflix", "https://www.netflix.com", True),
+    ("disney", "Disney+", "mdi:star-four-points", "https://www.disneyplus.com", True),
+    ("prime", "Prime Video", "mdi:amazon", "https://www.primevideo.com", True),
+    ("browser", "Navigateur", "mdi:web", "https://www.google.com", True),
+    ("canal", "Canal+", "mdi:ticket-confirmation", "https://www.canalplus.com", False),
+    ("max", "Max", "mdi:play-box", "https://play.max.com", False),
+    ("appletv", "Apple TV", "mdi:apple", "https://tv.apple.com", False),
+)
+
+
+def _player_api_version(player: dict[str, Any]) -> str:
+    text = str(player.get("api_version") or "6").strip().lower()
+    if text.startswith("v"):
+        text = text[1:]
+    major = text.split(".")[0] or "6"
+    return f"v{major}"
+
 
 async def async_setup_entry(
     hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback
@@ -101,6 +121,12 @@ async def async_setup_entry(
             entities.append(
                 FreeboxPlayerRemoteButton(
                     router, player, entry, key, name, icon, enabled
+                )
+            )
+        for key, name, icon, url, enabled in PLAYER_APP_BUTTONS:
+            entities.append(
+                FreeboxPlayerAppButton(
+                    router, player, key, name, icon, url, enabled
                 )
             )
 
@@ -174,6 +200,44 @@ class FreeboxPlayerRemoteButton(ButtonEntity):
             _LOGGER.error(
                 "Touche %s échouée sur Player %s : %s",
                 self._key,
+                self._player_id,
+                err,
+            )
+
+
+class FreeboxPlayerAppButton(ButtonEntity):
+    """Ouvre une app / URL sur le Freebox Player."""
+
+    _attr_has_entity_name = True
+
+    def __init__(
+        self,
+        router: FreeboxRouter,
+        player: dict[str, Any],
+        key: str,
+        name: str,
+        icon: str,
+        url: str,
+        enabled_by_default: bool,
+    ) -> None:
+        self._router = router
+        self._player_id = player["id"]
+        self._api_version = _player_api_version(player)
+        self._url = url
+        self._attr_name = name
+        self._attr_icon = icon
+        self._attr_unique_id = f"{router.mac}_player_{self._player_id}_app_{key}"
+        self._attr_device_info = player_device_info(router, player)
+        self._attr_entity_registry_enabled_default = enabled_by_default
+
+    async def async_press(self) -> None:
+        path = f"player/{self._player_id}/api/{self._api_version}/control/open"
+        try:
+            await self._router._api.player._access.post(path, {"url": self._url})
+        except Exception as err:
+            _LOGGER.error(
+                "Impossible d'ouvrir %s sur Player %s : %s",
+                self._attr_name,
                 self._player_id,
                 err,
             )

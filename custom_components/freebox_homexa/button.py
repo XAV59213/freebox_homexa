@@ -45,8 +45,8 @@ BUTTON_DESCRIPTIONS: tuple[FreeboxButtonEntityDescription, ...] = (
     ),
 )
 
-# Touches utiles de la télécommande Free (API remote.send_key).
-enabled=False évite d'encombrer Contrôles avec le pavé numérique.
+# Touches de la télécommande Free (API remote.send_key).
+# enabled=False : pavé numérique et couleurs désactivés par défaut.
 PLAYER_REMOTE_BUTTONS: tuple[tuple[str, str, str, bool], ...] = (
     ("home", "Accueil", "mdi:home", True),
     ("back", "Retour", "mdi:arrow-u-left-top", True),

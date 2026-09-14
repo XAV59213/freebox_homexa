@@ -14,7 +14,15 @@ from freebox_api.exceptions import AuthorizationError, HttpRequestError
 import aiohttp
 import homeassistant.helpers.device_registry as dr
 
-from .const import DOMAIN, PLATFORMS, SERVICE_REBOOT, SERVICE_RELOAD, SERVICE_REMOTE, option_home_poll_interval
+from .const import (
+    DOMAIN,
+    PLATFORMS,
+    SERVICE_REBOOT,
+    SERVICE_RELOAD,
+    SERVICE_REMOTE,
+    option_home_poll_interval,
+    option_remote_code,
+)
 from .router import FreeboxRouter, get_api
 from .tnt_setup import async_setup_bundled_tnt
 
@@ -29,7 +37,7 @@ CONFIG_SCHEMA = vol.Schema(
         DOMAIN: vol.Schema(
             {
                 vol.Required(CONF_HOST): cv.string,
-                vol.Required("remote_code"): cv.string,
+                vol.Optional("remote_code"): cv.string,
             }
         )
     },
@@ -141,11 +149,18 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         code_list = call.data.get("code", "")
         if not code_list:
             return
+        remote_code = option_remote_code(entry)
+        if not remote_code:
+            _LOGGER.warning(
+                "Code télécommande Player manquant. "
+                "Paramètres → Homexa → Configurer, ou Player : Réglages → Système → Informations."
+            )
+            return
         async with aiohttp.ClientSession() as session:
             for code in code_list.split(","):
                 url = PLAYER_PATH_TEMPLATE.format(
                     host=entry.data[CONF_HOST],
-                    remote_code=entry.data["remote_code"],
+                    remote_code=remote_code,
                     key=code.strip(),
                 )
                 try:

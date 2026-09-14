@@ -50,11 +50,15 @@ class FreeboxRemote(RemoteEntity):
         self, router: FreeboxRouter, player: dict[str, Any], entry: ConfigEntry
     ) -> None:
         self._router = router
+        self._entry = entry
         self._player_id = player["id"]
-        self._remote_code = option_remote_code(entry)
         self._attr_unique_id = f"{router.mac}_player_{self._player_id}_remote"
         self._attr_device_info = player_device_info(router, player)
         self._attr_is_on = bool(player.get("reachable"))
+
+    @property
+    def _remote_code(self) -> str | None:
+        return option_remote_code(self._entry)
 
     async def async_turn_on(self, **kwargs: Any) -> None:
         await self._send_commands(["power"], False, 0)
@@ -71,7 +75,8 @@ class FreeboxRemote(RemoteEntity):
         )
 
     async def _send_commands(self, commands: list[str], long_press: bool, repeat: int) -> None:
-        if not self._remote_code:
+        remote_code = self._remote_code
+        if not remote_code:
             _LOGGER.warning(
                 "Code télécommande réseau manquant. Paramètres → Homexa → Configurer, "
                 "ou sur le Player : Réglages → Système → Informations."
@@ -83,7 +88,7 @@ class FreeboxRemote(RemoteEntity):
                 continue
             try:
                 await self._router._api.remote.send_key(
-                    code=str(self._remote_code),
+                    code=str(remote_code),
                     key=cmd,
                     long_press=long_press,
                     repeat=repeat,

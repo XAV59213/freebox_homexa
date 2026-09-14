@@ -62,10 +62,13 @@ Dès l’installation, ou ensuite : **Paramètres → Appareils et services → 
 | Suivre les clients LAN | oui | `device_tracker` des téléphones / PC / objets |
 | Créer les capteurs RSSI Wi-Fi | oui | Signal en dBm dès que le client est vu en Wi-Fi |
 | Créer un device Homexa par client LAN | oui | Désactivez pour éviter les doublons depuis HA 2026.8 |
+| Intervalle Home (secondes) | 15 | PIR, contacts, alarme, volets : 5 / 10 / 15 / 20 / 25 / 30 |
 
 Le Server, les répéteurs et le pack Home (alarme, PIR, caméras, volets) gardent toujours leurs devices.
 
 Si vous désactivez « device par client » après coup, rechargez l’intégration puis supprimez à la main les anciens devices Homexa devenus vides.
+
+Pour 5 s, désactivez l’intégration officielle Freebox : les deux en parallèle saturent l’API.
 
 ### Player (télécommande)
 
@@ -91,7 +94,7 @@ HACS → Freebox Homexa → **Mettre à jour** → redémarrer Home Assistant.
 | HDMI ne change pas l’entrée TV | Normal : CEC réveille la TV, ça ne sélectionne pas HDMI 1/2/3 |
 | Pas de RSSI Wi-Fi | Client Ethernet, ou droit LAN / Wi-Fi manquant dans Freebox OS |
 | Devices en doublon (HA 2026.8) | Désactivez « Créer un device Homexa pour chaque client LAN » |
-| PIR décalé vs intégration officielle | L’officielle désactivée + poll Home à 15 s |
+| PIR décalé vs intégration officielle | Officielle désactivée + intervalle Home à 5 ou 10 s |
 
 Logs : **Paramètres → Système → Journaux**, filtre `freebox_homexa`.
 

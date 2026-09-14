@@ -21,11 +21,14 @@ from homeassistant.helpers.storage import Store
 from .const import (
     CONF_CREATE_LAN_DEVICES,
     CONF_CREATE_WIFI_SENSORS,
+    CONF_HOME_POLL_INTERVAL,
     CONF_TRACK_LAN_CLIENTS,
     DEFAULT_CREATE_LAN_DEVICES,
     DEFAULT_CREATE_WIFI_SENSORS,
+    DEFAULT_HOME_POLL_INTERVAL,
     DEFAULT_TRACK_LAN_CLIENTS,
     DOMAIN,
+    HOME_POLL_INTERVAL_OPTIONS,
     STORAGE_VERSION,
 )
 from .router import get_api, get_hosts_list_if_supported, resolve_token_file
@@ -41,6 +44,16 @@ _PLACEHOLDERS = {
     "accounts_url": FREEBOX_ACCOUNTS_URL,
     "api_url": FREEBOX_API_URL,
 }
+
+
+def _coerce_home_poll_interval(value: Any) -> int:
+    try:
+        interval = int(value)
+    except (TypeError, ValueError):
+        return DEFAULT_HOME_POLL_INTERVAL
+    if interval in HOME_POLL_INTERVAL_OPTIONS:
+        return interval
+    return DEFAULT_HOME_POLL_INTERVAL
 
 
 def _lan_options_schema(defaults: dict[str, Any] | None = None) -> vol.Schema:
@@ -63,8 +76,25 @@ def _lan_options_schema(defaults: dict[str, Any] | None = None) -> vol.Schema:
                     CONF_CREATE_LAN_DEVICES, DEFAULT_CREATE_LAN_DEVICES
                 ),
             ): bool,
+            vol.Required(
+                CONF_HOME_POLL_INTERVAL,
+                default=_coerce_home_poll_interval(
+                    defaults.get(CONF_HOME_POLL_INTERVAL, DEFAULT_HOME_POLL_INTERVAL)
+                ),
+            ): vol.In(HOME_POLL_INTERVAL_OPTIONS),
         }
     )
+
+
+def _options_from_input(user_input: dict[str, Any]) -> dict[str, Any]:
+    return {
+        CONF_TRACK_LAN_CLIENTS: user_input[CONF_TRACK_LAN_CLIENTS],
+        CONF_CREATE_WIFI_SENSORS: user_input[CONF_CREATE_WIFI_SENSORS],
+        CONF_CREATE_LAN_DEVICES: user_input[CONF_CREATE_LAN_DEVICES],
+        CONF_HOME_POLL_INTERVAL: _coerce_home_poll_interval(
+            user_input.get(CONF_HOME_POLL_INTERVAL, DEFAULT_HOME_POLL_INTERVAL)
+        ),
+    }
 
 
 class FreeboxFlowHandler(ConfigFlow, domain=DOMAIN):
@@ -191,18 +221,14 @@ class FreeboxFlowHandler(ConfigFlow, domain=DOMAIN):
     async def async_step_lan_options(
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
-        """Choix LAN avant création des devices / entités."""
+        """Choix LAN + poll Home avant création des devices / entités."""
         if user_input is None:
             return self.async_show_form(
                 step_id="lan_options",
                 data_schema=_lan_options_schema(),
             )
 
-        self._options = {
-            CONF_TRACK_LAN_CLIENTS: user_input[CONF_TRACK_LAN_CLIENTS],
-            CONF_CREATE_WIFI_SENSORS: user_input[CONF_CREATE_WIFI_SENSORS],
-            CONF_CREATE_LAN_DEVICES: user_input[CONF_CREATE_LAN_DEVICES],
-        }
+        self._options = _options_from_input(user_input)
         return self.async_create_entry(
             title=self._data[CONF_HOST],
             data=self._data,
@@ -218,13 +244,13 @@ class FreeboxFlowHandler(ConfigFlow, domain=DOMAIN):
 
 
 class FreeboxOptionsFlowHandler(OptionsFlow):
-    """Options : suivi LAN, capteurs RSSI, rattachement aux devices."""
+    """Options : suivi LAN, capteurs RSSI, devices, intervalle Home."""
 
     async def async_step_init(
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
         if user_input is not None:
-            return self.async_create_entry(title="", data=user_input)
+            return self.async_create_entry(title="", data=_options_from_input(user_input))
 
         return self.async_show_form(
             step_id="init",

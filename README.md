@@ -63,6 +63,7 @@ Dès l’installation, ou ensuite : **Paramètres → Appareils et services → 
 | Créer les capteurs RSSI Wi-Fi | oui | Signal en dBm dès que le client est vu en Wi-Fi |
 | Créer un device Homexa par client LAN | oui | Désactivez pour éviter les doublons depuis HA 2026.8 |
 | Intervalle Home (secondes) | 15 | PIR, contacts, alarme, volets : 5 / 10 / 15 / 20 / 25 / 30 |
+| Code télécommande Player | vide | 8 chiffres, Player : Réglages → Système → Informations |
 
 Le Server, les répéteurs et le pack Home (alarme, PIR, caméras, volets) gardent toujours leurs devices.
 
@@ -72,7 +73,11 @@ Pour 5 s, désactivez l’intégration officielle Freebox : les deux en parallè
 
 ### Player (télécommande)
 
-Sur le Player : **Réglages → Système → Informations** → note le code télécommande si l’intégration le demande.
+Le **code télécommande réseau** (8 chiffres) se règle dans les options Homexa.
+
+Sur le Player : **Réglages → Système → Informations**. Utile sur Révolution / Delta / Devialet pour power, TV, chiffres. Mini 4K / Pop passent souvent par **Android TV Remote**. Laisser vide si vous n’avez pas de Player.
+
+Volume et lecture passent par l’API Player, sans ce code.
 
 ---
 
@@ -87,10 +92,11 @@ HACS → Freebox Homexa → **Mettre à jour** → redémarrer Home Assistant.
 | Symptôme | Piste |
 |---|---|
 | L’intégration ne démarre pas | HA 2026.8.0+ requis (`via_device_id`) |
-| `bad_json` sur l’alarme | Version **28.8.2** (payload `{"value": ...}`) |
+| `bad_json` sur l’alarme | Version **28.8.2** (payload `{\"value\": ...}`) |
 | Seulement 2 boutons d’alarme | 28.8+ expose Présent / Absent / Désarmé |
 | Répéteur invisible | Redémarre HA ; le F-RP01A est détecté via les hôtes LAN |
 | Player absent | Droits Player dans Freebox OS + redémarrage |
+| Télécommande sans effet | Renseigner le code Player dans Configurer |
 | HDMI ne change pas l’entrée TV | Normal : CEC réveille la TV, ça ne sélectionne pas HDMI 1/2/3 |
 | Pas de RSSI Wi-Fi | Client Ethernet, ou droit LAN / Wi-Fi manquant dans Freebox OS |
 | Devices en doublon (HA 2026.8) | Désactivez « Créer un device Homexa pour chaque client LAN » |

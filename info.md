@@ -20,6 +20,7 @@ Doc complète : [Wiki](https://github.com/XAV59213/freebox_homexa/wiki)
 - Répéteurs Free **F-RP01A**
 - Player Devialet / Mini 4K / Pop + télécommande
 - Sources TV / HDMI (CEC) / YouTube / Netflix
+- Code télécommande Player réglable dans les options
 
 HDMI = sortie Player vers la TV (CEC), pas un switch d’entrée HDMI.
 

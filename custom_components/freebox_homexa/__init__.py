@@ -14,12 +14,11 @@ from freebox_api.exceptions import AuthorizationError, HttpRequestError
 import aiohttp
 import homeassistant.helpers.device_registry as dr
 
-from .const import DOMAIN, PLATFORMS, SERVICE_REBOOT, SERVICE_RELOAD, SERVICE_REMOTE
+from .const import DOMAIN, PLATFORMS, SERVICE_REBOOT, SERVICE_RELOAD, SERVICE_REMOTE, option_home_poll_interval
 from .router import FreeboxRouter, get_api
 from .tnt_setup import async_setup_bundled_tnt
 
 SCAN_INTERVAL = timedelta(seconds=40)
-SCAN_INTERVAL_HOME = timedelta(seconds=15)
 STORAGE_VERSION = 1
 STORAGE_KEY = f"{DOMAIN}_config"
 PLAYER_PATH_TEMPLATE = "http://{host}/pub/remote_control?code={remote_code}&key={key}"
@@ -105,8 +104,13 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         except Exception:
             _LOGGER.debug("Poll Home ignoré (API lente ou occupée)", exc_info=True)
 
+    home_interval = option_home_poll_interval(entry)
+    _LOGGER.info("Poll Home toutes les %s s", home_interval)
+
     entry.async_on_unload(async_track_time_interval(hass, router.update_all, SCAN_INTERVAL))
-    entry.async_on_unload(async_track_time_interval(hass, _poll_home, SCAN_INTERVAL_HOME))
+    entry.async_on_unload(
+        async_track_time_interval(hass, _poll_home, timedelta(seconds=home_interval))
+    )
     entry.async_on_unload(entry.add_update_listener(async_reload_entry))
 
     hass.data[DOMAIN][entry.unique_id] = router

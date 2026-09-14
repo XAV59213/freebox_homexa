@@ -21,6 +21,7 @@ CONF_TRACK_LAN_CLIENTS = "track_lan_clients"
 CONF_CREATE_WIFI_SENSORS = "create_wifi_sensors"
 CONF_CREATE_LAN_DEVICES = "create_lan_devices"
 CONF_HOME_POLL_INTERVAL = "home_poll_interval"
+CONF_REMOTE_CODE = "remote_code"
 
 DEFAULT_TRACK_LAN_CLIENTS = True
 DEFAULT_CREATE_WIFI_SENSORS = True
@@ -136,3 +137,14 @@ def option_home_poll_interval(entry: ConfigEntry) -> int:
     if value in HOME_POLL_INTERVAL_OPTIONS:
         return value
     return DEFAULT_HOME_POLL_INTERVAL
+
+
+def option_remote_code(entry: ConfigEntry) -> str | None:
+    """Code télécommande réseau du Player (options puis data)."""
+    raw = entry.options.get(CONF_REMOTE_CODE)
+    if raw is None or str(raw).strip() == "":
+        raw = entry.data.get(CONF_REMOTE_CODE)
+    if raw is None:
+        return None
+    code = str(raw).strip()
+    return code or None

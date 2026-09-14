@@ -20,10 +20,13 @@ REPEATER_MODEL = "F-RP01A"
 CONF_TRACK_LAN_CLIENTS = "track_lan_clients"
 CONF_CREATE_WIFI_SENSORS = "create_wifi_sensors"
 CONF_CREATE_LAN_DEVICES = "create_lan_devices"
+CONF_HOME_POLL_INTERVAL = "home_poll_interval"
 
 DEFAULT_TRACK_LAN_CLIENTS = True
 DEFAULT_CREATE_WIFI_SENSORS = True
 DEFAULT_CREATE_LAN_DEVICES = True
+DEFAULT_HOME_POLL_INTERVAL = 15
+HOME_POLL_INTERVAL_OPTIONS = [5, 10, 15, 20, 25, 30]
 
 # Must stay stable. freebox-api requests a new pairing if this dict differs
 # from the saved token file (app_version / hostname used to change every restart).
@@ -122,3 +125,14 @@ HOME_COMPATIBLE_CATEGORIES = [
 def option_enabled(entry: ConfigEntry, key: str, default: bool = True) -> bool:
     """Lit une option booléenne de la config entry."""
     return bool(entry.options.get(key, default))
+
+
+def option_home_poll_interval(entry: ConfigEntry) -> int:
+    """Intervalle du poll Home (PIR, contacts, alarme, volets), en secondes."""
+    try:
+        value = int(entry.options.get(CONF_HOME_POLL_INTERVAL, DEFAULT_HOME_POLL_INTERVAL))
+    except (TypeError, ValueError):
+        return DEFAULT_HOME_POLL_INTERVAL
+    if value in HOME_POLL_INTERVAL_OPTIONS:
+        return value
+    return DEFAULT_HOME_POLL_INTERVAL

@@ -39,6 +39,16 @@
           "create_lan_devices": "If off, trackers and RSSI stay standalone entities (no extra device).",
           "home_poll_interval": "How often to query PIR, contacts, alarm and shutters. 5 s is closer to the official integration if that one is disabled."
         }
+      },
+      "remotes": {
+        "title": "Player remotes",
+        "description": "Network remote code (8 digits) from the Player: Settings → System → Information.\nDetected: {players}\n\nThe shared code is used if a Player has no code of its own. Leave empty without a Player, or for Mini 4K / Pop (Android TV Remote).",
+        "data": {
+          "remote_code": "Shared remote code"
+        },
+        "data_description": {
+          "remote_code": "Fallback for every remote. Extra fields appear per detected Player."
+        }
       }
     },
     "error": {
@@ -68,6 +78,16 @@
           "create_wifi_sensors": "RSSI is added when a client is seen on Wi-Fi, including after the first setup.",
           "create_lan_devices": "Turn off to keep tracker and RSSI as standalone entities and avoid duplicate devices.",
           "home_poll_interval": "PIR, contacts, alarm and shutters. Disable the official Freebox integration before using 5 s."
+        }
+      },
+      "remotes": {
+        "title": "Player remotes",
+        "description": "Network remote code (8 digits) from the Player: Settings → System → Information.\nDetected: {players}\n\nThe shared code is used if a Player has no code of its own.",
+        "data": {
+          "remote_code": "Shared remote code"
+        },
+        "data_description": {
+          "remote_code": "Fallback for every remote entity. Extra fields appear per detected Player."
         }
       }
     }

@@ -16,7 +16,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
-from .const import DOMAIN
+from .const import DOMAIN, option_remote_code
 from .router import FreeboxRouter
 
 _LOGGER = logging.getLogger(__name__)
@@ -36,8 +36,6 @@ PLAYER_FEATURES = (
     | MediaPlayerEntityFeature.PLAY_MEDIA
 )
 
-# url: opened via POST .../control/open
-# remote: IR/network key via Freebox remote API (Mini 4K / CEC wake)
 COMMON_SOURCES: dict[str, dict[str, str]] = {
     "TV": {"url": "tv:", "remote": "tv"},
     "HDMI (CEC)": {"url": "tv:", "remote": "tv"},
@@ -111,10 +109,7 @@ async def async_setup_entry(
         _LOGGER.warning("Impossible de lister les Freebox Player : %s", err)
         return
 
-    entities = [
-        FreeboxPlayerMediaPlayer(router, player, entry.data.get("remote_code"))
-        for player in players
-    ]
+    entities = [FreeboxPlayerMediaPlayer(router, player, entry) for player in players]
     if entities:
         async_add_entities(entities, True)
         _LOGGER.info("%s Freebox Player(s) ajouté(s)", len(entities))
@@ -135,12 +130,12 @@ class FreeboxPlayerMediaPlayer(MediaPlayerEntity):
         self,
         router: FreeboxRouter,
         player: dict[str, Any],
-        remote_code: str | None = None,
+        entry: ConfigEntry,
     ) -> None:
         self._router = router
+        self._entry = entry
         self._player = player
         self._player_id = player["id"]
-        self._remote_code = remote_code
         self._kind = _player_kind(player)
         self._api_version = _normalize_api_version(player.get("api_version"))
         self._attr_unique_id = f"{router.mac}_player_{self._player_id}"
@@ -151,6 +146,10 @@ class FreeboxPlayerMediaPlayer(MediaPlayerEntity):
             self._attr_source_list = list(MINI_4K_SOURCES)
         else:
             self._attr_source_list = list(DEVIALET_SOURCES)
+
+    @property
+    def _remote_code(self) -> str | None:
+        return option_remote_code(self._entry, self._player_id)
 
     def _path(self, suffix: str, version: str | None = None) -> str:
         return f"player/{self._player_id}/api/{version or self._api_version}/{suffix}"
@@ -187,10 +186,11 @@ class FreeboxPlayerMediaPlayer(MediaPlayerEntity):
                 _LOGGER.error("Commande %s échouée sur Player %s : %s", name, self._player_id, err)
 
     async def _send_remote(self, key: str) -> None:
-        if not self._remote_code:
+        remote_code = self._remote_code
+        if not remote_code:
             return
         try:
-            await self._router._api.remote.send_key(code=str(self._remote_code), key=key)
+            await self._router._api.remote.send_key(code=str(remote_code), key=key)
         except Exception as err:
             _LOGGER.debug("Touche remote %s indisponible : %s", key, err)
 
@@ -314,7 +314,6 @@ class FreeboxPlayerMediaPlayer(MediaPlayerEntity):
     async def async_turn_on(self) -> None:
         if self.state == MediaPlayerState.OFF:
             await self._try_power()
-            # One Touch Play : la TV bascule souvent sur l'entrée HDMI du Player (CEC).
             await self.async_select_source("HDMI (CEC)")
 
     async def async_turn_off(self) -> None:

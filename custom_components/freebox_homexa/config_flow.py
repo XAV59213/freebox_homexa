@@ -22,6 +22,8 @@ from .const import (
     CONF_CREATE_LAN_DEVICES,
     CONF_CREATE_WIFI_SENSORS,
     CONF_HOME_POLL_INTERVAL,
+    CONF_REMOTE_CODE,
+    CONF_REMOTE_CODES,
     CONF_TRACK_LAN_CLIENTS,
     DEFAULT_CREATE_LAN_DEVICES,
     DEFAULT_CREATE_WIFI_SENSORS,
@@ -30,6 +32,8 @@ from .const import (
     DOMAIN,
     HOME_POLL_INTERVAL_OPTIONS,
     STORAGE_VERSION,
+    option_remote_code,
+    remote_code_field,
 )
 from .router import get_api, get_hosts_list_if_supported, resolve_token_file
 
@@ -54,6 +58,15 @@ def _coerce_home_poll_interval(value: Any) -> int:
     if interval in HOME_POLL_INTERVAL_OPTIONS:
         return interval
     return DEFAULT_HOME_POLL_INTERVAL
+
+
+def _coerce_remote_code(value: Any) -> str:
+    return str(value or "").strip()
+
+
+def _player_label(player: dict[str, Any]) -> str:
+    name = player.get("device_name") or player.get("name") or f"Player {player.get('id')}"
+    return str(name)
 
 
 def _lan_options_schema(defaults: dict[str, Any] | None = None) -> vol.Schema:
@@ -86,7 +99,7 @@ def _lan_options_schema(defaults: dict[str, Any] | None = None) -> vol.Schema:
     )
 
 
-def _options_from_input(user_input: dict[str, Any]) -> dict[str, Any]:
+def _lan_options_from_input(user_input: dict[str, Any]) -> dict[str, Any]:
     return {
         CONF_TRACK_LAN_CLIENTS: user_input[CONF_TRACK_LAN_CLIENTS],
         CONF_CREATE_WIFI_SENSORS: user_input[CONF_CREATE_WIFI_SENSORS],
@@ -97,6 +110,47 @@ def _options_from_input(user_input: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def _remotes_schema(
+    defaults: dict[str, Any],
+    players: list[dict[str, Any]],
+) -> vol.Schema:
+    fields: dict[Any, Any] = {
+        vol.Optional(
+            CONF_REMOTE_CODE,
+            default=_coerce_remote_code(defaults.get(CONF_REMOTE_CODE)),
+        ): str,
+    }
+    codes = defaults.get(CONF_REMOTE_CODES) if isinstance(defaults.get(CONF_REMOTE_CODES), dict) else {}
+    for player in players:
+        pid = player.get("id")
+        if pid is None:
+            continue
+        key = remote_code_field(pid)
+        default = _coerce_remote_code(
+            defaults.get(key) or codes.get(str(pid)) or codes.get(pid)
+        )
+        fields[vol.Optional(key, default=default)] = str
+    return vol.Schema(fields)
+
+
+def _remotes_from_input(
+    user_input: dict[str, Any], players: list[dict[str, Any]]
+) -> dict[str, Any]:
+    shared = _coerce_remote_code(user_input.get(CONF_REMOTE_CODE))
+    per_player: dict[str, str] = {}
+    for player in players:
+        pid = player.get("id")
+        if pid is None:
+            continue
+        code = _coerce_remote_code(user_input.get(remote_code_field(pid)))
+        if code:
+            per_player[str(pid)] = code
+    result: dict[str, Any] = {CONF_REMOTE_CODE: shared, CONF_REMOTE_CODES: per_player}
+    for pid, code in per_player.items():
+        result[remote_code_field(pid)] = code
+    return result
+
+
 class FreeboxFlowHandler(ConfigFlow, domain=DOMAIN):
     """Gère le flux de configuration pour l'intégration Freebox."""
 
@@ -105,6 +159,7 @@ class FreeboxFlowHandler(ConfigFlow, domain=DOMAIN):
     def __init__(self) -> None:
         self._data: dict[str, Any] = {}
         self._options: dict[str, Any] = {}
+        self._players: list[dict[str, Any]] = []
 
     @staticmethod
     @callback
@@ -163,6 +218,21 @@ class FreeboxFlowHandler(ConfigFlow, domain=DOMAIN):
         except Exception as err:
             _LOGGER.debug("Impossible de supprimer le token : %s", err)
 
+    async def _list_players(self) -> list[dict[str, Any]]:
+        fbx = await get_api(self.hass, self._data[CONF_HOST])
+        try:
+            await fbx.open(self._data[CONF_HOST], self._data.get(CONF_PORT, 80))
+            players = await fbx.player.get_players() or []
+            await fbx.close()
+            return list(players)
+        except Exception as err:
+            _LOGGER.debug("Liste Player indisponible au setup : %s", err)
+            try:
+                await fbx.close()
+            except Exception:
+                pass
+            return []
+
     async def async_step_link(
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
@@ -182,6 +252,10 @@ class FreeboxFlowHandler(ConfigFlow, domain=DOMAIN):
 
             await fbx.system.get_config()
             await get_hosts_list_if_supported(fbx)
+            try:
+                self._players = await fbx.player.get_players() or []
+            except Exception:
+                self._players = []
             await fbx.close()
 
             store = Store(self.hass, STORAGE_VERSION, STORAGE_KEY_CONFIG)
@@ -221,14 +295,33 @@ class FreeboxFlowHandler(ConfigFlow, domain=DOMAIN):
     async def async_step_lan_options(
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
-        """Choix LAN + poll Home avant création des devices / entités."""
+        """Choix LAN + poll Home avant création des devices."""
         if user_input is None:
             return self.async_show_form(
                 step_id="lan_options",
                 data_schema=_lan_options_schema(),
             )
 
-        self._options = _options_from_input(user_input)
+        self._options = _lan_options_from_input(user_input)
+        return await self.async_step_remotes()
+
+    async def async_step_remotes(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """Codes télécommande réseau des Players."""
+        players = self._players or []
+        if user_input is None:
+            names = ", ".join(_player_label(p) for p in players) or "aucun Player détecté"
+            return self.async_show_form(
+                step_id="remotes",
+                data_schema=_remotes_schema({}, players),
+                description_placeholders={"players": names},
+            )
+
+        remote_opts = _remotes_from_input(user_input, players)
+        self._options.update(remote_opts)
+        if remote_opts.get(CONF_REMOTE_CODE):
+            self._data[CONF_REMOTE_CODE] = remote_opts[CONF_REMOTE_CODE]
         return self.async_create_entry(
             title=self._data[CONF_HOST],
             data=self._data,
@@ -244,15 +337,58 @@ class FreeboxFlowHandler(ConfigFlow, domain=DOMAIN):
 
 
 class FreeboxOptionsFlowHandler(OptionsFlow):
-    """Options : suivi LAN, capteurs RSSI, devices, intervalle Home."""
+    """Options : LAN, intervalle Home, puis télécommandes."""
+
+    def __init__(self) -> None:
+        self._pending: dict[str, Any] = {}
+        self._players: list[dict[str, Any]] = []
+
+    async def _list_players(self) -> list[dict[str, Any]]:
+        router = self.hass.data.get(DOMAIN, {}).get(self.config_entry.unique_id)
+        if router is None:
+            return []
+        try:
+            return list(await router._api.player.get_players() or [])
+        except Exception as err:
+            _LOGGER.debug("Liste Player indisponible dans les options : %s", err)
+            return []
 
     async def async_step_init(
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
         if user_input is not None:
-            return self.async_create_entry(title="", data=_options_from_input(user_input))
+            self._pending = _lan_options_from_input(user_input)
+            return await self.async_step_remotes()
 
         return self.async_show_form(
             step_id="init",
             data_schema=_lan_options_schema(dict(self.config_entry.options)),
+        )
+
+    async def async_step_remotes(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        if not self._players:
+            self._players = await self._list_players()
+        players = self._players
+        defaults = dict(self.config_entry.options)
+        if not _coerce_remote_code(defaults.get(CONF_REMOTE_CODE)):
+            defaults[CONF_REMOTE_CODE] = self.config_entry.data.get(CONF_REMOTE_CODE) or ""
+
+        if user_input is not None:
+            options = {**self._pending, **_remotes_from_input(user_input, players)}
+            new_data = dict(self.config_entry.data)
+            shared = options.get(CONF_REMOTE_CODE)
+            if shared:
+                new_data[CONF_REMOTE_CODE] = shared
+            else:
+                new_data.pop(CONF_REMOTE_CODE, None)
+            self.hass.config_entries.async_update_entry(self.config_entry, data=new_data)
+            return self.async_create_entry(title="", data=options)
+
+        names = ", ".join(_player_label(p) for p in players) or "aucun Player détecté"
+        return self.async_show_form(
+            step_id="remotes",
+            data_schema=_remotes_schema(defaults, players),
+            description_placeholders={"players": names},
         )

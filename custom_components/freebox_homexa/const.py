@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 import enum
+from typing import Any
 from homeassistant.const import Platform
 from homeassistant.components.alarm_control_panel import AlarmControlPanelState  # noqa: F401
 from homeassistant.config_entries import ConfigEntry
@@ -22,6 +23,7 @@ CONF_CREATE_WIFI_SENSORS = "create_wifi_sensors"
 CONF_CREATE_LAN_DEVICES = "create_lan_devices"
 CONF_HOME_POLL_INTERVAL = "home_poll_interval"
 CONF_REMOTE_CODE = "remote_code"
+CONF_REMOTE_CODES = "remote_codes"
 
 DEFAULT_TRACK_LAN_CLIENTS = True
 DEFAULT_CREATE_WIFI_SENSORS = True
@@ -139,12 +141,30 @@ def option_home_poll_interval(entry: ConfigEntry) -> int:
     return DEFAULT_HOME_POLL_INTERVAL
 
 
-def option_remote_code(entry: ConfigEntry) -> str | None:
-    """Code télécommande réseau du Player (options puis data)."""
-    raw = entry.options.get(CONF_REMOTE_CODE)
-    if raw is None or str(raw).strip() == "":
-        raw = entry.data.get(CONF_REMOTE_CODE)
+def _clean_remote_code(raw: Any) -> str | None:
     if raw is None:
         return None
     code = str(raw).strip()
     return code or None
+
+
+def remote_code_field(player_id: Any) -> str:
+    """Clé d'option pour le code d'un Player."""
+    return f"{CONF_REMOTE_CODE}_{player_id}"
+
+
+def option_remote_code(entry: ConfigEntry, player_id: Any | None = None) -> str | None:
+    """Code télécommande réseau : d'abord celui du Player, sinon le code commun."""
+    if player_id is not None:
+        codes = entry.options.get(CONF_REMOTE_CODES)
+        if isinstance(codes, dict):
+            found = _clean_remote_code(codes.get(str(player_id)) or codes.get(player_id))
+            if found:
+                return found
+        found = _clean_remote_code(entry.options.get(remote_code_field(player_id)))
+        if found:
+            return found
+    found = _clean_remote_code(entry.options.get(CONF_REMOTE_CODE))
+    if found:
+        return found
+    return _clean_remote_code(entry.data.get(CONF_REMOTE_CODE))

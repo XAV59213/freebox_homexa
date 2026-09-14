@@ -2,7 +2,7 @@
 
 Intégration Home Assistant pour Freebox Server, Freebox Home, répéteurs Wi-Fi Free et Freebox Player.
 
-**Version :** 28.8.20 · Home Assistant **2026.8.0+**
+**Version :** 28.8.22 · Home Assistant **2026.8.0+**
 
 Doc complète : [Wiki](https://github.com/XAV59213/freebox_homexa/wiki)
 

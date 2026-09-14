@@ -4,7 +4,7 @@
 
 Intégration **Home Assistant** pour la Freebox Server, Freebox Home, les répéteurs Wi-Fi Free et le Freebox Player.
 
-**Version actuelle :** [28.8.19](https://github.com/XAV59213/freebox_homexa/releases/tag/28.8.19) · Home Assistant **2026.8.0+**
+**Version actuelle :** [28.8.22](https://github.com/XAV59213/freebox_homexa/releases/tag/28.8.22) · Home Assistant **2026.8.0+**
 
 Wiki : [Documentation](https://github.com/XAV59213/freebox_homexa/wiki)
 
@@ -73,7 +73,7 @@ Pour 5 s, désactivez l’intégration officielle Freebox : les deux en parallè
 
 ### Player (télécommande)
 
-Le **code télécommande réseau** (8 chiffres) se règle dans les options Homexa.
+Le **code télécommande réseau** (8 chiffres) se règle dans **Configurer**, sous l’intervalle Home.
 
 Sur le Player : **Réglages → Système → Informations**. Utile sur Révolution / Delta / Devialet pour power, TV, chiffres. Mini 4K / Pop passent souvent par **Android TV Remote**. Laisser vide si vous n’avez pas de Player.
 

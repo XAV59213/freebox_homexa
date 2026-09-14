@@ -2,7 +2,7 @@
 
 Intégration Home Assistant pour Freebox Server, Freebox Home, répéteurs Wi-Fi Free et Freebox Player.
 
-**Version :** 28.8.19 · Home Assistant **2026.8.0+**
+**Version :** 28.8.20 · Home Assistant **2026.8.0+**
 
 Doc complète : [Wiki](https://github.com/XAV59213/freebox_homexa/wiki)
 
@@ -20,7 +20,7 @@ Doc complète : [Wiki](https://github.com/XAV59213/freebox_homexa/wiki)
 - Répéteurs Free **F-RP01A**
 - Player Devialet / Mini 4K / Pop + télécommande
 - Sources TV / HDMI (CEC) / YouTube / Netflix
-- Code télécommande Player réglable dans les options
+- Code télécommande Player réglable dans Configurer
 
 HDMI = sortie Player vers la TV (CEC), pas un switch d’entrée HDMI.
 

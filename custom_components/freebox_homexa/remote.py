@@ -58,7 +58,7 @@ class FreeboxRemote(RemoteEntity):
 
     @property
     def _remote_code(self) -> str | None:
-        return option_remote_code(self._entry)
+        return option_remote_code(self._entry, self._player_id)
 
     async def async_turn_on(self, **kwargs: Any) -> None:
         await self._send_commands(["power"], False, 0)
@@ -78,8 +78,9 @@ class FreeboxRemote(RemoteEntity):
         remote_code = self._remote_code
         if not remote_code:
             _LOGGER.warning(
-                "Code télécommande réseau manquant. Paramètres → Homexa → Configurer, "
-                "ou sur le Player : Réglages → Système → Informations."
+                "Code télécommande manquant pour le Player %s. "
+                "Paramètres → Homexa → Configurer → Télécommandes.",
+                self._player_id,
             )
             return
         for cmd in commands:

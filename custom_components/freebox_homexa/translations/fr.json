@@ -27,12 +27,14 @@
         "data": {
           "track_lan_clients": "Suivre les clients LAN (device trackers)",
           "create_wifi_sensors": "Créer les capteurs RSSI Wi-Fi",
-          "create_lan_devices": "Créer un device Homexa pour chaque client LAN"
+          "create_lan_devices": "Créer un device Homexa pour chaque client LAN",
+          "home_poll_interval": "Intervalle Home (secondes)"
         },
         "data_description": {
           "track_lan_clients": "Téléphones, PC et objets vus par la Freebox.",
           "create_wifi_sensors": "Force du signal en dBm quand le client est en Wi-Fi.",
-          "create_lan_devices": "Si décoché, tracker et RSSI restent des entités seules (pas de device en plus)."
+          "create_lan_devices": "Si décoché, tracker et RSSI restent des entités seules (pas de device en plus).",
+          "home_poll_interval": "Fréquence PIR, contacts, alarme et volets. 5 s se rapproche de l'officielle si celle-ci est désactivée."
         }
       }
     },
@@ -55,12 +57,14 @@
         "data": {
           "track_lan_clients": "Suivre les clients LAN (device trackers)",
           "create_wifi_sensors": "Créer les capteurs RSSI Wi-Fi",
-          "create_lan_devices": "Créer un device Homexa pour chaque client LAN"
+          "create_lan_devices": "Créer un device Homexa pour chaque client LAN",
+          "home_poll_interval": "Intervalle Home (secondes)"
         },
         "data_description": {
           "track_lan_clients": "Désactivez si la présence est déjà gérée par une autre intégration.",
           "create_wifi_sensors": "Le RSSI est ajouté dès qu'un client est vu en Wi-Fi, y compris après la première config.",
-          "create_lan_devices": "Désactivez pour garder tracker et RSSI en entités seules, sans doublon de device."
+          "create_lan_devices": "Désactivez pour garder tracker et RSSI en entités seules, sans doublon de device.",
+          "home_poll_interval": "PIR, contacts, alarme et volets. Désactivez l'intégration officielle Freebox avant de passer à 5 s."
         }
       }
     }

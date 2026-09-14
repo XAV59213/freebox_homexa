@@ -149,7 +149,7 @@ class FreeboxPlayerMediaPlayer(MediaPlayerEntity):
 
     @property
     def _remote_code(self) -> str | None:
-        return option_remote_code(self._entry)
+        return option_remote_code(self._entry, self._player_id)
 
     def _path(self, suffix: str, version: str | None = None) -> str:
         return f"player/{self._player_id}/api/{version or self._api_version}/{suffix}"

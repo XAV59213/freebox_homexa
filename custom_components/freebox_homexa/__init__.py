@@ -23,6 +23,7 @@ from .const import (
     option_home_poll_interval,
     option_remote_code,
 )
+from .frontend import JSModuleRegistration
 from .router import FreeboxRouter, get_api
 from .tnt_setup import async_setup_bundled_tnt
 
@@ -30,7 +31,7 @@ SCAN_INTERVAL = timedelta(seconds=40)
 STORAGE_VERSION = 1
 STORAGE_KEY = f"{DOMAIN}_config"
 PLAYER_PATH_TEMPLATE = "http://{host}/pub/remote_control?code={remote_code}&key={key}"
-_RESERVED_DATA_KEYS = {"config", "store", "tnt_coordinator"}
+_RESERVED_DATA_KEYS = {"config", "store", "tnt_coordinator", "_card_registered"}
 
 CONFIG_SCHEMA = vol.Schema(
     {
@@ -53,6 +54,10 @@ def _router_keys(hass: HomeAssistant) -> list[str]:
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     hass.data.setdefault(DOMAIN, {})
+
+    if not hass.data[DOMAIN].get("_card_registered"):
+        await JSModuleRegistration(hass).async_register()
+        hass.data[DOMAIN]["_card_registered"] = True
 
     store = Store(hass, STORAGE_VERSION, STORAGE_KEY)
     stored_data = await store.async_load()

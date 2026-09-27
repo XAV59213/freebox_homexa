@@ -1,63 +1,53 @@
 # Cartes Lovelace Freebox Homexa
 
-Reproduction de la vue **Alarme / Volet / PIR / Player / RSSI**.
+Vue **Alarme / Volet / PIR / Player / RSSI / SMS Free**.
 
 ## Fichiers
 
 | Fichier | Usage |
 |---|---|
-| [homexa-dashboard.yaml](homexa-dashboard.yaml) | Vue complète **Mushroom** (identique à la capture) |
-| [homexa-tuiles-natives.yaml](homexa-tuiles-natives.yaml) | Même idée avec les **tuiles HA**, sans carte custom |
+| [homexa-dashboard.yaml](homexa-dashboard.yaml) | Vue **Mushroom** + carte FreeSMS XA |
+| [homexa-tuiles-natives.yaml](homexa-tuiles-natives.yaml) | Tuiles HA + carte FreeSMS XA |
 
-## Prérequis (version Mushroom)
+## Prérequis
 
-1. HACS → Frontend → dépôt [Mushroom](https://github.com/piitaya/lovelace-mushroom)
-2. Télécharger → **Recharger les ressources** (Ctrl+F5)
-
-`card-mod` est optionnel (juste pour centrer / taille d’icône).
+1. HACS → Frontend → [Mushroom](https://github.com/piitaya/lovelace-mushroom) (version Mushroom seulement)
+2. Intégration [Free Mobile SMS XA](https://github.com/XAV59213/freesmsxa) installée
+3. Si la carte SMS manque : **Paramètres → Tableaux de bord → ⋮ → Ressources**
+   - URL : `/freesmsxa/freesmsxa-send-card.js`
+   - Type : Module JavaScript
 
 ## Coller la vue
 
-1. Tableau de bord → **Modifier** → menu 3 points → **Éditeur brut**
+1. Tableau de bord → **Modifier** → 3 points → **Éditeur brut**
 2. Ajoute le contenu de `homexa-dashboard.yaml` dans `views:`
 3. Remplace les `entity_id` :
 
 ```yaml
-alarm_control_panel.alarme      # pack sécurité Freebox Home
-cover.volet_salon               # volet Freebox Home
-binary_sensor.pir_entree        # détecteur de mouvement
-media_player.freebox_player     # Player Devialet / Mini 4K / Pop
-sensor.wifi_rssi                # capteur RSSI d’un client Wi-Fi
+alarm_control_panel.alarme
+cover.volet_salon
+binary_sensor.pir_entree
+media_player.freebox_player
+sensor.wifi_rssi
+sensor.papa_etat_sms
+sensor.papa_sms_aujourdhui
+sensor.papa_sms_envoyes
 ```
 
-Pour trouver tes IDs : **Paramètres → Appareils et services → Freebox Homexa → entités**.
+La carte `custom:freesmsxa-send-card` détecte toute seule `notify.papa`, `notify.maman`, etc.
 
 ## Boutons Player
 
-| Puce | Action Homexa |
+| Puce | Action |
 |---|---|
-| YouTube | `media_player.select_source` → `YouTube` |
-| Netflix | `media_player.select_source` → `Netflix` |
-| prime | `media_player.play_media` → `https://www.primevideo.com` |
-
-Prime Video n’est pas une source officielle du Player : on ouvre l’URL.
-TV / HDMI (CEC) se sélectionnent aussi via `select_source` si tu veux les ajouter.
+| YouTube | `select_source` → YouTube |
+| Netflix | `select_source` → Netflix |
+| prime | `play_media` → https://www.primevideo.com |
 
 ## États alarme
-
-Comme l’app Free :
 
 | Bouton | État HA |
 |---|---|
 | Présent | `armed_home` |
 | Absent | `armed_away` |
 | Désarmé | `disarmed` |
-
-## Qualité RSSI
-
-| dBm | Libellé |
-|---|---|
-| ≥ −50 | Excellent |
-| ≥ −60 | Bon |
-| ≥ −70 | Moyen |
-| < −70 | Faible |

@@ -1,19 +1,14 @@
 # Freebox Homexa — tableau de bord prêt à coller
-# Capture de référence : alarme + volet + PIR + Player + RSSI
+# Capture : alarme + volet + PIR + Player + RSSI + SMS Free
 #
-# Prérequis HACS : Mushroom
-#   https://github.com/piitaya/lovelace-mushroom
+# Prérequis HACS
+#   Mushroom : https://github.com/piitaya/lovelace-mushroom
+#   Free Mobile SMS XA : https://github.com/XAV59213/freesmsxa
+#     (carte custom:freesmsxa-send-card)
 #
-# Installation
-# 1. HACS → Frontend → Mushroom → Télécharger → Recharger les ressources
-# 2. Tableau de bord → Modifier → 3 points → Éditeur brut
-# 3. Colle cette vue dans `views:` (ou remplace une vue existante)
-# 4. Adapte les entity_id ci-dessous à tes entités Homexa
-#
-# Correspondance Freebox → Home Assistant
-#   Présent  = armed_home
-#   Absent   = armed_away
-#   Désarmé  = disarmed
+# Si la carte SMS n’apparaît pas :
+#   Paramètres → Tableaux de bord → ⋮ → Ressources
+#   /freesmsxa/freesmsxa-send-card.js  (module JavaScript)
 
 title: Homexa
 path: homexa
@@ -36,11 +31,6 @@ cards:
         show_keypad: false
         tap_action:
           action: more-info
-        card_mod:
-          style: |
-            ha-card {
-              --icon-size: 36px;
-            }
 
       - type: custom:mushroom-cover-card
         entity: cover.volet_salon
@@ -60,26 +50,14 @@ cards:
         entity: binary_sensor.pir_entree
         primary: PIR entrée
         secondary: >-
-          {% if is_state(entity, 'on') %}
-            Actif
-          {% elif is_state(entity, 'off') %}
-            Inactif
-          {% else %}
-            {{ states(entity) }}
-          {% endif %}
+          {% if is_state(entity, 'on') %}Actif
+          {% elif is_state(entity, 'off') %}Inactif
+          {% else %}{{ states(entity) }}{% endif %}
         icon: mdi:walk
         icon_color: "{{ 'red' if is_state(entity, 'on') else 'disabled' }}"
         layout: vertical
         tap_action:
           action: more-info
-        card_mod:
-          style: |
-            ha-card {
-              text-align: center;
-            }
-            mushroom-shape-icon {
-              --icon-size: 54px;
-            }
 
       - type: vertical-stack
         cards:
@@ -149,8 +127,7 @@ cards:
           {% if states(entity) in ['unknown', 'unavailable', 'none', ''] %}
             Hors ligne
           {% else %}
-            {{ rssi | int }} dBm
-            —
+            {{ rssi | int }} dBm —
             {% if rssi >= -50 %}Excellent
             {% elif rssi >= -60 %}Bon
             {% elif rssi >= -70 %}Moyen
@@ -159,8 +136,38 @@ cards:
         layout: vertical
         tap_action:
           action: more-info
-        card_mod:
-          style: |
-            ha-card {
-              text-align: center;
-            }
+
+  - type: custom:freesmsxa-send-card
+    title: Envoyer un SMS
+
+  - type: grid
+    columns: 3
+    square: false
+    cards:
+      - type: tile
+        entity: sensor.papa_etat_sms
+        name: Papa
+        icon: mdi:message-text
+        vertical: true
+      - type: tile
+        entity: sensor.papa_sms_aujourdhui
+        name: Aujourd’hui
+        icon: mdi:calendar-today
+        vertical: true
+      - type: tile
+        entity: sensor.papa_sms_envoyes
+        name: Total
+        icon: mdi:counter
+        vertical: true
+
+  - type: markdown
+    title: Historique SMS
+    content: >-
+      {% set log = state_attr('sensor.papa_etat_sms', 'sms_log') %}
+      {% if log %}
+      {% for item in log[:8] %}
+      {{ '✅' if item.status == 'sent' else '❌' }} {{ item.time }} — {{ item.message }}
+      {% endfor %}
+      {% else %}
+      Aucun SMS pour l’instant.
+      {% endif %}

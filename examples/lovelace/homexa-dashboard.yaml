@@ -1,173 +1,202 @@
-# Freebox Homexa — tableau de bord prêt à coller
-# Capture : alarme + volet + PIR + Player + RSSI + SMS Free
+# Freebox Homexa — vue basée sur tes entités HA
+# Volets, Player, contacts Home, SMS XA
 #
-# Prérequis HACS
-#   Mushroom : https://github.com/piitaya/lovelace-mushroom
-#   Free Mobile SMS XA : https://github.com/XAV59213/freesmsxa
-#     (carte custom:freesmsxa-send-card)
-#
-# Si la carte SMS n’apparaît pas :
-#   Paramètres → Tableaux de bord → ⋮ → Ressources
-#   /freesmsxa/freesmsxa-send-card.js  (module JavaScript)
+# Prérequis : Mushroom + Free Mobile SMS XA
+# Optionnel : auto-entities (pour lister alarme / PIR / RSSI Homexa)
 
 title: Homexa
 path: homexa
 icon: mdi:router-wireless
 type: masonry
 cards:
+  - type: custom:auto-entities
+    card:
+      type: grid
+      columns: 1
+      square: false
+    card_param: cards
+    filter:
+      include:
+        - integration: freebox_homexa
+          domain: alarm_control_panel
+          options:
+            type: custom:mushroom-alarm-control-panel-card
+            name: Alarme
+            icon: mdi:shield-home-outline
+            states:
+              - armed_home
+              - armed_away
+              - disarmed
+            layout: horizontal
+            show_keypad: false
+    show_empty: false
+
   - type: grid
     columns: 2
     square: false
     cards:
-      - type: custom:mushroom-alarm-control-panel-card
-        entity: alarm_control_panel.alarme
-        name: Alarme
-        icon: mdi:shield-home-outline
-        states:
-          - armed_home
-          - armed_away
-          - disarmed
-        layout: horizontal
-        show_keypad: false
-        tap_action:
-          action: more-info
-
       - type: custom:mushroom-cover-card
         entity: cover.volet_salon
         name: Volet salon
-        icon: mdi:window-shutter
         show_buttons_control: true
         show_position_control: false
         layout: horizontal
-        tap_action:
-          action: more-info
+      - type: custom:mushroom-cover-card
+        entity: cover.volet_cuisine
+        name: Volet cuisine
+        show_buttons_control: true
+        show_position_control: false
+        layout: horizontal
+      - type: custom:mushroom-cover-card
+        entity: cover.volet_papa
+        name: Volet papa
+        show_buttons_control: true
+        show_position_control: false
+        layout: horizontal
+      - type: custom:mushroom-cover-card
+        entity: cover.volet_fille
+        name: Volet fille
+        show_buttons_control: true
+        show_position_control: false
+        layout: horizontal
+      - type: custom:mushroom-cover-card
+        entity: cover.volet_loulou
+        name: Volet loulou
+        show_buttons_control: true
+        show_position_control: false
+        layout: horizontal
+      - type: custom:mushroom-cover-card
+        entity: cover.volets_maison
+        name: Volets maison
+        show_buttons_control: true
+        show_position_control: false
+        layout: horizontal
+
+  - type: vertical-stack
+    cards:
+      - type: custom:mushroom-media-player-card
+        entity: media_player.freebox_player
+        name: Freebox Player
+        icon: mdi:television-play
+        use_media_info: true
+        media_controls:
+          - previous
+          - play_pause_stop
+          - next
+        volume_controls: []
+      - type: custom:mushroom-chips-card
+        alignment: center
+        chips:
+          - type: template
+            icon: mdi:youtube
+            icon_color: red
+            content: YouTube
+            tap_action:
+              action: call-service
+              service: media_player.select_source
+              target:
+                entity_id: media_player.freebox_player
+              data:
+                source: YouTube
+          - type: template
+            icon: mdi:netflix
+            icon_color: red
+            content: Netflix
+            tap_action:
+              action: call-service
+              service: media_player.select_source
+              target:
+                entity_id: media_player.freebox_player
+              data:
+                source: Netflix
+          - type: template
+            icon: mdi:amazon
+            icon_color: blue
+            content: prime
+            tap_action:
+              action: call-service
+              service: media_player.play_media
+              target:
+                entity_id: media_player.freebox_player
+              data:
+                media_content_type: url
+                media_content_id: https://www.primevideo.com
 
   - type: grid
     columns: 3
     square: false
     cards:
-      - type: custom:mushroom-template-card
-        entity: binary_sensor.pir_entree
-        primary: PIR entrée
-        secondary: >-
-          {% if is_state(entity, 'on') %}Actif
-          {% elif is_state(entity, 'off') %}Inactif
-          {% else %}{{ states(entity) }}{% endif %}
-        icon: mdi:walk
-        icon_color: "{{ 'red' if is_state(entity, 'on') else 'disabled' }}"
+      - type: custom:mushroom-entity-card
+        entity: binary_sensor.porte_entree
+        name: Porte entrée
+        icon: mdi:door
         layout: vertical
-        tap_action:
-          action: more-info
-
-      - type: vertical-stack
-        cards:
-          - type: custom:mushroom-media-player-card
-            entity: media_player.freebox_player
-            name: Freebox Player
-            icon: mdi:television-play
-            use_media_info: true
-            show_volume_level: false
-            volume_controls: []
-            media_controls:
-              - previous
-              - play_pause_stop
-              - next
-            tap_action:
-              action: more-info
-          - type: custom:mushroom-chips-card
-            alignment: center
-            chips:
-              - type: template
-                icon: mdi:youtube
-                icon_color: red
-                content: YouTube
-                tap_action:
-                  action: call-service
-                  service: media_player.select_source
-                  target:
-                    entity_id: media_player.freebox_player
-                  data:
-                    source: YouTube
-              - type: template
-                icon: mdi:netflix
-                icon_color: red
-                content: Netflix
-                tap_action:
-                  action: call-service
-                  service: media_player.select_source
-                  target:
-                    entity_id: media_player.freebox_player
-                  data:
-                    source: Netflix
-              - type: template
-                icon: mdi:amazon
-                icon_color: blue
-                content: prime
-                tap_action:
-                  action: call-service
-                  service: media_player.play_media
-                  target:
-                    entity_id: media_player.freebox_player
-                  data:
-                    media_content_type: url
-                    media_content_id: https://www.primevideo.com
-
-      - type: custom:mushroom-template-card
-        entity: sensor.wifi_rssi
-        primary: WiFi RSSI
-        icon: mdi:wifi
-        icon_color: >-
-          {% set rssi = states(entity) | float(-100) %}
-          {% if rssi >= -50 %}green
-          {% elif rssi >= -60 %}teal
-          {% elif rssi >= -70 %}amber
-          {% else %}red{% endif %}
-        secondary: >-
-          {% set rssi = states(entity) | float(-100) %}
-          {% if states(entity) in ['unknown', 'unavailable', 'none', ''] %}
-            Hors ligne
-          {% else %}
-            {{ rssi | int }} dBm —
-            {% if rssi >= -50 %}Excellent
-            {% elif rssi >= -60 %}Bon
-            {% elif rssi >= -70 %}Moyen
-            {% else %}Faible{% endif %}
-          {% endif %}
+      - type: custom:mushroom-entity-card
+        entity: binary_sensor.porte_cuisine
+        name: Porte cuisine
+        icon: mdi:door
         layout: vertical
-        tap_action:
-          action: more-info
+      - type: custom:mushroom-entity-card
+        entity: binary_sensor.baie_vitree
+        name: Baie vitrée
+        icon: mdi:door-sliding
+        layout: vertical
+      - type: custom:mushroom-entity-card
+        entity: binary_sensor.fenetre_cuisine
+        name: Fenêtre cuisine
+        icon: mdi:window-closed-variant
+        layout: vertical
+      - type: custom:mushroom-entity-card
+        entity: binary_sensor.fenetre_papa
+        name: Fenêtre papa
+        icon: mdi:window-closed-variant
+        layout: vertical
+      - type: custom:mushroom-entity-card
+        entity: binary_sensor.fenetre_loulous
+        name: Fenêtre loulous
+        icon: mdi:window-closed-variant
+        layout: vertical
+      - type: custom:mushroom-entity-card
+        entity: binary_sensor.porte_fenetre_filles
+        name: Porte fenêtre filles
+        icon: mdi:door-sliding
+        layout: vertical
+
+  - type: custom:auto-entities
+    card:
+      type: grid
+      columns: 3
+      square: false
+    card_param: cards
+    filter:
+      include:
+        - integration: freebox_homexa
+          domain: binary_sensor
+          attributes:
+            device_class: motion
+          options:
+            type: custom:mushroom-template-card
+            primary: "{{ state_attr(entity, 'friendly_name') }}"
+            secondary: "{{ 'Actif' if is_state(entity, 'on') else 'Inactif' }}"
+            icon: mdi:walk
+            icon_color: "{{ 'red' if is_state(entity, 'on') else 'disabled' }}"
+            layout: vertical
+    show_empty: false
+
+  - type: custom:auto-entities
+    card:
+      type: entities
+      title: Signal Wi-Fi (RSSI Homexa)
+    filter:
+      include:
+        - integration: freebox_homexa
+          domain: sensor
+          attributes:
+            device_class: signal_strength
+    sort:
+      method: state
+      numeric: true
+    show_empty: false
 
   - type: custom:freesmsxa-send-card
     title: Envoyer un SMS
-
-  - type: grid
-    columns: 3
-    square: false
-    cards:
-      - type: tile
-        entity: sensor.papa_etat_sms
-        name: Papa
-        icon: mdi:message-text
-        vertical: true
-      - type: tile
-        entity: sensor.papa_sms_aujourdhui
-        name: Aujourd’hui
-        icon: mdi:calendar-today
-        vertical: true
-      - type: tile
-        entity: sensor.papa_sms_envoyes
-        name: Total
-        icon: mdi:counter
-        vertical: true
-
-  - type: markdown
-    title: Historique SMS
-    content: >-
-      {% set log = state_attr('sensor.papa_etat_sms', 'sms_log') %}
-      {% if log %}
-      {% for item in log[:8] %}
-      {{ '✅' if item.status == 'sent' else '❌' }} {{ item.time }} — {{ item.message }}
-      {% endfor %}
-      {% else %}
-      Aucun SMS pour l’instant.
-      {% endif %}

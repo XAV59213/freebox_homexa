@@ -81,6 +81,18 @@ Volume et lecture passent par l’API Player, sans ce code.
 
 ---
 
+## Tableau de bord (carte prête à coller)
+
+Vue Lovelace **Alarme / Volet / PIR / Player / RSSI** :
+
+- [examples/lovelace/homexa-dashboard.yaml](examples/lovelace/homexa-dashboard.yaml) — Mushroom (rendu de la capture)
+- [examples/lovelace/homexa-tuiles-natives.yaml](examples/lovelace/homexa-tuiles-natives.yaml) — tuiles natives, sans carte custom
+- Mode d’emploi : [examples/lovelace/README.md](examples/lovelace/README.md)
+
+HACS → Frontend → [Mushroom](https://github.com/piitaya/lovelace-mushroom), puis colle le YAML dans l’éditeur brut du tableau de bord. Remplace les `entity_id` par tes entités Homexa.
+
+---
+
 ## Mise à jour
 
 HACS → Freebox Homexa → **Mettre à jour** → redémarrer Home Assistant.

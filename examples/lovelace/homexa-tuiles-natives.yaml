@@ -1,38 +1,53 @@
-# Variante sans Mushroom — tuiles natives Home Assistant 2024+
-# Tableau de bord → Ajouter une carte → Colle chaque bloc, ou toute la grille.
+# Variante sans Mushroom — tuiles natives + carte SMS XA
+# Tableau de bord → Ajouter une carte → Colle ce bloc.
 
-type: grid
-columns: 2
-square: false
+type: vertical-stack
 cards:
-  - type: tile
-    entity: alarm_control_panel.alarme
-    name: Alarme
-    features:
-      - type: alarm-modes
-        modes:
-          - armed_home
-          - armed_away
-          - disarmed
+  - type: grid
+    columns: 2
+    square: false
+    cards:
+      - type: tile
+        entity: alarm_control_panel.alarme
+        name: Alarme
+        features:
+          - type: alarm-modes
+            modes:
+              - armed_home
+              - armed_away
+              - disarmed
+      - type: tile
+        entity: cover.volet_salon
+        name: Volet salon
+        features:
+          - type: cover-open-close
+      - type: tile
+        entity: binary_sensor.pir_entree
+        name: PIR entrée
+        vertical: true
+      - type: tile
+        entity: media_player.freebox_player
+        name: Freebox Player
+        features:
+          - type: media-player-playback
+      - type: tile
+        entity: sensor.wifi_rssi
+        name: WiFi RSSI
+        vertical: true
 
-  - type: tile
-    entity: cover.volet_salon
-    name: Volet salon
-    features:
-      - type: cover-open-close
+  - type: custom:freesmsxa-send-card
+    title: Envoyer un SMS
 
-  - type: tile
-    entity: binary_sensor.pir_entree
-    name: PIR entrée
-    vertical: true
-
-  - type: tile
-    entity: media_player.freebox_player
-    name: Freebox Player
-    features:
-      - type: media-player-playback
-
-  - type: tile
-    entity: sensor.wifi_rssi
-    name: WiFi RSSI
-    vertical: true
+  - type: grid
+    columns: 3
+    square: false
+    cards:
+      - type: tile
+        entity: sensor.papa_etat_sms
+        name: Papa
+      - type: tile
+        entity: sensor.papa_sms_aujourdhui
+        name: Aujourd’hui
+      - type: tile
+        entity: sensor.papa_sms_envoyes
+        name: Total

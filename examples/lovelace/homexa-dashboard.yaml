@@ -1,202 +1,140 @@
-# Freebox Homexa — vue basée sur tes entités HA
-# Volets, Player, contacts Home, SMS XA
+# Vue identique à la capture : Alarme | Volet / PIR | Player | RSSI
+# Entités Homexa de l’installation (volet salon + Player).
+# Alarme / PIR / RSSI : remplace si tes IDs diffèrent.
 #
-# Prérequis : Mushroom + Free Mobile SMS XA
-# Optionnel : auto-entities (pour lister alarme / PIR / RSSI Homexa)
+# HACS requis : Mushroom
+# Optionnel : card-mod (taille icônes)
 
 title: Homexa
 path: homexa
 icon: mdi:router-wireless
 type: masonry
 cards:
-  - type: custom:auto-entities
-    card:
-      type: grid
-      columns: 1
-      square: false
-    card_param: cards
-    filter:
-      include:
-        - integration: freebox_homexa
-          domain: alarm_control_panel
-          options:
-            type: custom:mushroom-alarm-control-panel-card
-            name: Alarme
-            icon: mdi:shield-home-outline
-            states:
-              - armed_home
-              - armed_away
-              - disarmed
-            layout: horizontal
-            show_keypad: false
-    show_empty: false
-
   - type: grid
     columns: 2
     square: false
     cards:
+      - type: custom:mushroom-alarm-control-panel-card
+        entity: alarm_control_panel.alarme
+        name: Alarme
+        icon: mdi:shield-home-outline
+        states:
+          - armed_home
+          - armed_away
+          - disarmed
+        show_keypad: false
+        tap_action:
+          action: more-info
+
       - type: custom:mushroom-cover-card
         entity: cover.volet_salon
         name: Volet salon
+        icon: mdi:window-shutter
         show_buttons_control: true
         show_position_control: false
-        layout: horizontal
-      - type: custom:mushroom-cover-card
-        entity: cover.volet_cuisine
-        name: Volet cuisine
-        show_buttons_control: true
-        show_position_control: false
-        layout: horizontal
-      - type: custom:mushroom-cover-card
-        entity: cover.volet_papa
-        name: Volet papa
-        show_buttons_control: true
-        show_position_control: false
-        layout: horizontal
-      - type: custom:mushroom-cover-card
-        entity: cover.volet_fille
-        name: Volet fille
-        show_buttons_control: true
-        show_position_control: false
-        layout: horizontal
-      - type: custom:mushroom-cover-card
-        entity: cover.volet_loulou
-        name: Volet loulou
-        show_buttons_control: true
-        show_position_control: false
-        layout: horizontal
-      - type: custom:mushroom-cover-card
-        entity: cover.volets_maison
-        name: Volets maison
-        show_buttons_control: true
-        show_position_control: false
-        layout: horizontal
-
-  - type: vertical-stack
-    cards:
-      - type: custom:mushroom-media-player-card
-        entity: media_player.freebox_player
-        name: Freebox Player
-        icon: mdi:television-play
-        use_media_info: true
-        media_controls:
-          - previous
-          - play_pause_stop
-          - next
-        volume_controls: []
-      - type: custom:mushroom-chips-card
-        alignment: center
-        chips:
-          - type: template
-            icon: mdi:youtube
-            icon_color: red
-            content: YouTube
-            tap_action:
-              action: call-service
-              service: media_player.select_source
-              target:
-                entity_id: media_player.freebox_player
-              data:
-                source: YouTube
-          - type: template
-            icon: mdi:netflix
-            icon_color: red
-            content: Netflix
-            tap_action:
-              action: call-service
-              service: media_player.select_source
-              target:
-                entity_id: media_player.freebox_player
-              data:
-                source: Netflix
-          - type: template
-            icon: mdi:amazon
-            icon_color: blue
-            content: prime
-            tap_action:
-              action: call-service
-              service: media_player.play_media
-              target:
-                entity_id: media_player.freebox_player
-              data:
-                media_content_type: url
-                media_content_id: https://www.primevideo.com
+        tap_action:
+          action: more-info
 
   - type: grid
     columns: 3
     square: false
     cards:
-      - type: custom:mushroom-entity-card
-        entity: binary_sensor.porte_entree
-        name: Porte entrée
-        icon: mdi:door
+      - type: custom:mushroom-template-card
+        entity: binary_sensor.pir_entree
+        primary: PIR entrée
+        icon: mdi:walk
+        icon_color: "{{ 'red' if is_state(entity, 'on') else 'disabled' }}"
         layout: vertical
-      - type: custom:mushroom-entity-card
-        entity: binary_sensor.porte_cuisine
-        name: Porte cuisine
-        icon: mdi:door
-        layout: vertical
-      - type: custom:mushroom-entity-card
-        entity: binary_sensor.baie_vitree
-        name: Baie vitrée
-        icon: mdi:door-sliding
-        layout: vertical
-      - type: custom:mushroom-entity-card
-        entity: binary_sensor.fenetre_cuisine
-        name: Fenêtre cuisine
-        icon: mdi:window-closed-variant
-        layout: vertical
-      - type: custom:mushroom-entity-card
-        entity: binary_sensor.fenetre_papa
-        name: Fenêtre papa
-        icon: mdi:window-closed-variant
-        layout: vertical
-      - type: custom:mushroom-entity-card
-        entity: binary_sensor.fenetre_loulous
-        name: Fenêtre loulous
-        icon: mdi:window-closed-variant
-        layout: vertical
-      - type: custom:mushroom-entity-card
-        entity: binary_sensor.porte_fenetre_filles
-        name: Porte fenêtre filles
-        icon: mdi:door-sliding
-        layout: vertical
+        secondary: >-
+          {% if is_state(entity, 'on') %}Actif
+          {% else %}Inactif{% endif %}
+          — {{ as_timestamp(states[entity].last_changed) | timestamp_custom('%H:%M') }}
+        tap_action:
+          action: more-info
+        card_mod:
+          style: |
+            ha-card { text-align: center; }
+            mushroom-shape-icon { --icon-size: 56px; }
 
-  - type: custom:auto-entities
-    card:
-      type: grid
-      columns: 3
-      square: false
-    card_param: cards
-    filter:
-      include:
-        - integration: freebox_homexa
-          domain: binary_sensor
-          attributes:
-            device_class: motion
-          options:
-            type: custom:mushroom-template-card
-            primary: "{{ state_attr(entity, 'friendly_name') }}"
-            secondary: "{{ 'Actif' if is_state(entity, 'on') else 'Inactif' }}"
-            icon: mdi:walk
-            icon_color: "{{ 'red' if is_state(entity, 'on') else 'disabled' }}"
-            layout: vertical
-    show_empty: false
+      - type: vertical-stack
+        cards:
+          - type: custom:mushroom-media-player-card
+            entity: media_player.freebox_player
+            name: Freebox Player
+            icon: mdi:play-circle-outline
+            use_media_info: true
+            show_volume_level: false
+            volume_controls: []
+            media_controls:
+              - previous
+              - play_pause_stop
+              - next
+            tap_action:
+              action: more-info
+          - type: custom:mushroom-chips-card
+            alignment: center
+            chips:
+              - type: template
+                icon: mdi:youtube
+                icon_color: red
+                tap_action:
+                  action: call-service
+                  service: media_player.select_source
+                  target:
+                    entity_id: media_player.freebox_player
+                  data:
+                    source: YouTube
+              - type: template
+                icon: mdi:netflix
+                icon_color: red
+                tap_action:
+                  action: call-service
+                  service: media_player.select_source
+                  target:
+                    entity_id: media_player.freebox_player
+                  data:
+                    source: Netflix
+              - type: template
+                icon: mdi:amazon
+                icon_color: blue
+                tap_action:
+                  action: call-service
+                  service: media_player.play_media
+                  target:
+                    entity_id: media_player.freebox_player
+                  data:
+                    media_content_type: url
+                    media_content_id: https://www.primevideo.com
 
-  - type: custom:auto-entities
-    card:
-      type: entities
-      title: Signal Wi-Fi (RSSI Homexa)
-    filter:
-      include:
-        - integration: freebox_homexa
-          domain: sensor
-          attributes:
-            device_class: signal_strength
-    sort:
-      method: state
-      numeric: true
-    show_empty: false
-
-  - type: custom:freesmsxa-send-card
-    title: Envoyer un SMS
+      - type: custom:mushroom-template-card
+        entity: sensor.signal_wi_fi
+        primary: WiFi RSSI
+        icon: mdi:wifi
+        layout: vertical
+        icon_color: >-
+          {% set rssi = states(entity) | float(-100) %}
+          {% if rssi >= -50 %}green
+          {% elif rssi >= -60 %}teal
+          {% elif rssi >= -70 %}amber
+          {% else %}red{% endif %}
+        secondary: >-
+          {% set rssi = states(entity) | float(-100) %}
+          {% if states(entity) in ['unknown', 'unavailable', ''] %}
+            Hors ligne
+          {% else %}
+            {{ rssi | int }} dBm
+            {% if rssi >= -50 %}Excellent
+            {% elif rssi >= -60 %}Bon
+            {% elif rssi >= -70 %}Moyen
+            {% else %}Faible{% endif %}
+          {% endif %}
+        tap_action:
+          action: more-info
+        card_mod:
+          style: |
+            ha-card { text-align: center; }
+            mushroom-shape-icon { --icon-size: 40px; }
+            .secondary {
+              font-size: 22px !important;
+              font-weight: 700;
+            }

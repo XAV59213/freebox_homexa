@@ -1,0 +1,166 @@
+# Freebox Homexa — tableau de bord prêt à coller
+# Capture de référence : alarme + volet + PIR + Player + RSSI
+#
+# Prérequis HACS : Mushroom
+#   https://github.com/piitaya/lovelace-mushroom
+#
+# Installation
+# 1. HACS → Frontend → Mushroom → Télécharger → Recharger les ressources
+# 2. Tableau de bord → Modifier → 3 points → Éditeur brut
+# 3. Colle cette vue dans `views:` (ou remplace une vue existante)
+# 4. Adapte les entity_id ci-dessous à tes entités Homexa
+#
+# Correspondance Freebox → Home Assistant
+#   Présent  = armed_home
+#   Absent   = armed_away
+#   Désarmé  = disarmed
+
+title: Homexa
+path: homexa
+icon: mdi:router-wireless
+type: masonry
+cards:
+  - type: grid
+    columns: 2
+    square: false
+    cards:
+      - type: custom:mushroom-alarm-control-panel-card
+        entity: alarm_control_panel.alarme
+        name: Alarme
+        icon: mdi:shield-home-outline
+        states:
+          - armed_home
+          - armed_away
+          - disarmed
+        layout: horizontal
+        show_keypad: false
+        tap_action:
+          action: more-info
+        card_mod:
+          style: |
+            ha-card {
+              --icon-size: 36px;
+            }
+
+      - type: custom:mushroom-cover-card
+        entity: cover.volet_salon
+        name: Volet salon
+        icon: mdi:window-shutter
+        show_buttons_control: true
+        show_position_control: false
+        layout: horizontal
+        tap_action:
+          action: more-info
+
+  - type: grid
+    columns: 3
+    square: false
+    cards:
+      - type: custom:mushroom-template-card
+        entity: binary_sensor.pir_entree
+        primary: PIR entrée
+        secondary: >-
+          {% if is_state(entity, 'on') %}
+            Actif
+          {% elif is_state(entity, 'off') %}
+            Inactif
+          {% else %}
+            {{ states(entity) }}
+          {% endif %}
+        icon: mdi:walk
+        icon_color: "{{ 'red' if is_state(entity, 'on') else 'disabled' }}"
+        layout: vertical
+        tap_action:
+          action: more-info
+        card_mod:
+          style: |
+            ha-card {
+              text-align: center;
+            }
+            mushroom-shape-icon {
+              --icon-size: 54px;
+            }
+
+      - type: vertical-stack
+        cards:
+          - type: custom:mushroom-media-player-card
+            entity: media_player.freebox_player
+            name: Freebox Player
+            icon: mdi:television-play
+            use_media_info: true
+            show_volume_level: false
+            volume_controls: []
+            media_controls:
+              - previous
+              - play_pause_stop
+              - next
+            tap_action:
+              action: more-info
+          - type: custom:mushroom-chips-card
+            alignment: center
+            chips:
+              - type: template
+                icon: mdi:youtube
+                icon_color: red
+                content: YouTube
+                tap_action:
+                  action: call-service
+                  service: media_player.select_source
+                  target:
+                    entity_id: media_player.freebox_player
+                  data:
+                    source: YouTube
+              - type: template
+                icon: mdi:netflix
+                icon_color: red
+                content: Netflix
+                tap_action:
+                  action: call-service
+                  service: media_player.select_source
+                  target:
+                    entity_id: media_player.freebox_player
+                  data:
+                    source: Netflix
+              - type: template
+                icon: mdi:amazon
+                icon_color: blue
+                content: prime
+                tap_action:
+                  action: call-service
+                  service: media_player.play_media
+                  target:
+                    entity_id: media_player.freebox_player
+                  data:
+                    media_content_type: url
+                    media_content_id: https://www.primevideo.com
+
+      - type: custom:mushroom-template-card
+        entity: sensor.wifi_rssi
+        primary: WiFi RSSI
+        icon: mdi:wifi
+        icon_color: >-
+          {% set rssi = states(entity) | float(-100) %}
+          {% if rssi >= -50 %}green
+          {% elif rssi >= -60 %}teal
+          {% elif rssi >= -70 %}amber
+          {% else %}red{% endif %}
+        secondary: >-
+          {% set rssi = states(entity) | float(-100) %}
+          {% if states(entity) in ['unknown', 'unavailable', 'none', ''] %}
+            Hors ligne
+          {% else %}
+            {{ rssi | int }} dBm
+            —
+            {% if rssi >= -50 %}Excellent
+            {% elif rssi >= -60 %}Bon
+            {% elif rssi >= -70 %}Moyen
+            {% else %}Faible{% endif %}
+          {% endif %}
+        layout: vertical
+        tap_action:
+          action: more-info
+        card_mod:
+          style: |
+            ha-card {
+              text-align: center;
+            }

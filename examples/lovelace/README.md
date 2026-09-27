@@ -1,41 +1,35 @@
-# Cartes Lovelace Freebox Homexa
+# Carte Lovelace Freebox Homexa
 
-Vue branchée sur **tes** entités Home Assistant (pas des exemples génériques).
+Carte native livrée avec l’intégration : **Freebox Homexa**.
 
-## Entités utilisées
+```yaml
+type: custom:freebox-homexa-card
+```
 
-### Volets Homexa
-- `cover.volet_salon`
-- `cover.volet_cuisine`
-- `cover.volet_papa`
-- `cover.volet_fille`
-- `cover.volet_loulou`
-- `cover.volets_maison`
+Après mise à jour : redémarre Home Assistant.
+Tableau de bord → Modifier → Ajouter une carte → cherche **Freebox Homexa**.
 
-### Player
+Si elle n’apparaît pas :
+
+**Paramètres → Tableaux de bord → ⋮ → Ressources**
+
+- URL : `/freebox_homexa/freebox-homexa-card.js`
+- Type : Module JavaScript
+
+## Options (facultatif)
+
+```yaml
+type: custom:freebox-homexa-card
+alarm_entity: alarm_control_panel.alarme
+cover_entity: cover.volet_salon
+pir_entity: binary_sensor.pir_entree
+player_entity: media_player.freebox_player
+rssi_entity: sensor.signal_wi_fi
+```
+
+Sans ces clés, la carte prend toute seule :
+- l’alarme Homexa
+- le volet dont le nom contient `salon`
+- un PIR / motion
 - `media_player.freebox_player`
-
-### Contacts / portes / fenêtres Home
-- `binary_sensor.porte_entree`
-- `binary_sensor.porte_cuisine`
-- `binary_sensor.baie_vitree`
-- `binary_sensor.fenetre_cuisine`
-- `binary_sensor.fenetre_papa`
-- `binary_sensor.fenetre_loulous`
-- `binary_sensor.porte_fenetre_filles`
-
-### Découverts auto (intégration `freebox_homexa`)
-- `alarm_control_panel.*` → carte Alarme Présent / Absent / Désarmé
-- `binary_sensor` motion → PIR
-- `sensor` signal_strength → RSSI Wi-Fi
-
-Nécessite HACS → [auto-entities](https://github.com/thomasloven/lovelace-auto-entities).
-
-### SMS
-- `custom:freesmsxa-send-card` ([freesmsxa](https://github.com/XAV59213/freesmsxa))
-
-## Prérequis
-
-- Mushroom
-- auto-entities (recommandé)
-- Free Mobile SMS XA
+- le premier capteur RSSI

@@ -4,6 +4,7 @@
 - Carte Lovelace : hauteur auto en vue Sections (plus de débordement qui masque la carte du dessous)
 - Boutons alarme / volet / player : délégation de clic stable, plus détruits à chaque refresh hass
 - Layout mobile compact pour PIR / Player / RSSI
+- Versions alignées : `manifest.json`, `const.VERSION`, README, info.md, wiki
 
 ## 28.8.24
 - Synchronisation de la version affichée avec la release GitHub `28.8.24`

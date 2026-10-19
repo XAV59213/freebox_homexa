@@ -127,22 +127,10 @@ def extract_wifi_details(device: dict[str, Any]) -> dict[str, Any]:
     return details
 
 
-def _token_candidates(hass: HomeAssistant, host: str) -> list[Path]:
+def _token_path(hass: HomeAssistant, host: str) -> Path:
+    """Own token path only — never touch core Freebox .storage/freebox/."""
     slug = slugify(host)
-    storage_root = Path(hass.config.path(".storage"))
-    return [
-        storage_root / "freebox_homexa" / f"{slug}.conf",
-        storage_root / "freebox" / f"{slug}.conf",
-        storage_root / DOMAIN / f"{slug}.conf",
-    ]
-
-
-def resolve_token_file(hass: HomeAssistant, host: str) -> Path:
-    """Return an existing token file, or the canonical Homexa path."""
-    for candidate in _token_candidates(hass, host):
-        if candidate.is_file():
-            return candidate
-    return _token_candidates(hass, host)[0]
+    return Path(hass.config.path(".storage")) / "freebox_homexa" / f"{slug}.conf"
 
 
 def _app_desc_from_token(token_file: Path) -> dict[str, str]:
@@ -162,7 +150,7 @@ def _app_desc_from_token(token_file: Path) -> dict[str, str]:
 
 async def get_api(hass: HomeAssistant, host: str) -> Freepybox:
     """Obtient l'API Freebox en réutilisant le token déjà enregistré."""
-    token_file = resolve_token_file(hass, host)
+    token_file = _token_path(hass, host)
     storage_dir = token_file.parent
 
     def _ensure_directory():

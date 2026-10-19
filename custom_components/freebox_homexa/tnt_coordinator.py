@@ -32,6 +32,47 @@ def _parse_xmltv_datetime(value: str | None):
         return None
 
 
+def _parse_xmltv(xml_text: str, channels: list[str]) -> tuple[dict, dict]:
+    """Parse XMLTV off the event loop."""
+    root = ET.fromstring(xml_text)
+    wanted = set(channels)
+    meta: dict[str, dict] = {}
+    for channel in root.findall("channel"):
+        cid = channel.get("id")
+        if cid not in wanted:
+            continue
+        display = channel.findtext("display-name") or cid
+        icon_el = channel.find("icon")
+        meta[cid] = {"name": display, "icon": icon_el.get("src") if icon_el is not None else None}
+    programmes: dict[str, list[Programme]] = {cid: [] for cid in wanted}
+    for node in root.findall("programme"):
+        cid = node.get("channel")
+        if cid not in wanted:
+            continue
+        start = _parse_xmltv_datetime(node.get("start"))
+        stop = _parse_xmltv_datetime(node.get("stop"))
+        title = node.findtext("title")
+        if not start or not stop or not title:
+            continue
+        icon_el = node.find("icon")
+        rating_el = node.find("rating/value")
+        programmes[cid].append(
+            Programme(
+                start=start,
+                stop=stop,
+                title=title,
+                subtitle=node.findtext("sub-title"),
+                desc=node.findtext("desc"),
+                category=node.findtext("category"),
+                icon=icon_el.get("src") if icon_el is not None else None,
+                rating=rating_el.text if rating_el is not None else None,
+            )
+        )
+    for cid in programmes:
+        programmes[cid].sort(key=lambda item: item.start)
+    return programmes, meta
+
+
 class Programme:
     def __init__(self, start, stop, title, subtitle, desc, category, icon, rating) -> None:
         self.start = start
@@ -120,42 +161,9 @@ class ProgrammeTntFrCoordinator(DataUpdateCoordinator):
         async with self._session.get(XMLTV_URL, timeout=60) as resp:
             resp.raise_for_status()
             xml_text = await resp.text()
-        root = ET.fromstring(xml_text)
-        wanted = set(self._channels)
-        meta: dict[str, dict] = {}
-        for channel in root.findall("channel"):
-            cid = channel.get("id")
-            if cid not in wanted:
-                continue
-            display = channel.findtext("display-name") or cid
-            icon_el = channel.find("icon")
-            meta[cid] = {"name": display, "icon": icon_el.get("src") if icon_el is not None else None}
-        programmes: dict[str, list[Programme]] = {cid: [] for cid in wanted}
-        for node in root.findall("programme"):
-            cid = node.get("channel")
-            if cid not in wanted:
-                continue
-            start = _parse_xmltv_datetime(node.get("start"))
-            stop = _parse_xmltv_datetime(node.get("stop"))
-            title = node.findtext("title")
-            if not start or not stop or not title:
-                continue
-            icon_el = node.find("icon")
-            rating_el = node.find("rating/value")
-            programmes[cid].append(
-                Programme(
-                    start=start,
-                    stop=stop,
-                    title=title,
-                    subtitle=node.findtext("sub-title"),
-                    desc=node.findtext("desc"),
-                    category=node.findtext("category"),
-                    icon=icon_el.get("src") if icon_el is not None else None,
-                    rating=rating_el.text if rating_el is not None else None,
-                )
-            )
-        for cid in programmes:
-            programmes[cid].sort(key=lambda item: item.start)
+        programmes, meta = await self.hass.async_add_executor_job(
+            _parse_xmltv, xml_text, self._channels
+        )
         self._programmes_by_channel = programmes
         self._channels_meta = meta
 

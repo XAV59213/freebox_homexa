@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import logging
-import os
 from pathlib import Path
 from dataclasses import dataclass
 from typing import Any
@@ -15,10 +14,9 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import EntityCategory
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
-from homeassistant.helpers.storage import Store
 from homeassistant.util import slugify
 
-from .const import DOMAIN, STORAGE_VERSION, STORAGE_KEY
+from .const import DOMAIN
 from .router import FreeboxRouter
 from .entity import FreeboxHomeEntity
 
@@ -47,12 +45,10 @@ async def async_setup_entry(
     router: FreeboxRouter = hass.data[DOMAIN][entry.unique_id]
     entities = []
 
-    # Interrupteurs d'inversion pour les volets
     for nodeid, node in router.home_devices.items():
         if node["category"] in {"shutter", "opener"}:
             entities.append(FreeboxShutterInvertSwitchEntity(hass, router, node))
 
-    # Interrupteur WiFi
     for entity_description in SWITCH_DESCRIPTIONS:
         entities.append(FreeboxSwitch(router, entity_description))
 
@@ -94,7 +90,7 @@ class FreeboxSwitch(SwitchEntity):
 
 
 class FreeboxShutterInvertSwitchEntity(FreeboxHomeEntity, SwitchEntity):
-    """Interrupteur d'inversion pour les volets (utilise le même dossier sécurisé)."""
+    """Interrupteur d'inversion pour les volets."""
 
     _attr_has_entity_name = True
     _attr_icon = "mdi:directions-fork"
@@ -103,13 +99,13 @@ class FreeboxShutterInvertSwitchEntity(FreeboxHomeEntity, SwitchEntity):
     def __init__(self, hass: HomeAssistant, router: FreeboxRouter, node: dict[str, Any]) -> None:
         super().__init__(hass, router, node)
         self._attr_unique_id = f"{self._attr_unique_id}_InvertSwitch"
+        storage_dir = Path(hass.config.path(".storage", "freebox_homexa"))
+        self._path = storage_dir / f"{slugify(self._attr_unique_id)}.conf"
+        self._state: bool = False
 
-        # Utilise le même dossier sécurisé que router.py
-        storage_dir = hass.config.path(".storage", "freebox_homexa")
-        Path(storage_dir).mkdir(parents=True, exist_ok=True)
-
-        self._path = Path(storage_dir) / f"{slugify(self._attr_unique_id)}.conf"
-        self._load_state()
+    async def async_added_to_hass(self) -> None:
+        await super().async_added_to_hass()
+        await self.hass.async_add_executor_job(self._load_state)
 
     @property
     def translation_key(self) -> str:
@@ -120,13 +116,13 @@ class FreeboxShutterInvertSwitchEntity(FreeboxHomeEntity, SwitchEntity):
         return self._state
 
     async def async_turn_on(self, **kwargs: Any) -> None:
-        await self.hass.async_add_executor_job(self._path.write_text, "1")
+        await self.hass.async_add_executor_job(self._write, "1")
         self._state = True
         self.async_write_ha_state()
         _LOGGER.info(f"Inversion activée pour {self._attr_name}")
 
     async def async_turn_off(self, **kwargs: Any) -> None:
-        await self.hass.async_add_executor_job(self._path.write_text, "0")
+        await self.hass.async_add_executor_job(self._write, "0")
         self._state = False
         self.async_write_ha_state()
         _LOGGER.info(f"Inversion désactivée pour {self._attr_name}")
@@ -136,7 +132,11 @@ class FreeboxShutterInvertSwitchEntity(FreeboxHomeEntity, SwitchEntity):
         return True
 
     async def async_update(self) -> None:
-        self._load_state()
+        await self.hass.async_add_executor_job(self._load_state)
+
+    def _write(self, content: str) -> None:
+        self._path.parent.mkdir(parents=True, exist_ok=True)
+        self._path.write_text(content)
 
     def _load_state(self) -> None:
         try:

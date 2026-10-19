@@ -133,6 +133,11 @@ def _token_path(hass: HomeAssistant, host: str) -> Path:
     return Path(hass.config.path(".storage")) / "freebox_homexa" / f"{slug}.conf"
 
 
+def resolve_token_file(hass: HomeAssistant, host: str) -> Path:
+    """Public helper used by config_flow to locate (and optionally delete) the token file."""
+    return _token_path(hass, host)
+
+
 def _app_desc_from_token(token_file: Path) -> dict[str, str]:
     """Keep the descriptor stored with the token so freebox-api does not re-pair."""
     app_desc = dict(APP_DESC)

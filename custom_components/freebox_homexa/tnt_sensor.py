@@ -57,7 +57,9 @@ class HomexaTntSensor(CoordinatorEntity[ProgrammeTntFrCoordinator], SensorEntity
             "channel_id": self._channel_id,
             "channel_name": data.get("channel_name") or self._attr_name,
             "channel_icon": data.get("channel_icon"),
+            "homexa_tnt": True,
             "current": data.get("current"),
+            "next": data.get("next"),
             "prime_time": data.get("prime_time"),
             "second_part": data.get("second_part"),
         }

@@ -33,3 +33,11 @@ Sans ces clés, la carte prend toute seule :
 - un PIR / motion
 - `media_player.freebox_player`
 - le premier capteur RSSI
+
+# Carte « Homexa TNT »
+
+```yaml
+type: custom:homexa-tnt-card
+```
+
+Tableau de bord → Ajouter une carte → cherche **Homexa TNT**. Options : voir [homexa-tnt-card.yaml](homexa-tnt-card.yaml).

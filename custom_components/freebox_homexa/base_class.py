@@ -4,6 +4,7 @@ from typing import Dict, Optional
 from homeassistant.helpers.entity import Entity
 from .const import DOMAIN, VALUE_NOT_SET, DUMMY
 from .router import FreeboxRouter
+from .registry_compat import as_version
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -58,7 +59,7 @@ class FreeboxBaseClass(Entity):
             "name": self._device_name,
             "manufacturer": self._manufacturer,
             "model": self._model,
-            "sw_version": self._firmware,
+            "sw_version": as_version(self._firmware),
             "via_device_id": self._router.device_id,
         }
 

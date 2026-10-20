@@ -605,3 +605,32 @@ def async_merge_repeater_devices(
                 "Appareil répéteur non rattaché : %s (%s, modèle %s)", idents, device.name, device.model
             )
     return merged
+
+
+def repeater_registry_devices(hass: HomeAssistant, entry: ConfigEntry) -> list[dict[str, Any]]:
+    """Appareils répéteurs (identifiant repeater_*) de l'entrée, pour diagnostic / journal."""
+    from homeassistant.helpers import entity_registry as er
+
+    registry = dr.async_get(hass)
+    entities = er.async_get(hass)
+    result: list[dict[str, Any]] = []
+    for device in entry_devices(registry, entry.entry_id):
+        idents = sorted(i for dom, i in device.identifiers if dom == DOMAIN and str(i).startswith("repeater_"))
+        if not idents:
+            continue
+        ents = er.async_entries_for_device(entities, device.id, include_disabled_entities=True)
+        result.append(
+            {
+                "device_id": device.id,
+                "name": device.name,
+                "name_by_user": device.name_by_user,
+                "model": device.model,
+                "area_id": device.area_id,
+                "identifiers": idents,
+                "connections": sorted(f"{t}:{v}" for t, v in device.connections),
+                "via_device_id": device.via_device_id,
+                "entity_count": len(ents),
+                "entities": sorted(e.entity_id for e in ents),
+            }
+        )
+    return result

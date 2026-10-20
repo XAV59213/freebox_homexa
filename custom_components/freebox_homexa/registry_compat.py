@@ -55,3 +55,10 @@ def entry_devices(registry: Any, entry_id: str) -> list[Any]:
 def remove_device(registry: Any, device_id: str) -> None:
     """Supprime l'appareil (remplace remove_config_entry_id, déprécié)."""
     registry.async_remove_device(device_id)
+
+
+def as_version(value: Any) -> str | None:
+    """sw_version / hw_version : toujours une chaîne (HA 2026.12 refuse les int)."""
+    if value is None or value == "":
+        return None
+    return str(value)

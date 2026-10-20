@@ -39,6 +39,7 @@ from .tnt_const import selected_channels
 from .tnt_setup import TNT_COORDINATORS_KEY
 from .tnt_sensor import HomexaTntSensor
 from .wifi_ap_sensors import async_setup_wifi_ap_sensors
+from .registry_compat import as_version
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -267,7 +268,7 @@ class FreeboxDiskSensor(FreeboxSensor):
             "identifiers": {(DOMAIN, disk["id"])},
             "model": disk["model"],
             "name": f"Disque {disk['id']}",
-            "sw_version": disk["firmware"],
+            "sw_version": as_version(disk.get("firmware")),
         }
         parent_id = router.parent_for(f"disk:{disk['id']}", f"Disque {disk['id']}", GROUP_SERVER)
         if parent_id:

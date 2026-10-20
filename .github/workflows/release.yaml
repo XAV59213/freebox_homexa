@@ -4,8 +4,9 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: Tag / version HACS (ex. 28.8.22)
-        required: true
+        description: Tag / version HACS (ex. 28.8.32). Vide = version de manifest.json
+        required: false
+        default: ""
         type: string
       target:
         description: Branche ou SHA cible
@@ -28,24 +29,38 @@ jobs:
       - name: Create GitHub Release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          TAG: ${{ inputs.tag }}
+          INPUT_TAG: ${{ inputs.tag }}
           TARGET: ${{ inputs.target }}
         run: |
           set -euo pipefail
-          NOTES=$(cat <<EOF
-          ## What's Changed
-          * feat: code télécommande Player dans Configurer (#47)
-          * fix: champ visible sur le même écran que l'intervalle Home
-          * chore: version ${TAG} alignée HACS / GitHub Release
+          MANIFEST_VERSION=$(jq -r '.version' custom_components/freebox_homexa/manifest.json)
+          TAG="${INPUT_TAG:-$MANIFEST_VERSION}"
+          if [ -z "$TAG" ] || [ "$TAG" = "null" ]; then
+            echo "::error::Aucune version trouvée (input tag vide et manifest.json sans version)"
+            exit 1
+          fi
+          if [ "$TAG" != "$MANIFEST_VERSION" ]; then
+            echo "::error::Le tag ($TAG) ne correspond pas à manifest.json ($MANIFEST_VERSION) ; HACS exige qu'ils soient alignés"
+            exit 1
+          fi
+          if gh release view "$TAG" >/dev/null 2>&1 || git ls-remote --exit-code --tags origin "refs/tags/$TAG" >/dev/null 2>&1; then
+            echo "::error::Le tag ou la release $TAG existe déjà, rien à publier"
+            exit 1
+          fi
 
-          HACS lit le tag GitHub et le champ version du manifest. Cette release aligne les deux sur ${TAG}.
-
-          **Full Changelog**: https://github.com/XAV59213/freebox_homexa/compare/28.8.21...${TAG}
-          EOF
-          )
-          NOTES=$(echo "$NOTES" | sed 's/^[[:space:]]//')
-          if gh release view "$TAG" >/dev/null 2>&1; then
-            gh release edit "$TAG" --title "$TAG" --notes "$NOTES"
+          # Notes : section correspondante de CHANGELOG.md, sinon notes générées par GitHub
+          NOTES_FILE=$(mktemp)
+          if [ -f CHANGELOG.md ]; then
+            awk -v v="$TAG" '
+              $0 ~ "^## " { if (found) exit; if ($2 == v) { found = 1; next } }
+              found { print }
+            ' CHANGELOG.md > "$NOTES_FILE"
+          fi
+          if [ -s "$NOTES_FILE" ] && grep -q '[^[:space:]]' "$NOTES_FILE"; then
+            echo "Notes issues de CHANGELOG.md (## $TAG)"
+            gh release create "$TAG" --target "$TARGET" --title "$TAG" \
+              --notes-file "$NOTES_FILE" --generate-notes
           else
-            gh release create "$TAG" --target "$TARGET" --title "$TAG" --notes "$NOTES"
+            echo "Pas de section $TAG dans CHANGELOG.md : notes générées automatiquement"
+            gh release create "$TAG" --target "$TARGET" --title "$TAG" --generate-notes
           fi

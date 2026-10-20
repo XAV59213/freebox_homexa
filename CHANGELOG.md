@@ -1,6 +1,6 @@
 # Changelog
 
-## Non publié
+## 28.8.47
 - Correction : `sw_version` des appareils toujours passé en texte (firmware des nœuds Freebox Home, disques, Freebox Server) ; Home Assistant 2026.12 refusera les nombres
 - Diagnostics (« Télécharger les diagnostics » sur l'intégration) : hôtes LAN répéteurs ou clients de répéteurs bruts, réponse brute ou erreur de l'API `/repeater/`, regroupement calculé par répéteur, et tous les appareils `repeater_*` du registre (identifiants, connexions, modèle, pièce, entités). Les MAC sont conservées ; numéros de série, jetons, mots de passe et clés sont masqués
 - Journal : avertissement au chargement quand des appareils répéteurs restent en double (visible sans activer le mode debug)

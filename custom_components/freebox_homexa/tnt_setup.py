@@ -16,11 +16,23 @@ _WS_KEY = "freebox_homexa_tnt_ws"
 
 async def async_setup_bundled_tnt(hass: HomeAssistant) -> ProgrammeTntFrCoordinator | None:
     """Set up TNT data under Homexa namespace. Do not touch other integrations' cards."""
-    if hass.config_entries.async_entries(TNT_DOMAIN):
-        _LOGGER.info("Programme TNT FR est déjà installé, bundle Homexa ignoré")
-        return None
+    existing = hass.data.get("freebox_homexa", {}).get("tnt")
+    if existing is not None:
+        return existing
 
-    if not hass.data.get(_WS_KEY):
+    external = [
+        entry
+        for entry in hass.config_entries.async_entries(TNT_DOMAIN)
+        if entry.disabled_by is None and entry.source != "ignore"
+    ]
+    if external:
+        # L'intégration séparée fournit déjà ses commandes websocket :
+        # on ne les ré-enregistre pas, mais Homexa crée quand même ses capteurs.
+        _LOGGER.info(
+            "Programme TNT FR séparé détecté : websocket non enregistré, "
+            "capteurs TNT Homexa créés quand même"
+        )
+    elif not hass.data.get(_WS_KEY):
         async_register_websocket_api(hass)
         hass.data[_WS_KEY] = True
 

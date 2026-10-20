@@ -1,5 +1,11 @@
 # Changelog
 
+## Non publié
+- Appareils : parents virtuels « Sécurité », « Volets » et « Réseau » par Freebox (rattachés au Freebox Server) pour désencombrer la liste ; identifiants d'entités inchangés
+- Pièce suggérée déduite du nom des appareils (uniquement pour les nouveaux appareils)
+- Noms : plus de « Unknown device » ; clients nommés « wlan0 » ou par MAC renommés via un autre nom d'hôte ou le fabricant
+- Option « Créer des appareils pour les clients réseau » : désactivée, les appareils clients existants sont retirés au rechargement
+
 ## 28.8.35
 - Carte Lovelace « Homexa TNT » (`custom:homexa-tnt-card`), adaptée de Programme TNT FR (cyclope205, MIT) : servie directement par l'intégration (aucune copie dans `www`, aucun CDN), avec rappels et affiches TMDB (#60)
 - Capteurs TNT : nouveau créneau « À suivre » (attribut `next`) (#60)

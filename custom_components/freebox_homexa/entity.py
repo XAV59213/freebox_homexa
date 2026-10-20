@@ -11,6 +11,7 @@ from homeassistant.helpers.dispatcher import async_dispatcher_connect
 from homeassistant.helpers.entity import Entity
 from freebox_api.exceptions import HttpRequestError
 from .const import CATEGORY_TO_MODEL, DOMAIN, FreeboxHomeCategory
+from .device_groups import home_node_group, home_node_name, suggested_area
 from .router import FreeboxRouter
 
 _LOGGER = logging.getLogger(__name__)
@@ -38,7 +39,7 @@ class FreeboxHomeEntity(Entity):
         self._node = node
         self._sub_node = sub_node
         self._id = node["id"]
-        self._attr_name = node["label"].strip()
+        self._attr_name = (node.get("label") or "").strip()
         self._device_name = self._attr_name
         self._attr_unique_id = f"{self._router.mac}-node_{self._id}"
 
@@ -60,6 +61,12 @@ class FreeboxHomeEntity(Entity):
                 self._manufacturer = "Somfy"
                 self._model = CATEGORY_TO_MODEL[FreeboxHomeCategory.IOHOME]
 
+        if not (node.get("label") or "").strip() or self._device_name.lower() == "unknown device":
+            self._device_name = home_node_name(node, self._model)
+            self._attr_name = self._device_name + (
+                " " + sub_node["label"].strip() if sub_node is not None else ""
+            )
+
         device_info: dict[str, Any] = {
             "identifiers": {(DOMAIN, self._id)},
             "manufacturer": self._manufacturer,
@@ -67,8 +74,12 @@ class FreeboxHomeEntity(Entity):
             "name": self._device_name,
             "sw_version": self._firmware,
         }
-        if router.device_id:
-            device_info["via_device_id"] = router.device_id
+        area = suggested_area(self._device_name)
+        if area:
+            device_info["suggested_area"] = area
+        parent_id = router.group_device_id(home_node_group(node))
+        if parent_id:
+            device_info["via_device_id"] = parent_id
         self._attr_device_info = DeviceInfo(**device_info)
 
     async def set_home_endpoint_value(

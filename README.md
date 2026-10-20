@@ -61,7 +61,7 @@ Dès l’installation, ou ensuite : **Paramètres → Appareils et services → 
 |---|---|---|
 | Suivre les clients LAN | oui | `device_tracker` des téléphones / PC / objets |
 | Créer les capteurs RSSI Wi-Fi | oui | Signal en dBm dès que le client est vu en Wi-Fi |
-| Créer un device Homexa par client LAN | oui | Désactivez pour éviter les doublons depuis HA 2026.8 |
+| Créer des appareils pour les clients réseau | oui | Désactivé : pas de device par client, et les devices clients existants sont retirés au rechargement |
 | Intervalle Home (secondes) | 15 | PIR, contacts, alarme, volets : 5 / 10 / 15 / 20 / 25 / 30 |
 | Code télécommande Player | vide | 8 chiffres, Player : Réglages → Système → Informations |
 
@@ -70,6 +70,20 @@ Le Server, les répéteurs et le pack Home (alarme, PIR, caméras, volets) garde
 Si vous désactivez « device par client » après coup, rechargez l’intégration puis supprimez à la main les anciens devices Homexa devenus vides.
 
 Pour 5 s, désactivez l’intégration officielle Freebox : les deux en parallèle saturent l’API.
+
+### Organisation des appareils
+
+Pour alléger la liste des appareils, chaque Freebox crée trois appareils parents virtuels, rattachés au **Freebox Server** :
+
+| Parent | Contenu |
+|---|---|
+| **Sécurité** | alarme, télécommandes, détecteurs d'ouverture et de mouvement, caméras |
+| **Volets** | volets roulants, ouvrants, équipements RTS / IO |
+| **Réseau** | appareils clients LAN / Wi-Fi (seulement si l'option est activée) |
+
+- Les identifiants d'entités ne changent pas ; les appareils existants sont re-rattachés au rechargement.
+- **Pièce suggérée** déduite du nom (« Volet cuisine » → Cuisine, « Fenêtre Papa » → Papa…). Home Assistant ne l'applique **qu'à la création** d'un appareil : les appareils existants gardent leur pièce.
+- Les clients sans nom (« Unknown device », « wlan0 », adresse MAC) prennent un autre nom d'hôte connu, sinon « <fabricant> <fin de MAC> ».
 
 ### Player (télécommande)
 
@@ -124,7 +138,7 @@ HACS → Freebox Homexa → **Mettre à jour** → redémarrer Home Assistant.
 | Télécommande sans effet | Renseigner le code Player dans Configurer |
 | HDMI ne change pas l’entrée TV | Normal : CEC réveille la TV, ça ne sélectionne pas HDMI 1/2/3 |
 | Pas de RSSI Wi-Fi | Client Ethernet, ou droit LAN / Wi-Fi manquant dans Freebox OS |
-| Devices en doublon (HA 2026.8) | Désactivez « Créer un device Homexa pour chaque client LAN » |
+| Devices en doublon (HA 2026.8) | Désactivez « Créer des appareils pour les clients réseau » |
 | PIR décalé vs intégration officielle | Officielle désactivée + intervalle Home à 5 ou 10 s |
 
 Logs : **Paramètres → Système → Journaux**, filtre `freebox_homexa`.

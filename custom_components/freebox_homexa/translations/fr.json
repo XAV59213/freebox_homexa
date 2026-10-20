@@ -27,7 +27,7 @@
         "data": {
           "track_lan_clients": "Suivre les clients LAN (device trackers)",
           "create_wifi_sensors": "Créer les capteurs RSSI Wi-Fi",
-          "create_lan_devices": "Créer un device Homexa pour chaque client LAN",
+          "create_lan_devices": "Créer des appareils pour les clients réseau",
           "home_poll_interval": "Intervalle Home (secondes)",
           "remote_code": "Code télécommande Player"
         },
@@ -67,14 +67,14 @@
         "data": {
           "track_lan_clients": "Suivre les clients LAN (device trackers)",
           "create_wifi_sensors": "Créer les capteurs RSSI Wi-Fi",
-          "create_lan_devices": "Créer un device Homexa pour chaque client LAN",
+          "create_lan_devices": "Créer des appareils pour les clients réseau",
           "home_poll_interval": "Intervalle Home (secondes)",
           "remote_code": "Code télécommande Player"
         },
         "data_description": {
           "track_lan_clients": "Désactivez si la présence est déjà gérée par une autre intégration.",
           "create_wifi_sensors": "Le RSSI est ajouté dès qu'un client est vu en Wi-Fi, y compris après la première config.",
-          "create_lan_devices": "Désactivez pour garder tracker et RSSI en entités seules, sans doublon de device.",
+          "create_lan_devices": "Désactivé : tracker et RSSI restent des entités seules et les appareils clients réseau existants sont retirés au rechargement.",
           "home_poll_interval": "PIR, contacts, alarme et volets. Désactivez l'intégration officielle Freebox avant de passer à 5 s.",
           "remote_code": "8 chiffres. Sur le Player : Réglages → Système → Informations. Sert pour power, TV et chiffres. Mini 4K / Pop : souvent Android TV Remote."
         }

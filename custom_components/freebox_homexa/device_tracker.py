@@ -16,12 +16,12 @@ from .const import (
     CONF_CREATE_LAN_DEVICES,
     CONF_TRACK_LAN_CLIENTS,
     DEFAULT_CREATE_LAN_DEVICES,
-    DEFAULT_DEVICE_NAME,
     DEFAULT_TRACK_LAN_CLIENTS,
     DEVICE_ICONS,
     DOMAIN,
     option_enabled,
 )
+from .device_groups import GROUP_NETWORK, lan_client_name, suggested_area
 from .router import FreeboxRouter, is_freebox_repeater
 
 _LOGGER = logging.getLogger(__name__)
@@ -87,7 +87,7 @@ class FreeboxDevice(ScannerEntity):
     ) -> None:
         self._router = router
         self._create_lan_devices = create_lan_devices
-        self._name = device["primary_name"].strip() or DEFAULT_DEVICE_NAME
+        self._name = lan_client_name(device)
         self._mac = device["l2ident"]["id"]
         self._manufacturer = device.get("vendor_name", "Inconnu")
         self._attr_icon = icon_for_freebox_device(device)
@@ -115,12 +115,17 @@ class FreeboxDevice(ScannerEntity):
 
         parent = device.get("wifi_parent") or {}
         identifier = parent.get("identifier") or self._router.mac
-        return DeviceInfo(
-            connections={(CONNECTION_NETWORK_MAC, self._mac)},
-            manufacturer=self._manufacturer,
-            name=self._name,
-            via_device_id=self._router.via_device_id_for(identifier),
-        )
+        info: dict[str, Any] = {
+            "connections": {(CONNECTION_NETWORK_MAC, self._mac)},
+            "manufacturer": self._manufacturer,
+            "name": self._name,
+            "via_device_id": self._router.group_device_ids.get(GROUP_NETWORK)
+            or self._router.via_device_id_for(identifier),
+        }
+        area = suggested_area(self._name)
+        if area:
+            info["suggested_area"] = area
+        return DeviceInfo(**info)
 
     @callback
     def async_update_state(self) -> None:

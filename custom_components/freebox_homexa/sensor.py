@@ -29,11 +29,11 @@ from .const import (
     CONF_CREATE_WIFI_SENSORS,
     DEFAULT_CREATE_LAN_DEVICES,
     DEFAULT_CREATE_WIFI_SENSORS,
-    DEFAULT_DEVICE_NAME,
     DOMAIN,
     option_enabled,
 )
 from .entity import FreeboxHomeEntity
+from .device_groups import GROUP_NETWORK, lan_client_name
 from .router import FreeboxRouter, is_freebox_repeater
 from .tnt_const import selected_channels
 from .tnt_setup import TNT_COORDINATORS_KEY
@@ -318,7 +318,7 @@ class FreeboxWifiSignalSensor(SensorEntity):
         self._router = router
         self._create_lan_devices = create_lan_devices
         self._mac = device["l2ident"]["id"]
-        name = (device.get("primary_name") or "").strip() or DEFAULT_DEVICE_NAME
+        name = lan_client_name(device)
         self._attr_unique_id = f"{router.mac}_{self._mac}_wifi_signal"
         self._attr_extra_state_attributes: dict[str, Any] = {}
         self._attr_native_value = None
@@ -345,8 +345,9 @@ class FreeboxWifiSignalSensor(SensorEntity):
                 "manufacturer": device.get("vendor_name") or "Inconnu",
                 "name": name,
             }
-            if self._router.device_id:
-                device_info["via_device_id"] = self._router.device_id
+            parent_id = self._router.group_device_id(GROUP_NETWORK)
+            if parent_id:
+                device_info["via_device_id"] = parent_id
             self._attr_device_info = DeviceInfo(**device_info)
             return
 

@@ -15,15 +15,19 @@ import aiohttp
 import homeassistant.helpers.device_registry as dr
 
 from .const import (
+    CONF_CREATE_LAN_DEVICES,
+    DEFAULT_CREATE_LAN_DEVICES,
     DOMAIN,
     PLATFORMS,
     SERVICE_REBOOT,
     SERVICE_RELOAD,
     SERVICE_REMOTE,
+    option_enabled,
     option_home_poll_interval,
     option_remote_code,
 )
 from .frontend import JSModuleRegistration
+from .device_groups import async_ensure_group_devices, async_remove_lan_client_devices
 from .router import FreeboxRouter, get_api
 from .tnt_setup import (
     TNT_COORDINATORS_KEY,
@@ -121,6 +125,16 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
     router = FreeboxRouter(hass, entry, api, freebox_config)
     router.device_id = parent_device.id
+    create_lan_devices = option_enabled(
+        entry, CONF_CREATE_LAN_DEVICES, DEFAULT_CREATE_LAN_DEVICES
+    )
+    router.group_device_ids = async_ensure_group_devices(
+        hass, entry, freebox_config["mac"], parent_device.id, create_lan_devices
+    )
+    if not create_lan_devices:
+        removed = async_remove_lan_client_devices(hass, entry, freebox_config["mac"])
+        if removed:
+            _LOGGER.info("%s appareil(s) client réseau retiré(s) du registre", removed)
     await router.update_all()
     await router.update_home_devices()
 

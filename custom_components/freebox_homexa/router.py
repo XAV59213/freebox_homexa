@@ -220,6 +220,7 @@ class FreeboxRouter:
         self._sw_v: str = freebox_config["firmware_version"]
         self._attrs: dict[str, Any] = {}
         self.device_id: str | None = None
+        self.group_device_ids: dict[str, str] = {}
         self._home_update_lock = asyncio.Lock()
 
         self.supports_hosts = True
@@ -457,6 +458,12 @@ class FreeboxRouter:
                 device = registry.async_get_device(identifiers={(DOMAIN, ident)})
                 if device is not None:
                     return device.id
+        return self.device_id
+
+    def group_device_id(self, group: str | None) -> str | None:
+        """device_id du parent virtuel (Sécurité/Volets/Réseau), sinon le Freebox Server."""
+        if group and group in self.group_device_ids:
+            return self.group_device_ids[group]
         return self.device_id
 
     @property

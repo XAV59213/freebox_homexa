@@ -8,7 +8,6 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from typing import Any
 
 from .const import DOMAIN
-from .device_groups import GROUP_TV
 from .tnt_const import ALL_CHANNELS
 from .tnt_coordinator import ProgrammeTntFrCoordinator
 
@@ -16,9 +15,9 @@ TNT_DEVICE_INFO = DeviceInfo(
     # Identifiant propre à Homexa : (programme_tnt_fr, programme_tnt_fr) est
     # celui de l'intégration séparée et fusionnerait les deux appareils.
     identifiers={(DOMAIN, "programme_tnt_fr")},
-    name="Programme TNT FR",
+    name="TNT",
     manufacturer="xmltvfr.fr",
-    model="Guide TNT",
+    model="Guide TV et Programme TNT FR",
     entry_type=DeviceEntryType.SERVICE,
     configuration_url="https://xmltvfr.fr/",
 )
@@ -37,12 +36,6 @@ class HomexaTntSensor(CoordinatorEntity[ProgrammeTntFrCoordinator], SensorEntity
         router: Any = None,
     ) -> None:
         super().__init__(coordinator)
-        if router is not None:
-            parent_id = router.parent_for("programme_tnt_fr", "Programme TNT FR", GROUP_TV)
-            if parent_id:
-                self._attr_device_info = DeviceInfo(
-                    **TNT_DEVICE_INFO, via_device_id=parent_id
-                )
         self._channel_id = channel_id
         self._attr_unique_id = f"{unique_prefix}_tnt_{channel_id}"
         self._attr_name = ALL_CHANNELS.get(channel_id, channel_id)

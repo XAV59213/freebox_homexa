@@ -220,24 +220,10 @@
     "device_group": {
       "options": {
         "auto": "Automatique",
-        "home": "Maison connectée et alarme",
-        "cameras": "Caméras",
+        "server": "Freebox Server",
+        "home": "Freebox Maison connectée",
         "player": "Freebox Player",
-        "vm": "Contrôle de la VM",
-        "downloads": "Téléchargements",
-        "parental": "Contrôle parental",
-        "calls": "Journal d'appels",
-        "tv": "Guide TV et enregistrements",
-        "equipment": "Équipements et réglages Freebox",
-        "net_amazon": "Équipements › Amazon",
-        "net_phones": "Équipements › Téléphones",
-        "net_computers": "Équipements › Ordinateurs",
-        "net_media": "Équipements › TV & multimédia",
-        "net_iot": "Équipements › Objets connectés",
-        "net_consoles": "Équipements › Consoles",
-        "net_printers": "Équipements › Imprimantes",
-        "net_other": "Équipements › Autres (réseau)",
-        "other": "Autres"
+        "tnt": "TNT"
       }
     }
   }

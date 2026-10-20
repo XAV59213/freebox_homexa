@@ -1,4 +1,4 @@
-"""Appareils parents virtuels (un par service Freebox OS), noms et pièces suggérées."""
+"""Rattachement des appareils aux 4 services (Server, Player, Maison connectée, TNT), noms et pièces."""
 
 from __future__ import annotations
 
@@ -11,28 +11,36 @@ from homeassistant.helpers import device_registry as dr
 
 from .const import DOMAIN, FreeboxHomeCategory
 
-# Groupes calqués sur les droits d'accès de Freebox OS (un groupe par service).
+# 4 services de premier niveau : Freebox Server, Freebox Player, Maison connectée, TNT.
+GROUP_SERVER = "server"
 GROUP_HOME = "home"
-GROUP_CAMERAS = "cameras"
 GROUP_PLAYER = "player"
-GROUP_VM = "vm"
-GROUP_DOWNLOADS = "downloads"
-GROUP_PARENTAL = "parental"
-GROUP_CALLS = "calls"
-GROUP_TV = "tv"
-GROUP_EQUIPMENT = "equipment"
-GROUP_OTHER = "other"
+GROUP_TNT = "tnt"
 GROUP_AUTO = "auto"
 CONF_DEVICE_GROUP_OVERRIDES = "device_group_overrides"
+SERVICE_CHOICES = (GROUP_SERVER, GROUP_HOME, GROUP_PLAYER, GROUP_TNT)
 
-# Anciens groupes par type (≤ 28.8.39) : conservés pour la migration et le nettoyage.
+# Anciens groupes (28.8.36 → 28.8.42) : valeurs « automatiques » encore produites
+# par le classement des clients, et identifiants de parents virtuels à nettoyer.
+GROUP_CAMERAS = "cameras"
+GROUP_EQUIPMENT = "equipment"
+GROUP_TV = "tv"
+GROUP_OTHER = "other"
 LEGACY_GROUP_MAP = {
     "security": GROUP_HOME,
     "windows": GROUP_HOME,
     "covers": GROUP_HOME,
-    "network": GROUP_EQUIPMENT,
     "media": GROUP_PLAYER,
-    "infrastructure": GROUP_EQUIPMENT,
+    "tv": GROUP_TNT,
+    "network": GROUP_SERVER,
+    "infrastructure": GROUP_SERVER,
+    "equipment": GROUP_SERVER,
+    "cameras": GROUP_SERVER,
+    "vm": GROUP_SERVER,
+    "downloads": GROUP_SERVER,
+    "parental": GROUP_SERVER,
+    "calls": GROUP_SERVER,
+    "other": GROUP_SERVER,
 }
 
 NET_AMAZON = "net_amazon"
@@ -48,50 +56,20 @@ NETWORK_SUBGROUPS = (
     NET_IOT, NET_CONSOLES, NET_PRINTERS, NET_OTHER,
 )
 
-SERVICE_GROUPS = (
-    GROUP_HOME, GROUP_CAMERAS, GROUP_PLAYER, GROUP_VM, GROUP_DOWNLOADS,
-    GROUP_PARENTAL, GROUP_CALLS, GROUP_TV, GROUP_EQUIPMENT, GROUP_OTHER,
-)
+# "player" : ancien parent virtuel « Freebox Player » (28.8.40), source de doublon.
+LEGACY_GROUPS = (*LEGACY_GROUP_MAP, *NETWORK_SUBGROUPS, GROUP_PLAYER)
 
 GROUP_NAMES = {
-    GROUP_HOME: "Maison connectée et alarme",
-    GROUP_CAMERAS: "Caméras",
+    GROUP_SERVER: "Freebox Server",
+    GROUP_HOME: "Freebox Maison connectée",
     GROUP_PLAYER: "Freebox Player",
-    GROUP_VM: "Contrôle de la VM",
-    GROUP_DOWNLOADS: "Téléchargements",
-    GROUP_PARENTAL: "Contrôle parental",
-    GROUP_CALLS: "Journal d'appels",
-    GROUP_TV: "Guide TV et enregistrements",
-    GROUP_EQUIPMENT: "Équipements et réglages Freebox",
-    GROUP_OTHER: "Autres",
-    NET_AMAZON: "Amazon",
-    NET_PHONES: "Téléphones",
-    NET_COMPUTERS: "Ordinateurs",
-    NET_MEDIA: "TV & multimédia",
-    NET_IOT: "Objets connectés",
-    NET_CONSOLES: "Consoles",
-    NET_PRINTERS: "Imprimantes",
-    NET_OTHER: "Autres (réseau)",
-    # anciens groupes, uniquement pour le libellé du nettoyage
-    "security": "Sécurité",
-    "windows": "Fenêtres",
-    "covers": "Volets",
-    "network": "Réseau",
-    "media": "Multimédia",
-    "infrastructure": "Infrastructure",
+    GROUP_TNT: "TNT",
 }
 GROUP_MODELS = {
-    GROUP_HOME: "Service Freebox Home : alarme, détecteurs, volets, ouvrants, prises",
-    GROUP_CAMERAS: "Service caméras (Freebox Home et caméras IP)",
-    GROUP_PLAYER: "Service Freebox Player",
-    GROUP_VM: "Service machines virtuelles",
-    GROUP_DOWNLOADS: "Service gestionnaire de téléchargements",
-    GROUP_PARENTAL: "Service contrôle parental",
-    GROUP_CALLS: "Service téléphonie / journal d'appels",
-    GROUP_TV: "Service guide TV, TNT et enregistrements",
-    GROUP_EQUIPMENT: "Service équipements : répéteurs, disques, clients réseau",
-    GROUP_OTHER: "Appareils non classés",
+    GROUP_HOME: "Freebox Home : alarme, détecteurs, volets, caméras, prises",
 }
+# Anciens appareils de service (28.8.40 → 28.8.42), fusionnés dans le serveur / TNT.
+LEGACY_SERVICE_KEYS = ("calls", "tv_guide")
 
 
 def group_identifier(router_mac: str, group: str) -> tuple[str, str]:
@@ -99,32 +77,37 @@ def group_identifier(router_mac: str, group: str) -> tuple[str, str]:
     return (DOMAIN, f"{router_mac}_group_{group}")
 
 
-def group_parent(group: str) -> str | None:
-    """Groupe parent (les sous-groupes réseau sont sous « Équipements »)."""
-    return GROUP_EQUIPMENT if group in NETWORK_SUBGROUPS else None
+def to_service(group: str | None) -> str:
+    """Groupe (ancien ou automatique) -> un des 4 services ; défaut : Freebox Server."""
+    if group in SERVICE_CHOICES:
+        return group
+    return LEGACY_GROUP_MAP.get(group or "", GROUP_SERVER)
 
 
 def home_node_group(node: dict[str, Any]) -> str:
-    """Groupe d'un nœud Freebox Home : Caméras, sinon Maison connectée et alarme."""
-    if node.get("category") == FreeboxHomeCategory.CAMERA:
-        return GROUP_CAMERAS
+    """Tous les nœuds Freebox Home (caméras comprises) : Freebox Maison connectée."""
     return GROUP_HOME
 
 
 def migrate_group(group: str | None) -> str | None:
-    """Ancien groupe par type -> groupe de service le plus proche."""
-    if group is None:
+    """Ancien groupe -> service le plus proche (None pour « Automatique »)."""
+    if group is None or group == GROUP_AUTO:
         return None
-    return LEGACY_GROUP_MAP.get(group, group)
+    if group in SERVICE_CHOICES:
+        return group
+    if group == GROUP_CAMERAS:
+        return None  # caméra Home -> Maison, caméra IP -> serveur : laissé en automatique
+    if group in NETWORK_SUBGROUPS:
+        return GROUP_SERVER
+    return LEGACY_GROUP_MAP.get(group)
 
 
 def migrate_overrides(overrides: dict[str, str] | None) -> dict[str, str]:
-    """Surcharges enregistrées migrées vers les groupes de service (inconnus ignorés)."""
-    valid = set(SERVICE_GROUPS) | set(NETWORK_SUBGROUPS)
+    """Surcharges enregistrées migrées vers les 4 services (inconnues ignorées)."""
     result: dict[str, str] = {}
     for key, value in (overrides or {}).items():
         new = migrate_group(value)
-        if new in valid:
+        if new in SERVICE_CHOICES:
             result[key] = new
     return result
 
@@ -293,57 +276,74 @@ def classify_lan_client(device: dict[str, Any]) -> str:
 
 
 def async_get_group_device(
-    hass: HomeAssistant,
-    entry_id: str,
-    router_mac: str,
-    server_device_id: str | None,
-    group: str,
+    hass: HomeAssistant, entry_id: str, router_mac: str, group: str
 ) -> str:
-    """Crée au besoin le parent virtuel (et son parent) ; retourne son device_id."""
+    """Crée au besoin l'appareil « Freebox Maison connectée » (premier niveau)."""
     registry = dr.async_get(hass)
-    parent = group_parent(group)
-    parent_id = (
-        async_get_group_device(hass, entry_id, router_mac, server_device_id, parent)
-        if parent
-        else server_device_id
-    )
     device = registry.async_get_or_create(
         config_entry_id=entry_id,
         identifiers={group_identifier(router_mac, group)},
         manufacturer="Freebox SAS",
-        model=GROUP_MODELS.get(group, f"Groupe {GROUP_NAMES[group]}"),
+        model=GROUP_MODELS.get(group, GROUP_NAMES[group]),
         name=GROUP_NAMES[group],
         entry_type=dr.DeviceEntryType.SERVICE,
     )
-    if parent_id and device.via_device_id != parent_id:
-        registry.async_update_device(device.id, via_device_id=parent_id)
+    updates: dict[str, Any] = {}
+    if device.name != GROUP_NAMES[group]:
+        updates["name"] = GROUP_NAMES[group]  # renommage (name_by_user conservé)
+    if device.via_device_id is not None:
+        updates["via_device_id"] = None  # service de premier niveau
+    if updates:
+        device = registry.async_update_device(device.id, **updates) or device
     return device.id
 
 
-ALL_GROUPS = (*SERVICE_GROUPS, *NETWORK_SUBGROUPS)
-# Groupes vérifiés par le nettoyage : actuels + anciens groupes par type.
-CLEANUP_GROUPS = (*ALL_GROUPS, *LEGACY_GROUP_MAP)
+def _has_entities(hass: HomeAssistant, device_id: str) -> bool:
+    from homeassistant.helpers import entity_registry as er
+
+    return bool(
+        er.async_entries_for_device(er.async_get(hass), device_id, include_disabled_entities=True)
+    )
+
+
+def _has_children(registry: Any, device_id: str) -> bool:
+    return any(d.via_device_id == device_id for d in registry.devices.values())
 
 
 def async_remove_unused_group_devices(
     hass: HomeAssistant, entry: ConfigEntry, router_mac: str, used: set[str]
 ) -> list[str]:
-    """Retire les parents virtuels de cette entrée qu'aucun appareil n'a demandés.
+    """Retire les anciens parents virtuels et appareils de service devenus vides.
 
-    `used` contient les groupes (et leurs parents) résolus par les entités : on ne
-    se fie pas au registre, où les enfants ne sont pas encore tous enregistrés.
+    Appelé en différé (entités déjà ré-attachées). Un appareil n'est retiré que
+    s'il n'a plus ni entité ni enfant : aucune entité n'est supprimée.
     """
     registry = dr.async_get(hass)
     removed: list[str] = []
-    for group in CLEANUP_GROUPS:
-        if group in used:
-            continue
-        device = registry.async_get_device(identifiers={group_identifier(router_mac, group)})
+    candidates = [group_identifier(router_mac, g) for g in LEGACY_GROUPS]
+    candidates += [(DOMAIN, f"{router_mac}_service_{k}") for k in LEGACY_SERVICE_KEYS]
+    if GROUP_HOME not in used:
+        candidates.append(group_identifier(router_mac, GROUP_HOME))
+    for ident in candidates:
+        device = registry.async_get_device(identifiers={ident})
         if device is None or entry.entry_id not in device.config_entries:
             continue
+        if _has_entities(hass, device.id) or _has_children(registry, device.id):
+            continue
         registry.async_update_device(device.id, remove_config_entry_id=entry.entry_id)
-        removed.append(GROUP_NAMES[group])
+        removed.append(device.name or ident[1])
     return removed
+
+
+def async_detach_top_level_devices(
+    hass: HomeAssistant, entry: ConfigEntry, idents: list[tuple[str, str]]
+) -> None:
+    """Players et TNT : services de premier niveau (plus de via_device)."""
+    registry = dr.async_get(hass)
+    for ident in idents:
+        device = registry.async_get_device(identifiers={ident})
+        if device is not None and entry.entry_id in device.config_entries and device.via_device_id:
+            registry.async_update_device(device.id, via_device_id=None)
 
 
 def async_remove_merged_node_devices(
@@ -361,6 +361,8 @@ def async_remove_merged_node_devices(
             continue
         if er.async_entries_for_device(entities, device.id, include_disabled_entities=True):
             continue
+        if _has_children(registry, device.id):
+            continue
         registry.async_update_device(device.id, remove_config_entry_id=entry.entry_id)
         removed += 1
     return removed
@@ -368,7 +370,7 @@ def async_remove_merged_node_devices(
 
 def group_choices() -> list[str]:
     """Valeurs proposées dans l'écran « Groupes des appareils »."""
-    return [GROUP_AUTO, *ALL_GROUPS]
+    return [GROUP_AUTO, *SERVICE_CHOICES]
 
 
 def async_remove_lan_client_devices(

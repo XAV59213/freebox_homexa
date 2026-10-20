@@ -1,8 +1,9 @@
 # Changelog
 
-## Non publié
+## 28.8.39
 - Appareils : nouveau groupe « Caméras » (rattaché au Freebox Server) : caméras Freebox Home (sorties de « Sécurité ») et caméras IP du réseau (`ip_camera`, Hikvision, Dahua, Reolink, Foscam, Ezviz, Axis), auparavant dans « Objets connectés »
-- « Caméras » ajouté aux choix de l'écran « Groupes des appareils »
+- « Caméras » ajouté aux choix de l'écran « Groupes des appareils » (#64)
+- ⚠️ Pas encore testé dans Home Assistant : merci de signaler tout problème dans les issues
 
 ## 28.8.38
 - Appareils : **tous** les appareils Homexa sont désormais rangés dans un groupe ; nouveaux groupes « Multimédia » (Freebox Player, guide TNT), « Infrastructure » (répéteurs, disques) et « Autres » (repli) ; le sous-groupe réseau de repli devient « Autres (réseau) »

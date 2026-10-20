@@ -20,6 +20,12 @@ from homeassistant.helpers import selector
 from homeassistant.helpers.service_info.zeroconf import ZeroconfServiceInfo
 from homeassistant.helpers.storage import Store
 
+from .device_groups import (
+    CONF_DEVICE_GROUP_OVERRIDES,
+    GROUP_AUTO,
+    GROUP_NAMES,
+    group_choices,
+)
 from .const import (
     CONF_CREATE_LAN_DEVICES,
     CONF_CREATE_WIFI_SENSORS,
@@ -481,7 +487,60 @@ class FreeboxOptionsFlowHandler(OptionsFlow):
     async def async_step_init(
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
-        return self.async_show_menu(step_id="init", menu_options=["general", "tnt", "profiles"])
+        return self.async_show_menu(step_id="init", menu_options=["general", "groups", "tnt", "profiles"])
+
+    def _group_fields(self) -> dict[str, str]:
+        """Libellé affiché -> clé stable de l'appareil (libellés uniques)."""
+        router = self.hass.data.get(DOMAIN, {}).get(self.config_entry.unique_id)
+        devices = dict(getattr(router, "grouped_devices", {}) or {})
+        overrides = dict(self.config_entry.options.get(CONF_DEVICE_GROUP_OVERRIDES) or {})
+        for key in overrides:  # appareils surchargés mais absents ce coup-ci
+            devices.setdefault(key, (key, ""))
+        fields: dict[str, str] = {}
+        for key, (name, auto) in sorted(devices.items(), key=lambda kv: kv[1][0].lower()):
+            auto_label = GROUP_NAMES.get(auto, "")
+            label = f"{name} (auto : {auto_label})" if auto_label else name
+            if label in fields:
+                label = f"{label} [{key}]"
+            fields[label] = key
+        return fields
+
+    async def async_step_groups(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        fields = self._group_fields()
+        current = dict(self.config_entry.options)
+        overrides = dict(current.get(CONF_DEVICE_GROUP_OVERRIDES) or {})
+        if user_input is not None:
+            new_overrides: dict[str, str] = {}
+            for label, key in fields.items():
+                value = user_input.get(label, GROUP_AUTO)
+                if value and value != GROUP_AUTO:
+                    new_overrides[key] = value
+            current[CONF_DEVICE_GROUP_OVERRIDES] = new_overrides
+            return self.async_create_entry(title="", data=current)
+        if not fields:
+            return self.async_abort(reason="no_devices")
+        choice = selector.selector(
+            {
+                "select": {
+                    "options": group_choices(),
+                    "mode": "dropdown",
+                    "translation_key": "device_group",
+                }
+            }
+        )
+        schema = vol.Schema(
+            {
+                vol.Optional(label, default=overrides.get(key, GROUP_AUTO)): choice
+                for label, key in fields.items()
+            }
+        )
+        return self.async_show_form(
+            step_id="groups",
+            data_schema=schema,
+            description_placeholders={"count": str(len(fields))},
+        )
 
     async def async_step_tnt(
         self, user_input: dict[str, Any] | None = None

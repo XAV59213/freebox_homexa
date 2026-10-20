@@ -33,7 +33,7 @@ from .const import (
     option_enabled,
 )
 from .entity import FreeboxHomeEntity
-from .device_groups import classify_lan_client, lan_client_name
+from .device_groups import GROUP_INFRA, classify_lan_client, lan_client_name
 from .router import FreeboxRouter, is_freebox_repeater
 from .tnt_const import selected_channels
 from .tnt_setup import TNT_COORDINATORS_KEY
@@ -159,7 +159,7 @@ async def async_setup_entry(
     if coordinator is not None:
         channels = selected_channels(entry.options)
         entities.extend(
-            HomexaTntSensor(coordinator, channel_id, router.mac) for channel_id in channels
+            HomexaTntSensor(coordinator, channel_id, router.mac, router) for channel_id in channels
         )
         _async_remove_unselected_tnt_entities(hass, entry, router.mac, channels)
 
@@ -269,8 +269,9 @@ class FreeboxDiskSensor(FreeboxSensor):
             "name": f"Disque {disk['id']}",
             "sw_version": disk["firmware"],
         }
-        if router.device_id:
-            device_info["via_device_id"] = router.device_id
+        parent_id = router.parent_for(f"disk:{disk['id']}", f"Disque {disk['id']}", GROUP_INFRA)
+        if parent_id:
+            device_info["via_device_id"] = parent_id
         self._attr_device_info = DeviceInfo(**device_info)
 
     @callback
@@ -333,7 +334,7 @@ class FreeboxWifiSignalSensor(SensorEntity):
                 connections={(CONNECTION_NETWORK_MAC, self._mac)},
                 manufacturer=device.get("vendor_name") or "Freebox SAS",
                 name=name,
-                via_device_id=self._router.device_id,
+                via_device_id=self._router.parent_for(f"repeater_{self._mac}", name, GROUP_INFRA),
             )
             return
 
@@ -345,7 +346,9 @@ class FreeboxWifiSignalSensor(SensorEntity):
                 "manufacturer": device.get("vendor_name") or "Inconnu",
                 "name": name,
             }
-            parent_id = self._router.group_device_id(classify_lan_client(device))
+            parent_id = self._router.parent_for(
+                f"mac:{self._mac.lower()}", name, classify_lan_client(device)
+            )
             if parent_id:
                 device_info["via_device_id"] = parent_id
             self._attr_device_info = DeviceInfo(**device_info)

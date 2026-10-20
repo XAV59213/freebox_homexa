@@ -59,6 +59,7 @@
       "init": {
         "menu_options": {
           "general": "General settings",
+          "groups": "Device groups",
           "tnt": "TNT guide",
           "profiles": "Reminder profiles"
         },
@@ -108,6 +109,10 @@
           "tts_engine": "Text-to-speech engine (optional)",
           "announce_volume": "Announcement volume (optional)"
         }
+      },
+      "groups": {
+        "title": "Device groups",
+        "description": "{count} Homexa devices. “Automatic” keeps the computed group (shown in brackets); pick a group to force it. Applied on reload (automatic after saving)."
       }
     },
     "error": {
@@ -115,6 +120,9 @@
       "no_name": "Enter a name for this profile.",
       "duplicate_name": "A profile with this name already exists.",
       "device_conflict": "The same device cannot be both a notification target and a voice speaker (it would be announced twice)."
+    },
+    "abort": {
+      "no_devices": "No Homexa device loaded: reload the integration and try again."
     }
   },
   "services": {
@@ -208,6 +216,28 @@
           "name": "Profile name",
           "description": "Reminder profile name (optional if only one profile exists)."
         }
+      }
+    }
+  },
+  "selector": {
+    "device_group": {
+      "options": {
+        "auto": "Automatic",
+        "security": "Security",
+        "windows": "Windows",
+        "covers": "Shutters",
+        "network": "Network",
+        "net_amazon": "Network › Amazon",
+        "net_phones": "Network › Phones",
+        "net_computers": "Network › Computers",
+        "net_media": "Network › TV & media",
+        "net_iot": "Network › Smart devices",
+        "net_consoles": "Network › Consoles",
+        "net_printers": "Network › Printers",
+        "net_other": "Network › Other (network)",
+        "media": "Multimedia",
+        "infrastructure": "Infrastructure",
+        "other": "Other"
       }
     }
   }

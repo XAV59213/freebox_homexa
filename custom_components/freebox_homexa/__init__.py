@@ -6,9 +6,9 @@ import homeassistant.helpers.config_validation as cv
 from homeassistant.const import CONF_HOST, CONF_PORT, EVENT_HOMEASSISTANT_STOP
 from datetime import datetime, timedelta
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.core import Event, HomeAssistant, ServiceCall
+from homeassistant.core import Event, HomeAssistant, ServiceCall, callback
 from homeassistant.exceptions import ConfigEntryAuthFailed, ConfigEntryNotReady
-from homeassistant.helpers.event import async_track_time_interval
+from homeassistant.helpers.event import async_call_later, async_track_time_interval
 from homeassistant.helpers.storage import Store
 from freebox_api.exceptions import AuthorizationError, HttpRequestError
 import aiohttp
@@ -27,7 +27,7 @@ from .const import (
     option_remote_code,
 )
 from .frontend import JSModuleRegistration
-from .device_groups import async_remove_empty_group_devices, async_remove_lan_client_devices
+from .device_groups import async_remove_lan_client_devices, async_remove_unused_group_devices
 from .router import FreeboxRouter, get_api
 from .tnt_setup import (
     TNT_COORDINATORS_KEY,
@@ -164,10 +164,21 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             _LOGGER.exception("Rappels TNT indisponibles (le reste de l'intégration n'est pas affecté)")
 
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
-    # Parents virtuels créés à la demande par les entités ; on retire ceux restés vides.
-    empty_groups = async_remove_empty_group_devices(hass, entry, freebox_config["mac"])
-    if empty_groups:
-        _LOGGER.debug("Groupes vides retirés : %s", ", ".join(empty_groups))
+    # Parents virtuels créés à la demande par les entités. Les groupes inutilisés
+    # sont retirés un peu plus tard : certaines plateformes ajoutent leurs entités
+    # via des signaux après le setup (retirer trop tôt détachait p. ex. les volets).
+    @callback
+    def _cleanup_groups(_now: datetime | None = None) -> None:
+        removed = async_remove_unused_group_devices(
+            hass, entry, freebox_config["mac"], set(router.used_groups)
+        )
+        for group in list(router.group_device_ids):
+            if group not in router.used_groups:
+                router.group_device_ids.pop(group, None)
+        if removed:
+            _LOGGER.debug("Groupes vides retirés : %s", ", ".join(removed))
+
+    entry.async_on_unload(async_call_later(hass, 120, _cleanup_groups))
 
     async def async_reboot(call: ServiceCall) -> None:
         await router.reboot()

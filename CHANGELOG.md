@@ -1,7 +1,10 @@
 # Changelog
 
-## Non publié
-- Carte Lovelace « Homexa TNT » (`custom:homexa-tnt-card`), adaptée de Programme TNT FR (MIT), servie par l'intégration sans CDN ni ressource externe
+## 28.8.35
+- Carte Lovelace « Homexa TNT » (`custom:homexa-tnt-card`), adaptée de Programme TNT FR (cyclope205, MIT) : servie directement par l'intégration (aucune copie dans `www`, aucun CDN), avec rappels et affiches TMDB (#60)
+- Capteurs TNT : nouveau créneau « À suivre » (attribut `next`) (#60)
+- Guide TV par journée de diffusion (05h → 05h) pour la carte (#60)
+- ⚠️ Carte pas encore testée dans Home Assistant : merci de signaler tout problème dans les issues
 
 ## 28.8.34
 - Correction : l'écran d'options « Profils de rappel » n'affiche plus une boîte « Erreur » vide (#59)

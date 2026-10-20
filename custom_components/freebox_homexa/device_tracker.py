@@ -21,7 +21,7 @@ from .const import (
     DOMAIN,
     option_enabled,
 )
-from .device_groups import GROUP_NETWORK, lan_client_name, suggested_area
+from .device_groups import classify_lan_client, lan_client_name, suggested_area
 from .router import FreeboxRouter, is_freebox_repeater
 
 _LOGGER = logging.getLogger(__name__)
@@ -113,14 +113,11 @@ class FreeboxDevice(ScannerEntity):
         if not self._create_lan_devices:
             return None
 
-        parent = device.get("wifi_parent") or {}
-        identifier = parent.get("identifier") or self._router.mac
         info: dict[str, Any] = {
             "connections": {(CONNECTION_NETWORK_MAC, self._mac)},
             "manufacturer": self._manufacturer,
             "name": self._name,
-            "via_device_id": self._router.group_device_ids.get(GROUP_NETWORK)
-            or self._router.via_device_id_for(identifier),
+            "via_device_id": self._router.group_device_id(classify_lan_client(device)),
         }
         area = suggested_area(self._name)
         if area:

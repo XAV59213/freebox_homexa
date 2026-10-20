@@ -27,7 +27,7 @@ from .const import (
     option_remote_code,
 )
 from .frontend import JSModuleRegistration
-from .device_groups import async_ensure_group_devices, async_remove_lan_client_devices
+from .device_groups import async_remove_empty_group_devices, async_remove_lan_client_devices
 from .router import FreeboxRouter, get_api
 from .tnt_setup import (
     TNT_COORDINATORS_KEY,
@@ -128,9 +128,6 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     create_lan_devices = option_enabled(
         entry, CONF_CREATE_LAN_DEVICES, DEFAULT_CREATE_LAN_DEVICES
     )
-    router.group_device_ids = async_ensure_group_devices(
-        hass, entry, freebox_config["mac"], parent_device.id, create_lan_devices
-    )
     if not create_lan_devices:
         removed = async_remove_lan_client_devices(hass, entry, freebox_config["mac"])
         if removed:
@@ -167,6 +164,10 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             _LOGGER.exception("Rappels TNT indisponibles (le reste de l'intégration n'est pas affecté)")
 
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
+    # Parents virtuels créés à la demande par les entités ; on retire ceux restés vides.
+    empty_groups = async_remove_empty_group_devices(hass, entry, freebox_config["mac"])
+    if empty_groups:
+        _LOGGER.debug("Groupes vides retirés : %s", ", ".join(empty_groups))
 
     async def async_reboot(call: ServiceCall) -> None:
         await router.reboot()

@@ -74,7 +74,7 @@
         "data_description": {
           "track_lan_clients": "Désactivez si la présence est déjà gérée par une autre intégration.",
           "create_wifi_sensors": "Le RSSI est ajouté dès qu'un client est vu en Wi-Fi, y compris après la première config.",
-          "create_lan_devices": "Désactivé : tracker et RSSI restent des entités seules et les appareils clients réseau existants sont retirés au rechargement.",
+          "create_lan_devices": "Activé : chaque client est rangé sous Réseau › Amazon, Téléphones, Ordinateurs, TV & multimédia, Objets connectés, Consoles, Imprimantes ou Autres. Désactivé : tracker et RSSI restent des entités seules et les appareils clients existants sont retirés au rechargement.",
           "home_poll_interval": "PIR, contacts, alarme et volets. Désactivez l'intégration officielle Freebox avant de passer à 5 s.",
           "remote_code": "8 chiffres. Sur le Player : Réglages → Système → Informations. Sert pour power, TV et chiffres. Mini 4K / Pop : souvent Android TV Remote."
         }

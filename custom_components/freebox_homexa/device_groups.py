@@ -12,16 +12,40 @@ from homeassistant.helpers import device_registry as dr
 from .const import DOMAIN, FreeboxHomeCategory
 
 GROUP_SECURITY = "security"
+GROUP_WINDOWS = "windows"
 GROUP_COVERS = "covers"
 GROUP_NETWORK = "network"
 
+NET_AMAZON = "net_amazon"
+NET_PHONES = "net_phones"
+NET_COMPUTERS = "net_computers"
+NET_MEDIA = "net_media"
+NET_IOT = "net_iot"
+NET_CONSOLES = "net_consoles"
+NET_PRINTERS = "net_printers"
+NET_OTHER = "net_other"
+NETWORK_SUBGROUPS = (
+    NET_AMAZON, NET_PHONES, NET_COMPUTERS, NET_MEDIA,
+    NET_IOT, NET_CONSOLES, NET_PRINTERS, NET_OTHER,
+)
+
 GROUP_NAMES = {
     GROUP_SECURITY: "Sécurité",
+    GROUP_WINDOWS: "Fenêtres",
     GROUP_COVERS: "Volets",
     GROUP_NETWORK: "Réseau",
+    NET_AMAZON: "Amazon",
+    NET_PHONES: "Téléphones",
+    NET_COMPUTERS: "Ordinateurs",
+    NET_MEDIA: "TV & multimédia",
+    NET_IOT: "Objets connectés",
+    NET_CONSOLES: "Consoles",
+    NET_PRINTERS: "Imprimantes",
+    NET_OTHER: "Autres",
 }
 GROUP_MODELS = {
-    GROUP_SECURITY: "Groupe alarme, télécommandes, capteurs et caméras",
+    GROUP_SECURITY: "Groupe alarme, télécommandes, détecteurs de mouvement et caméras",
+    GROUP_WINDOWS: "Groupe détecteurs d'ouverture (fenêtres / portes)",
     GROUP_COVERS: "Groupe volets et ouvrants",
     GROUP_NETWORK: "Groupe clients LAN / Wi-Fi",
 }
@@ -29,7 +53,6 @@ GROUP_MODELS = {
 _SECURITY_CATEGORIES = {
     FreeboxHomeCategory.ALARM,
     FreeboxHomeCategory.KFB,
-    FreeboxHomeCategory.DWS,
     FreeboxHomeCategory.PIR,
     FreeboxHomeCategory.CAMERA,
 }
@@ -47,9 +70,16 @@ def group_identifier(router_mac: str, group: str) -> tuple[str, str]:
     return (DOMAIN, f"{router_mac}_group_{group}")
 
 
+def group_parent(group: str) -> str | None:
+    """Groupe parent (les sous-groupes réseau sont sous « Réseau »)."""
+    return GROUP_NETWORK if group in NETWORK_SUBGROUPS else None
+
+
 def home_node_group(node: dict[str, Any]) -> str | None:
     """Groupe d'un nœud Freebox Home (None = rattaché directement au Freebox Server)."""
     category = node.get("category")
+    if category == FreeboxHomeCategory.DWS:
+        return GROUP_WINDOWS
     if category in _SECURITY_CATEGORIES:
         return GROUP_SECURITY
     if category in _COVER_CATEGORIES:
@@ -60,37 +90,184 @@ def home_node_group(node: dict[str, Any]) -> str | None:
     return None
 
 
-def async_ensure_group_devices(
+# --- Classification des clients réseau --------------------------------------
+
+_HOST_TYPE_GROUPS = {
+    "smartphone": NET_PHONES,
+    "tablet": NET_PHONES,
+    "ip_phone": NET_PHONES,
+    "workstation": NET_COMPUTERS,
+    "laptop": NET_COMPUTERS,
+    "nas": NET_COMPUTERS,
+    "television": NET_MEDIA,
+    "multimedia_device": NET_MEDIA,
+    "freebox_player": NET_MEDIA,
+    "freebox_mini": NET_MEDIA,
+    "freebox_hd": NET_MEDIA,
+    "freebox_delta": NET_MEDIA,
+    "vg_console": NET_CONSOLES,
+    "printer": NET_PRINTERS,
+    "ip_camera": NET_IOT,
+    "car": NET_IOT,
+}
+# (mot-clé fabricant, groupe) — testés dans l'ordre
+_VENDOR_GROUPS = (
+    ("amazon", NET_AMAZON),
+    ("nintendo", NET_CONSOLES),
+    ("sony interactive", NET_CONSOLES),
+    ("microsoft xbox", NET_CONSOLES),
+    ("valve", NET_CONSOLES),
+    ("epson", NET_PRINTERS),
+    ("canon", NET_PRINTERS),
+    ("brother", NET_PRINTERS),
+    ("hewlett", NET_PRINTERS),
+    ("lexmark", NET_PRINTERS),
+    ("kyocera", NET_PRINTERS),
+    ("xerox", NET_PRINTERS),
+    ("espressif", NET_IOT),
+    ("tuya", NET_IOT),
+    ("shelly", NET_IOT),
+    ("allterco", NET_IOT),
+    ("sonoff", NET_IOT),
+    ("itead", NET_IOT),
+    ("signify", NET_IOT),
+    ("philips lighting", NET_IOT),
+    ("netatmo", NET_IOT),
+    ("nest", NET_IOT),
+    ("ring llc", NET_IOT),
+    ("meross", NET_IOT),
+    ("tp-link", NET_IOT),
+    ("lifx", NET_IOT),
+    ("ecovacs", NET_IOT),
+    ("roborock", NET_IOT),
+    ("irobot", NET_IOT),
+    ("dreame", NET_IOT),
+    ("raspberry", NET_IOT),
+    ("sonos", NET_MEDIA),
+    ("roku", NET_MEDIA),
+    ("lg electronics", NET_MEDIA),
+    ("vizio", NET_MEDIA),
+    ("tcl", NET_MEDIA),
+    ("hisense", NET_MEDIA),
+    ("bose", NET_MEDIA),
+    ("freebox", NET_MEDIA),
+    ("dell", NET_COMPUTERS),
+    ("lenovo", NET_COMPUTERS),
+    ("asustek", NET_COMPUTERS),
+    ("intel", NET_COMPUTERS),
+    ("micro-star", NET_COMPUTERS),
+    ("synology", NET_COMPUTERS),
+    ("qnap", NET_COMPUTERS),
+    ("oneplus", NET_PHONES),
+    ("oppo", NET_PHONES),
+    ("realme", NET_PHONES),
+    ("huawei", NET_PHONES),
+    ("motorola", NET_PHONES),
+    ("fairphone", NET_PHONES),
+)
+# (mot-clé nom d'hôte, groupe) — testés dans l'ordre
+_NAME_GROUPS = (
+    (("echo", "alexa", "fire tv", "firetv", "fire-tv", "kindle"), NET_AMAZON),
+    (("iphone", "android", "galaxy", "pixel", "redmi", "xiaomi", "phone", "smartphone",
+      "ipad", "tablet", "tab-", "oneplus", "huawei", "honor"), NET_PHONES),
+    (("macbook", "imac", "mac-mini", "macmini", "mac mini", "desktop-", "laptop", "pc-",
+      "-pc", "ordi", "thinkpad", "nas-", "-nas", "diskstation", "workstation", "surface"), NET_COMPUTERS),
+    (("playstation", "ps4", "ps5", "xbox", "switch", "nintendo", "steamdeck",
+      "steam-deck"), NET_CONSOLES),
+    (("printer", "imprimante", "epson", "officejet", "deskjet", "laserjet", "brn",
+      "canon"), NET_PRINTERS),
+    (("tv", "chromecast", "roku", "sonos", "apple-tv", "appletv", "shield", "kodi",
+      "player", "freebox", "bravia", "speaker", "enceinte"), NET_MEDIA),
+    (("esp", "tuya", "shelly", "sonoff", "tasmota", "hue", "plug", "prise", "camera",
+      "cam-", "netatmo", "nest", "ring", "robot", "roborock", "vacuum", "aspirateur",
+      "thermostat", "zigbee", "bridge", "raspberry", "homeassistant", "wled"), NET_IOT),
+)
+
+
+def _client_names(device: dict[str, Any]) -> str:
+    names = [device.get("primary_name") or "", device.get("default_name") or ""]
+    names += [
+        (n.get("name") or "") for n in device.get("names") or [] if isinstance(n, dict)
+    ]
+    return " ".join(names).lower()
+
+
+def classify_lan_client(device: dict[str, Any]) -> str:
+    """Sous-groupe réseau : host_type Freebox, puis fabricant, puis nom d'hôte."""
+    vendor = (device.get("vendor_name") or "").lower()
+    names = _client_names(device)
+    # Amazon d'abord : la Freebox classe souvent les Echo en "multimedia_device".
+    if "amazon" in vendor or any(k in names for k in _NAME_GROUPS[0][0]):
+        return NET_AMAZON
+    group = _HOST_TYPE_GROUPS.get(device.get("host_type") or "")
+    if group:
+        return group
+    if "apple" in vendor or "samsung" in vendor or "xiaomi" in vendor or "google" in vendor:
+        # Fabricants multi-produits : le nom d'hôte tranche, sinon téléphone.
+        for keywords, kw_group in _NAME_GROUPS:
+            if any(k in names for k in keywords):
+                return kw_group
+        if "samsung" in vendor and "tv" in names:
+            return NET_MEDIA
+        return NET_PHONES
+    for keyword, vendor_group in _VENDOR_GROUPS:
+        if keyword in vendor:
+            return vendor_group
+    for keywords, kw_group in _NAME_GROUPS:
+        if any(k in names for k in keywords):
+            return kw_group
+    return NET_OTHER
+
+
+# --- Registre ---------------------------------------------------------------
+
+
+def async_get_group_device(
     hass: HomeAssistant,
-    entry: ConfigEntry,
+    entry_id: str,
     router_mac: str,
-    server_device_id: str,
-    create_network: bool,
-) -> dict[str, str]:
-    """Crée/met à jour les parents virtuels ; retourne {groupe: device_id}."""
+    server_device_id: str | None,
+    group: str,
+) -> str:
+    """Crée au besoin le parent virtuel (et son parent) ; retourne son device_id."""
     registry = dr.async_get(hass)
-    ids: dict[str, str] = {}
-    for group, name in GROUP_NAMES.items():
-        identifier = group_identifier(router_mac, group)
-        if group == GROUP_NETWORK and not create_network:
-            device = registry.async_get_device(identifiers={identifier})
-            if device is not None:
-                registry.async_update_device(
-                    device.id, remove_config_entry_id=entry.entry_id
-                )
+    parent = group_parent(group)
+    parent_id = (
+        async_get_group_device(hass, entry_id, router_mac, server_device_id, parent)
+        if parent
+        else server_device_id
+    )
+    device = registry.async_get_or_create(
+        config_entry_id=entry_id,
+        identifiers={group_identifier(router_mac, group)},
+        manufacturer="Freebox SAS",
+        model=GROUP_MODELS.get(group, f"Groupe {GROUP_NAMES[group]}"),
+        name=GROUP_NAMES[group],
+        entry_type=dr.DeviceEntryType.SERVICE,
+    )
+    if parent_id and device.via_device_id != parent_id:
+        registry.async_update_device(device.id, via_device_id=parent_id)
+    return device.id
+
+
+def async_remove_empty_group_devices(
+    hass: HomeAssistant, entry: ConfigEntry, router_mac: str
+) -> list[str]:
+    """Retire les parents virtuels sans enfant (sous-groupes d'abord)."""
+    registry = dr.async_get(hass)
+    removed: list[str] = []
+    order = [*NETWORK_SUBGROUPS, GROUP_SECURITY, GROUP_WINDOWS, GROUP_COVERS, GROUP_NETWORK]
+    for group in order:
+        device = registry.async_get_device(identifiers={group_identifier(router_mac, group)})
+        if device is None:
             continue
-        device = registry.async_get_or_create(
-            config_entry_id=entry.entry_id,
-            identifiers={identifier},
-            manufacturer="Freebox SAS",
-            model=GROUP_MODELS[group],
-            name=name,
-            entry_type=dr.DeviceEntryType.SERVICE,
+        has_child = any(
+            d.via_device_id == device.id for d in registry.devices.values()
         )
-        if device.via_device_id != server_device_id:
-            registry.async_update_device(device.id, via_device_id=server_device_id)
-        ids[group] = device.id
-    return ids
+        if not has_child:
+            registry.async_update_device(device.id, remove_config_entry_id=entry.entry_id)
+            removed.append(GROUP_NAMES[group])
+    return removed
 
 
 def async_remove_lan_client_devices(

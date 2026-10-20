@@ -74,7 +74,7 @@
         "data_description": {
           "track_lan_clients": "Disable this if presence is already handled by another integration.",
           "create_wifi_sensors": "RSSI is added when a client is seen on Wi-Fi, including after the first setup.",
-          "create_lan_devices": "Off: tracker and RSSI stay standalone entities and existing network client devices are removed on reload.",
+          "create_lan_devices": "On: each client is filed under Network › Amazon, Phones, Computers, TV & media, Smart devices, Consoles, Printers or Other. Off: tracker and RSSI stay standalone entities and existing client devices are removed on reload.",
           "home_poll_interval": "PIR, contacts, alarm and shutters. Disable the official Freebox integration before using 5 s.",
           "remote_code": "8 digits. On the Player: Settings → System → Information. Used for power, TV and digits. Mini 4K / Pop often use Android TV Remote."
         }

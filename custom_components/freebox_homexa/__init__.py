@@ -30,6 +30,7 @@ from .frontend import JSModuleRegistration
 from .device_groups import (
     CONF_DEVICE_GROUP_OVERRIDES,
     async_remove_lan_client_devices,
+    async_remove_merged_node_devices,
     async_remove_unused_group_devices,
     migrate_overrides,
 )
@@ -190,6 +191,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
                 router.group_device_ids.pop(group, None)
         if removed:
             _LOGGER.debug("Groupes vides retirés : %s", ", ".join(removed))
+        merged = async_remove_merged_node_devices(hass, entry, set(router.merged_node_ids))
+        if merged:
+            _LOGGER.debug("%s ancien(s) appareil(s) alarme retiré(s)", merged)
 
     entry.async_on_unload(async_call_later(hass, 120, _cleanup_groups))
 

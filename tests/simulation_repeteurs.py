@@ -75,7 +75,8 @@ aps,reps=wa.build_wifi_aps(router_mac=RM,router_name="F",router_model="v7",devic
 for k,v in reps.items(): print(k,v["name"],v["model"],v["client_count"],v["macs"]); print("   ",v["grouping"])
 assert len(reps)==3, len(reps)
 assert set(reps)=={"8C:97:EA:55:BB:B6","8C:97:EA:12:34:56","8C:97:EA:77:88:99"}
-assert all(v["client_count"]==2 for v in reps.values())
+# BSSID des clients non reliés de façon fiable à un hôte : pas de fusion, pas d'appareil.
+assert all(v["client_count"]==0 for v in reps.values())
 # registry like user's: 9 devices
 i=0
 def dev(mac,area=None,model="fbxwmr",n=3,name="x"):
@@ -91,8 +92,11 @@ total=len([e for e,(d,k) in ENT.items() if k[0]!="binary_sensor"])
 n=dg.async_merge_repeater_devices(None,types.SimpleNamespace(entry_id="E"),RM,reps)
 left=[d for d in DEV if d!="srv"]
 print("fusionnés:",n,"restants:",left)
-assert len(left)==3 and n==6
-assert "stale" not in ENT and len(ENT)==total
-areas={DEV[d].area_id for d in left}; assert areas=={"test",None,"garage"},areas
+# Hôtes fusionnés par IP partagée ; les 2 appareils « BSSID seul » (sans lien fiable)
+# sont conservés (avertissement), pas fusionnés au hasard.
+assert len(left)==5 and n==4, (left, n)
+assert set(left)>={"dev1","dev2","dev7","dev6","dev9"}
+assert len(ENT)==total+1  # rien de supprimé (l'entité « En ligne » du BSSID reste sur son appareil)
+areas={DEV[d].area_id for d in ("dev1","dev2","dev7")}; assert areas=={"test",None,"garage"},areas
 assert all(len(DEV[d].identifiers)==1 for d in left)
 print("SIMULATION_OK")

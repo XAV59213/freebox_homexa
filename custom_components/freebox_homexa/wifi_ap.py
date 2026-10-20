@@ -53,24 +53,6 @@ def display_mac(norm: str) -> str:
     return ":".join(norm[i : i + 2] for i in range(0, len(norm), 2)) if len(norm) == 12 else norm
 
 
-def _repeater_distance(a: str, b: str) -> int | None:
-    """Distance entre deux MAC d'un même répéteur physique, None si sans rapport.
-
-    Un répéteur Free expose plusieurs MAC (Ethernet, radios 2,4 / 5 GHz, backhaul,
-    BSSID « locally administered ») : mêmes 3 derniers octets, ou mêmes octets 2 à 5
-    avec un dernier octet proche.
-    """
-    if len(a) != 12 or len(b) != 12:
-        return 0 if a == b else None
-    if a == b or a[6:] == b[6:]:
-        return 0
-    if a[2:10] == b[2:10]:
-        diff = abs(int(a[10:], 16) - int(b[10:], 16))
-        if diff < 16:
-            return diff
-    return None
-
-
 def api_repeater_macs(repeater: dict[str, Any]) -> list[str]:
     """Toutes les MAC d'un répéteur de l'API /repeater/ (principale, backhaul, BSSID).
 
@@ -81,53 +63,6 @@ def api_repeater_macs(repeater: dict[str, Any]) -> list[str]:
     macs += [b.get("mac") for b in repeater.get("backhaul") or [] if isinstance(b, dict)]
     macs += [f.get("bssid") for f in repeater.get("fronthaul") or [] if isinstance(f, dict)]
     return [m for m in macs if m]
-
-
-def cluster_repeater_macs(
-    macs: list[str],
-    anchors: list[str] | None = None,
-    known: dict[str, list[str]] | None = None,
-) -> dict[str, str]:
-    """MAC normalisée -> MAC canonique (affichage) du répéteur physique.
-
-    `anchors` : MAC principales de l'API /repeater/ (une par répéteur) ; à défaut,
-    la plus petite MAC de chaque grappe sert d'ancre (stable d'un démarrage à l'autre).
-    """
-    result: dict[str, str] = {}
-    anchor_norms: list[str] = []
-    # MAC connues par l'API : rattachement exact, prioritaire sur la proximité.
-    # Toutes servent ensuite de référence pour les MAC voisines (BSSID invités…).
-    refs: dict[str, str] = {}
-    for anchor, members in (known or {}).items():
-        a_norm = normalize_mac(anchor)
-        if not a_norm:
-            continue
-        if a_norm not in anchor_norms:
-            anchor_norms.append(a_norm)
-        for member in [anchor, *members]:
-            m_norm = normalize_mac(member)
-            if m_norm and m_norm not in result:
-                result[m_norm] = display_mac(a_norm)
-                refs[m_norm] = a_norm
-    for anchor in anchors or []:
-        norm = normalize_mac(anchor)
-        if norm and norm not in anchor_norms:
-            anchor_norms.append(norm)
-            result[norm] = display_mac(norm)
-    for norm in sorted({normalize_mac(m) for m in macs if m}):
-        if norm in result:
-            continue
-        best: tuple[int, str] | None = None
-        for ref, anchor in [*refs.items(), *((a, a) for a in anchor_norms)]:
-            dist = _repeater_distance(norm, ref)
-            if dist is not None and (best is None or dist < best[0]):
-                best = (dist, anchor)
-        if best is None:
-            anchor_norms.append(norm)
-            result[norm] = display_mac(norm)
-        else:
-            result[norm] = display_mac(best[1])
-    return result
 
 
 def eui64_mac(addr: str | None) -> str:
@@ -171,7 +106,7 @@ def group_repeater_macs(
       2. même access_point.uid ;
       3. adresse IP (v4/v6) commune entre hôtes (interfaces pontées du répéteur) ;
       4. IPv6 EUI-64 d'un hôte qui encode la MAC d'un autre hôte ;
-      5. proximité des MAC (BSSID / radios : mêmes octets 2 à 5).
+    Aucune fusion sur la seule proximité des MAC.
     Retourne (MAC -> MAC canonique, MAC canonique -> raisons du regroupement).
     """
     parent: dict[str, str] = {}
@@ -232,11 +167,8 @@ def group_repeater_macs(
             elif encoded and encoded in nodes:
                 union(encoded, mac, "EUI-64")
                 main_macs.add(encoded)
-    ordered = sorted(nodes)
-    for i, a in enumerate(ordered):
-        for b in ordered[i + 1 :]:
-            if find(a) != find(b) and _repeater_distance(a, b) is not None:
-                union(a, b, "MAC voisines")
+    # Pas de regroupement par simple proximité de MAC (plages consécutives d'un
+    # répéteur à l'autre, jumeau 20/22 non fiable) : en cas de doute, pas de fusion.
 
     clusters: dict[str, list[str]] = {}
     for n in nodes:
@@ -247,9 +179,11 @@ def group_repeater_macs(
         normalize_mac(m) for rep in api_repeaters or [] for m in api_repeater_macs(rep)
     }
     for root, members in list(clusters.items()):
-        # Pas un répéteur Free : aucune MAC Free (ni jumelle), ni API, ni uid répéteur.
-        # (ex. hôte nommé « Repeteur… » avec une MAC aléatoire, non relié à un répéteur)
-        if not any(is_free_mac(m) or m in api_nodes or m in ap_uids for m in members):
+        # Pas un répéteur Free : ex. hôte nommé « Repeteur… » avec une MAC aléatoire.
+        # Il faut au moins un hôte LAN ou une entrée API (un BSSID seul, sans lien
+        # fiable vers un hôte, ne crée pas d'appareil) et au moins une MAC Free / API.
+        has_anchor = any(m in hosts or m in api_nodes for m in members)
+        if not has_anchor or not any(is_free_mac(m) or m in api_nodes for m in members):
             for m in members:
                 rejected.append(display_mac(m))
             del clusters[root]

@@ -66,7 +66,8 @@ aps,reps=wa.build_wifi_aps(router_mac=RM,router_name="F",router_model="v7",devic
 rej=aps["gateway"]["rejected_repeater_macs"]
 for k,v in reps.items(): print("répéteur",k,v["name"],v["macs"],v["grouping"])
 print("rejetés :",rej)
-assert set(reps)=={"20:66:CF:4B:49:63","20:66:CF:4A:05:93","22:66:CF:C6:92:D4"},set(reps)
+# Sans IP / uid / API : aucune fusion sur la seule proximité (Garage reste séparé).
+assert set(reps)=={"20:66:CF:4B:49:63","20:66:CF:4B:49:69","22:66:CF:4B:49:69","20:66:CF:4A:05:93","22:66:CF:C6:92:D4"},set(reps)
 assert set(rej)=={"AC:E2:D3:D9:E9:2E","AE:69:19:D4:56:AB","B4:E4:54:B7:EE:3E","C0:F8:53:CE:6A:92"}
 i=0
 for name,model,mac,n,area in USER:
@@ -79,6 +80,14 @@ n=dg.async_merge_repeater_devices(None,types.SimpleNamespace(entry_id="E"),RM,re
 reps_left=sorted((DEV[d].name,sorted(i for _,i in DEV[d].identifiers),DEV[d].area_id) for d in DEV if any(str(i).startswith("repeater_") for _,i in DEV[d].identifiers))
 clients=sorted(DEV[d].name for d in DEV if d.startswith("dev") and not DEV[d].identifiers)
 print("appareils répéteurs :",reps_left); print("convertis en clients :",clients)
-assert len(reps_left)==3 and len(clients)==4 and len(ENT)==total
-assert {a for _,_,a in reps_left}=={"test_freebox","grange",None} or {a for _,_,a in reps_left}=={"garage","grange",None}
+assert len(reps_left)==5 and len(clients)==4 and len(ENT)==total
+garage=[r for r in reps_left if r[2]=="garage"]; test=[r for r in reps_left if r[2]=="test_freebox"]
+assert garage and test and garage[0][1]!=test[0][1]  # Garage jamais fusionné avec TEST FREEBOX
+
+# Variante : si le jumeau 20/22 partage la même IP (signal fiable), il est fusionné.
+hosts["20:66:CF:4B:49:69"]["l3connectivities"]=[{"addr":"192.168.1.40"}]
+hosts["22:66:CF:4B:49:69"]["l3connectivities"]=[{"addr":"192.168.1.40"}]
+_,reps2=wa.build_wifi_aps(router_mac=RM,router_name="F",router_model="v7",devices=hosts)
+assert len(reps2)==4 and any(set(v["macs"])=={"20:66:CF:4B:49:69","22:66:CF:4B:49:69"} for v in reps2.values())
+assert not any("20:66:CF:4B:49:63" in v["macs"] and len(v["macs"])>1 for v in reps2.values())
 print("SIMULATION_UTILISATEUR_OK")

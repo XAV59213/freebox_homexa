@@ -27,7 +27,11 @@ def websocket_get_programmes(hass: HomeAssistant, connection: websocket_api.Acti
     channels = msg["channels"]
     date_str = msg.get("date")
     programmes: dict[str, list[dict]] = {}
-    for coordinator in hass.data.get(DOMAIN, {}).values():
+    sources = list(hass.data.get(DOMAIN, {}).values())
+    homexa_tnt = hass.data.get("freebox_homexa", {}).get("tnt")
+    if homexa_tnt is not None:
+        sources.append(homexa_tnt)
+    for coordinator in sources:
         get_day = getattr(coordinator, "get_programmes_for_day", None)
         if get_day is None:
             continue

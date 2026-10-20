@@ -222,6 +222,14 @@ class FreeboxRouter:
         self.device_id: str | None = None
         self.group_device_ids: dict[str, str] = {}
         self.entry_id: str = entry.entry_id
+        from .device_groups import CONF_DEVICE_GROUP_OVERRIDES
+
+        self.group_overrides: dict[str, str] = dict(
+            entry.options.get(CONF_DEVICE_GROUP_OVERRIDES) or {}
+        )
+        self.used_groups: set[str] = set()
+        # clé stable -> (nom, groupe automatique) pour l'écran d'options
+        self.grouped_devices: dict[str, tuple[str, str]] = {}
         self._home_update_lock = asyncio.Lock()
 
         self.supports_hosts = True
@@ -460,6 +468,25 @@ class FreeboxRouter:
                 if device is not None:
                     return device.id
         return self.device_id
+
+    def parent_for(self, key: str, name: str, auto_group: str | None) -> str | None:
+        """device_id du groupe d'un appareil (surcharge utilisateur, sinon automatique).
+
+        `key` est la clé stable de l'appareil (dérivée de son identifiant), utilisée
+        par l'écran d'options « Groupes des appareils ».
+        """
+        from .device_groups import GROUP_AUTO, GROUP_NAMES, GROUP_OTHER, group_parent
+
+        auto = auto_group or GROUP_OTHER
+        self.grouped_devices[key] = (name, auto)
+        group = self.group_overrides.get(key) or GROUP_AUTO
+        if group == GROUP_AUTO or group not in GROUP_NAMES:
+            group = auto
+        self.used_groups.add(group)
+        parent = group_parent(group)
+        if parent:
+            self.used_groups.add(parent)
+        return self.group_device_id(group)
 
     def group_device_id(self, group: str | None) -> str | None:
         """device_id du parent virtuel (Sécurité/Volets/Réseau), sinon le Freebox Server."""

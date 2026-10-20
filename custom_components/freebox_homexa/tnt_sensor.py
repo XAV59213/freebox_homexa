@@ -5,7 +5,10 @@ from homeassistant.components.sensor import SensorEntity
 from homeassistant.helpers.device_registry import DeviceEntryType, DeviceInfo
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
+from typing import Any
+
 from .const import DOMAIN
+from .device_groups import GROUP_MEDIA
 from .tnt_const import ALL_CHANNELS
 from .tnt_coordinator import ProgrammeTntFrCoordinator
 
@@ -31,8 +34,15 @@ class HomexaTntSensor(CoordinatorEntity[ProgrammeTntFrCoordinator], SensorEntity
         coordinator: ProgrammeTntFrCoordinator,
         channel_id: str,
         unique_prefix: str,
+        router: Any = None,
     ) -> None:
         super().__init__(coordinator)
+        if router is not None:
+            parent_id = router.parent_for("programme_tnt_fr", "Programme TNT FR", GROUP_MEDIA)
+            if parent_id:
+                self._attr_device_info = DeviceInfo(
+                    **TNT_DEVICE_INFO, via_device_id=parent_id
+                )
         self._channel_id = channel_id
         self._attr_unique_id = f"{unique_prefix}_tnt_{channel_id}"
         self._attr_name = ALL_CHANNELS.get(channel_id, channel_id)

@@ -77,7 +77,7 @@ class FreeboxHomeEntity(Entity):
         area = suggested_area(self._device_name)
         if area:
             device_info["suggested_area"] = area
-        parent_id = router.group_device_id(home_node_group(node))
+        parent_id = router.parent_for(f"node:{self._id}", self._device_name, home_node_group(node))
         if parent_id:
             device_info["via_device_id"] = parent_id
         self._attr_device_info = DeviceInfo(**device_info)

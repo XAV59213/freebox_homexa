@@ -56,6 +56,7 @@
       "init": {
         "menu_options": {
           "general": "Paramètres généraux",
+          "groups": "Groupes des appareils",
           "tnt": "Guide TNT",
           "profiles": "Profils de rappel"
         },
@@ -105,6 +106,10 @@
           "tts_engine": "Moteur de synthèse vocale (facultatif)",
           "announce_volume": "Volume de l'annonce (facultatif)"
         }
+      },
+      "groups": {
+        "title": "Groupes des appareils",
+        "description": "{count} appareils Homexa. « Automatique » garde le classement calculé (indiqué entre parenthèses) ; choisissez un groupe pour le forcer. Appliqué au rechargement (automatique après validation)."
       }
     },
     "error": {
@@ -112,6 +117,9 @@
       "no_name": "Indiquez un nom pour ce profil.",
       "duplicate_name": "Un profil porte déjà ce nom.",
       "device_conflict": "Un même appareil ne peut pas être à la fois cible de notification et enceinte vocale (il serait annoncé deux fois)."
+    },
+    "abort": {
+      "no_devices": "Aucun appareil Homexa chargé : rechargez l'intégration puis réessayez."
     }
   },
   "services": {
@@ -205,6 +213,28 @@
           "name": "Nom du profil",
           "description": "Nom du profil de rappel (facultatif s'il n'y en a qu'un)."
         }
+      }
+    }
+  },
+  "selector": {
+    "device_group": {
+      "options": {
+        "auto": "Automatique",
+        "security": "Sécurité",
+        "windows": "Fenêtres",
+        "covers": "Volets",
+        "network": "Réseau",
+        "net_amazon": "Réseau › Amazon",
+        "net_phones": "Réseau › Téléphones",
+        "net_computers": "Réseau › Ordinateurs",
+        "net_media": "Réseau › TV & multimédia",
+        "net_iot": "Réseau › Objets connectés",
+        "net_consoles": "Réseau › Consoles",
+        "net_printers": "Réseau › Imprimantes",
+        "net_other": "Réseau › Autres (réseau)",
+        "media": "Multimédia",
+        "infrastructure": "Infrastructure",
+        "other": "Autres"
       }
     }
   }

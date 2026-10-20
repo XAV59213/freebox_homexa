@@ -15,6 +15,11 @@ GROUP_SECURITY = "security"
 GROUP_WINDOWS = "windows"
 GROUP_COVERS = "covers"
 GROUP_NETWORK = "network"
+GROUP_MEDIA = "media"
+GROUP_INFRA = "infrastructure"
+GROUP_OTHER = "other"
+GROUP_AUTO = "auto"
+CONF_DEVICE_GROUP_OVERRIDES = "device_group_overrides"
 
 NET_AMAZON = "net_amazon"
 NET_PHONES = "net_phones"
@@ -34,6 +39,9 @@ GROUP_NAMES = {
     GROUP_WINDOWS: "Fenêtres",
     GROUP_COVERS: "Volets",
     GROUP_NETWORK: "Réseau",
+    GROUP_MEDIA: "Multimédia",
+    GROUP_INFRA: "Infrastructure",
+    GROUP_OTHER: "Autres",
     NET_AMAZON: "Amazon",
     NET_PHONES: "Téléphones",
     NET_COMPUTERS: "Ordinateurs",
@@ -41,13 +49,16 @@ GROUP_NAMES = {
     NET_IOT: "Objets connectés",
     NET_CONSOLES: "Consoles",
     NET_PRINTERS: "Imprimantes",
-    NET_OTHER: "Autres",
+    NET_OTHER: "Autres (réseau)",
 }
 GROUP_MODELS = {
     GROUP_SECURITY: "Groupe alarme, télécommandes, détecteurs de mouvement et caméras",
     GROUP_WINDOWS: "Groupe détecteurs d'ouverture (fenêtres / portes)",
     GROUP_COVERS: "Groupe volets et ouvrants",
     GROUP_NETWORK: "Groupe clients LAN / Wi-Fi",
+    GROUP_MEDIA: "Groupe Freebox Player et guide TNT",
+    GROUP_INFRA: "Groupe répéteurs Wi-Fi et disques",
+    GROUP_OTHER: "Groupe appareils non classés",
 }
 
 _SECURITY_CATEGORIES = {
@@ -101,10 +112,10 @@ _HOST_TYPE_GROUPS = {
     "nas": NET_COMPUTERS,
     "television": NET_MEDIA,
     "multimedia_device": NET_MEDIA,
-    "freebox_player": NET_MEDIA,
-    "freebox_mini": NET_MEDIA,
-    "freebox_hd": NET_MEDIA,
-    "freebox_delta": NET_MEDIA,
+    "freebox_player": GROUP_MEDIA,
+    "freebox_mini": GROUP_MEDIA,
+    "freebox_hd": GROUP_MEDIA,
+    "freebox_delta": GROUP_MEDIA,
     "vg_console": NET_CONSOLES,
     "printer": NET_PRINTERS,
     "ip_camera": NET_IOT,
@@ -152,6 +163,16 @@ _VENDOR_GROUPS = (
     ("bose", NET_MEDIA),
     ("freebox", NET_MEDIA),
     ("dell", NET_COMPUTERS),
+    ("chongqing fugui", NET_COMPUTERS),
+    ("hon hai", NET_COMPUTERS),
+    ("liteon", NET_COMPUTERS),
+    ("lite-on", NET_COMPUTERS),
+    ("azurewave", NET_COMPUTERS),
+    ("wistron", NET_COMPUTERS),
+    ("quanta", NET_COMPUTERS),
+    ("compal", NET_COMPUTERS),
+    ("realtek", NET_COMPUTERS),
+    ("foss", NET_IOT),
     ("lenovo", NET_COMPUTERS),
     ("asustek", NET_COMPUTERS),
     ("intel", NET_COMPUTERS),
@@ -170,7 +191,8 @@ _NAME_GROUPS = (
     (("echo", "alexa", "fire tv", "firetv", "fire-tv", "kindle"), NET_AMAZON),
     (("iphone", "android", "galaxy", "pixel", "redmi", "xiaomi", "phone", "smartphone",
       "ipad", "tablet", "tab-", "oneplus", "huawei", "honor"), NET_PHONES),
-    (("macbook", "imac", "mac-mini", "macmini", "mac mini", "desktop-", "laptop", "pc-",
+    (("probook", "elitebook", "zbook", "pavilion", "envy", "ideapad", "latitude",
+      "inspiron", "vivobook", "zenbook", "macbook", "imac", "mac-mini", "macmini", "mac mini", "desktop-", "laptop", "pc-",
       "-pc", "ordi", "thinkpad", "nas-", "-nas", "diskstation", "workstation", "surface"), NET_COMPUTERS),
     (("playstation", "ps4", "ps5", "xbox", "switch", "nintendo", "steamdeck",
       "steam-deck"), NET_CONSOLES),
@@ -181,6 +203,12 @@ _NAME_GROUPS = (
     (("esp", "tuya", "shelly", "sonoff", "tasmota", "hue", "plug", "prise", "camera",
       "cam-", "netatmo", "nest", "ring", "robot", "roborock", "vacuum", "aspirateur",
       "thermostat", "zigbee", "bridge", "raspberry", "homeassistant", "wled"), NET_IOT),
+)
+# Mots-clés forts du nom d'hôte, testés avant le fabricant (ex. carte Wi-Fi Intel dans un objet WLED).
+_STRONG_NAME_GROUPS = (
+    (("wled", "tasmota", "esphome", "shelly", "sonoff"), NET_IOT),
+    (("probook", "elitebook", "zbook", "thinkpad", "latitude", "macbook", "laptop",
+      "desktop-", "-pc", "pc-"), NET_COMPUTERS),
 )
 
 
@@ -202,6 +230,9 @@ def classify_lan_client(device: dict[str, Any]) -> str:
     group = _HOST_TYPE_GROUPS.get(device.get("host_type") or "")
     if group:
         return group
+    for keywords, kw_group in _STRONG_NAME_GROUPS:
+        if any(k in names for k in keywords):
+            return kw_group
     if "apple" in vendor or "samsung" in vendor or "xiaomi" in vendor or "google" in vendor:
         # Fabricants multi-produits : le nom d'hôte tranche, sinon téléphone.
         for keywords, kw_group in _NAME_GROUPS:
@@ -250,24 +281,36 @@ def async_get_group_device(
     return device.id
 
 
-def async_remove_empty_group_devices(
-    hass: HomeAssistant, entry: ConfigEntry, router_mac: str
+ALL_GROUPS = (
+    GROUP_SECURITY, GROUP_WINDOWS, GROUP_COVERS, GROUP_NETWORK, *NETWORK_SUBGROUPS,
+    GROUP_MEDIA, GROUP_INFRA, GROUP_OTHER,
+)
+
+
+def async_remove_unused_group_devices(
+    hass: HomeAssistant, entry: ConfigEntry, router_mac: str, used: set[str]
 ) -> list[str]:
-    """Retire les parents virtuels sans enfant (sous-groupes d'abord)."""
+    """Retire les parents virtuels de cette entrée qu'aucun appareil n'a demandés.
+
+    `used` contient les groupes (et leurs parents) résolus par les entités : on ne
+    se fie pas au registre, où les enfants ne sont pas encore tous enregistrés.
+    """
     registry = dr.async_get(hass)
     removed: list[str] = []
-    order = [*NETWORK_SUBGROUPS, GROUP_SECURITY, GROUP_WINDOWS, GROUP_COVERS, GROUP_NETWORK]
-    for group in order:
-        device = registry.async_get_device(identifiers={group_identifier(router_mac, group)})
-        if device is None:
+    for group in ALL_GROUPS:
+        if group in used:
             continue
-        has_child = any(
-            d.via_device_id == device.id for d in registry.devices.values()
-        )
-        if not has_child:
-            registry.async_update_device(device.id, remove_config_entry_id=entry.entry_id)
-            removed.append(GROUP_NAMES[group])
+        device = registry.async_get_device(identifiers={group_identifier(router_mac, group)})
+        if device is None or entry.entry_id not in device.config_entries:
+            continue
+        registry.async_update_device(device.id, remove_config_entry_id=entry.entry_id)
+        removed.append(GROUP_NAMES[group])
     return removed
+
+
+def group_choices() -> list[str]:
+    """Valeurs proposées dans l'écran « Groupes des appareils »."""
+    return [GROUP_AUTO, *ALL_GROUPS]
 
 
 def async_remove_lan_client_devices(

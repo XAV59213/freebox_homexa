@@ -22,6 +22,7 @@ from freebox_api.exceptions import HttpRequestError, NotOpenError
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_HOST, CONF_PORT
 from homeassistant.core import HomeAssistant
+from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers.device_registry import CONNECTION_NETWORK_MAC, DeviceInfo
 from homeassistant.helpers.dispatcher import async_dispatcher_send
 from homeassistant.util import slugify
@@ -443,6 +444,20 @@ class FreeboxRouter:
             model=self.model,
             sw_version=self._sw_v,
         )
+
+    def via_device_id_for(self, identifier: str | None = None) -> str | None:
+        """device_id du parent (via_device_id), à la place de via_device=(DOMAIN, …) déprécié.
+
+        Cherche d'abord (DOMAIN, identifier), puis (DOMAIN, "repeater_<identifier>"),
+        sinon renvoie le device Freebox Server.
+        """
+        if identifier and identifier != self.mac:
+            registry = dr.async_get(self.hass)
+            for ident in (identifier, f"repeater_{identifier}"):
+                device = registry.async_get_device(identifiers={(DOMAIN, ident)})
+                if device is not None:
+                    return device.id
+        return self.device_id
 
     @property
     def signal_device_new(self) -> str:

@@ -77,8 +77,9 @@ Pour alléger la liste des appareils, **chaque appareil Homexa** (hors Freebox S
 
 | Parent | Contenu |
 |---|---|
-| **Sécurité** | alarme, télécommandes, détecteurs de mouvement, caméras |
+| **Sécurité** | alarme, télécommandes, détecteurs de mouvement |
 | **Fenêtres** | détecteurs d'ouverture fenêtres / portes |
+| **Caméras** | caméras Freebox Home et caméras IP du réseau (`ip_camera`, Hikvision, Dahua, Reolink, Foscam, Ezviz, Axis) |
 | **Volets** | volets roulants, ouvrants, équipements RTS / IO |
 | **Multimédia** | Freebox Player (et sa télécommande), guide « Programme TNT FR » |
 | **Infrastructure** | répéteurs Wi-Fi, disques |
@@ -87,7 +88,7 @@ Pour alléger la liste des appareils, **chaque appareil Homexa** (hors Freebox S
 | ↳ Téléphones | smartphones, tablettes, téléphones IP (Apple, Samsung, Xiaomi…) |
 | ↳ Ordinateurs | PC, portables (ProBook, EliteBook, ThinkPad…), Mac, NAS ; cartes Wi-Fi Chongqing Fugui (HP), Hon Hai, Liteon, Intel, AzureWave… |
 | ↳ TV & multimédia | TV, Chromecast, Sonos… |
-| ↳ Objets connectés | WLED, Espressif, Tuya, Shelly, Sonoff, Hue, FOSS, aspirateurs, caméras IP… |
+| ↳ Objets connectés | WLED, Espressif, Tuya, Shelly, Sonoff, Hue, FOSS, aspirateurs… |
 | ↳ Consoles | PlayStation, Xbox, Nintendo, Steam Deck |
 | ↳ Imprimantes | Epson, Canon, Brother, HP… |
 | ↳ Autres (réseau) | clients non reconnus |

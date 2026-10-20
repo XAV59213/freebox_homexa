@@ -22,17 +22,12 @@ def _ap_device_info(router: FreeboxRouter, access_point: dict[str, Any]) -> Devi
     if access_point.get("kind") == "gateway":
         return router.device_info
     mac = access_point.get("mac") or access_point.get("id")
-    device_info: dict[str, Any] = {
-        "identifiers": {(DOMAIN, f"repeater_{mac}")},
-        "connections": {(CONNECTION_NETWORK_MAC, mac)},
-        "manufacturer": access_point.get("vendor_name") or "Freebox SAS",
-        "model": access_point.get("model") or REPEATER_MODEL,
-        "name": access_point.get("name") or f"Répéteur Wi-Fi {str(mac)[-5:]}",
-    }
-    parent_id = router.parent_for(f"repeater_{mac}", device_info["name"], GROUP_SERVER)
-    if parent_id:
-        device_info["via_device_id"] = parent_id
-    return DeviceInfo(**device_info)
+    return router.repeater_device_info(
+        mac,
+        access_point.get("name") or f"Répéteur Wi-Fi {str(mac)[-5:]}",
+        access_point.get("model") or REPEATER_MODEL,
+        access_point.get("vendor_name"),
+    )
 
 
 def _client_label(access_point: dict[str, Any]) -> str:

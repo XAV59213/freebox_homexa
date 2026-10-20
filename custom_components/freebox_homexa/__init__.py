@@ -31,6 +31,7 @@ from .device_groups import (
     CONF_DEVICE_GROUP_OVERRIDES,
     async_detach_top_level_devices,
     async_remove_lan_client_devices,
+    async_merge_repeater_devices,
     async_remove_merged_node_devices,
     async_remove_unused_group_devices,
     migrate_overrides,
@@ -148,6 +149,13 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         if removed:
             _LOGGER.info("%s appareil(s) client réseau retiré(s) du registre", removed)
     await router.update_all()
+    # Un appareil par répéteur physique : fusion des doublons avant l'ajout des entités.
+    try:
+        merged = async_merge_repeater_devices(hass, entry, router.mac, router.repeaters)
+        if merged:
+            _LOGGER.info("%s appareil(s) répéteur en double fusionné(s)", merged)
+    except Exception:  # noqa: BLE001
+        _LOGGER.exception("Fusion des répéteurs en double impossible")
     await router.update_home_devices()
 
     async def _poll_home(_now: datetime | None = None) -> None:

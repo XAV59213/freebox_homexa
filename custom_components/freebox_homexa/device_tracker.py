@@ -101,15 +101,8 @@ class FreeboxDevice(ScannerEntity):
             return self._router.device_info
 
         if is_freebox_repeater(device, self._router.mac):
-            return DeviceInfo(
-                identifiers={(DOMAIN, f"repeater_{self._mac}")},
-                connections={(CONNECTION_NETWORK_MAC, self._mac)},
-                manufacturer=device.get("vendor_name") or "Freebox SAS",
-                model=device.get("model") or "F-RP01A",
-                name=self._name,
-                via_device_id=self._router.parent_for(
-                    f"repeater_{self._mac}", self._name, GROUP_SERVER
-                ),
+            return self._router.repeater_device_info(
+                self._mac, self._name, device.get("model") or "F-RP01A", device.get("vendor_name")
             )
 
         if not self._create_lan_devices:

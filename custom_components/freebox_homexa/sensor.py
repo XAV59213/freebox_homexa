@@ -329,12 +329,8 @@ class FreeboxWifiSignalSensor(SensorEntity):
         if is_freebox_repeater(device, self._router.mac):
             self._attr_has_entity_name = True
             self._attr_name = "Signal Wi-Fi"
-            self._attr_device_info = DeviceInfo(
-                identifiers={(DOMAIN, f"repeater_{self._mac}")},
-                connections={(CONNECTION_NETWORK_MAC, self._mac)},
-                manufacturer=device.get("vendor_name") or "Freebox SAS",
-                name=name,
-                via_device_id=self._router.parent_for(f"repeater_{self._mac}", name, GROUP_SERVER),
+            self._attr_device_info = self._router.repeater_device_info(
+                self._mac, name, device.get("model"), device.get("vendor_name")
             )
             return
 

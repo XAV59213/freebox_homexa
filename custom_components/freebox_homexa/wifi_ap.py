@@ -30,11 +30,64 @@ def is_freebox_repeater(device: dict[str, Any], router_mac: str) -> bool:
     return False
 
 
+def display_mac(norm: str) -> str:
+    """AABBCCDDEEFF -> AA:BB:CC:DD:EE:FF."""
+    return ":".join(norm[i : i + 2] for i in range(0, len(norm), 2)) if len(norm) == 12 else norm
+
+
+def _repeater_distance(a: str, b: str) -> int | None:
+    """Distance entre deux MAC d'un même répéteur physique, None si sans rapport.
+
+    Un répéteur Free expose plusieurs MAC (Ethernet, radios 2,4 / 5 GHz, backhaul,
+    BSSID « locally administered ») : mêmes 3 derniers octets, ou mêmes octets 2 à 5
+    avec un dernier octet proche.
+    """
+    if len(a) != 12 or len(b) != 12:
+        return 0 if a == b else None
+    if a == b or a[6:] == b[6:]:
+        return 0
+    if a[2:10] == b[2:10]:
+        diff = abs(int(a[10:], 16) - int(b[10:], 16))
+        if diff < 16:
+            return diff
+    return None
+
+
+def cluster_repeater_macs(macs: list[str], anchors: list[str] | None = None) -> dict[str, str]:
+    """MAC normalisée -> MAC canonique (affichage) du répéteur physique.
+
+    `anchors` : MAC principales de l'API /repeater/ (une par répéteur) ; à défaut,
+    la plus petite MAC de chaque grappe sert d'ancre (stable d'un démarrage à l'autre).
+    """
+    result: dict[str, str] = {}
+    anchor_norms: list[str] = []
+    for anchor in anchors or []:
+        norm = normalize_mac(anchor)
+        if norm and norm not in anchor_norms:
+            anchor_norms.append(norm)
+            result[norm] = display_mac(norm)
+    for norm in sorted({normalize_mac(m) for m in macs if m}):
+        if norm in result:
+            continue
+        best: tuple[int, str] | None = None
+        for anchor in anchor_norms:
+            dist = _repeater_distance(norm, anchor)
+            if dist is not None and (best is None or dist < best[0]):
+                best = (dist, anchor)
+        if best is None:
+            anchor_norms.append(norm)
+            result[norm] = display_mac(norm)
+        else:
+            result[norm] = display_mac(best[1])
+    return result
+
+
 def parent_identifier(access_point: dict[str, Any], router_mac: str) -> str:
     """HA device identifier for the AP that owns this client."""
     if access_point.get("kind") == "gateway":
         return router_mac
-    return f"repeater_{access_point.get('mac') or access_point.get('id')}"
+    mac = access_point.get("mac") or access_point.get("id")
+    return f"repeater_{mac}"
 
 
 def _client_summary(device: dict[str, Any]) -> dict[str, Any]:
@@ -110,6 +163,7 @@ def build_wifi_aps(
     router_model: str,
     devices: dict[str, dict[str, Any]],
     radio_status: list[dict[str, Any]] | None = None,
+    api_repeaters: list[dict[str, Any]] | None = None,
 ) -> tuple[dict[str, dict[str, Any]], dict[str, dict[str, Any]]]:
     """Group Wi-Fi clients by gateway / repeater access point."""
     radio_status = radio_status or []
@@ -146,68 +200,61 @@ def build_wifi_aps(
         }
     }
 
+    # Une entrée par répéteur PHYSIQUE : toutes ses MAC (hôtes LAN, BSSID) regroupées.
+    api_repeaters = [r for r in api_repeaters or [] if isinstance(r, dict)]
+    api_by_norm = {normalize_mac(r.get("main_mac")): r for r in api_repeaters if r.get("main_mac")}
+    hosts = {
+        normalize_mac(mac): device
+        for mac, device in devices.items()
+        if is_freebox_repeater(device, router_mac)
+    }
+    aliases = cluster_repeater_macs(
+        [*hosts, *repeater_clients], [r.get("main_mac") for r in api_repeaters]
+    )
+    canon_macs: dict[str, list[str]] = {}
+    for norm, canon in aliases.items():
+        canon_macs.setdefault(canon, []).append(display_mac(norm))
+
     repeaters: dict[str, dict[str, Any]] = {}
-    matched: set[str] = set()
-    for mac, device in devices.items():
-        if not is_freebox_repeater(device, router_mac):
+    for canon, macs in canon_macs.items():
+        norms = [normalize_mac(m) for m in macs]
+        canon_norm = normalize_mac(canon)
+        member_hosts = [hosts[n] for n in sorted(norms, key=lambda n: (n != canon_norm, n)) if n in hosts]
+        api = api_by_norm.get(canon_norm) or {}
+        if not member_hosts and not api and not any(n in repeater_clients for n in norms):
             continue
-        norm = normalize_mac(mac)
-        clients = list(repeater_clients.get(norm, []))
-        if not clients:
-            for other_mac, grouped in repeater_clients.items():
-                if other_mac.endswith(norm[-6:]) or norm.endswith(other_mac[-6:]):
-                    clients = list(grouped)
-                    matched.add(other_mac)
-                    break
-        else:
-            matched.add(norm)
-        name = (device.get("primary_name") or "").strip() or f"Répéteur Wi-Fi {mac[-5:]}"
-        payload = dict(device)
+        clients = [c for n in norms for c in repeater_clients.get(n, [])]
+        host = member_hosts[0] if member_hosts else {}
+        name = (
+            (api.get("name") or "").strip()
+            or (host.get("primary_name") or "").strip()
+            or f"Répéteur Wi-Fi {canon[-5:]}"
+        )
+        active = any(h.get("active") for h in member_hosts) or bool(clients) or (
+            api.get("status") in ("running", "ok", "active")
+        )
+        payload = dict(host)
         payload.update(
             {
-                "id": mac,
+                "id": canon,
                 "kind": "repeater",
                 "name": name,
-                "mac": mac,
-                "model": device.get("model") or REPEATER_MODEL,
-                "vendor_name": device.get("vendor_name") or "Freebox SAS",
-                "online": bool(device.get("active")),
-                "state": "active" if device.get("active") else "offline",
+                "mac": canon,
+                "macs": sorted(macs),
+                "l2ident": {"id": canon},
+                "serial": api.get("sn"),
+                "model": api.get("model") or host.get("model") or REPEATER_MODEL,
+                "vendor_name": host.get("vendor_name") or "Freebox SAS",
+                "active": active,
+                "online": active,
+                "state": "active" if active else "offline",
                 "client_count": len(clients),
                 "clients": clients,
                 "client_names": [item["name"] for item in clients],
             }
         )
-        repeaters[mac] = payload
-        wifi_aps[mac] = payload
-
-    for ap_mac, clients in repeater_clients.items():
-        if ap_mac in matched:
-            continue
-        if any(normalize_mac(key) == ap_mac for key in wifi_aps):
-            continue
-        display_mac = (
-            ":".join(ap_mac[i : i + 2] for i in range(0, len(ap_mac), 2))
-            if len(ap_mac) == 12
-            else ap_mac
-        )
-        payload = {
-            "id": display_mac,
-            "kind": "repeater",
-            "name": f"Répéteur Wi-Fi {display_mac[-5:]}",
-            "mac": display_mac,
-            "l2ident": {"id": display_mac},
-            "model": REPEATER_MODEL,
-            "vendor_name": "Freebox SAS",
-            "active": True,
-            "online": True,
-            "state": "active",
-            "client_count": len(clients),
-            "clients": clients,
-            "client_names": [item["name"] for item in clients],
-        }
-        repeaters[display_mac] = payload
-        wifi_aps[display_mac] = payload
+        repeaters[canon] = payload
+        wifi_aps[canon] = payload
 
     annotate_wifi_parents(devices, wifi_aps, router_mac)
     return wifi_aps, repeaters

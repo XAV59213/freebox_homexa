@@ -487,3 +487,101 @@ def suggested_area(name: str | None) -> str | None:
         if word and not word.isdigit() and len(word) > 1 and word.lower() not in _AREA_STOPWORDS:
             return word[:1].upper() + word[1:].lower()
     return None
+
+
+# --- Répéteurs : un appareil par répéteur physique ---------------------------
+
+
+def _norm_mac(value: str | None) -> str:
+    return (value or "").upper().replace(":", "").replace("-", "")
+
+
+def async_merge_repeater_devices(
+    hass: HomeAssistant,
+    entry: ConfigEntry,
+    router_mac: str,
+    repeaters: dict[str, dict[str, Any]],
+) -> int:
+    """Fusionne les appareils en double d'un même répéteur physique.
+
+    Pour chaque répéteur (MAC canonique + toutes ses MAC), les appareils de cette
+    entrée portant `repeater_<une de ses MAC>` ou une de ses MAC en connexion sont
+    réunis : entités et enfants déplacés vers l'appareil conservé (entity_id
+    inchangés), puis les doublons vidés sont retirés. Les entités par point d'accès
+    des anciennes MAC (« En ligne », clients Wi-Fi), devenues doublons, sont retirées.
+    Appelé avant l'ajout des entités, pour éviter les collisions d'identifiants.
+    """
+    from homeassistant.helpers import entity_registry as er
+
+    registry = dr.async_get(hass)
+    entities = er.async_get(hass)
+    router_norm = _norm_mac(router_mac)
+    merged = 0
+    devices = [
+        d
+        for d in dr.async_entries_for_config_entry(registry, entry.entry_id)
+        if (DOMAIN, router_mac) not in d.identifiers
+    ]
+    for canon, payload in repeaters.items():
+        norms = {_norm_mac(m) for m in payload.get("macs") or [canon]} - {router_norm}
+        canon_ident = (DOMAIN, f"repeater_{canon}")
+
+        def _belongs(device: dr.DeviceEntry) -> bool:
+            for domain, ident in device.identifiers:
+                if domain == DOMAIN and ident.startswith("repeater_") and _norm_mac(ident[9:]) in norms:
+                    return True
+            return any(
+                c[0] == dr.CONNECTION_NETWORK_MAC and _norm_mac(c[1]) in norms
+                for c in device.connections
+            )
+
+        group = [d for d in devices if _belongs(d)]
+        # Entités par AP des anciennes MAC (une seule par répéteur désormais).
+        for alias in payload.get("macs") or []:
+            if _norm_mac(alias) == _norm_mac(canon):
+                continue
+            for domain, uid in (
+                ("binary_sensor", f"{router_mac}_repeater_{alias}"),
+                ("sensor", f"{router_mac}_wifi_clients_{alias}"),
+                ("sensor", f"{router_mac}_wifi_client_list_{alias}"),
+            ):
+                entity_id = entities.async_get_entity_id(domain, DOMAIN, uid)
+                if entity_id:
+                    entities.async_remove(entity_id)
+        if not group:
+            continue
+        counts = {
+            d.id: len(er.async_entries_for_device(entities, d.id, include_disabled_entities=True))
+            for d in group
+        }
+        keeper = next((d for d in group if canon_ident in d.identifiers), None) or max(
+            group, key=lambda d: counts[d.id]
+        )
+        area_id = keeper.area_id
+        name_by_user = keeper.name_by_user
+        for dup in group:
+            if dup.id == keeper.id:
+                continue
+            for ent in er.async_entries_for_device(entities, dup.id, include_disabled_entities=True):
+                entities.async_update_entity(ent.entity_id, device_id=keeper.id)
+            for child in list(registry.devices.values()):
+                if child.via_device_id == dup.id:
+                    registry.async_update_device(child.id, via_device_id=keeper.id)
+            area_id = area_id or dup.area_id
+            name_by_user = name_by_user or dup.name_by_user
+            if dup.config_entries == {entry.entry_id}:
+                registry.async_remove_device(dup.id)
+            else:
+                registry.async_update_device(dup.id, remove_config_entry_id=entry.entry_id)
+            devices = [d for d in devices if d.id != dup.id]
+            merged += 1
+        try:
+            registry.async_update_device(
+                keeper.id,
+                new_identifiers={canon_ident},
+                area_id=area_id,
+                name_by_user=name_by_user,
+            )
+        except Exception:  # noqa: BLE001 — collision éventuelle : on garde l'existant
+            pass
+    return merged

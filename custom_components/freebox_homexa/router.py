@@ -238,6 +238,9 @@ class FreeboxRouter:
         self.supports_hosts = True
         self.devices: dict[str, dict[str, Any]] = {}
         self.repeaters: dict[str, dict[str, Any]] = {}
+        # MAC normalisée -> MAC canonique du répéteur physique
+        self.repeater_aliases: dict[str, str] = {}
+        self.api_repeaters: list[dict[str, Any]] = []
         self.wifi_aps: dict[str, dict[str, Any]] = {}
         self.wifi_radio_status: list[dict[str, Any]] = []
         self.disks: dict[int, dict[str, Any]] = {}
@@ -252,6 +255,44 @@ class FreeboxRouter:
 
         _LOGGER.debug(f"Routeur Freebox {self.name} initialisé")
 
+    async def _fetch_api_repeaters(self) -> None:
+        """Liste /repeater/ (une entrée par répéteur physique : main_mac, sn, nom)."""
+        try:
+            data = await self._api.wifi._access.get("repeater/")
+        except Exception as err:  # noqa: BLE001 — API absente / droit manquant
+            _LOGGER.debug("API répéteurs indisponible : %s", err)
+            return
+        if isinstance(data, list):
+            self.api_repeaters = [r for r in data if isinstance(r, dict)]
+
+    def repeater_canonical_mac(self, mac: str | None) -> str:
+        """MAC canonique du répéteur physique auquel appartient `mac`."""
+        from .wifi_ap import normalize_mac
+
+        return self.repeater_aliases.get(normalize_mac(mac), mac or "")
+
+    def repeater_device_info(
+        self, mac: str | None, name: str, model: str | None = None, manufacturer: str | None = None
+    ) -> DeviceInfo:
+        """DeviceInfo unique d'un répéteur physique (identifiant + toutes ses MAC)."""
+        canon = self.repeater_canonical_mac(mac)
+        payload = self.repeaters.get(canon) or {}
+        macs = payload.get("macs") or [canon]
+        name = payload.get("name") or name
+        info: dict[str, Any] = {
+            "identifiers": {(DOMAIN, f"repeater_{canon}")},
+            "connections": {(CONNECTION_NETWORK_MAC, m.lower()) for m in macs},
+            "manufacturer": manufacturer or payload.get("vendor_name") or "Freebox SAS",
+            "model": payload.get("model") or model,
+            "name": name,
+        }
+        if payload.get("serial"):
+            info["serial_number"] = payload["serial"]
+        parent_id = self.parent_for(f"repeater_{canon}", name, "server")
+        if parent_id:
+            info["via_device_id"] = parent_id
+        return DeviceInfo(**info)
+
     def _refresh_repeaters(self) -> None:
         """Build gateway + repeater maps and attach Wi-Fi clients."""
         self.wifi_aps, self.repeaters = build_wifi_aps(
@@ -260,7 +301,15 @@ class FreeboxRouter:
             router_model=self.model,
             devices=self.devices,
             radio_status=self.wifi_radio_status,
+            api_repeaters=self.api_repeaters,
         )
+        from .wifi_ap import normalize_mac
+
+        self.repeater_aliases = {
+            normalize_mac(alias): canon
+            for canon, payload in self.repeaters.items()
+            for alias in payload.get("macs") or [canon]
+        }
         if self.repeaters:
             _LOGGER.info("Répéteurs Wi-Fi détectés : %s", list(self.repeaters.keys()))
 
@@ -342,6 +391,7 @@ class FreeboxRouter:
             self.devices[device_mac] = fbx_device
 
         await self._enrich_wifi_stations()
+        await self._fetch_api_repeaters()
         self._refresh_repeaters()
         async_dispatcher_send(self.hass, self.signal_device_update)
         if new_device:

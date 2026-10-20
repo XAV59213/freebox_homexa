@@ -27,8 +27,9 @@ def _ap_device_info(router: FreeboxRouter, access_point: dict[str, Any]) -> Devi
         "manufacturer": access_point.get("vendor_name") or "Freebox SAS",
         "model": access_point.get("model") or REPEATER_MODEL,
         "name": access_point.get("name") or f"Répéteur Wi-Fi {str(mac)[-5:]}",
-        "via_device": (DOMAIN, router.mac),
     }
+    if router.device_id:
+        device_info["via_device_id"] = router.device_id
     return DeviceInfo(**device_info)
 
 

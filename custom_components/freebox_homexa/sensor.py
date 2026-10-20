@@ -333,7 +333,7 @@ class FreeboxWifiSignalSensor(SensorEntity):
                 connections={(CONNECTION_NETWORK_MAC, self._mac)},
                 manufacturer=device.get("vendor_name") or "Freebox SAS",
                 name=name,
-                via_device=(DOMAIN, self._router.mac),
+                via_device_id=self._router.device_id,
             )
             return
 

@@ -107,7 +107,7 @@ class FreeboxDevice(ScannerEntity):
                 manufacturer=device.get("vendor_name") or "Freebox SAS",
                 model=device.get("model") or "F-RP01A",
                 name=self._name,
-                via_device=(DOMAIN, self._router.mac),
+                via_device_id=self._router.device_id,
             )
 
         if not self._create_lan_devices:
@@ -119,7 +119,7 @@ class FreeboxDevice(ScannerEntity):
             connections={(CONNECTION_NETWORK_MAC, self._mac)},
             manufacturer=self._manufacturer,
             name=self._name,
-            via_device=(DOMAIN, identifier),
+            via_device_id=self._router.via_device_id_for(identifier),
         )
 
     @callback

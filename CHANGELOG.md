@@ -1,6 +1,6 @@
 # Changelog
 
-## Non publié
+## 28.8.43
 - Appareils : nouvelle organisation en **4 services de premier niveau** : « Freebox Server », « Freebox Player », « Freebox Maison connectée » (entités du module d'alarme + nœuds Freebox Home, caméras Home comprises) et « TNT » (Guide TV + Programme TNT FR)
 - Correction des doublons : les parents virtuels portant le même nom que de vrais appareils (« Freebox Player » dans « Freebox Player », « Guide TV Freebox » à côté de « Programme TNT FR », « Journal d'appels »…) et les anciens groupes restés en place sont supprimés ; les clients réseau, répéteurs, disques et caméras IP sont rattachés directement au Freebox Server ; les entités d'appels reviennent sur le Freebox Server ; le Guide TV rejoint l'appareil TNT
 - Nettoyage différé (~2 min) plus sûr : un ancien groupe n'est retiré que s'il n'a plus ni entité ni appareil enfant ; Players et TNT sont d'abord détachés de leurs anciens groupes ; identifiants d'entités inchangés

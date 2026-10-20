@@ -5,6 +5,11 @@ DOMAIN = "programme_tnt_fr"
 XMLTV_URL = "https://xmltvfr.fr/xmltv/xmltv_fr.xml"
 CONF_CHANNELS = "channels"
 CONF_REMINDER_PROFILES = "reminder_profiles"
+# Champs d'un profil de rappel (adapted from cyclope205/programme-tnt-fr, MIT)
+CONF_NOTIFY_TARGET = "notify_target"
+CONF_MEDIA_PLAYER_TARGETS = "media_player_targets"
+CONF_TTS_ENGINE = "tts_engine"
+CONF_ANNOUNCE_VOLUME = "announce_volume"
 UPDATE_INTERVAL_MINUTES = 5
 FETCH_MIN_INTERVAL_MINUTES = 60
 PRIME_TIME_START = time(21, 15)

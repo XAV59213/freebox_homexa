@@ -56,7 +56,8 @@
       "init": {
         "menu_options": {
           "general": "Paramètres généraux",
-          "tnt": "Guide TNT"
+          "tnt": "Guide TNT",
+          "profiles": "Profils de rappel"
         },
         "title": "Options Freebox Homexa"
       },
@@ -86,10 +87,31 @@
           "tnt_channels_belgique": "Chaînes belges (RTBF)",
           "tnt_tmdb_api_key": "Clé API TMDB personnelle (facultatif)"
         }
+      },
+      "profiles": {
+        "title": "Profils de rappel",
+        "description": "Profils configurés : {profiles}. Un profil regroupe le nom d'une personne et ses propres appareils à notifier.",
+        "data": {
+          "action": "Action"
+        }
+      },
+      "add_profile": {
+        "title": "Profil de rappel",
+        "description": "Donnez un nom au profil (ex. Fred) et choisissez ses appareils.",
+        "data": {
+          "name": "Nom du profil",
+          "notify_target": "Appareil à notifier (facultatif)",
+          "media_player_targets": "Enceintes/TV pour l'annonce vocale (facultatif)",
+          "tts_engine": "Moteur de synthèse vocale (facultatif)",
+          "announce_volume": "Volume de l'annonce (facultatif)"
+        }
       }
     },
     "error": {
-      "no_channels": "Sélectionnez au moins une chaîne."
+      "no_channels": "Sélectionnez au moins une chaîne.",
+      "no_name": "Indiquez un nom pour ce profil.",
+      "duplicate_name": "Un profil porte déjà ce nom.",
+      "device_conflict": "Un même appareil ne peut pas être à la fois cible de notification et enceinte vocale (il serait annoncé deux fois)."
     }
   },
   "services": {
@@ -108,6 +130,80 @@
         "code": {
           "name": "Code de la commande",
           "description": "Le code de la commande à envoyer (ex: power, play, pause)."
+        }
+      }
+    },
+    "schedule_reminder": {
+      "name": "Programmer un rappel TNT",
+      "description": "Programme un rappel (notification et/ou annonce vocale) avant le début d'un programme.",
+      "fields": {
+        "channel_name": {
+          "name": "Nom de la chaîne",
+          "description": "Nom affiché de la chaîne."
+        },
+        "program_title": {
+          "name": "Titre du programme",
+          "description": "Titre du programme."
+        },
+        "start_time": {
+          "name": "Heure de début",
+          "description": "Heure de début du programme (ISO 8601)."
+        },
+        "minutes_before": {
+          "name": "Minutes avant",
+          "description": "Délai avant le début (5, 10 ou 15 min)."
+        },
+        "profile_name": {
+          "name": "Nom du profil",
+          "description": "Nom du profil de rappel (facultatif s'il n'y en a qu'un)."
+        }
+      }
+    },
+    "cancel_reminder": {
+      "name": "Annuler un rappel TNT",
+      "description": "Annule un rappel programmé précédemment.",
+      "fields": {
+        "channel_name": {
+          "name": "Nom de la chaîne",
+          "description": "Nom affiché de la chaîne."
+        },
+        "program_title": {
+          "name": "Titre du programme",
+          "description": "Titre du programme."
+        },
+        "start_time": {
+          "name": "Heure de début",
+          "description": "Heure de début du programme (ISO 8601)."
+        },
+        "minutes_before": {
+          "name": "Minutes avant",
+          "description": "Délai avant le début (5, 10 ou 15 min)."
+        },
+        "profile_name": {
+          "name": "Nom du profil",
+          "description": "Nom du profil de rappel (facultatif s'il n'y en a qu'un)."
+        }
+      }
+    },
+    "get_reminder_status": {
+      "name": "État des rappels TNT",
+      "description": "Renvoie les délais (minutes) pour lesquels un rappel est programmé sur ce programme.",
+      "fields": {
+        "channel_name": {
+          "name": "Nom de la chaîne",
+          "description": "Nom affiché de la chaîne."
+        },
+        "program_title": {
+          "name": "Titre du programme",
+          "description": "Titre du programme."
+        },
+        "start_time": {
+          "name": "Heure de début",
+          "description": "Heure de début du programme (ISO 8601)."
+        },
+        "profile_name": {
+          "name": "Nom du profil",
+          "description": "Nom du profil de rappel (facultatif s'il n'y en a qu'un)."
         }
       }
     }

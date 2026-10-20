@@ -30,3 +30,127 @@ play_channel:
     channel:
       description: Nom (France 2) ou numéro (2)
       example: "France 2"
+
+# Rappels du guide TNT (adapted from cyclope205/programme-tnt-fr v3.0.8, MIT)
+schedule_reminder:
+  name: Schedule reminder
+  description: Programme un rappel avant le debut d'un programme (notification et/ou annonce vocale).
+  fields:
+    channel_name:
+      name: Channel name
+      description: Nom affiche de la chaine.
+      required: true
+      example: "TF1"
+      selector:
+        text:
+    program_title:
+      name: Program title
+      description: Titre du programme.
+      required: true
+      example: "Le 20h"
+      selector:
+        text:
+    start_time:
+      name: Start time
+      description: Heure de debut du programme (ISO 8601).
+      required: true
+      example: "2026-09-01T20:00:00+02:00"
+      selector:
+        text:
+    minutes_before:
+      name: Minutes before
+      description: Nombre de minutes avant le debut auquel envoyer le rappel (5, 10 ou 15).
+      required: true
+      example: 10
+      selector:
+        number:
+          min: 5
+          max: 15
+          step: 5
+          unit_of_measurement: min
+          mode: box
+    profile_name:
+      name: Profile name
+      description: Nom du profil de rappel (personne/appareils) configure dans Freebox Homexa → Configurer → Profils de rappel. Facultatif s'il n'existe qu'un seul profil.
+      required: false
+      example: "Fred"
+      selector:
+        text:
+
+cancel_reminder:
+  name: Cancel reminder
+  description: Annule un rappel precedemment programme.
+  fields:
+    channel_name:
+      name: Channel name
+      description: Nom affiche de la chaine.
+      required: true
+      example: "TF1"
+      selector:
+        text:
+    program_title:
+      name: Program title
+      description: Titre du programme.
+      required: true
+      example: "Le 20h"
+      selector:
+        text:
+    start_time:
+      name: Start time
+      description: Heure de debut du programme (ISO 8601).
+      required: true
+      example: "2026-09-01T20:00:00+02:00"
+      selector:
+        text:
+    minutes_before:
+      name: Minutes before
+      description: Delai (en minutes) du rappel a annuler (5, 10 ou 15).
+      required: true
+      example: 10
+      selector:
+        number:
+          min: 5
+          max: 15
+          step: 5
+          unit_of_measurement: min
+          mode: box
+    profile_name:
+      name: Profile name
+      description: Nom du profil de rappel (personne/appareils) concerne. Doit correspondre a celui utilise pour programmer le rappel.
+      required: false
+      example: "Fred"
+      selector:
+        text:
+
+get_reminder_status:
+  name: Get reminder status
+  description: Renvoie la liste des delais (en minutes) pour lesquels un rappel est actuellement programme sur ce programme.
+  fields:
+    channel_name:
+      name: Channel name
+      description: Nom affiche de la chaine.
+      required: true
+      example: "TF1"
+      selector:
+        text:
+    program_title:
+      name: Program title
+      description: Titre du programme.
+      required: true
+      example: "Le 20h"
+      selector:
+        text:
+    start_time:
+      name: Start time
+      description: Heure de debut du programme (ISO 8601).
+      required: true
+      example: "2026-09-01T20:00:00+02:00"
+      selector:
+        text:
+    profile_name:
+      name: Profile name
+      description: Nom du profil de rappel (personne/appareils) concerne. Doit correspondre a celui utilise pour programmer le rappel.
+      required: false
+      example: "Fred"
+      selector:
+        text:

@@ -29,7 +29,9 @@ from .tnt_setup import (
     TNT_COORDINATORS_KEY,
     async_setup_bundled_tnt,
     async_unload_bundled_tnt,
+    external_tnt_active,
 )
+from .tnt_reminders import async_setup_reminders, async_unload_reminders
 
 SCAN_INTERVAL = timedelta(seconds=40)
 STORAGE_VERSION = 1
@@ -142,6 +144,13 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         await async_setup_bundled_tnt(hass, entry)
     except Exception:
         _LOGGER.exception("Guide TNT embarqué indisponible")
+    if external_tnt_active(hass):
+        _LOGGER.info("Programme TNT FR séparé actif : services de rappel Homexa non enregistrés")
+    else:
+        try:
+            await async_setup_reminders(hass)
+        except Exception:  # noqa: BLE001
+            _LOGGER.exception("Rappels TNT indisponibles (le reste de l'intégration n'est pas affecté)")
 
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
 
@@ -211,6 +220,7 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         for service in (SERVICE_REBOOT, SERVICE_RELOAD, SERVICE_REMOTE):
             if hass.services.has_service(DOMAIN, service):
                 hass.services.async_remove(DOMAIN, service)
+        async_unload_reminders(hass)
     return True
 
 

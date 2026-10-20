@@ -31,7 +31,7 @@ SCAN_INTERVAL = timedelta(seconds=40)
 STORAGE_VERSION = 1
 STORAGE_KEY = f"{DOMAIN}_config"
 PLAYER_PATH_TEMPLATE = "http://{host}/pub/remote_control?code={remote_code}&key={key}"
-_RESERVED_DATA_KEYS = {"config", "store", "tnt_coordinator", "_card_registered"}
+_RESERVED_DATA_KEYS = {"config", "store", "tnt_coordinator", "tnt", "_card_registered"}
 
 CONFIG_SCHEMA = vol.Schema(
     {

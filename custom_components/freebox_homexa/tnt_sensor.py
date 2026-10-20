@@ -1,4 +1,4 @@
-"""Capteurs TNT : même présentation que cyclope205/programme-tnt-fr."""
+"""Capteurs TNT, adapted from cyclope205/programme-tnt-fr (MIT)."""
 from __future__ import annotations
 
 from homeassistant.components.sensor import SensorEntity
@@ -6,7 +6,7 @@ from homeassistant.helpers.device_registry import DeviceEntryType, DeviceInfo
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import DOMAIN
-from .tnt_const import TNT_CHANNELS
+from .tnt_const import ALL_CHANNELS
 from .tnt_coordinator import ProgrammeTntFrCoordinator
 
 TNT_DEVICE_INFO = DeviceInfo(
@@ -35,7 +35,7 @@ class HomexaTntSensor(CoordinatorEntity[ProgrammeTntFrCoordinator], SensorEntity
         super().__init__(coordinator)
         self._channel_id = channel_id
         self._attr_unique_id = f"{unique_prefix}_tnt_{channel_id}"
-        self._attr_name = TNT_CHANNELS.get(channel_id, channel_id)
+        self._attr_name = ALL_CHANNELS.get(channel_id, channel_id)
 
     @property
     def _data(self) -> dict:

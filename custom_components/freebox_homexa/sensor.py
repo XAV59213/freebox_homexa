@@ -19,6 +19,7 @@ from homeassistant.const import (
 )
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.device_registry import CONNECTION_NETWORK_MAC, DeviceInfo
+from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.dispatcher import async_dispatcher_connect
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.util import dt as dt_util
@@ -34,7 +35,8 @@ from .const import (
 )
 from .entity import FreeboxHomeEntity
 from .router import FreeboxRouter, is_freebox_repeater
-from .tnt_const import DEFAULT_CHANNELS
+from .tnt_const import selected_channels
+from .tnt_setup import TNT_COORDINATORS_KEY
 from .tnt_sensor import HomexaTntSensor
 from .wifi_ap_sensors import async_setup_wifi_ap_sensors
 
@@ -94,6 +96,24 @@ def _is_wifi_client(device: dict[str, Any]) -> bool:
     return "wifi_signal_dbm" in wifi or wifi.get("connectivity") == "wifi"
 
 
+@callback
+def _async_remove_unselected_tnt_entities(
+    hass: HomeAssistant, entry: ConfigEntry, unique_prefix: str, channels: list[str]
+) -> None:
+    """Retire du registre les capteurs TNT des chaînes décochées dans les options."""
+    registry = er.async_get(hass)
+    prefix = f"{unique_prefix}_tnt_"
+    wanted = {f"{prefix}{channel_id}" for channel_id in channels}
+    for reg_entry in er.async_entries_for_config_entry(registry, entry.entry_id):
+        if (
+            reg_entry.domain == "sensor"
+            and reg_entry.unique_id.startswith(prefix)
+            and reg_entry.unique_id not in wanted
+        ):
+            _LOGGER.debug("Capteur TNT retiré (chaîne décochée) : %s", reg_entry.entity_id)
+            registry.async_remove(reg_entry.entity_id)
+
+
 async def async_setup_entry(
     hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback
 ) -> None:
@@ -135,12 +155,13 @@ async def async_setup_entry(
             ):
                 entities.append(FreeboxBatterySensor(hass, router, node, endpoint))
 
-    coordinator = hass.data[DOMAIN].get("tnt_coordinator")
+    coordinator = hass.data[DOMAIN].get(TNT_COORDINATORS_KEY, {}).get(entry.entry_id)
     if coordinator is not None:
-        channels = list(coordinator.data or DEFAULT_CHANNELS)
+        channels = selected_channels(entry.options)
         entities.extend(
             HomexaTntSensor(coordinator, channel_id, router.mac) for channel_id in channels
         )
+        _async_remove_unselected_tnt_entities(hass, entry, router.mac, channels)
 
     if entities:
         async_add_entities(entities, True)

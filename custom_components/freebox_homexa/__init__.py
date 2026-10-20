@@ -25,13 +25,24 @@ from .const import (
 )
 from .frontend import JSModuleRegistration
 from .router import FreeboxRouter, get_api
-from .tnt_setup import async_setup_bundled_tnt
+from .tnt_setup import (
+    TNT_COORDINATORS_KEY,
+    async_setup_bundled_tnt,
+    async_unload_bundled_tnt,
+)
 
 SCAN_INTERVAL = timedelta(seconds=40)
 STORAGE_VERSION = 1
 STORAGE_KEY = f"{DOMAIN}_config"
 PLAYER_PATH_TEMPLATE = "http://{host}/pub/remote_control?code={remote_code}&key={key}"
-_RESERVED_DATA_KEYS = {"config", "store", "tnt_coordinator", "tnt", "_card_registered"}
+_RESERVED_DATA_KEYS = {
+    "config",
+    "store",
+    "tnt_coordinator",
+    "tnt",
+    TNT_COORDINATORS_KEY,
+    "_card_registered",
+}
 
 CONFIG_SCHEMA = vol.Schema(
     {
@@ -128,10 +139,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
     hass.data[DOMAIN][entry.unique_id] = router
     try:
-        hass.data[DOMAIN]["tnt_coordinator"] = await async_setup_bundled_tnt(hass)
+        await async_setup_bundled_tnt(hass, entry)
     except Exception:
         _LOGGER.exception("Guide TNT embarqué indisponible")
-        hass.data[DOMAIN]["tnt_coordinator"] = None
 
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
 
@@ -190,6 +200,7 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     unload_ok = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
     if not unload_ok:
         return False
+    async_unload_bundled_tnt(hass, entry)
     router = hass.data[DOMAIN].pop(entry.unique_id, None)
     if router is not None:
         await router.close()

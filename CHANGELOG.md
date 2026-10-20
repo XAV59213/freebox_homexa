@@ -1,10 +1,11 @@
 # Changelog
 
-## Non publié
+## 28.8.37
 - Appareils : nouveau groupe « Fenêtres » (détecteurs d'ouverture, sortis de « Sécurité »)
 - Clients réseau rangés en sous-groupes sous « Réseau » : Amazon, Téléphones, Ordinateurs, TV & multimédia, Objets connectés, Consoles, Imprimantes, Autres (type d'hôte Freebox, puis fabricant, puis nom d'hôte)
 - Seuls les groupes ayant des membres sont créés ; les groupes vides (y compris Sécurité / Volets / Réseau de la 28.8.36) sont retirés au rechargement
-- Identifiants d'entités inchangés ; appareils re-rattachés au rechargement
+- Identifiants d'entités inchangés ; appareils re-rattachés au rechargement (#62)
+- ⚠️ Pas encore testé dans Home Assistant : merci de signaler tout problème dans les issues
 
 ## 28.8.36
 - Appareils : parents virtuels « Sécurité », « Volets » et « Réseau » par Freebox (rattachés au Freebox Server) pour désencombrer la liste ; identifiants d'entités inchangés

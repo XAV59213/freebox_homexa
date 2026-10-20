@@ -100,7 +100,7 @@ class FreeboxDevice(ScannerEntity):
         if device.get("attrs") is not None:
             return self._router.device_info
 
-        if is_freebox_repeater(device, self._router.mac):
+        if self._router.is_repeater_host(device):
             return self._router.repeater_device_info(
                 self._mac, self._name, device.get("model") or "F-RP01A", device.get("vendor_name")
             )

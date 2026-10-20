@@ -152,7 +152,14 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     await router.update_all()
     # Un appareil par répéteur physique : fusion des doublons avant l'ajout des entités.
     try:
-        merged = async_merge_repeater_devices(hass, entry, router.mac, router.repeaters)
+        merged = async_merge_repeater_devices(
+            hass,
+            entry,
+            router.mac,
+            router.repeaters,
+            (router.wifi_aps.get("gateway") or {}).get("rejected_repeater_macs"),
+            set(router.devices),
+        )
         if merged:
             _LOGGER.info("%s appareil(s) répéteur en double fusionné(s)", merged)
     except Exception:  # noqa: BLE001

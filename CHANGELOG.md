@@ -1,5 +1,12 @@
 # Changelog
 
+## Non publié
+- Correction : la fusion des répéteurs plantait (`AttributeError: 'int' object has no attribute 'startswith'`) sur les appareils dont l'identifiant n'est pas du texte (id entier des nœuds Freebox Home) ; tous les parcours d'identifiants ignorent désormais les valeurs non texte
+- Répéteurs : un hôte n'est retenu comme répéteur que si sa MAC est un OUI Free (ex. `20:66:CF`) ou son jumeau « locally administered » (`22:66:CF`). Les hôtes nommés « Repeteur… » avec une MAC non Free (ex. `AC:E2:D3…`, `C0:F8:53…`) redeviennent des clients réseau ordinaires (entités conservées)
+- Répéteurs : plus aucune fusion sur la seule proximité des MAC (plages consécutives d'un répéteur à l'autre, jumeau 20/22 non fiable : « Garage » était fusionné à tort). Fusion uniquement sur signaux fiables : API `/repeater/`, même `access_point.uid`, IP commune, IPv6 EUI-64. En cas de doute, pas de fusion
+- Les appareils répéteurs absents de lan/browser (débranchés) sont conservés et signalés par un avertissement
+- ⚠️ Pas encore testé dans Home Assistant : merci de signaler tout problème dans les issues
+
 ## 28.8.47
 - Correction : `sw_version` des appareils toujours passé en texte (firmware des nœuds Freebox Home, disques, Freebox Server) ; Home Assistant 2026.12 refusera les nombres
 - Diagnostics (« Télécharger les diagnostics » sur l'intégration) : hôtes LAN répéteurs ou clients de répéteurs bruts, réponse brute ou erreur de l'API `/repeater/`, regroupement calculé par répéteur, et tous les appareils `repeater_*` du registre (identifiants, connexions, modèle, pièce, entités). Les MAC sont conservées ; numéros de série, jetons, mots de passe et clés sont masqués

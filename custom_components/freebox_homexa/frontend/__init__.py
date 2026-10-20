@@ -15,6 +15,7 @@ from homeassistant.core import Event, HomeAssistant, callback
 from homeassistant.helpers.event import async_call_later
 
 from ..const import CARD_FILENAME, STATIC_CARD_PATH, URL_BASE, VERSION
+from ..tnt_const import TNT_CARD_FILENAME
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -71,6 +72,11 @@ class JSModuleRegistration:
             _LOGGER.debug("Vue HTTP de la carte déjà enregistrée")
 
         add_extra_js_url(self.hass, f"{STATIC_CARD_PATH}?v={VERSION}")
+        # Carte « Homexa TNT » : servie depuis ce dossier via le chemin statique
+        # URL_BASE (aucune copie dans www, aucun /local/, aucun CDN). Chargée
+        # avec add_extra_js_url uniquement : aucune ressource Lovelace créée,
+        # et celles des autres intégrations ne sont jamais lues ni modifiées.
+        add_extra_js_url(self.hass, f"{URL_BASE}/{TNT_CARD_FILENAME}?v={VERSION}")
 
         if self.hass.is_running:
             await self._async_register_lovelace_resources()

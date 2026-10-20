@@ -1,0 +1,16 @@
+# Carte « Homexa TNT » (guide TV, Guide TNT de Freebox Homexa)
+# Adaptée de cyclope205/programme-tnt-fr (MIT). Chargée automatiquement par l'intégration.
+type: custom:homexa-tnt-card
+columns: 2
+show_favorites: true
+show_current: true
+show_next: true
+show_prime_time: true
+show_second_part: true
+# favorite_channels:
+#   - TF1.fr
+#   - France2.fr
+# entities:            # facultatif : par défaut tous les capteurs TNT Homexa
+#   - sensor.tf1
+# zap_channel_scripts: # facultatif : channel_id -> script qui change de chaîne sur le Player
+#   TF1.fr: script.player_tf1

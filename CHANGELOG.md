@@ -1,5 +1,8 @@
 # Changelog
 
+## Non publié
+- Carte Lovelace « Homexa TNT » (`custom:homexa-tnt-card`), adaptée de Programme TNT FR (MIT), servie par l'intégration sans CDN ni ressource externe
+
 ## 28.8.34
 - Correction : l'écran d'options « Profils de rappel » n'affiche plus une boîte « Erreur » vide (#59)
 - Appareils : `via_device` (déprécié dans Home Assistant) remplacé par `via_device_id` pour les répéteurs, clients LAN et capteurs RSSI (#59)

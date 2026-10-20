@@ -89,6 +89,19 @@ Vue Lovelace **Alarme / Volet / PIR / Player / RSSI** :
 - [examples/lovelace/homexa-tuiles-natives.yaml](examples/lovelace/homexa-tuiles-natives.yaml) — tuiles natives, sans carte custom
 - Mode d’emploi : [examples/lovelace/README.md](examples/lovelace/README.md)
 
+### Carte « Homexa TNT » (guide TV)
+
+Carte guide TV livrée avec l'intégration, adaptée de [Programme TNT FR](https://github.com/cyclope205/programme-tnt-fr) (MIT) : carrousels « En ce moment / À suivre / 1re et 2e partie de soirée », Guide TV par jour, chaînes favorites, affiches et notes TMDB (si une clé personnelle est configurée) et rappels (profils de rappel Homexa).
+
+```yaml
+type: custom:homexa-tnt-card
+```
+
+- Chargée automatiquement depuis l'intégration (`/freebox_homexa/homexa-tnt-card.js`), sans ressource Lovelace à ajouter, sans CDN.
+- Nom distinct (`homexa-tnt-card`, « Homexa TNT » dans le sélecteur de cartes) : aucune collision avec la carte `programme-tnt-fr-card` si l'intégration séparée est aussi installée.
+- N'affiche que les capteurs TNT de Freebox Homexa ; chaînes à choisir dans Configurer → Guide TNT.
+- Exemple complet : [examples/lovelace/homexa-tnt-card.yaml](examples/lovelace/homexa-tnt-card.yaml)
+
 HACS → Frontend → [Mushroom](https://github.com/piitaya/lovelace-mushroom), puis colle le YAML dans l’éditeur brut du tableau de bord. Remplace les `entity_id` par tes entités Homexa.
 
 ---

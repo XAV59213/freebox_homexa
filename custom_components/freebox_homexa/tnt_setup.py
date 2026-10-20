@@ -11,11 +11,12 @@ from homeassistant.core import HomeAssistant
 
 from .tnt_const import CONF_TMDB_API_KEY, DOMAIN as TNT_DOMAIN, selected_channels
 from .tnt_coordinator import ProgrammeTntFrCoordinator
-from .tnt_ws import async_register_websocket_api
+from .tnt_ws import async_register_homexa_websocket_api, async_register_websocket_api
 
 _LOGGER = logging.getLogger(__name__)
 
 _WS_KEY = "freebox_homexa_tnt_ws"
+_HOMEXA_WS_KEY = "freebox_homexa_tnt_homexa_ws"
 # hass.data[freebox_homexa][TNT_COORDINATORS_KEY][entry_id] -> coordinator
 TNT_COORDINATORS_KEY = "tnt_coordinators"
 
@@ -32,6 +33,10 @@ async def async_setup_bundled_tnt(
     hass: HomeAssistant, entry: ConfigEntry
 ) -> ProgrammeTntFrCoordinator | None:
     """Crée le coordinateur TNT de cette entrée selon les chaînes choisies dans les options."""
+    if not hass.data.get(_HOMEXA_WS_KEY):
+        async_register_homexa_websocket_api(hass)
+        hass.data[_HOMEXA_WS_KEY] = True
+
     if external_tnt_active(hass):
         # L'intégration séparée fournit déjà ses commandes websocket :
         # on ne les ré-enregistre pas, mais Homexa crée quand même ses capteurs.

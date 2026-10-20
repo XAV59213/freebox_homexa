@@ -6,13 +6,14 @@ https://github.com/cyclope205/programme-tnt-fr (v3.0.8).
 ## Ported / adapted files
 
 - `custom_components/freebox_homexa/tnt_const.py` — XMLTV slots, TNT / extra / RTBF channel lists
-- `custom_components/freebox_homexa/tnt_coordinator.py` — XMLTV coordinator (current / prime time / second part)
+- `custom_components/freebox_homexa/tnt_coordinator.py` — XMLTV coordinator (current / next / prime time / second part, day guide)
 - `custom_components/freebox_homexa/tnt_sensor.py` — per-channel sensors
-- `custom_components/freebox_homexa/tnt_ws.py` — websocket commands `programme_tnt_fr/*`
+- `custom_components/freebox_homexa/tnt_ws.py` — websocket commands `programme_tnt_fr/*` and `freebox_homexa/tnt_*`
 - `custom_components/freebox_homexa/tnt_setup.py` — setup of the built-in guide
 - `custom_components/freebox_homexa/config_flow.py` — options steps « Guide TNT » (channel selection, personal TMDB key) and « Profils de rappel » (reminder profiles, notify/media_player conflict check)
 - `custom_components/freebox_homexa/tnt_reminders.py` — persistent reminders and services `schedule_reminder` / `cancel_reminder` / `get_reminder_status`
 - `custom_components/freebox_homexa/services.yaml` — reminder service descriptions
+- `custom_components/freebox_homexa/frontend/homexa-tnt-card.js` — Lovelace card (renamed `homexa-tnt-card`, Homexa websocket commands and services)
 - `custom_components/freebox_homexa/tnt_tmdb.py` — TMDB posters / rating / votes (title cleaning, matching, cache, batching, retry with backoff), personal key only
 
 The author's bundled default TMDB API key is **not** included: TMDB features

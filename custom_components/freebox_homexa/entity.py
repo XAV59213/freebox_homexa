@@ -11,7 +11,7 @@ from homeassistant.helpers.dispatcher import async_dispatcher_connect
 from homeassistant.helpers.entity import Entity
 from freebox_api.exceptions import HttpRequestError
 from .const import CATEGORY_TO_MODEL, DOMAIN, FreeboxHomeCategory
-from .device_groups import home_node_group, home_node_name, suggested_area
+from .device_groups import GROUP_HOME, group_identifier, home_node_group, home_node_name, suggested_area
 from .router import FreeboxRouter
 
 _LOGGER = logging.getLogger(__name__)
@@ -74,6 +74,11 @@ class FreeboxHomeEntity(Entity):
             "name": self._device_name,
             "sw_version": self._firmware,
         }
+        if node.get("category") == FreeboxHomeCategory.ALARM:
+            # Le module d'alarme porte ses entités sur l'appareil de groupe
+            # « Maison connectée et alarme » (plus d'appareil séparé ni de groupe vide).
+            self._attr_device_info = self._alarm_group_device_info(hass, router)
+            return
         area = suggested_area(self._device_name)
         if area:
             device_info["suggested_area"] = area
@@ -81,6 +86,20 @@ class FreeboxHomeEntity(Entity):
         if parent_id:
             device_info["via_device_id"] = parent_id
         self._attr_device_info = DeviceInfo(**device_info)
+
+    def _alarm_group_device_info(self, hass: HomeAssistant, router: FreeboxRouter) -> DeviceInfo:
+        """DeviceInfo du groupe « Maison connectée et alarme » ; retire l'ancien appareil alarme."""
+        router.used_groups.add(GROUP_HOME)
+        router.group_device_id(GROUP_HOME)  # crée le groupe (rattaché au Freebox Server)
+        # L'ancien appareil séparé est retiré par le nettoyage différé, une fois
+        # les entités déplacées (le retirer ici supprimerait leurs entrées du registre).
+        router.merged_node_ids.add(self._id)
+        return DeviceInfo(
+            identifiers={group_identifier(router.mac, GROUP_HOME)},
+            manufacturer=self._manufacturer,
+            model=self._model,
+            sw_version=self._firmware,
+        )
 
     async def set_home_endpoint_value(
         self, command_id: int | None, value: Any | None = None

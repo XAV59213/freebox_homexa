@@ -228,6 +228,8 @@ class FreeboxRouter:
             entry.options.get(CONF_DEVICE_GROUP_OVERRIDES)
         )
         self.used_groups: set[str] = set()
+        # nœuds Home dont les entités vivent sur un appareil de groupe (module d'alarme)
+        self.merged_node_ids: set[Any] = set()
         # clé stable -> (nom, groupe automatique) pour l'écran d'options
         self.grouped_devices: dict[str, tuple[str, str]] = {}
         self._home_update_lock = asyncio.Lock()

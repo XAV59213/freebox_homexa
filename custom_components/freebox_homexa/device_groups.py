@@ -346,6 +346,26 @@ def async_remove_unused_group_devices(
     return removed
 
 
+def async_remove_merged_node_devices(
+    hass: HomeAssistant, entry: ConfigEntry, node_ids: set[Any]
+) -> int:
+    """Retire les anciens appareils de nœuds fusionnés dans un groupe, s'ils n'ont plus d'entités."""
+    from homeassistant.helpers import entity_registry as er
+
+    registry = dr.async_get(hass)
+    entities = er.async_get(hass)
+    removed = 0
+    for node_id in node_ids:
+        device = registry.async_get_device(identifiers={(DOMAIN, node_id)})
+        if device is None or entry.entry_id not in device.config_entries:
+            continue
+        if er.async_entries_for_device(entities, device.id, include_disabled_entities=True):
+            continue
+        registry.async_update_device(device.id, remove_config_entry_id=entry.entry_id)
+        removed += 1
+    return removed
+
+
 def group_choices() -> list[str]:
     """Valeurs proposées dans l'écran « Groupes des appareils »."""
     return [GROUP_AUTO, *ALL_GROUPS]

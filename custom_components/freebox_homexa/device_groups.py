@@ -546,7 +546,7 @@ def async_merge_repeater_devices(
             )
 
         group = [d for d in devices if _belongs(d)]
-        _LOGGER.debug(
+        _LOGGER.info(
             "Répéteur %s : appareils trouvés %s",
             canon,
             [(d.id, d.name, d.model, sorted(i for _, i in d.identifiers)) for d in group],
@@ -572,7 +572,7 @@ def async_merge_repeater_devices(
         keeper = next((d for d in group if canon_ident in d.identifiers), None) or max(
             group, key=lambda d: counts[d.id]
         )
-        _LOGGER.debug("Répéteur %s : appareil conservé %s (%s)", canon, keeper.id, keeper.name)
+        _LOGGER.info("Répéteur %s : appareil conservé %s (%s)", canon, keeper.id, keeper.name)
         area_id = keeper.area_id
         name_by_user = keeper.name_by_user
         for dup in group:
@@ -597,4 +597,11 @@ def async_merge_repeater_devices(
             )
         except Exception:  # noqa: BLE001 — collision éventuelle : on garde l'existant
             pass
+    known = {_norm_mac(m) for p in repeaters.values() for m in p.get("macs") or []}
+    for device in devices:
+        idents = [i for dom, i in device.identifiers if dom == DOMAIN and i.startswith("repeater_")]
+        if idents and not any(_norm_mac(i[9:]) in known for i in idents):
+            _LOGGER.info(
+                "Appareil répéteur non rattaché : %s (%s, modèle %s)", idents, device.name, device.model
+            )
     return merged

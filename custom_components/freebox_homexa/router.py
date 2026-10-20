@@ -261,7 +261,9 @@ class FreeboxRouter:
         try:
             data = await self._api.wifi._access.get("repeater/")
         except Exception as err:  # noqa: BLE001 — API absente / droit manquant
-            _LOGGER.debug("API répéteurs indisponible : %s", err)
+            if not getattr(self, "_repeater_api_logged", False):
+                _LOGGER.info("API /repeater/ indisponible (regroupement via lan/browser) : %s", err)
+                self._repeater_api_logged = True
             return
         if isinstance(data, list):
             self.api_repeaters = [r for r in data if isinstance(r, dict)]
@@ -320,11 +322,17 @@ class FreeboxRouter:
                 for r in self.api_repeaters
             ],
         )
-        for canon, payload in self.repeaters.items():
-            _LOGGER.debug(
-                "Répéteur physique %s (%s, %s) : MAC %s",
-                canon, payload.get("name"), payload.get("model"), payload.get("macs"),
-            )
+        summary = {
+            canon: (payload.get("name"), payload.get("model"), payload.get("macs"), payload.get("grouping"))
+            for canon, payload in self.repeaters.items()
+        }
+        if summary != getattr(self, "_repeater_summary", None):
+            self._repeater_summary = summary
+            for canon, (name, model, macs, grouping) in summary.items():
+                _LOGGER.info(
+                    "Répéteur physique %s (%s, %s) : MAC %s ; regroupement : %s",
+                    canon, name, model, macs, grouping or "aucun (MAC seule)",
+                )
 
     async def _enrich_wifi_stations(self) -> None:
         """Merge /wifi/ap/{id}/stations signal data onto LAN hosts."""

@@ -164,8 +164,6 @@ class FreeboxFlowHandler(ConfigFlow, domain=DOMAIN):
         self._data: dict[str, Any] = {}
         self._options: dict[str, Any] = {}
         self._players: list[dict[str, Any]] = []
-        self._profiles: list[dict] | None = None
-        self._editing_profile: str | None = None
 
     @staticmethod
     @callback
@@ -466,6 +464,9 @@ class FreeboxOptionsFlowHandler(OptionsFlow):
 
     def __init__(self) -> None:
         self._players: list[dict[str, Any]] = []
+        # État des écrans « Profils de rappel » (initialisé à la première ouverture)
+        self._profiles: list[dict] | None = None
+        self._editing_profile: str | None = None
 
     async def _list_players(self) -> list[dict[str, Any]]:
         router = self.hass.data.get(DOMAIN, {}).get(self.config_entry.unique_id)

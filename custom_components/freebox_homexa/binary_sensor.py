@@ -188,18 +188,10 @@ class FreeboxWifiApSensor(BinarySensorEntity):
         else:
             mac = access_point.get("mac") or ap_id
             name = access_point.get("name") or f"Répéteur Wi-Fi {str(mac)[-5:]}"
-            device_info: dict[str, Any] = {
-                "identifiers": {(DOMAIN, f"repeater_{mac}")},
-                "connections": {(CONNECTION_NETWORK_MAC, mac)},
-                "manufacturer": access_point.get("vendor_name") or "Freebox SAS",
-                "model": access_point.get("model") or REPEATER_MODEL,
-                "name": name,
-            }
-            parent_id = router.parent_for(f"repeater_{mac}", name, GROUP_SERVER)
-            if parent_id:
-                device_info["via_device_id"] = parent_id
+            self._attr_device_info = router.repeater_device_info(
+                mac, name, access_point.get("model") or REPEATER_MODEL, access_point.get("vendor_name")
+            )
             self._attr_name = "En ligne"
-            self._attr_device_info = DeviceInfo(**device_info)
             self._attr_unique_id = f"{router.mac}_repeater_{mac}"
             self._attr_icon = "mdi:wifi-sync"
         self._attr_is_on = bool(access_point.get("online"))

@@ -44,6 +44,7 @@ from .tnt_setup import (
     external_tnt_active,
 )
 from .tnt_reminders import async_setup_reminders, async_unload_reminders
+from .registry_compat import as_version
 
 SCAN_INTERVAL = timedelta(seconds=40)
 STORAGE_VERSION = 1
@@ -136,7 +137,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         manufacturer="Freebox SAS",
         name="Freebox Server",
         model=freebox_config["model_info"]["pretty_name"],
-        sw_version=freebox_config["firmware_version"],
+        sw_version=as_version(freebox_config.get("firmware_version")),
     )
 
     router = FreeboxRouter(hass, entry, api, freebox_config)
@@ -156,6 +157,23 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             _LOGGER.info("%s appareil(s) répéteur en double fusionné(s)", merged)
     except Exception:  # noqa: BLE001
         _LOGGER.exception("Fusion des répéteurs en double impossible")
+    try:
+        from .device_groups import repeater_registry_devices
+
+        rep_devices = repeater_registry_devices(hass, entry)
+        if len(rep_devices) > len(router.repeaters):
+            _LOGGER.warning(
+                "Répéteurs : %s appareil(s) dans le registre pour %s répéteur(s) détecté(s) "
+                "(non fusionnés) : %s. Téléchargez les diagnostics Homexa pour analyse.",
+                len(rep_devices),
+                len(router.repeaters),
+                [
+                    (d["name_by_user"] or d["name"], d["model"], d["identifiers"], d["entity_count"])
+                    for d in rep_devices
+                ],
+            )
+    except Exception:  # noqa: BLE001
+        _LOGGER.debug("Résumé des répéteurs impossible", exc_info=True)
     await router.update_home_devices()
 
     async def _poll_home(_now: datetime | None = None) -> None:

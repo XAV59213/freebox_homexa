@@ -13,6 +13,7 @@ from freebox_api.exceptions import HttpRequestError
 from .const import CATEGORY_TO_MODEL, DOMAIN, FreeboxHomeCategory
 from .device_groups import GROUP_HOME, group_identifier, home_node_group, home_node_name, suggested_area
 from .router import FreeboxRouter
+from .registry_compat import as_version
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -72,7 +73,7 @@ class FreeboxHomeEntity(Entity):
             "manufacturer": self._manufacturer,
             "model": self._model,
             "name": self._device_name,
-            "sw_version": self._firmware,
+            "sw_version": as_version(self._firmware),
         }
         if node.get("category") == FreeboxHomeCategory.ALARM:
             # Le module d'alarme porte ses entités sur l'appareil de groupe
@@ -98,7 +99,7 @@ class FreeboxHomeEntity(Entity):
             identifiers={group_identifier(router.mac, GROUP_HOME)},
             manufacturer=self._manufacturer,
             model=self._model,
-            sw_version=self._firmware,
+            sw_version=as_version(self._firmware),
         )
 
     async def set_home_endpoint_value(

@@ -35,7 +35,7 @@ from .const import (
     HOME_COMPATIBLE_CATEGORIES,
     REPEATER_MODEL,
 )
-from .registry_compat import get_device_by_identifier
+from .registry_compat import as_version, get_device_by_identifier
 from .wifi_ap import build_wifi_aps
 
 _LOGGER = logging.getLogger(__name__)
@@ -242,6 +242,8 @@ class FreeboxRouter:
         # MAC normalisée -> MAC canonique du répéteur physique
         self.repeater_aliases: dict[str, str] = {}
         self.api_repeaters: list[dict[str, Any]] = []
+        self.api_repeaters_raw: Any = None
+        self.api_repeaters_error: str | None = None
         self.wifi_aps: dict[str, dict[str, Any]] = {}
         self.wifi_radio_status: list[dict[str, Any]] = []
         self.disks: dict[int, dict[str, Any]] = {}
@@ -260,7 +262,11 @@ class FreeboxRouter:
         """Liste /repeater/ (une entrée par répéteur physique : main_mac, sn, nom)."""
         try:
             data = await self._api.wifi._access.get("repeater/")
+            self.api_repeaters_raw = data
+            self.api_repeaters_error = None
         except Exception as err:  # noqa: BLE001 — API absente / droit manquant
+            self.api_repeaters_raw = None
+            self.api_repeaters_error = f"{type(err).__name__}: {err}"
             if not getattr(self, "_repeater_api_logged", False):
                 _LOGGER.info("API /repeater/ indisponible (regroupement via lan/browser) : %s", err)
                 self._repeater_api_logged = True
@@ -526,7 +532,7 @@ class FreeboxRouter:
             manufacturer="Freebox SAS",
             name=self.name,
             model=self.model,
-            sw_version=self._sw_v,
+            sw_version=as_version(self._sw_v),
         )
 
     def via_device_id_for(self, identifier: str | None = None) -> str | None:

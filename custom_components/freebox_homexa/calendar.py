@@ -13,6 +13,7 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.util import dt as dt_util
 
 from .const import DOMAIN
+from .tnt_sensor import TNT_DEVICE_INFO
 from .router import FreeboxRouter
 from .tv_guide import summarize_guide
 
@@ -87,7 +88,7 @@ class FreeboxTvGuideCalendar(CalendarEntity):
     def __init__(self, router: FreeboxRouter) -> None:
         self._router = router
         self._attr_unique_id = f"{router.mac}_tv_guide"
-        self._attr_device_info = router.tv_guide_device_info
+        self._attr_device_info = TNT_DEVICE_INFO
         self._event: CalendarEvent | None = None
         self._channels: dict[str, dict[str, Any]] = {}
         self._summary: dict[str, Any] = {}

@@ -14,7 +14,7 @@ from homeassistant.helpers.entity import Entity
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from .const import DOMAIN, REPEATER_MODEL
-from .device_groups import GROUP_EQUIPMENT
+from .device_groups import GROUP_SERVER
 from .router import FreeboxRouter
 
 
@@ -29,7 +29,7 @@ def _ap_device_info(router: FreeboxRouter, access_point: dict[str, Any]) -> Devi
         "model": access_point.get("model") or REPEATER_MODEL,
         "name": access_point.get("name") or f"Répéteur Wi-Fi {str(mac)[-5:]}",
     }
-    parent_id = router.parent_for(f"repeater_{mac}", device_info["name"], GROUP_EQUIPMENT)
+    parent_id = router.parent_for(f"repeater_{mac}", device_info["name"], GROUP_SERVER)
     if parent_id:
         device_info["via_device_id"] = parent_id
     return DeviceInfo(**device_info)

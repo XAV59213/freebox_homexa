@@ -73,34 +73,18 @@ Pour 5 s, désactivez l’intégration officielle Freebox : les deux en parallè
 
 ### Organisation des appareils
 
-Pour alléger la liste des appareils, **chaque appareil Homexa** (hors Freebox Server) est rangé sous un appareil parent virtuel, lui-même rattaché au **Freebox Server**. Les groupes suivent les **services des droits d'accès Freebox OS** (Paramètres → Gestion des accès → Applications). Seuls les groupes qui ont des membres existent ; les groupes inutilisés (y compris les anciens groupes par type « Sécurité », « Volets », « Réseau »… d'avant la 28.8.40) sont retirés environ 2 minutes après le chargement.
+Les appareils Homexa sont rangés sous **4 services de premier niveau** :
 
-| Groupe (service Freebox) | Contenu |
+| Service | Contenu |
 |---|---|
-| **Maison connectée et alarme** | nœuds Freebox Home : alarme, télécommandes, détecteurs de mouvement et d'ouverture, volets, ouvrants, RTS / IO, prises… |
-| **Caméras** | caméras Freebox Home et caméras IP du réseau (`ip_camera`, Hikvision, Dahua, Reolink, Foscam, Ezviz, Axis) |
-| **Freebox Player** | Freebox Player (et sa télécommande / ses boutons) |
-| **Contrôle de la VM** | machines virtuelles (choix manuel) |
-| **Téléchargements** | gestionnaire de téléchargements (choix manuel) |
-| **Contrôle parental** | appareils soumis à un profil (choix manuel) |
-| **Journal d'appels** | appareil « Journal d'appels Freebox » : appels manqués, « Marquer les appels comme lus » |
-| **Guide TV et enregistrements** | appareil « Guide TV Freebox » (calendrier), guide « Programme TNT FR » |
-| **Équipements et réglages Freebox** | répéteurs Wi-Fi, disques, et sous-groupes de clients LAN / Wi-Fi (si l'option est activée) : |
-| ↳ Amazon | Echo, Alexa, Fire TV, Kindle, fabricant Amazon |
-| ↳ Téléphones | smartphones, tablettes, téléphones IP (Apple, Samsung, Xiaomi…) |
-| ↳ Ordinateurs | PC, portables (ProBook, EliteBook, ThinkPad…), Mac, NAS ; cartes Wi-Fi Chongqing Fugui (HP), Hon Hai, Liteon, Intel, AzureWave… |
-| ↳ TV & multimédia | TV, Chromecast, Sonos… |
-| ↳ Objets connectés | WLED, Espressif, Tuya, Shelly, Sonoff, Hue, FOSS, aspirateurs… |
-| ↳ Consoles | PlayStation, Xbox, Nintendo, Steam Deck |
-| ↳ Imprimantes | Epson, Canon, Brother, HP… |
-| ↳ Autres (réseau) | clients non reconnus |
-| **Autres** | tout appareil non classé |
+| **Freebox Server** (ex. « Freebox v7 (r1) ») | entités du serveur (débits, températures, Wi-Fi, redémarrage, appels manqués, « Marquer les appels comme lus »…) ; enfants : répéteurs Wi-Fi, disques, clients réseau (si l'option est activée), caméras IP |
+| **Freebox Player** | chaque Player (lecteur, télécommande, boutons d'applis) |
+| **Freebox Maison connectée** | entités du module d'alarme ; enfants : tous les nœuds Freebox Home (détecteurs, fenêtres, volets, ouvrants, RTS / IO, caméras Freebox Home, prises…) |
+| **TNT** | calendrier « Guide TV » et capteurs « Programme TNT FR » |
 
-Les entités propres au Freebox Server (débits, températures, Wi-Fi, redémarrage) restent sur le Freebox Server.
+Les anciens groupes (Sécurité, Volets, Réseau et ses sous-groupes, Caméras, Journal d'appels, Guide TV Freebox, Équipements…) sont retirés environ 2 minutes après le chargement, **uniquement s'ils n'ont plus ni entité ni appareil enfant** ; aucune entité n'est supprimée.
 
-Classement des clients : type d'hôte Freebox (`host_type`) d'abord, puis mots-clés forts du nom (WLED, ProBook…), puis fabricant (`vendor_name`), puis autres mots-clés du nom d'hôte (Amazon est testé en premier, car la Freebox classe souvent les Echo en « multimédia »).
-
-**Forcer un groupe** : Configurer → **Groupes des appareils** liste les appareils Homexa (avec leur groupe automatique entre parenthèses). « Automatique » garde le classement calculé ; tout autre choix est enregistré dans les options (clé stable de l'appareil) et appliqué au rechargement. Les choix enregistrés avec les anciens groupes sont migrés automatiquement (Sécurité / Fenêtres / Volets → Maison connectée et alarme, Multimédia → Freebox Player, Infrastructure / Réseau → Équipements et réglages Freebox).
+**Forcer un service** : Configurer → **Groupes des appareils** liste les appareils Homexa (avec leur service automatique entre parenthèses). Choix : Automatique, Freebox Server, Freebox Maison connectée, Freebox Player, TNT. Les choix enregistrés avec les anciens groupes sont migrés automatiquement (Sécurité / Fenêtres / Volets → Maison connectée, Multimédia → Player, Guide TV → TNT, Caméras → Automatique, le reste → Freebox Server).
 
 - Les identifiants d'entités ne changent pas ; les appareils existants sont re-rattachés au rechargement.
 - **Pièce suggérée** déduite du nom (« Volet cuisine » → Cuisine, « Fenêtre Papa » → Papa…). Home Assistant ne l'applique **qu'à la création** d'un appareil : les appareils existants gardent leur pièce.

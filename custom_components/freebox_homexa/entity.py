@@ -90,7 +90,7 @@ class FreeboxHomeEntity(Entity):
     def _alarm_group_device_info(self, hass: HomeAssistant, router: FreeboxRouter) -> DeviceInfo:
         """DeviceInfo du groupe « Maison connectée et alarme » ; retire l'ancien appareil alarme."""
         router.used_groups.add(GROUP_HOME)
-        router.group_device_id(GROUP_HOME)  # crée le groupe (rattaché au Freebox Server)
+        router.group_device_id(GROUP_HOME)  # crée l'appareil « Freebox Maison connectée »
         # L'ancien appareil séparé est retiré par le nettoyage différé, une fois
         # les entités déplacées (le retirer ici supprimerait leurs entrées du registre).
         router.merged_node_ids.add(self._id)

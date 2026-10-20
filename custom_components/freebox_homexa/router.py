@@ -230,6 +230,7 @@ class FreeboxRouter:
         self.used_groups: set[str] = set()
         # nœuds Home dont les entités vivent sur un appareil de groupe (module d'alarme)
         self.merged_node_ids: set[Any] = set()
+        self.player_identifiers: set[str] = set()
         # clé stable -> (nom, groupe automatique) pour l'écran d'options
         self.grouped_devices: dict[str, tuple[str, str]] = {}
         self._home_update_lock = asyncio.Lock()
@@ -472,65 +473,45 @@ class FreeboxRouter:
         return self.device_id
 
     def parent_for(self, key: str, name: str, auto_group: str | None) -> str | None:
-        """device_id du groupe d'un appareil (surcharge utilisateur, sinon automatique).
+        """device_id du service parent (surcharge utilisateur, sinon automatique).
 
-        `key` est la clé stable de l'appareil (dérivée de son identifiant), utilisée
-        par l'écran d'options « Groupes des appareils ».
+        4 services : Freebox Server (défaut), Freebox Maison connectée, Freebox Player, TNT.
+        `key` est la clé stable de l'appareil, utilisée par l'écran « Groupes des appareils ».
         """
-        from .device_groups import ALL_GROUPS, GROUP_AUTO, GROUP_OTHER, group_parent
+        from .device_groups import GROUP_AUTO, SERVICE_CHOICES, to_service
 
-        auto = auto_group or GROUP_OTHER
+        auto = to_service(auto_group)
         self.grouped_devices[key] = (name, auto)
         group = self.group_overrides.get(key) or GROUP_AUTO
-        if group == GROUP_AUTO or group not in ALL_GROUPS:
+        if group not in SERVICE_CHOICES:
             group = auto
         self.used_groups.add(group)
-        parent = group_parent(group)
-        if parent:
-            self.used_groups.add(parent)
         return self.group_device_id(group)
 
-    def service_device_info(self, key: str, name: str, model: str, group: str) -> DeviceInfo:
-        """Device d'un service Freebox (appels, guide TV…) rangé dans son groupe."""
-        info: dict[str, Any] = {
-            "identifiers": {(DOMAIN, f"{self.mac}_service_{key}")},
-            "manufacturer": "Freebox SAS",
-            "name": name,
-            "model": model,
-            "entry_type": dr.DeviceEntryType.SERVICE,
-        }
-        parent_id = self.parent_for(f"service:{key}", name, group)
-        if parent_id:
-            info["via_device_id"] = parent_id
-        return DeviceInfo(**info)
-
-    @property
-    def calls_device_info(self) -> DeviceInfo:
-        from .device_groups import GROUP_CALLS
-
-        return self.service_device_info(
-            "calls", "Journal d'appels Freebox", "Téléphonie Freebox", GROUP_CALLS
-        )
-
-    @property
-    def tv_guide_device_info(self) -> DeviceInfo:
-        from .device_groups import GROUP_TV
-
-        return self.service_device_info(
-            "tv_guide", "Guide TV Freebox", "Guide TV Freebox", GROUP_TV
-        )
-
     def group_device_id(self, group: str | None) -> str | None:
-        """device_id du parent virtuel (Sécurité/Volets/Réseau), sinon le Freebox Server."""
-        if not group:
-            return self.device_id
-        if group not in self.group_device_ids:
-            from .device_groups import async_get_group_device
+        """device_id du service ; repli sur le Freebox Server."""
+        from .device_groups import GROUP_HOME, GROUP_PLAYER, GROUP_TNT
 
-            self.group_device_ids[group] = async_get_group_device(
-                self.hass, self.entry_id, self.mac, self.device_id, group
+        if group == GROUP_HOME:
+            if group not in self.group_device_ids:
+                from .device_groups import async_get_group_device
+
+                self.group_device_ids[group] = async_get_group_device(
+                    self.hass, self.entry_id, self.mac, group
+                )
+            return self.group_device_ids[group]
+        if group in (GROUP_PLAYER, GROUP_TNT):
+            registry = dr.async_get(self.hass)
+            idents = (
+                [(DOMAIN, "programme_tnt_fr")]
+                if group == GROUP_TNT
+                else [(DOMAIN, i) for i in sorted(self.player_identifiers)]
             )
-        return self.group_device_ids[group]
+            for ident in idents:
+                device = registry.async_get_device(identifiers={ident})
+                if device is not None:
+                    return device.id
+        return self.device_id
 
     @property
     def signal_device_new(self) -> str:

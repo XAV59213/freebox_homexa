@@ -29,6 +29,7 @@ from .const import (
 from .frontend import JSModuleRegistration
 from .device_groups import (
     CONF_DEVICE_GROUP_OVERRIDES,
+    async_detach_top_level_devices,
     async_remove_lan_client_devices,
     async_remove_merged_node_devices,
     async_remove_unused_group_devices,
@@ -183,6 +184,13 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     # via des signaux après le setup (retirer trop tôt détachait p. ex. les volets).
     @callback
     def _cleanup_groups(_now: datetime | None = None) -> None:
+        # D'abord détacher Players / TNT de leurs anciens groupes, puis retirer les vides.
+        async_detach_top_level_devices(
+            hass,
+            entry,
+            [(DOMAIN, "programme_tnt_fr")]
+            + [(DOMAIN, ident) for ident in router.player_identifiers],
+        )
         removed = async_remove_unused_group_devices(
             hass, entry, freebox_config["mac"], set(router.used_groups)
         )

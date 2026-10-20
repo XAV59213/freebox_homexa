@@ -221,6 +221,7 @@ class FreeboxRouter:
         self._attrs: dict[str, Any] = {}
         self.device_id: str | None = None
         self.group_device_ids: dict[str, str] = {}
+        self.entry_id: str = entry.entry_id
         self._home_update_lock = asyncio.Lock()
 
         self.supports_hosts = True
@@ -462,9 +463,15 @@ class FreeboxRouter:
 
     def group_device_id(self, group: str | None) -> str | None:
         """device_id du parent virtuel (Sécurité/Volets/Réseau), sinon le Freebox Server."""
-        if group and group in self.group_device_ids:
-            return self.group_device_ids[group]
-        return self.device_id
+        if not group:
+            return self.device_id
+        if group not in self.group_device_ids:
+            from .device_groups import async_get_group_device
+
+            self.group_device_ids[group] = async_get_group_device(
+                self.hass, self.entry_id, self.mac, self.device_id, group
+            )
+        return self.group_device_ids[group]
 
     @property
     def signal_device_new(self) -> str:

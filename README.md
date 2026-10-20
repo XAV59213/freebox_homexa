@@ -73,13 +73,24 @@ Pour 5 s, désactivez l’intégration officielle Freebox : les deux en parallè
 
 ### Organisation des appareils
 
-Pour alléger la liste des appareils, chaque Freebox crée trois appareils parents virtuels, rattachés au **Freebox Server** :
+Pour alléger la liste des appareils, chaque Freebox regroupe ses équipements sous des appareils parents virtuels, rattachés au **Freebox Server**. Seuls les groupes qui ont des membres sont créés ; les groupes vides sont retirés au rechargement.
 
 | Parent | Contenu |
 |---|---|
-| **Sécurité** | alarme, télécommandes, détecteurs d'ouverture et de mouvement, caméras |
+| **Sécurité** | alarme, télécommandes, détecteurs de mouvement, caméras |
+| **Fenêtres** | détecteurs d'ouverture fenêtres / portes |
 | **Volets** | volets roulants, ouvrants, équipements RTS / IO |
-| **Réseau** | appareils clients LAN / Wi-Fi (seulement si l'option est activée) |
+| **Réseau** | sous-groupes de clients LAN / Wi-Fi (si l'option est activée) : |
+| ↳ Amazon | Echo, Alexa, Fire TV, Kindle, fabricant Amazon |
+| ↳ Téléphones | smartphones, tablettes, téléphones IP (Apple, Samsung, Xiaomi…) |
+| ↳ Ordinateurs | PC, portables, Mac, NAS |
+| ↳ TV & multimédia | TV, Freebox Player, Chromecast, Sonos… |
+| ↳ Objets connectés | Espressif, Tuya, Shelly, Sonoff, Hue, aspirateurs, caméras IP… |
+| ↳ Consoles | PlayStation, Xbox, Nintendo, Steam Deck |
+| ↳ Imprimantes | Epson, Canon, Brother, HP… |
+| ↳ Autres | tout le reste |
+
+Classement des clients : type d'hôte Freebox (`host_type`) d'abord, puis fabricant (`vendor_name`), puis mots-clés du nom d'hôte (Amazon est testé en premier, car la Freebox classe souvent les Echo en « multimédia »).
 
 - Les identifiants d'entités ne changent pas ; les appareils existants sont re-rattachés au rechargement.
 - **Pièce suggérée** déduite du nom (« Volet cuisine » → Cuisine, « Fenêtre Papa » → Papa…). Home Assistant ne l'applique **qu'à la création** d'un appareil : les appareils existants gardent leur pièce.

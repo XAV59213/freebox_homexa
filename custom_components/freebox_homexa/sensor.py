@@ -33,7 +33,7 @@ from .const import (
     option_enabled,
 )
 from .entity import FreeboxHomeEntity
-from .device_groups import GROUP_NETWORK, lan_client_name
+from .device_groups import classify_lan_client, lan_client_name
 from .router import FreeboxRouter, is_freebox_repeater
 from .tnt_const import selected_channels
 from .tnt_setup import TNT_COORDINATORS_KEY
@@ -345,7 +345,7 @@ class FreeboxWifiSignalSensor(SensorEntity):
                 "manufacturer": device.get("vendor_name") or "Inconnu",
                 "name": name,
             }
-            parent_id = self._router.group_device_id(GROUP_NETWORK)
+            parent_id = self._router.group_device_id(classify_lan_client(device))
             if parent_id:
                 device_info["via_device_id"] = parent_id
             self._attr_device_info = DeviceInfo(**device_info)

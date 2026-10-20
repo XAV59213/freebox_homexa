@@ -5,11 +5,14 @@ from homeassistant.components.sensor import SensorEntity
 from homeassistant.helpers.device_registry import DeviceEntryType, DeviceInfo
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from .tnt_const import DOMAIN as TNT_DOMAIN, TNT_CHANNELS
+from .const import DOMAIN
+from .tnt_const import TNT_CHANNELS
 from .tnt_coordinator import ProgrammeTntFrCoordinator
 
 TNT_DEVICE_INFO = DeviceInfo(
-    identifiers={(TNT_DOMAIN, "programme_tnt_fr")},
+    # Identifiant propre à Homexa : (programme_tnt_fr, programme_tnt_fr) est
+    # celui de l'intégration séparée et fusionnerait les deux appareils.
+    identifiers={(DOMAIN, "programme_tnt_fr")},
     name="Programme TNT FR",
     manufacturer="xmltvfr.fr",
     model="Guide TNT",

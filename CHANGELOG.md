@@ -1,6 +1,6 @@
 # Changelog
 
-## Non publié
+## 28.8.44
 - Répéteurs Wi-Fi : **un seul appareil par répéteur physique**. Un répéteur Free expose plusieurs MAC (Ethernet, radios, BSSID) que la Freebox liste comme autant d'hôtes (« Repeteur Wifi Freebox », « #2 », « -2 »…) ; chaque MAC créait son propre appareil. Les MAC sont désormais regroupées (API `/repeater/` quand elle est disponible, sinon par proximité des adresses) sous un identifiant stable, avec toutes les MAC en connexions et le numéro de série
 - Migration au démarrage : les appareils répéteurs en double sont fusionnés (entités et pièce déplacées sur l'appareil conservé, entity_id inchangés), puis retirés ; les entités « En ligne » / clients Wi-Fi des anciennes MAC, devenues doublons, sont supprimées
 - ⚠️ Pas encore testé dans Home Assistant : merci de signaler tout problème dans les issues

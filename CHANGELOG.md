@@ -1,5 +1,11 @@
 # Changelog
 
+## Non publié
+- Répéteurs Wi-Fi : correction de la fusion de la 28.8.44, qui laissait encore ~9 appareils pour 3 répéteurs. Les MAC d'un répéteur n'ont rien de « proche » (principale `8C:97:EA:55:…`, Ethernet `16:E4:…`, radios et BSSID `8C/8E:97:EA:9B:…`) : elles sont désormais lues dans l'API `/repeater/` (`main_mac`, `backhaul[].mac`, `fronthaul[].bssid`), et chaque hôte LAN / BSSID est rattaché au bon répéteur ; les doublons existants sont fusionnés au chargement (entités, pièce et nom conservés)
+- Journal de débogage : liste des répéteurs de l'API, MAC retenues par répéteur, appareils trouvés et appareil conservé lors de la fusion
+- Registre des appareils (HA 2026.8+) : plus d'API dépréciées — `async_get_device_by_identifier` au lieu de `async_get_device`, `config_entry_id` au lieu de `config_entries`, `async_remove_device` au lieu de `remove_config_entry_id`, plus de parcours de `registry.devices`, `via_device_id` au lieu de `via_device` (avec repli si les nouvelles API sont absentes)
+- ⚠️ Pas encore testé dans Home Assistant : merci de signaler tout problème dans les issues
+
 ## 28.8.44
 - Répéteurs Wi-Fi : **un seul appareil par répéteur physique**. Un répéteur Free expose plusieurs MAC (Ethernet, radios, BSSID) que la Freebox liste comme autant d'hôtes (« Repeteur Wifi Freebox », « #2 », « -2 »…) ; chaque MAC créait son propre appareil. Les MAC sont désormais regroupées (API `/repeater/` quand elle est disponible, sinon par proximité des adresses) sous un identifiant stable, avec toutes les MAC en connexions et le numéro de série
 - Migration au démarrage : les appareils répéteurs en double sont fusionnés (entités et pièce déplacées sur l'appareil conservé, entity_id inchangés), puis retirés ; les entités « En ligne » / clients Wi-Fi des anciennes MAC, devenues doublons, sont supprimées

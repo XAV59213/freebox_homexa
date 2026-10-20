@@ -1,6 +1,6 @@
 # Changelog
 
-## Non publié
+## 28.8.46
 - Répéteurs Wi-Fi : nouveau regroupement des MAC par répéteur physique à partir de `lan/browser` (seule API documentée dans `API_FREEBOX_OS.txt`) : même `access_point.uid`, même adresse IP entre hôtes répéteurs (interfaces pontées), IPv6 EUI-64 désignant la MAC principale, puis MAC voisines ; l'API `/repeater/` (non documentée) reste un simple bonus. Les 28.8.44 / 28.8.45 ne regroupaient rien quand cette API ne répondait pas
 - Journal (niveau info) : pour chaque répéteur physique, ses MAC et la raison de chaque regroupement ; appareils trouvés / conservé lors de la fusion ; appareils répéteurs restés non rattachés ; indisponibilité de l'API `/repeater/`
 - ⚠️ Pas encore testé dans Home Assistant : merci de signaler tout problème dans les issues

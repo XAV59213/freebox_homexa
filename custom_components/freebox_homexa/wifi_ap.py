@@ -4,7 +4,8 @@ from __future__ import annotations
 
 from typing import Any
 
-from .const import DEFAULT_DEVICE_NAME, REPEATER_MODEL
+from .const import REPEATER_MODEL
+from .device_groups import lan_client_name
 
 
 def normalize_mac(mac: str | None) -> str:
@@ -40,7 +41,7 @@ def _client_summary(device: dict[str, Any]) -> dict[str, Any]:
     wifi = device.get("wifi") or {}
     ident = device.get("l2ident") or {}
     mac = ident.get("id") or ""
-    name = (device.get("primary_name") or "").strip() or mac or DEFAULT_DEVICE_NAME
+    name = lan_client_name(device)
     return {
         "name": name,
         "mac": mac,

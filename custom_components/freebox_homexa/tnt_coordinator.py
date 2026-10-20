@@ -10,6 +10,7 @@ from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 from homeassistant.util import dt as dt_util
 
+from .tnt_tmdb import TmdbMatch, TmdbResolver
 from .tnt_const import (
     DAY_RESET,
     FETCH_MIN_INTERVAL_MINUTES,
@@ -66,6 +67,7 @@ def _parse_xmltv(xml_text: str, channels: list[str]) -> tuple[dict, dict]:
                 category=node.findtext("category"),
                 icon=icon_el.get("src") if icon_el is not None else None,
                 rating=rating_el.text if rating_el is not None else None,
+                date=(node.findtext("date") or "").strip() or None,
             )
         )
     for cid in programmes:
@@ -74,7 +76,9 @@ def _parse_xmltv(xml_text: str, channels: list[str]) -> tuple[dict, dict]:
 
 
 class Programme:
-    def __init__(self, start, stop, title, subtitle, desc, category, icon, rating) -> None:
+    def __init__(
+        self, start, stop, title, subtitle, desc, category, icon, rating, date=None
+    ) -> None:
         self.start = start
         self.stop = stop
         self.title = title
@@ -83,16 +87,22 @@ class Programme:
         self.category = category
         self.icon = icon
         self.rating = rating
+        self.date = date
 
-    def as_dict(self) -> dict:
+    def as_dict(self, match: TmdbMatch | None = None) -> dict:
         return {
             "title": self.title,
             "subtitle": self.subtitle,
             "description": self.desc,
             "category": self.category,
             "icon": self.icon,
-            "poster": self.icon,
+            "poster": match.poster if match else self.icon,
+            "tmdb_id": match.tmdb_id if match else None,
+            "tmdb_media_type": match.media_type if match else None,
+            "tmdb_rating": match.rating if match else 0,
+            "tmdb_votes": match.votes if match else 0,
             "rating": self.rating,
+            "date": self.date,
             "start": self.start.isoformat() if self.start else None,
             "stop": self.stop.isoformat() if self.stop else None,
         }
@@ -111,6 +121,11 @@ class ProgrammeTntFrCoordinator(DataUpdateCoordinator):
         self._channels = channels
         # Clé TMDB personnelle de l'utilisateur (jamais de clé par défaut)
         self._tmdb_api_key = tmdb_api_key
+        self._tmdb: TmdbResolver | None = (
+            TmdbResolver(hass, tmdb_api_key, self.async_request_refresh)
+            if tmdb_api_key
+            else None
+        )
         self._session = async_get_clientsession(hass)
         self._programmes_by_channel: dict[str, list[Programme]] = {}
         self._channels_meta: dict[str, dict] = {}
@@ -129,6 +144,11 @@ class ProgrammeTntFrCoordinator(DataUpdateCoordinator):
                 if not self._programmes_by_channel:
                     raise UpdateFailed(f"Impossible de recuperer le flux XMLTV: {err}") from err
                 _LOGGER.warning("XMLTV en cache : %s", err)
+            if self._tmdb is not None:
+                self._tmdb.prune(self._all_programmes())
+
+        if self._tmdb is not None:
+            self._tmdb.schedule(self._all_programmes(), now)
 
         result: dict[str, dict] = {}
         for channel_id in self._channels:
@@ -138,9 +158,9 @@ class ProgrammeTntFrCoordinator(DataUpdateCoordinator):
                 "channel_id": channel_id,
                 "channel_name": meta.get("name", ALL_CHANNELS.get(channel_id, channel_id)),
                 "channel_icon": meta.get("icon"),
-                "current": current.as_dict() if current else None,
-                "prime_time": prime_time.as_dict() if prime_time else None,
-                "second_part": second_part.as_dict() if second_part else None,
+                "current": self._programme_dict(current),
+                "prime_time": self._programme_dict(prime_time),
+                "second_part": self._programme_dict(second_part),
             }
         return result
 
@@ -156,10 +176,20 @@ class ProgrammeTntFrCoordinator(DataUpdateCoordinator):
         else:
             day = dt_util.now().date()
         return [
-            programme.as_dict()
+            self._programme_dict(programme)
             for programme in programmes
             if programme.start and programme.start.date() == day
         ]
+
+    def _all_programmes(self):
+        for channel_id in self._channels:
+            yield from self._programmes_by_channel.get(channel_id, [])
+
+    def _programme_dict(self, programme: Programme | None) -> dict | None:
+        if programme is None:
+            return None
+        match = self._tmdb.get(programme) if self._tmdb is not None else None
+        return programme.as_dict(match)
 
     async def _fetch_and_parse(self) -> None:
         async with self._session.get(XMLTV_URL, timeout=60) as resp:

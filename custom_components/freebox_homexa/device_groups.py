@@ -13,6 +13,7 @@ from .const import DOMAIN, FreeboxHomeCategory
 
 GROUP_SECURITY = "security"
 GROUP_WINDOWS = "windows"
+GROUP_CAMERAS = "cameras"
 GROUP_COVERS = "covers"
 GROUP_NETWORK = "network"
 GROUP_MEDIA = "media"
@@ -37,6 +38,7 @@ NETWORK_SUBGROUPS = (
 GROUP_NAMES = {
     GROUP_SECURITY: "Sécurité",
     GROUP_WINDOWS: "Fenêtres",
+    GROUP_CAMERAS: "Caméras",
     GROUP_COVERS: "Volets",
     GROUP_NETWORK: "Réseau",
     GROUP_MEDIA: "Multimédia",
@@ -52,7 +54,8 @@ GROUP_NAMES = {
     NET_OTHER: "Autres (réseau)",
 }
 GROUP_MODELS = {
-    GROUP_SECURITY: "Groupe alarme, télécommandes, détecteurs de mouvement et caméras",
+    GROUP_SECURITY: "Groupe alarme, télécommandes et détecteurs de mouvement",
+    GROUP_CAMERAS: "Groupe caméras (Freebox Home et caméras IP)",
     GROUP_WINDOWS: "Groupe détecteurs d'ouverture (fenêtres / portes)",
     GROUP_COVERS: "Groupe volets et ouvrants",
     GROUP_NETWORK: "Groupe clients LAN / Wi-Fi",
@@ -65,7 +68,6 @@ _SECURITY_CATEGORIES = {
     FreeboxHomeCategory.ALARM,
     FreeboxHomeCategory.KFB,
     FreeboxHomeCategory.PIR,
-    FreeboxHomeCategory.CAMERA,
 }
 _COVER_CATEGORIES = {
     FreeboxHomeCategory.SHUTTER,
@@ -91,6 +93,8 @@ def home_node_group(node: dict[str, Any]) -> str | None:
     category = node.get("category")
     if category == FreeboxHomeCategory.DWS:
         return GROUP_WINDOWS
+    if category == FreeboxHomeCategory.CAMERA:
+        return GROUP_CAMERAS
     if category in _SECURITY_CATEGORIES:
         return GROUP_SECURITY
     if category in _COVER_CATEGORIES:
@@ -118,11 +122,18 @@ _HOST_TYPE_GROUPS = {
     "freebox_delta": GROUP_MEDIA,
     "vg_console": NET_CONSOLES,
     "printer": NET_PRINTERS,
-    "ip_camera": NET_IOT,
+    "ip_camera": GROUP_CAMERAS,
     "car": NET_IOT,
 }
 # (mot-clé fabricant, groupe) — testés dans l'ordre
 _VENDOR_GROUPS = (
+    ("hikvision", GROUP_CAMERAS),
+    ("dahua", GROUP_CAMERAS),
+    ("reolink", GROUP_CAMERAS),
+    ("foscam", GROUP_CAMERAS),
+    ("shenzhen foscam", GROUP_CAMERAS),
+    ("ezviz", GROUP_CAMERAS),
+    ("axis communications", GROUP_CAMERAS),
     ("amazon", NET_AMAZON),
     ("nintendo", NET_CONSOLES),
     ("sony interactive", NET_CONSOLES),
@@ -188,6 +199,8 @@ _VENDOR_GROUPS = (
 )
 # (mot-clé nom d'hôte, groupe) — testés dans l'ordre
 _NAME_GROUPS = (
+    (("hikvision", "reolink", "foscam", "ezviz", "dahua", "ipcam", "ip-cam", "camera",
+      "cam-", "-cam", "axis-"), GROUP_CAMERAS),
     (("echo", "alexa", "fire tv", "firetv", "fire-tv", "kindle"), NET_AMAZON),
     (("iphone", "android", "galaxy", "pixel", "redmi", "xiaomi", "phone", "smartphone",
       "ipad", "tablet", "tab-", "oneplus", "huawei", "honor"), NET_PHONES),
@@ -200,8 +213,7 @@ _NAME_GROUPS = (
       "canon"), NET_PRINTERS),
     (("tv", "chromecast", "roku", "sonos", "apple-tv", "appletv", "shield", "kodi",
       "player", "freebox", "bravia", "speaker", "enceinte"), NET_MEDIA),
-    (("esp", "tuya", "shelly", "sonoff", "tasmota", "hue", "plug", "prise", "camera",
-      "cam-", "netatmo", "nest", "ring", "robot", "roborock", "vacuum", "aspirateur",
+    (("esp", "tuya", "shelly", "sonoff", "tasmota", "hue", "plug", "prise", "netatmo", "nest", "ring", "robot", "roborock", "vacuum", "aspirateur",
       "thermostat", "zigbee", "bridge", "raspberry", "homeassistant", "wled"), NET_IOT),
 )
 # Mots-clés forts du nom d'hôte, testés avant le fabricant (ex. carte Wi-Fi Intel dans un objet WLED).
@@ -210,6 +222,9 @@ _STRONG_NAME_GROUPS = (
     (("probook", "elitebook", "zbook", "thinkpad", "latitude", "macbook", "laptop",
       "desktop-", "-pc", "pc-"), NET_COMPUTERS),
 )
+
+
+_AMAZON_NAMES = next(k for k, g in _NAME_GROUPS if g == NET_AMAZON)
 
 
 def _client_names(device: dict[str, Any]) -> str:
@@ -225,7 +240,7 @@ def classify_lan_client(device: dict[str, Any]) -> str:
     vendor = (device.get("vendor_name") or "").lower()
     names = _client_names(device)
     # Amazon d'abord : la Freebox classe souvent les Echo en "multimedia_device".
-    if "amazon" in vendor or any(k in names for k in _NAME_GROUPS[0][0]):
+    if "amazon" in vendor or any(k in names for k in _AMAZON_NAMES):
         return NET_AMAZON
     group = _HOST_TYPE_GROUPS.get(device.get("host_type") or "")
     if group:
@@ -282,7 +297,7 @@ def async_get_group_device(
 
 
 ALL_GROUPS = (
-    GROUP_SECURITY, GROUP_WINDOWS, GROUP_COVERS, GROUP_NETWORK, *NETWORK_SUBGROUPS,
+    GROUP_SECURITY, GROUP_WINDOWS, GROUP_CAMERAS, GROUP_COVERS, GROUP_NETWORK, *NETWORK_SUBGROUPS,
     GROUP_MEDIA, GROUP_INFRA, GROUP_OTHER,
 )
 

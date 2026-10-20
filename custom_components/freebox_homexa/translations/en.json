@@ -222,6 +222,7 @@
         "auto": "Automatic",
         "security": "Security",
         "windows": "Windows",
+        "cameras": "Cameras",
         "covers": "Shutters",
         "network": "Network",
         "net_amazon": "Network › Amazon",

@@ -15,7 +15,7 @@ from .tnt_const import (
     FETCH_MIN_INTERVAL_MINUTES,
     LATE_NIGHT_START,
     PRIME_TIME_START,
-    TNT_CHANNELS,
+    ALL_CHANNELS,
     UPDATE_INTERVAL_MINUTES,
     XMLTV_URL,
 )
@@ -99,7 +99,9 @@ class Programme:
 
 
 class ProgrammeTntFrCoordinator(DataUpdateCoordinator):
-    def __init__(self, hass: HomeAssistant, channels: list[str], tmdb_api_key: str | None = None) -> None:
+    def __init__(
+        self, hass: HomeAssistant, channels: list[str], tmdb_api_key: str | None = None
+    ) -> None:
         super().__init__(
             hass,
             _LOGGER,
@@ -107,6 +109,8 @@ class ProgrammeTntFrCoordinator(DataUpdateCoordinator):
             update_interval=timedelta(minutes=UPDATE_INTERVAL_MINUTES),
         )
         self._channels = channels
+        # Clé TMDB personnelle de l'utilisateur (jamais de clé par défaut)
+        self._tmdb_api_key = tmdb_api_key
         self._session = async_get_clientsession(hass)
         self._programmes_by_channel: dict[str, list[Programme]] = {}
         self._channels_meta: dict[str, dict] = {}
@@ -132,7 +136,7 @@ class ProgrammeTntFrCoordinator(DataUpdateCoordinator):
             meta = self._channels_meta.get(channel_id, {})
             result[channel_id] = {
                 "channel_id": channel_id,
-                "channel_name": meta.get("name", TNT_CHANNELS.get(channel_id, channel_id)),
+                "channel_name": meta.get("name", ALL_CHANNELS.get(channel_id, channel_id)),
                 "channel_icon": meta.get("icon"),
                 "current": current.as_dict() if current else None,
                 "prime_time": prime_time.as_dict() if prime_time else None,

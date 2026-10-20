@@ -54,6 +54,13 @@
   "options": {
     "step": {
       "init": {
+        "menu_options": {
+          "general": "Paramètres généraux",
+          "tnt": "Guide TNT"
+        },
+        "title": "Options Freebox Homexa"
+      },
+      "general": {
         "title": "Options Freebox Homexa",
         "description": "Les clients LAN sont les téléphones, PC et objets vus par la Freebox. Le Server, les répéteurs et le pack Home ne sont pas concernés. Depuis Home Assistant 2026.8, les devices ne sont plus fusionnés entre intégrations.\n\nPlayers détectés : {players}",
         "data": {
@@ -70,7 +77,19 @@
           "home_poll_interval": "PIR, contacts, alarme et volets. Désactivez l'intégration officielle Freebox avant de passer à 5 s.",
           "remote_code": "8 chiffres. Sur le Player : Réglages → Système → Informations. Sert pour power, TV et chiffres. Mini 4K / Pop : souvent Android TV Remote."
         }
+      },
+      "tnt": {
+        "title": "Guide TNT",
+        "description": "Choisissez les chaînes suivies. Les capteurs des chaînes décochées sont supprimés. La clé API TMDB personnelle est facultative : sans elle, aucune affiche n'est récupérée (aucune clé partagée n'est fournie).",
+        "data": {
+          "tnt_channels_france": "Chaînes françaises (TNT + supplémentaires)",
+          "tnt_channels_belgique": "Chaînes belges (RTBF)",
+          "tnt_tmdb_api_key": "Clé API TMDB personnelle (facultatif)"
+        }
       }
+    },
+    "error": {
+      "no_channels": "Sélectionnez au moins une chaîne."
     }
   },
   "services": {

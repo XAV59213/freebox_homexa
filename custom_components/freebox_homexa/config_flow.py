@@ -15,6 +15,7 @@ from homeassistant.config_entries import (
 )
 from homeassistant.const import CONF_HOST, CONF_PORT
 from homeassistant.core import callback
+from homeassistant.helpers import selector
 from homeassistant.helpers.service_info.zeroconf import ZeroconfServiceInfo
 from homeassistant.helpers.storage import Store
 
@@ -33,6 +34,15 @@ from .const import (
     HOME_POLL_INTERVAL_OPTIONS,
     STORAGE_VERSION,
     remote_code_field,
+)
+from .tnt_const import (
+    CONF_TMDB_API_KEY,
+    CONF_TNT_CHANNELS,
+    CONF_TNT_CHANNELS_BELGIQUE,
+    CONF_TNT_CHANNELS_FRANCE,
+    FRANCE_CHANNELS,
+    RTBF_CHANNELS,
+    selected_channels,
 )
 from .router import get_api, get_hosts_list_if_supported, resolve_token_file
 
@@ -295,6 +305,35 @@ class FreeboxFlowHandler(ConfigFlow, domain=DOMAIN):
         return await self.async_step_user({CONF_HOST: host, CONF_PORT: int(port)})
 
 
+def _tnt_schema(channels_default: list[str], tmdb_api_key_default: str | None) -> vol.Schema:
+    """Formulaire « Guide TNT » (adapted from cyclope205/programme-tnt-fr, MIT)."""
+    france_options = [
+        selector.SelectOptionDict(value=channel_id, label=name)
+        for channel_id, name in FRANCE_CHANNELS.items()
+    ]
+    belgique_options = [
+        selector.SelectOptionDict(value=channel_id, label=name)
+        for channel_id, name in RTBF_CHANNELS.items()
+    ]
+    france_default = [c for c in channels_default if c in FRANCE_CHANNELS]
+    belgique_default = [c for c in channels_default if c in RTBF_CHANNELS]
+    tmdb_selector = selector.selector({"text": {"type": "password"}})
+    fields: dict[Any, Any] = {}
+    fields[vol.Optional(CONF_TNT_CHANNELS_FRANCE, default=france_default)] = selector.selector(
+        {"select": {"options": france_options, "multiple": True, "mode": "list"}}
+    )
+    fields[
+        vol.Optional(CONF_TNT_CHANNELS_BELGIQUE, default=belgique_default)
+    ] = selector.selector(
+        {"select": {"options": belgique_options, "multiple": True, "mode": "list"}}
+    )
+    if tmdb_api_key_default:
+        fields[vol.Optional(CONF_TMDB_API_KEY, default=tmdb_api_key_default)] = tmdb_selector
+    else:
+        fields[vol.Optional(CONF_TMDB_API_KEY)] = tmdb_selector
+    return vol.Schema(fields)
+
+
 class FreeboxOptionsFlowHandler(OptionsFlow):
     """Options : LAN, intervalle Home et télécommandes Player sur le même écran."""
 
@@ -314,6 +353,34 @@ class FreeboxOptionsFlowHandler(OptionsFlow):
     async def async_step_init(
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
+        return self.async_show_menu(step_id="init", menu_options=["general", "tnt"])
+
+    async def async_step_tnt(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        errors: dict[str, str] = {}
+        current = dict(self.config_entry.options)
+        if user_input is not None:
+            channels = list(user_input.get(CONF_TNT_CHANNELS_FRANCE) or []) + list(
+                user_input.get(CONF_TNT_CHANNELS_BELGIQUE) or []
+            )
+            if not channels:
+                errors["base"] = "no_channels"
+            else:
+                current[CONF_TNT_CHANNELS] = channels
+                current[CONF_TMDB_API_KEY] = (user_input.get(CONF_TMDB_API_KEY) or "").strip()
+                return self.async_create_entry(title="", data=current)
+        return self.async_show_form(
+            step_id="tnt",
+            data_schema=_tnt_schema(
+                selected_channels(current), current.get(CONF_TMDB_API_KEY) or None
+            ),
+            errors=errors,
+        )
+
+    async def async_step_general(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
         if not self._players:
             self._players = await self._list_players()
         players = self._players
@@ -330,11 +397,18 @@ class FreeboxOptionsFlowHandler(OptionsFlow):
             else:
                 new_data.pop(CONF_REMOTE_CODE, None)
             self.hass.config_entries.async_update_entry(self.config_entry, data=new_data)
-            return self.async_create_entry(title="", data=options)
+            # Conserver les options des autres écrans (Guide TNT, rappels…)
+            merged = {
+                key: value
+                for key, value in self.config_entry.options.items()
+                if not key.startswith(f"{CONF_REMOTE_CODE}_")
+            }
+            merged.update(options)
+            return self.async_create_entry(title="", data=merged)
 
         names = ", ".join(_player_label(p) for p in players) or "aucun Player détecté"
         return self.async_show_form(
-            step_id="init",
+            step_id="general",
             data_schema=_options_schema(defaults, players),
             description_placeholders={"players": names},
         )

@@ -23,7 +23,7 @@
   "requirements": [
     "freebox-api"
   ],
-  "version": "28.8.33",
+  "version": "28.8.34",
   "zeroconf": [
     "_fbx-api._tcp.local."
   ]

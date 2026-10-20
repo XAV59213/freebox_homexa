@@ -25,6 +25,8 @@ from .device_groups import (
     GROUP_AUTO,
     GROUP_NAMES,
     group_choices,
+    migrate_group,
+    migrate_overrides,
 )
 from .const import (
     CONF_CREATE_LAN_DEVICES,
@@ -493,12 +495,12 @@ class FreeboxOptionsFlowHandler(OptionsFlow):
         """Libellé affiché -> clé stable de l'appareil (libellés uniques)."""
         router = self.hass.data.get(DOMAIN, {}).get(self.config_entry.unique_id)
         devices = dict(getattr(router, "grouped_devices", {}) or {})
-        overrides = dict(self.config_entry.options.get(CONF_DEVICE_GROUP_OVERRIDES) or {})
+        overrides = migrate_overrides(self.config_entry.options.get(CONF_DEVICE_GROUP_OVERRIDES))
         for key in overrides:  # appareils surchargés mais absents ce coup-ci
             devices.setdefault(key, (key, ""))
         fields: dict[str, str] = {}
         for key, (name, auto) in sorted(devices.items(), key=lambda kv: kv[1][0].lower()):
-            auto_label = GROUP_NAMES.get(auto, "")
+            auto_label = GROUP_NAMES.get(migrate_group(auto) or "", "")
             label = f"{name} (auto : {auto_label})" if auto_label else name
             if label in fields:
                 label = f"{label} [{key}]"
@@ -510,7 +512,7 @@ class FreeboxOptionsFlowHandler(OptionsFlow):
     ) -> ConfigFlowResult:
         fields = self._group_fields()
         current = dict(self.config_entry.options)
-        overrides = dict(current.get(CONF_DEVICE_GROUP_OVERRIDES) or {})
+        overrides = migrate_overrides(current.get(CONF_DEVICE_GROUP_OVERRIDES))
         if user_input is not None:
             new_overrides: dict[str, str] = {}
             for label, key in fields.items():

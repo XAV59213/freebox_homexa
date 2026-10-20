@@ -1,4 +1,4 @@
-"""Appareils parents virtuels (Sécurité, Volets, Réseau), noms et pièces suggérées."""
+"""Appareils parents virtuels (un par service Freebox OS), noms et pièces suggérées."""
 
 from __future__ import annotations
 
@@ -11,16 +11,29 @@ from homeassistant.helpers import device_registry as dr
 
 from .const import DOMAIN, FreeboxHomeCategory
 
-GROUP_SECURITY = "security"
-GROUP_WINDOWS = "windows"
+# Groupes calqués sur les droits d'accès de Freebox OS (un groupe par service).
+GROUP_HOME = "home"
 GROUP_CAMERAS = "cameras"
-GROUP_COVERS = "covers"
-GROUP_NETWORK = "network"
-GROUP_MEDIA = "media"
-GROUP_INFRA = "infrastructure"
+GROUP_PLAYER = "player"
+GROUP_VM = "vm"
+GROUP_DOWNLOADS = "downloads"
+GROUP_PARENTAL = "parental"
+GROUP_CALLS = "calls"
+GROUP_TV = "tv"
+GROUP_EQUIPMENT = "equipment"
 GROUP_OTHER = "other"
 GROUP_AUTO = "auto"
 CONF_DEVICE_GROUP_OVERRIDES = "device_group_overrides"
+
+# Anciens groupes par type (≤ 28.8.39) : conservés pour la migration et le nettoyage.
+LEGACY_GROUP_MAP = {
+    "security": GROUP_HOME,
+    "windows": GROUP_HOME,
+    "covers": GROUP_HOME,
+    "network": GROUP_EQUIPMENT,
+    "media": GROUP_PLAYER,
+    "infrastructure": GROUP_EQUIPMENT,
+}
 
 NET_AMAZON = "net_amazon"
 NET_PHONES = "net_phones"
@@ -35,14 +48,21 @@ NETWORK_SUBGROUPS = (
     NET_IOT, NET_CONSOLES, NET_PRINTERS, NET_OTHER,
 )
 
+SERVICE_GROUPS = (
+    GROUP_HOME, GROUP_CAMERAS, GROUP_PLAYER, GROUP_VM, GROUP_DOWNLOADS,
+    GROUP_PARENTAL, GROUP_CALLS, GROUP_TV, GROUP_EQUIPMENT, GROUP_OTHER,
+)
+
 GROUP_NAMES = {
-    GROUP_SECURITY: "Sécurité",
-    GROUP_WINDOWS: "Fenêtres",
+    GROUP_HOME: "Maison connectée et alarme",
     GROUP_CAMERAS: "Caméras",
-    GROUP_COVERS: "Volets",
-    GROUP_NETWORK: "Réseau",
-    GROUP_MEDIA: "Multimédia",
-    GROUP_INFRA: "Infrastructure",
+    GROUP_PLAYER: "Freebox Player",
+    GROUP_VM: "Contrôle de la VM",
+    GROUP_DOWNLOADS: "Téléchargements",
+    GROUP_PARENTAL: "Contrôle parental",
+    GROUP_CALLS: "Journal d'appels",
+    GROUP_TV: "Guide TV et enregistrements",
+    GROUP_EQUIPMENT: "Équipements et réglages Freebox",
     GROUP_OTHER: "Autres",
     NET_AMAZON: "Amazon",
     NET_PHONES: "Téléphones",
@@ -52,29 +72,25 @@ GROUP_NAMES = {
     NET_CONSOLES: "Consoles",
     NET_PRINTERS: "Imprimantes",
     NET_OTHER: "Autres (réseau)",
+    # anciens groupes, uniquement pour le libellé du nettoyage
+    "security": "Sécurité",
+    "windows": "Fenêtres",
+    "covers": "Volets",
+    "network": "Réseau",
+    "media": "Multimédia",
+    "infrastructure": "Infrastructure",
 }
 GROUP_MODELS = {
-    GROUP_SECURITY: "Groupe alarme, télécommandes et détecteurs de mouvement",
-    GROUP_CAMERAS: "Groupe caméras (Freebox Home et caméras IP)",
-    GROUP_WINDOWS: "Groupe détecteurs d'ouverture (fenêtres / portes)",
-    GROUP_COVERS: "Groupe volets et ouvrants",
-    GROUP_NETWORK: "Groupe clients LAN / Wi-Fi",
-    GROUP_MEDIA: "Groupe Freebox Player et guide TNT",
-    GROUP_INFRA: "Groupe répéteurs Wi-Fi et disques",
-    GROUP_OTHER: "Groupe appareils non classés",
-}
-
-_SECURITY_CATEGORIES = {
-    FreeboxHomeCategory.ALARM,
-    FreeboxHomeCategory.KFB,
-    FreeboxHomeCategory.PIR,
-}
-_COVER_CATEGORIES = {
-    FreeboxHomeCategory.SHUTTER,
-    FreeboxHomeCategory.BASIC_SHUTTER,
-    FreeboxHomeCategory.OPENER,
-    FreeboxHomeCategory.RTS,
-    FreeboxHomeCategory.IOHOME,
+    GROUP_HOME: "Service Freebox Home : alarme, détecteurs, volets, ouvrants, prises",
+    GROUP_CAMERAS: "Service caméras (Freebox Home et caméras IP)",
+    GROUP_PLAYER: "Service Freebox Player",
+    GROUP_VM: "Service machines virtuelles",
+    GROUP_DOWNLOADS: "Service gestionnaire de téléchargements",
+    GROUP_PARENTAL: "Service contrôle parental",
+    GROUP_CALLS: "Service téléphonie / journal d'appels",
+    GROUP_TV: "Service guide TV, TNT et enregistrements",
+    GROUP_EQUIPMENT: "Service équipements : répéteurs, disques, clients réseau",
+    GROUP_OTHER: "Appareils non classés",
 }
 
 
@@ -84,25 +100,33 @@ def group_identifier(router_mac: str, group: str) -> tuple[str, str]:
 
 
 def group_parent(group: str) -> str | None:
-    """Groupe parent (les sous-groupes réseau sont sous « Réseau »)."""
-    return GROUP_NETWORK if group in NETWORK_SUBGROUPS else None
+    """Groupe parent (les sous-groupes réseau sont sous « Équipements »)."""
+    return GROUP_EQUIPMENT if group in NETWORK_SUBGROUPS else None
 
 
-def home_node_group(node: dict[str, Any]) -> str | None:
-    """Groupe d'un nœud Freebox Home (None = rattaché directement au Freebox Server)."""
-    category = node.get("category")
-    if category == FreeboxHomeCategory.DWS:
-        return GROUP_WINDOWS
-    if category == FreeboxHomeCategory.CAMERA:
+def home_node_group(node: dict[str, Any]) -> str:
+    """Groupe d'un nœud Freebox Home : Caméras, sinon Maison connectée et alarme."""
+    if node.get("category") == FreeboxHomeCategory.CAMERA:
         return GROUP_CAMERAS
-    if category in _SECURITY_CATEGORIES:
-        return GROUP_SECURITY
-    if category in _COVER_CATEGORIES:
-        return GROUP_COVERS
-    inherit = (node.get("type") or {}).get("inherit")
-    if inherit in ("node::rts", "node::ios"):
-        return GROUP_COVERS
-    return None
+    return GROUP_HOME
+
+
+def migrate_group(group: str | None) -> str | None:
+    """Ancien groupe par type -> groupe de service le plus proche."""
+    if group is None:
+        return None
+    return LEGACY_GROUP_MAP.get(group, group)
+
+
+def migrate_overrides(overrides: dict[str, str] | None) -> dict[str, str]:
+    """Surcharges enregistrées migrées vers les groupes de service (inconnus ignorés)."""
+    valid = set(SERVICE_GROUPS) | set(NETWORK_SUBGROUPS)
+    result: dict[str, str] = {}
+    for key, value in (overrides or {}).items():
+        new = migrate_group(value)
+        if new in valid:
+            result[key] = new
+    return result
 
 
 # --- Classification des clients réseau --------------------------------------
@@ -116,10 +140,10 @@ _HOST_TYPE_GROUPS = {
     "nas": NET_COMPUTERS,
     "television": NET_MEDIA,
     "multimedia_device": NET_MEDIA,
-    "freebox_player": GROUP_MEDIA,
-    "freebox_mini": GROUP_MEDIA,
-    "freebox_hd": GROUP_MEDIA,
-    "freebox_delta": GROUP_MEDIA,
+    "freebox_player": GROUP_PLAYER,
+    "freebox_mini": GROUP_PLAYER,
+    "freebox_hd": GROUP_PLAYER,
+    "freebox_delta": GROUP_PLAYER,
     "vg_console": NET_CONSOLES,
     "printer": NET_PRINTERS,
     "ip_camera": GROUP_CAMERAS,
@@ -296,10 +320,9 @@ def async_get_group_device(
     return device.id
 
 
-ALL_GROUPS = (
-    GROUP_SECURITY, GROUP_WINDOWS, GROUP_CAMERAS, GROUP_COVERS, GROUP_NETWORK, *NETWORK_SUBGROUPS,
-    GROUP_MEDIA, GROUP_INFRA, GROUP_OTHER,
-)
+ALL_GROUPS = (*SERVICE_GROUPS, *NETWORK_SUBGROUPS)
+# Groupes vérifiés par le nettoyage : actuels + anciens groupes par type.
+CLEANUP_GROUPS = (*ALL_GROUPS, *LEGACY_GROUP_MAP)
 
 
 def async_remove_unused_group_devices(
@@ -312,7 +335,7 @@ def async_remove_unused_group_devices(
     """
     registry = dr.async_get(hass)
     removed: list[str] = []
-    for group in ALL_GROUPS:
+    for group in CLEANUP_GROUPS:
         if group in used:
             continue
         device = registry.async_get_device(identifiers={group_identifier(router_mac, group)})

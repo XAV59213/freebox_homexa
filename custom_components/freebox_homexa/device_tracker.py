@@ -21,7 +21,7 @@ from .const import (
     DOMAIN,
     option_enabled,
 )
-from .device_groups import GROUP_INFRA, classify_lan_client, lan_client_name, suggested_area
+from .device_groups import GROUP_EQUIPMENT, classify_lan_client, lan_client_name, suggested_area
 from .router import FreeboxRouter, is_freebox_repeater
 
 _LOGGER = logging.getLogger(__name__)
@@ -108,7 +108,7 @@ class FreeboxDevice(ScannerEntity):
                 model=device.get("model") or "F-RP01A",
                 name=self._name,
                 via_device_id=self._router.parent_for(
-                    f"repeater_{self._mac}", self._name, GROUP_INFRA
+                    f"repeater_{self._mac}", self._name, GROUP_EQUIPMENT
                 ),
             )
 

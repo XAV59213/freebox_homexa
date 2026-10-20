@@ -33,7 +33,7 @@ from .const import (
     option_enabled,
 )
 from .entity import FreeboxHomeEntity
-from .device_groups import GROUP_INFRA, classify_lan_client, lan_client_name
+from .device_groups import GROUP_EQUIPMENT, classify_lan_client, lan_client_name
 from .router import FreeboxRouter, is_freebox_repeater
 from .tnt_const import selected_channels
 from .tnt_setup import TNT_COORDINATORS_KEY
@@ -237,6 +237,7 @@ class FreeboxSensor(SensorEntity):
 class FreeboxCallSensor(FreeboxSensor):
     def __init__(self, router: FreeboxRouter, description: SensorEntityDescription) -> None:
         super().__init__(router, description)
+        self._attr_device_info = router.calls_device_info
         self._call_list_for_type: list[dict[str, Any]] = []
 
     @callback
@@ -269,7 +270,7 @@ class FreeboxDiskSensor(FreeboxSensor):
             "name": f"Disque {disk['id']}",
             "sw_version": disk["firmware"],
         }
-        parent_id = router.parent_for(f"disk:{disk['id']}", f"Disque {disk['id']}", GROUP_INFRA)
+        parent_id = router.parent_for(f"disk:{disk['id']}", f"Disque {disk['id']}", GROUP_EQUIPMENT)
         if parent_id:
             device_info["via_device_id"] = parent_id
         self._attr_device_info = DeviceInfo(**device_info)
@@ -334,7 +335,7 @@ class FreeboxWifiSignalSensor(SensorEntity):
                 connections={(CONNECTION_NETWORK_MAC, self._mac)},
                 manufacturer=device.get("vendor_name") or "Freebox SAS",
                 name=name,
-                via_device_id=self._router.parent_for(f"repeater_{self._mac}", name, GROUP_INFRA),
+                via_device_id=self._router.parent_for(f"repeater_{self._mac}", name, GROUP_EQUIPMENT),
             )
             return
 

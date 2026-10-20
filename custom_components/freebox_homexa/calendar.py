@@ -87,7 +87,7 @@ class FreeboxTvGuideCalendar(CalendarEntity):
     def __init__(self, router: FreeboxRouter) -> None:
         self._router = router
         self._attr_unique_id = f"{router.mac}_tv_guide"
-        self._attr_device_info = router.device_info
+        self._attr_device_info = router.tv_guide_device_info
         self._event: CalendarEvent | None = None
         self._channels: dict[str, dict[str, Any]] = {}
         self._summary: dict[str, Any] = {}

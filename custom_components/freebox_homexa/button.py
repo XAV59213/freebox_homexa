@@ -145,7 +145,11 @@ class FreeboxButton(ButtonEntity):
     ) -> None:
         self.entity_description = description
         self._router = router
-        self._attr_device_info = router.device_info
+        self._attr_device_info = (
+            router.calls_device_info
+            if description.key == "mark_calls_as_read"
+            else router.device_info
+        )
         self._attr_unique_id = f"{router.mac} {description.name}"
         self._attr_name = description.name
 

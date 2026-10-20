@@ -14,7 +14,8 @@ from homeassistant.config_entries import (
     OptionsFlow,
 )
 from homeassistant.const import CONF_HOST, CONF_PORT
-from homeassistant.core import callback
+from homeassistant.core import HomeAssistant, callback
+from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers import selector
 from homeassistant.helpers.service_info.zeroconf import ZeroconfServiceInfo
 from homeassistant.helpers.storage import Store
@@ -36,6 +37,11 @@ from .const import (
     remote_code_field,
 )
 from .tnt_const import (
+    CONF_ANNOUNCE_VOLUME,
+    CONF_MEDIA_PLAYER_TARGETS,
+    CONF_NOTIFY_TARGET,
+    CONF_REMINDER_PROFILES,
+    CONF_TTS_ENGINE,
     CONF_TMDB_API_KEY,
     CONF_TNT_CHANNELS,
     CONF_TNT_CHANNELS_BELGIQUE,
@@ -158,6 +164,8 @@ class FreeboxFlowHandler(ConfigFlow, domain=DOMAIN):
         self._data: dict[str, Any] = {}
         self._options: dict[str, Any] = {}
         self._players: list[dict[str, Any]] = []
+        self._profiles: list[dict] | None = None
+        self._editing_profile: str | None = None
 
     @staticmethod
     @callback
@@ -334,6 +342,125 @@ def _tnt_schema(channels_default: list[str], tmdb_api_key_default: str | None) -
     return vol.Schema(fields)
 
 
+# --- Profils de rappel : adapted from cyclope205/programme-tnt-fr v3.0.8 (MIT) ---
+
+def _notify_options(hass: HomeAssistant) -> list[selector.SelectOptionDict]:
+    """Notify services actually registered on this HA instance.
+
+    Built dynamically (not a hardcoded list) since available targets
+    (mobile_app_*, alexa_media_*, ...) differ per install. Excluded:
+    "send_message" (needs an entity-based notify target, which this
+    install's notify integrations - legacy service-per-device style -
+    do not register); "notify" and "persistent_notification" (generic,
+    not tied to a specific person's device).
+
+    "alexa_media_*" slugs are kept: the reminder-firing code calls them
+    with data={"type": "tts"} so Alexa speaks the message itself, in its
+    own voice, with no audio file to fetch. That matters because the
+    other option (media_player_targets + tts_engine, using tts.speak)
+    needs Amazon's servers to download a generated audio file from this
+    HA instance's external URL - which fails for any install that isn't
+    reachable from the public internet (e.g. Tailscale-only external_url,
+    no Nabu Casa Cloud), producing a "can't access..." error spoken by
+    the Echo instead of the reminder.
+    """
+    services = hass.services.async_services().get("notify", {})
+    return [
+        selector.SelectOptionDict(value=slug, label=slug)
+        for slug in sorted(services)
+        if slug not in {"send_message", "notify", "persistent_notification"}
+    ]
+
+
+def _notify_media_player_conflict(
+    hass: HomeAssistant,
+    notify_targets: list[str],
+    media_player_targets: list[str],
+) -> bool:
+    """True if a notify target and a media_player target hit the same device.
+
+    Alexa Media Player registers both a media_player entity and a
+    notify.alexa_media_<slug> service for the same physical Echo. Selecting
+    both for one profile double-announces every reminder on that device (see
+    _alexa_notify_slug / _async_notify in reminders.py) - block that here
+    instead of letting it fail silently at reminder-fire time.
+    """
+    if not notify_targets or not media_player_targets:
+        return False
+    notify_slugs = {
+        slug[len("notify.") :] if slug.startswith("notify.") else slug
+        for slug in notify_targets
+    }
+    registry = er.async_get(hass)
+    for entity_id in media_player_targets:
+        entry = registry.async_get(entity_id)
+        if entry is None or entry.platform != "alexa_media":
+            continue
+        slug = "alexa_media_" + entity_id.split(".", 1)[1]
+        if slug in notify_slugs:
+            return True
+    return False
+
+
+def _profile_schema(
+    hass: HomeAssistant,
+    name_default: str | None = None,
+    notify_default: list[str] | None = None,
+    media_player_default: list[str] | None = None,
+    tts_default: str | None = None,
+    announce_volume_default: float | None = None,
+) -> vol.Schema:
+    """Form to create or edit one named reminder profile (a person -> their devices).
+
+    Mirrors the notify/media_player/tts fields of the general settings
+    form, but scoped to a single named profile instead of the whole
+    integration - so two people who each want reminders on their own
+    phone/speaker don't have to share one global target list. Passing
+    the *_default arguments pre-fills the form for editing an existing
+    profile instead of creating a new one.
+    """
+    notify_selector = selector.selector(
+        {
+            "select": {
+                "options": _notify_options(hass),
+                "multiple": True,
+                "mode": "dropdown",
+            }
+        }
+    )
+    media_player_selector = selector.selector(
+        {"entity": {"domain": "media_player", "multiple": True}}
+    )
+    tts_selector = selector.selector({"entity": {"domain": "tts", "multiple": False}})
+    volume_selector = selector.selector(
+        {"number": {"min": 0, "max": 1, "step": 0.05, "mode": "slider"}}
+    )
+    fields: dict = {}
+    if name_default is not None:
+        fields[vol.Required("name", default=name_default)] = selector.selector({"text": {}})
+    else:
+        fields[vol.Required("name")] = selector.selector({"text": {}})
+    if notify_default:
+        fields[vol.Optional(CONF_NOTIFY_TARGET, default=notify_default)] = notify_selector
+    else:
+        fields[vol.Optional(CONF_NOTIFY_TARGET)] = notify_selector
+    if media_player_default:
+        fields[
+            vol.Optional(CONF_MEDIA_PLAYER_TARGETS, default=media_player_default)
+        ] = media_player_selector
+    else:
+        fields[vol.Optional(CONF_MEDIA_PLAYER_TARGETS)] = media_player_selector
+    if tts_default:
+        fields[vol.Optional(CONF_TTS_ENGINE, default=tts_default)] = tts_selector
+    else:
+        fields[vol.Optional(CONF_TTS_ENGINE)] = tts_selector
+    if announce_volume_default is not None:
+        fields[vol.Optional(CONF_ANNOUNCE_VOLUME, default=announce_volume_default)] = volume_selector
+    else:
+        fields[vol.Optional(CONF_ANNOUNCE_VOLUME)] = volume_selector
+    return vol.Schema(fields)
+
+
 class FreeboxOptionsFlowHandler(OptionsFlow):
     """Options : LAN, intervalle Home et télécommandes Player sur le même écran."""
 
@@ -353,7 +480,7 @@ class FreeboxOptionsFlowHandler(OptionsFlow):
     async def async_step_init(
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
-        return self.async_show_menu(step_id="init", menu_options=["general", "tnt"])
+        return self.async_show_menu(step_id="init", menu_options=["general", "tnt", "profiles"])
 
     async def async_step_tnt(
         self, user_input: dict[str, Any] | None = None
@@ -377,6 +504,136 @@ class FreeboxOptionsFlowHandler(OptionsFlow):
             ),
             errors=errors,
         )
+
+    async def async_step_profiles(self, user_input: dict | None = None):
+        if self._profiles is None:
+            self._profiles = [
+                dict(p) for p in self.config_entry.options.get(CONF_REMINDER_PROFILES, [])
+            ]
+        actions = [
+            selector.SelectOptionDict(value="add", label="Ajouter un profil"),
+        ]
+        for profile in self._profiles:
+            actions.append(
+                selector.SelectOptionDict(
+                    value=f"edit:{profile['name']}",
+                    label=f"Modifier {profile['name']}",
+                )
+            )
+            actions.append(
+                selector.SelectOptionDict(
+                    value=f"remove:{profile['name']}",
+                    label=f"Supprimer {profile['name']}",
+                )
+            )
+        actions.append(selector.SelectOptionDict(value="done", label="Terminer"))
+
+        if user_input is not None:
+            action = user_input.get("action")
+            if action == "add":
+                self._editing_profile = None
+                return await self.async_step_add_profile()
+            if action and action.startswith("edit:"):
+                self._editing_profile = action[len("edit:") :]
+                return await self.async_step_add_profile()
+            if action and action.startswith("remove:"):
+                name = action[len("remove:") :]
+                self._profiles = [p for p in self._profiles if p["name"] != name]
+                return await self.async_step_profiles()
+            return self._save_profiles()
+
+        names = ", ".join(p["name"] for p in self._profiles) or "aucun profil configuré"
+        return self.async_show_form(
+            step_id="profiles",
+            data_schema=vol.Schema(
+                {
+                    vol.Required("action", default="done"): selector.selector(
+                        {"select": {"options": actions, "mode": "list"}}
+                    )
+                }
+            ),
+            description_placeholders={"profiles": names},
+        )
+
+    async def async_step_add_profile(self, user_input: dict | None = None):
+        errors: dict[str, str] = {}
+        editing_name = self._editing_profile
+        if user_input is not None:
+            name = (user_input.get("name") or "").strip()
+            if not name:
+                errors["base"] = "no_name"
+            elif any(
+                p["name"] == name
+                for p in self._profiles
+                if editing_name is None or p["name"] != editing_name
+            ):
+                errors["base"] = "duplicate_name"
+            elif _notify_media_player_conflict(
+                self.hass,
+                user_input.get(CONF_NOTIFY_TARGET) or [],
+                user_input.get(CONF_MEDIA_PLAYER_TARGETS) or [],
+            ):
+                errors["base"] = "device_conflict"
+            else:
+                profile: dict = {"name": name}
+                if user_input.get(CONF_NOTIFY_TARGET):
+                    profile[CONF_NOTIFY_TARGET] = user_input[CONF_NOTIFY_TARGET]
+                if user_input.get(CONF_MEDIA_PLAYER_TARGETS):
+                    profile[CONF_MEDIA_PLAYER_TARGETS] = user_input[CONF_MEDIA_PLAYER_TARGETS]
+                if user_input.get(CONF_TTS_ENGINE):
+                    profile[CONF_TTS_ENGINE] = user_input[CONF_TTS_ENGINE]
+                if user_input.get(CONF_ANNOUNCE_VOLUME) is not None:
+                    profile[CONF_ANNOUNCE_VOLUME] = user_input[CONF_ANNOUNCE_VOLUME]
+                if editing_name is not None:
+                    self._profiles = [
+                        profile if p["name"] == editing_name else p
+                        for p in self._profiles
+                    ]
+                else:
+                    self._profiles.append(profile)
+                self._editing_profile = None
+                return await self.async_step_profiles()
+
+        existing = None
+        if editing_name is not None:
+            existing = next(
+                (p for p in self._profiles if p["name"] == editing_name), None
+            )
+
+        if errors and user_input is not None:
+            name_default = user_input.get("name")
+            notify_default = user_input.get(CONF_NOTIFY_TARGET)
+            media_player_default = user_input.get(CONF_MEDIA_PLAYER_TARGETS)
+            tts_default = user_input.get(CONF_TTS_ENGINE)
+            announce_volume_default = user_input.get(CONF_ANNOUNCE_VOLUME)
+        else:
+            name_default = existing["name"] if existing else None
+            notify_default = existing.get(CONF_NOTIFY_TARGET) if existing else None
+            media_player_default = (
+                existing.get(CONF_MEDIA_PLAYER_TARGETS) if existing else None
+            )
+            tts_default = existing.get(CONF_TTS_ENGINE) if existing else None
+            announce_volume_default = (
+                existing.get(CONF_ANNOUNCE_VOLUME) if existing else None
+            )
+
+        return self.async_show_form(
+            step_id="add_profile",
+            data_schema=_profile_schema(
+                self.hass,
+                name_default=name_default,
+                notify_default=notify_default,
+                media_player_default=media_player_default,
+                tts_default=tts_default,
+                announce_volume_default=announce_volume_default,
+            ),
+            errors=errors,
+        )
+
+    def _save_profiles(self) -> ConfigFlowResult:
+        data = dict(self.config_entry.options)
+        data[CONF_REMINDER_PROFILES] = self._profiles or []
+        return self.async_create_entry(title="", data=data)
 
     async def async_step_general(
         self, user_input: dict[str, Any] | None = None

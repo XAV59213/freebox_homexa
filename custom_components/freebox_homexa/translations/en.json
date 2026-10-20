@@ -56,7 +56,8 @@
       "init": {
         "menu_options": {
           "general": "General settings",
-          "tnt": "TNT guide"
+          "tnt": "TNT guide",
+          "profiles": "Reminder profiles"
         },
         "title": "Freebox Homexa options"
       },
@@ -86,10 +87,31 @@
           "tnt_channels_belgique": "Belgian channels (RTBF)",
           "tnt_tmdb_api_key": "Personal TMDB API key (optional)"
         }
+      },
+      "profiles": {
+        "title": "Reminder profiles",
+        "description": "Configured profiles: {profiles}. A profile groups a person's name and their own devices to notify.",
+        "data": {
+          "action": "Action"
+        }
+      },
+      "add_profile": {
+        "title": "Reminder profile",
+        "description": "Name the profile (e.g. Fred) and choose its devices.",
+        "data": {
+          "name": "Profile name",
+          "notify_target": "Device to notify (optional)",
+          "media_player_targets": "Speakers/TVs for voice announcement (optional)",
+          "tts_engine": "Text-to-speech engine (optional)",
+          "announce_volume": "Announcement volume (optional)"
+        }
       }
     },
     "error": {
-      "no_channels": "Select at least one channel."
+      "no_channels": "Select at least one channel.",
+      "no_name": "Enter a name for this profile.",
+      "duplicate_name": "A profile with this name already exists.",
+      "device_conflict": "The same device cannot be both a notification target and a voice speaker (it would be announced twice)."
     }
   },
   "services": {
@@ -108,6 +130,80 @@
         "code": {
           "name": "Command Code",
           "description": "The code of the command to send (e.g., power, play, pause)."
+        }
+      }
+    },
+    "schedule_reminder": {
+      "name": "Schedule TNT reminder",
+      "description": "Schedules a reminder (notification and/or voice announcement) before a programme starts.",
+      "fields": {
+        "channel_name": {
+          "name": "Channel name",
+          "description": "Displayed channel name."
+        },
+        "program_title": {
+          "name": "Program title",
+          "description": "Programme title."
+        },
+        "start_time": {
+          "name": "Start time",
+          "description": "Programme start time (ISO 8601)."
+        },
+        "minutes_before": {
+          "name": "Minutes before",
+          "description": "Delay before the start (5, 10 or 15 min)."
+        },
+        "profile_name": {
+          "name": "Profile name",
+          "description": "Reminder profile name (optional if only one profile exists)."
+        }
+      }
+    },
+    "cancel_reminder": {
+      "name": "Cancel TNT reminder",
+      "description": "Cancels a previously scheduled reminder.",
+      "fields": {
+        "channel_name": {
+          "name": "Channel name",
+          "description": "Displayed channel name."
+        },
+        "program_title": {
+          "name": "Program title",
+          "description": "Programme title."
+        },
+        "start_time": {
+          "name": "Start time",
+          "description": "Programme start time (ISO 8601)."
+        },
+        "minutes_before": {
+          "name": "Minutes before",
+          "description": "Delay before the start (5, 10 or 15 min)."
+        },
+        "profile_name": {
+          "name": "Profile name",
+          "description": "Reminder profile name (optional if only one profile exists)."
+        }
+      }
+    },
+    "get_reminder_status": {
+      "name": "TNT reminder status",
+      "description": "Returns the delays (minutes) for which a reminder is scheduled on this programme.",
+      "fields": {
+        "channel_name": {
+          "name": "Channel name",
+          "description": "Displayed channel name."
+        },
+        "program_title": {
+          "name": "Program title",
+          "description": "Programme title."
+        },
+        "start_time": {
+          "name": "Start time",
+          "description": "Programme start time (ISO 8601)."
+        },
+        "profile_name": {
+          "name": "Profile name",
+          "description": "Reminder profile name (optional if only one profile exists)."
         }
       }
     }

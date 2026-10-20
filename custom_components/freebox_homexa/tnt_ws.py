@@ -48,7 +48,11 @@ def websocket_get_programmes(hass: HomeAssistant, connection: websocket_api.Acti
 @callback
 def websocket_get_reminder_profiles(hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg: dict) -> None:
     names: list[str] = []
-    for entry in hass.config_entries.async_entries(DOMAIN):
+    entries = [
+        *hass.config_entries.async_entries("freebox_homexa"),
+        *hass.config_entries.async_entries(DOMAIN),
+    ]
+    for entry in entries:
         for profile in entry.options.get(CONF_REMINDER_PROFILES, []):
             name = profile.get("name")
             if name and name not in names:

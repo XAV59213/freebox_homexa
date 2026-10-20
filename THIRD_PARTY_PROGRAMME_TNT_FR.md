@@ -10,7 +10,9 @@ https://github.com/cyclope205/programme-tnt-fr (v3.0.8).
 - `custom_components/freebox_homexa/tnt_sensor.py` — per-channel sensors
 - `custom_components/freebox_homexa/tnt_ws.py` — websocket commands `programme_tnt_fr/*`
 - `custom_components/freebox_homexa/tnt_setup.py` — setup of the built-in guide
-- `custom_components/freebox_homexa/config_flow.py` — options step « Guide TNT » (channel selection, personal TMDB key)
+- `custom_components/freebox_homexa/config_flow.py` — options steps « Guide TNT » (channel selection, personal TMDB key) and « Profils de rappel » (reminder profiles, notify/media_player conflict check)
+- `custom_components/freebox_homexa/tnt_reminders.py` — persistent reminders and services `schedule_reminder` / `cancel_reminder` / `get_reminder_status`
+- `custom_components/freebox_homexa/services.yaml` — reminder service descriptions
 
 The author's bundled default TMDB API key is **not** included: TMDB features
 only work with the user's own key.

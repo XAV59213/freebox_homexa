@@ -112,6 +112,130 @@ def cluster_repeater_macs(
     return result
 
 
+def eui64_mac(addr: str | None) -> str:
+    """MAC (normalisée) encodée dans une adresse IPv6 SLAAC/EUI-64, sinon ""."""
+    if not addr or ":" not in addr:
+        return ""
+    try:
+        import ipaddress
+
+        packed = ipaddress.IPv6Address(addr.split("%")[0]).packed
+    except ValueError:
+        return ""
+    iid = packed[8:]
+    if iid[3] != 0xFF or iid[4] != 0xFE:
+        return ""
+    raw = bytes([iid[0] ^ 0x02, iid[1], iid[2], iid[5], iid[6], iid[7]])
+    return raw.hex().upper()
+
+
+def _host_addrs(device: dict[str, Any]) -> list[str]:
+    return [
+        str(c.get("addr")).lower()
+        for c in device.get("l3connectivities") or []
+        if isinstance(c, dict) and c.get("addr")
+    ]
+
+
+def group_repeater_macs(
+    hosts: dict[str, dict[str, Any]],
+    ap_uids: dict[str, str],
+    api_repeaters: list[dict[str, Any]] | None = None,
+) -> tuple[dict[str, str], dict[str, list[str]]]:
+    """Regroupe toutes les MAC vues par répéteur PHYSIQUE (union-find).
+
+    `hosts` : MAC normalisée -> hôte LAN reconnu comme répéteur.
+    `ap_uids` : MAC normalisée d'un point d'accès répéteur (access_point.mac des
+    clients LAN) -> access_point.uid (identifiant du répéteur côté Freebox).
+
+    Signaux, du plus sûr au moins sûr :
+      1. API /repeater/ si elle répond (main_mac, backhaul, fronthaul) ;
+      2. même access_point.uid ;
+      3. adresse IP (v4/v6) commune entre hôtes (interfaces pontées du répéteur) ;
+      4. IPv6 EUI-64 d'un hôte qui encode la MAC d'un autre hôte ;
+      5. proximité des MAC (BSSID / radios : mêmes octets 2 à 5).
+    Retourne (MAC -> MAC canonique, MAC canonique -> raisons du regroupement).
+    """
+    parent: dict[str, str] = {}
+    reasons: dict[str, list[str]] = {}
+
+    def find(x: str) -> str:
+        parent.setdefault(x, x)
+        while parent[x] != x:
+            parent[x] = parent[parent[x]]
+            x = parent[x]
+        return x
+
+    def union(a: str, b: str, why: str) -> None:
+        ra, rb = find(a), find(b)
+        if ra != rb:
+            parent[rb] = ra
+            reasons.setdefault(ra, []).extend(reasons.pop(rb, []))
+            reasons[ra].append(f"{why}: {display_mac(a)} ~ {display_mac(b)}")
+
+    nodes = set(hosts) | set(ap_uids)
+    main_macs: set[str] = set()
+    for rep in api_repeaters or []:
+        macs = [normalize_mac(m) for m in api_repeater_macs(rep)]
+        macs = [m for m in macs if m]
+        if not macs:
+            continue
+        main_macs.add(macs[0])
+        nodes.update(macs)
+        for m in macs[1:]:
+            union(macs[0], m, f"API repeater {rep.get('id')}")
+    for n in nodes:
+        find(n)
+    by_uid: dict[str, str] = {}
+    for mac, uid in ap_uids.items():
+        if uid in by_uid:
+            union(by_uid[uid], mac, f"uid {uid}")
+        else:
+            by_uid[uid] = mac
+    by_addr: dict[str, str] = {}
+    for mac, device in hosts.items():
+        for addr in _host_addrs(device):
+            if addr.startswith("fe80") or addr in ("0.0.0.0", "::"):
+                encoded = eui64_mac(addr)
+                if encoded == mac:
+                    main_macs.add(mac)
+                elif encoded and encoded in nodes:
+                    union(encoded, mac, "EUI-64")
+                    main_macs.add(encoded)
+                continue
+            if addr in by_addr:
+                union(by_addr[addr], mac, f"IP {addr}")
+            else:
+                by_addr[addr] = mac
+            encoded = eui64_mac(addr)
+            if encoded == mac:
+                main_macs.add(mac)  # l'adresse SLAAC désigne l'interface principale
+            elif encoded and encoded in nodes:
+                union(encoded, mac, "EUI-64")
+                main_macs.add(encoded)
+    ordered = sorted(nodes)
+    for i, a in enumerate(ordered):
+        for b in ordered[i + 1 :]:
+            if find(a) != find(b) and _repeater_distance(a, b) is not None:
+                union(a, b, "MAC voisines")
+
+    clusters: dict[str, list[str]] = {}
+    for n in nodes:
+        clusters.setdefault(find(n), []).append(n)
+    aliases: dict[str, str] = {}
+    why: dict[str, list[str]] = {}
+    for root, members in clusters.items():
+        # Ancre stable : MAC principale (API / EUI-64), sinon plus petite MAC d'hôte.
+        candidates = sorted(m for m in members if m in main_macs) or sorted(
+            m for m in members if m in hosts
+        ) or sorted(members)
+        canon = display_mac(candidates[0])
+        for m in members:
+            aliases[m] = canon
+        why[canon] = reasons.get(root, [])
+    return aliases, why
+
+
 def parent_identifier(access_point: dict[str, Any], router_mac: str) -> str:
     """HA device identifier for the AP that owns this client."""
     if access_point.get("kind") == "gateway":
@@ -238,11 +362,15 @@ def build_wifi_aps(
         for mac, device in devices.items()
         if is_freebox_repeater(device, router_mac)
     }
-    aliases = cluster_repeater_macs(
-        [*hosts, *repeater_clients],
-        [r.get("main_mac") for r in api_repeaters],
-        {r["main_mac"]: api_repeater_macs(r) for r in api_repeaters if r.get("main_mac")},
-    )
+    ap_uids: dict[str, str] = {}
+    for device in devices.values():
+        access_point = device.get("access_point") or {}
+        ap_norm = normalize_mac(access_point.get("mac"))
+        if access_point.get("type") == "repeater" and ap_norm:
+            ap_uids.setdefault(ap_norm, str(access_point.get("uid") or f"mac:{ap_norm}"))
+    for ap_norm in repeater_clients:
+        ap_uids.setdefault(ap_norm, f"mac:{ap_norm}")
+    aliases, grouping = group_repeater_macs(hosts, ap_uids, api_repeaters)
     canon_macs: dict[str, list[str]] = {}
     for norm, canon in aliases.items():
         canon_macs.setdefault(canon, []).append(display_mac(norm))
@@ -268,6 +396,7 @@ def build_wifi_aps(
         payload = dict(host)
         payload.update(
             {
+                "grouping": grouping.get(canon, []),
                 "id": canon,
                 "kind": "repeater",
                 "name": name,

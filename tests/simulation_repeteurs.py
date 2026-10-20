@@ -45,25 +45,37 @@ def load(name):
     sys.modules["fh."+name]=m; exec(src,m.__dict__); return m
 load("registry_compat"); dg=load("device_groups"); wa=load("wifi_ap")
 RM="34:27:92:D9:E0:30"
-def rep(i,name,model,main,eth,bh,fh):
-    return {"id":i,"name":name,"model":model,"main_mac":main,"sn":f"SN{i}","status":"running",
-      "backhaul":[{"mac":eth,"type":"eth"},{"mac":bh[0],"type":"wifi"},{"mac":bh[1],"type":"wifi"}],
-      "fronthaul":[{"bssid":f} for f in fh]}
-API=[rep(1,"Repeteur Wifi Freebox","fbxwmr","8C:97:EA:55:BB:B6","16:E4:EF:4D:F7:1F",["8E:97:EA:9B:1F:91","8E:97:EA:9B:1F:95"],["8C:97:EA:9B:1F:90","8E:97:EA:9B:1F:90","8C:97:EA:9B:1F:94","8E:97:EA:9B:1F:94"]),
-     rep(2,"Repeteur Wifi Freebox #2","fbxwmr-r2","8C:97:EA:12:34:56","5A:11:22:33:44:55",["8E:97:EA:AA:00:01","8E:97:EA:AA:00:05"],["8C:97:EA:AA:00:00","8C:97:EA:AA:00:04"]),
-     rep(3,"Repeteur Wifi Freebox Garage","fbxwmr","8C:97:EA:77:88:99","2E:66:77:88:99:00",["8E:97:EA:CC:10:01","8E:97:EA:CC:10:05"],["8C:97:EA:CC:10:00","8C:97:EA:CC:10:04"])]
+# Données au format de lan/browser (API_FREEBOX_OS.txt) : l2ident.id, primary_name,
+# vendor_name, host_type, active, model, l3connectivities, access_point {type, mac, uid}.
+# Pas d'API /repeater/ (non documentée) : api_repeaters vide.
 hosts={}
-def h(mac,name,model=None): hosts[mac]={"l2ident":{"id":mac},"primary_name":name,"host_type":"networking_device","vendor_name":"Freebox SAS","model":model,"active":True}
-h("8C:97:EA:55:BB:B6","Repeteur Wifi Freebox","fbxwmr"); h("8E:97:EA:9B:1F:95","Repeteur Wifi Freebox"); h("16:E4:EF:4D:F7:1F","Repeteur-Wifi-Freebox-2","F-RP01A")
-h("8C:97:EA:12:34:56","Repeteur Wifi Freebox #2","fbxwmr-r2"); h("8E:97:EA:AA:00:05","Repeteur Wifi Freebox #2")
-h("8C:97:EA:77:88:99","Repeteur Wifi Freebox Garage","fbxwmr"); h("8E:97:EA:CC:10:05","Repeteur Wifi Freebox")
-hosts["AA:BB:CC:00:00:01"]={"l2ident":{"id":"AA:BB:CC:00:00:01"},"primary_name":"pc","access_point":{"type":"repeater","mac":"8C:97:EA:9B:1F:94"},"wifi":{"connectivity":"wifi"}}
-# 28.8.44 behaviour (no fronthaul/backhaul use) to show bug
-_,old=wa.build_wifi_aps(router_mac=RM,router_name="F",router_model="v7",devices=hosts,api_repeaters=[{k:v for k,v in r.items() if k not in("backhaul","fronthaul")} for r in API])
-print("sans backhaul/fronthaul :",len(old),"répéteurs")
-aps,reps=wa.build_wifi_aps(router_mac=RM,router_name="F",router_model="v7",devices=hosts,api_repeaters=API)
-for k,v in reps.items(): print(k,v["name"],v["model"],v["client_count"],v["macs"])
-assert len(reps)==3 and reps["8C:97:EA:55:BB:B6"]["client_count"]==1
+def h(mac,name,model=None,ips=(),active=True):
+    hosts[mac]={"l2ident":{"id":mac,"type":"mac_address"},"primary_name":name,"host_type":"networking_device",
+      "vendor_name":"Freebox SAS","model":model,"active":active,
+      "l3connectivities":[{"addr":ip,"af":"ipv6" if ":" in ip else "ipv4","active":active} for ip in ips]}
+def v6(mac):  # SLAAC EUI-64 de la MAC principale
+    b=[int(x,16) for x in mac.split(":")]; b[0]^=2
+    return "fd0f:ee:b0:0:%02x%02x:%02xff:fe%02x:%02x%02x"%tuple(b)
+REPS=[("8C:97:EA:55:BB:B6","16:E4:EF:4D:F7:1F","8E:97:EA:9B:1F:95","8C:97:EA:9B:1F:9","1","192.168.1.23","fbxwmr"),
+      ("8C:97:EA:12:34:56","5A:11:22:33:44:55","8E:97:EA:AA:00:05","8C:97:EA:AA:00:0","2","192.168.1.24","fbxwmr-r2"),
+      ("8C:97:EA:77:88:99","2E:66:77:88:99:00","8E:97:EA:CC:10:05","8C:97:EA:CC:10:0","3","192.168.1.25","fbxwmr")]
+names=[("Repeteur Wifi Freebox","Repeteur Wifi Freebox #2","Repeteur-Wifi-Freebox-2"),
+       ("Repeteur Wifi Freebox #2","Repeteur Wifi Freebox","Repeteur Wifi Freebox"),
+       ("Repeteur Wifi Freebox Garage","Repeteur Wifi Freebox","Repeteur Wifi Freebox")]
+for (main,eth,bh,fh,uid,ip,model),(n1,n2,n3) in zip(REPS,names):
+    h(main,n1,model,[ip,v6(main)])
+    h(bh,n2,model,[ip],active=False)       # backhaul Wi-Fi ponté : même IPv4
+    h(eth,n3,"F-RP01A",[ip],active=False)  # backhaul Ethernet : même IPv4
+    for k,suffix in enumerate(("0","4")):
+        cm=f"AA:BB:CC:0{uid}:00:0{k}"
+        hosts[cm]={"l2ident":{"id":cm},"primary_name":f"client{uid}{k}","active":True,"wifi":{"connectivity":"wifi"},
+          "access_point":{"type":"repeater","mac":fh+suffix,"uid":uid,"connectivity_type":"wifi"}}
+_,old=wa.build_wifi_aps(router_mac=RM,router_name="F",router_model="v7",devices=hosts)
+aps,reps=wa.build_wifi_aps(router_mac=RM,router_name="F",router_model="v7",devices=hosts)
+for k,v in reps.items(): print(k,v["name"],v["model"],v["client_count"],v["macs"]); print("   ",v["grouping"])
+assert len(reps)==3, len(reps)
+assert set(reps)=={"8C:97:EA:55:BB:B6","8C:97:EA:12:34:56","8C:97:EA:77:88:99"}
+assert all(v["client_count"]==2 for v in reps.values())
 # registry like user's: 9 devices
 i=0
 def dev(mac,area=None,model="fbxwmr",n=3,name="x"):

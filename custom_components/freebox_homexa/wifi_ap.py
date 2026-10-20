@@ -30,6 +30,24 @@ def is_freebox_repeater(device: dict[str, Any], router_mac: str) -> bool:
     return False
 
 
+# OUI Free / Freebox SAS (répéteurs, box, players). Le jumeau « locally administered »
+# (bit 0x02 du 1er octet, ex. 22:66:CF pour 20:66:CF) est aussi accepté.
+FREE_OUIS = frozenset(
+    {"0007CB", "0024D4", "140C76", "2066CF", "342792", "68A378", "70FC8F", "8C97EA", "E49E12", "F4CAE5"}
+)
+
+
+def is_free_mac(norm: str) -> bool:
+    """MAC normalisée appartenant à un OUI Free (ou à son jumeau local)."""
+    if len(norm) != 12:
+        return False
+    try:
+        first = int(norm[:2], 16)
+    except ValueError:
+        return False
+    return norm[:6] in FREE_OUIS or f"{first & ~0x02:02X}{norm[2:6]}" in FREE_OUIS
+
+
 def display_mac(norm: str) -> str:
     """AABBCCDDEEFF -> AA:BB:CC:DD:EE:FF."""
     return ":".join(norm[i : i + 2] for i in range(0, len(norm), 2)) if len(norm) == 12 else norm
@@ -158,6 +176,7 @@ def group_repeater_macs(
     """
     parent: dict[str, str] = {}
     reasons: dict[str, list[str]] = {}
+    rejected: list[str] = []
 
     def find(x: str) -> str:
         parent.setdefault(x, x)
@@ -224,6 +243,16 @@ def group_repeater_macs(
         clusters.setdefault(find(n), []).append(n)
     aliases: dict[str, str] = {}
     why: dict[str, list[str]] = {}
+    api_nodes = {
+        normalize_mac(m) for rep in api_repeaters or [] for m in api_repeater_macs(rep)
+    }
+    for root, members in list(clusters.items()):
+        # Pas un répéteur Free : aucune MAC Free (ni jumelle), ni API, ni uid répéteur.
+        # (ex. hôte nommé « Repeteur… » avec une MAC aléatoire, non relié à un répéteur)
+        if not any(is_free_mac(m) or m in api_nodes or m in ap_uids for m in members):
+            for m in members:
+                rejected.append(display_mac(m))
+            del clusters[root]
     for root, members in clusters.items():
         # Ancre stable : MAC principale (API / EUI-64), sinon plus petite MAC d'hôte.
         candidates = sorted(m for m in members if m in main_macs) or sorted(
@@ -233,6 +262,8 @@ def group_repeater_macs(
         for m in members:
             aliases[m] = canon
         why[canon] = reasons.get(root, [])
+    if rejected:
+        why["_rejected"] = sorted(rejected)
     return aliases, why
 
 
@@ -371,6 +402,7 @@ def build_wifi_aps(
     for ap_norm in repeater_clients:
         ap_uids.setdefault(ap_norm, f"mac:{ap_norm}")
     aliases, grouping = group_repeater_macs(hosts, ap_uids, api_repeaters)
+    wifi_aps["gateway"]["rejected_repeater_macs"] = grouping.pop("_rejected", [])
     canon_macs: dict[str, list[str]] = {}
     for norm, canon in aliases.items():
         canon_macs.setdefault(canon, []).append(display_mac(norm))

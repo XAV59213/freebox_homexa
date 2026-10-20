@@ -395,7 +395,7 @@ def async_remove_lan_client_devices(
     registry = dr.async_get(hass)
     removed = 0
     for device in dr.async_entries_for_config_entry(registry, entry.entry_id):
-        if any(ident[0] == DOMAIN for ident in device.identifiers):
+        if any(len(ident) > 0 and ident[0] == DOMAIN for ident in device.identifiers):
             continue
         macs = {c[1] for c in device.connections if c[0] == dr.CONNECTION_NETWORK_MAC}
         if not macs or router_mac in macs:
@@ -502,6 +502,18 @@ def suggested_area(name: str | None) -> str | None:
 # --- Répéteurs : un appareil par répéteur physique ---------------------------
 
 
+def _repeater_idents(device: Any) -> list[str]:
+    """Identifiants `repeater_*` de l'appareil (ignore les valeurs non texte, ex. id de nœud int)."""
+    result: list[str] = []
+    for ident in getattr(device, "identifiers", None) or ():
+        if not isinstance(ident, tuple) or len(ident) < 2 or ident[0] != DOMAIN:
+            continue
+        value = ident[1]
+        if isinstance(value, str) and value.startswith("repeater_"):
+            result.append(value)
+    return sorted(result)
+
+
 def _norm_mac(value: str | None) -> str:
     return (value or "").upper().replace(":", "").replace("-", "")
 
@@ -511,6 +523,8 @@ def async_merge_repeater_devices(
     entry: ConfigEntry,
     router_mac: str,
     repeaters: dict[str, dict[str, Any]],
+    rejected_macs: list[str] | None = None,
+    lan_macs: set[str] | None = None,
 ) -> int:
     """Fusionne les appareils en double d'un même répéteur physique.
 
@@ -537,8 +551,8 @@ def async_merge_repeater_devices(
         canon_ident = (DOMAIN, f"repeater_{canon}")
 
         def _belongs(device: dr.DeviceEntry) -> bool:
-            for domain, ident in device.identifiers:
-                if domain == DOMAIN and ident.startswith("repeater_") and _norm_mac(ident[9:]) in norms:
+            for ident in _repeater_idents(device):
+                if _norm_mac(ident[9:]) in norms:
                     return True
             return any(
                 c[0] == dr.CONNECTION_NETWORK_MAC and _norm_mac(c[1]) in norms
@@ -549,7 +563,7 @@ def async_merge_repeater_devices(
         _LOGGER.info(
             "Répéteur %s : appareils trouvés %s",
             canon,
-            [(d.id, d.name, d.model, sorted(i for _, i in d.identifiers)) for d in group],
+            [(d.id, d.name, d.model, _repeater_idents(d)) for d in group],
         )
         # Entités par AP des anciennes MAC (une seule par répéteur désormais).
         for alias in payload.get("macs") or []:
@@ -598,12 +612,31 @@ def async_merge_repeater_devices(
         except Exception:  # noqa: BLE001 — collision éventuelle : on garde l'existant
             pass
     known = {_norm_mac(m) for p in repeaters.values() for m in p.get("macs") or []}
-    for device in devices:
-        idents = [i for dom, i in device.identifiers if dom == DOMAIN and i.startswith("repeater_")]
-        if idents and not any(_norm_mac(i[9:]) in known for i in idents):
-            _LOGGER.info(
-                "Appareil répéteur non rattaché : %s (%s, modèle %s)", idents, device.name, device.model
-            )
+    rejected = {_norm_mac(m) for m in rejected_macs or []}
+    lan = {_norm_mac(m) for m in lan_macs or set()}
+    for device in entry_devices(registry, entry.entry_id):
+        idents = _repeater_idents(device)
+        if not idents or any(_norm_mac(i[9:]) in known for i in idents):
+            continue
+        macs = {_norm_mac(i[9:]) for i in idents}
+        if macs & rejected and macs & lan:
+            # Hôte présent dans lan/browser mais pas un répéteur Free (MAC non Free, non
+            # reliée à un répéteur) : redevient un client réseau ordinaire, entités conservées.
+            try:
+                registry.async_update_device(device.id, new_identifiers=set())
+                _LOGGER.warning(
+                    "Appareil %s (%s) n'est pas un répéteur Free : converti en client réseau",
+                    device.name, idents,
+                )
+                merged += 1
+                continue
+            except Exception:  # noqa: BLE001
+                _LOGGER.debug("Conversion de %s impossible", idents, exc_info=True)
+        _LOGGER.warning(
+            "Appareil répéteur non rattaché conservé : %s (%s, modèle %s)%s",
+            idents, device.name, device.model,
+            "" if macs & lan else " — absent de lan/browser (débranché ?), supprimable à la main",
+        )
     return merged
 
 
@@ -615,7 +648,7 @@ def repeater_registry_devices(hass: HomeAssistant, entry: ConfigEntry) -> list[d
     entities = er.async_get(hass)
     result: list[dict[str, Any]] = []
     for device in entry_devices(registry, entry.entry_id):
-        idents = sorted(i for dom, i in device.identifiers if dom == DOMAIN and str(i).startswith("repeater_"))
+        idents = _repeater_idents(device)
         if not idents:
             continue
         ents = er.async_entries_for_device(entities, device.id, include_disabled_entities=True)

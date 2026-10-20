@@ -18,7 +18,7 @@ from homeassistant.helpers.dispatcher import async_dispatcher_connect
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from .const import DOMAIN, REPEATER_MODEL, FreeboxHomeCategory
-from .device_groups import GROUP_INFRA
+from .device_groups import GROUP_EQUIPMENT
 from .entity import FreeboxHomeEntity
 from .router import FreeboxRouter
 
@@ -195,7 +195,7 @@ class FreeboxWifiApSensor(BinarySensorEntity):
                 "model": access_point.get("model") or REPEATER_MODEL,
                 "name": name,
             }
-            parent_id = router.parent_for(f"repeater_{mac}", name, GROUP_INFRA)
+            parent_id = router.parent_for(f"repeater_{mac}", name, GROUP_EQUIPMENT)
             if parent_id:
                 device_info["via_device_id"] = parent_id
             self._attr_name = "En ligne"

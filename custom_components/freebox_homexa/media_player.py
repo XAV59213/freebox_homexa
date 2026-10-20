@@ -17,7 +17,7 @@ from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from .const import DOMAIN, option_remote_code
-from .device_groups import GROUP_MEDIA
+from .device_groups import GROUP_PLAYER
 from .router import FreeboxRouter
 
 _LOGGER = logging.getLogger(__name__)
@@ -95,7 +95,7 @@ def player_device_info(router: FreeboxRouter, player: dict[str, Any]) -> DeviceI
     }
     if player.get("mac"):
         info["connections"] = {("mac", player["mac"])}
-    parent_id = router.parent_for(f"player_{player_id}", name, GROUP_MEDIA)
+    parent_id = router.parent_for(f"player_{player_id}", name, GROUP_PLAYER)
     if parent_id:
         info["via_device_id"] = parent_id
     return DeviceInfo(**info)

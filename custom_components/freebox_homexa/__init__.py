@@ -27,7 +27,12 @@ from .const import (
     option_remote_code,
 )
 from .frontend import JSModuleRegistration
-from .device_groups import async_remove_lan_client_devices, async_remove_unused_group_devices
+from .device_groups import (
+    CONF_DEVICE_GROUP_OVERRIDES,
+    async_remove_lan_client_devices,
+    async_remove_unused_group_devices,
+    migrate_overrides,
+)
 from .router import FreeboxRouter, get_api
 from .tnt_setup import (
     TNT_COORDINATORS_KEY,
@@ -111,6 +116,14 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         raise ConfigEntryNotReady from err
 
     freebox_config = await api.system.get_config()
+
+    # Migration des surcharges « Groupes des appareils » (groupes par type -> par service).
+    saved = entry.options.get(CONF_DEVICE_GROUP_OVERRIDES)
+    if saved and migrate_overrides(saved) != saved:
+        hass.config_entries.async_update_entry(
+            entry,
+            options={**entry.options, CONF_DEVICE_GROUP_OVERRIDES: migrate_overrides(saved)},
+        )
 
     device_registry = dr.async_get(hass)
     parent_device = device_registry.async_get_or_create(

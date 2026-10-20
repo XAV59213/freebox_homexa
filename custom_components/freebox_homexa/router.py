@@ -222,10 +222,10 @@ class FreeboxRouter:
         self.device_id: str | None = None
         self.group_device_ids: dict[str, str] = {}
         self.entry_id: str = entry.entry_id
-        from .device_groups import CONF_DEVICE_GROUP_OVERRIDES
+        from .device_groups import CONF_DEVICE_GROUP_OVERRIDES, migrate_overrides
 
-        self.group_overrides: dict[str, str] = dict(
-            entry.options.get(CONF_DEVICE_GROUP_OVERRIDES) or {}
+        self.group_overrides: dict[str, str] = migrate_overrides(
+            entry.options.get(CONF_DEVICE_GROUP_OVERRIDES)
         )
         self.used_groups: set[str] = set()
         # clé stable -> (nom, groupe automatique) pour l'écran d'options
@@ -475,18 +475,48 @@ class FreeboxRouter:
         `key` est la clé stable de l'appareil (dérivée de son identifiant), utilisée
         par l'écran d'options « Groupes des appareils ».
         """
-        from .device_groups import GROUP_AUTO, GROUP_NAMES, GROUP_OTHER, group_parent
+        from .device_groups import ALL_GROUPS, GROUP_AUTO, GROUP_OTHER, group_parent
 
         auto = auto_group or GROUP_OTHER
         self.grouped_devices[key] = (name, auto)
         group = self.group_overrides.get(key) or GROUP_AUTO
-        if group == GROUP_AUTO or group not in GROUP_NAMES:
+        if group == GROUP_AUTO or group not in ALL_GROUPS:
             group = auto
         self.used_groups.add(group)
         parent = group_parent(group)
         if parent:
             self.used_groups.add(parent)
         return self.group_device_id(group)
+
+    def service_device_info(self, key: str, name: str, model: str, group: str) -> DeviceInfo:
+        """Device d'un service Freebox (appels, guide TV…) rangé dans son groupe."""
+        info: dict[str, Any] = {
+            "identifiers": {(DOMAIN, f"{self.mac}_service_{key}")},
+            "manufacturer": "Freebox SAS",
+            "name": name,
+            "model": model,
+            "entry_type": dr.DeviceEntryType.SERVICE,
+        }
+        parent_id = self.parent_for(f"service:{key}", name, group)
+        if parent_id:
+            info["via_device_id"] = parent_id
+        return DeviceInfo(**info)
+
+    @property
+    def calls_device_info(self) -> DeviceInfo:
+        from .device_groups import GROUP_CALLS
+
+        return self.service_device_info(
+            "calls", "Journal d'appels Freebox", "Téléphonie Freebox", GROUP_CALLS
+        )
+
+    @property
+    def tv_guide_device_info(self) -> DeviceInfo:
+        from .device_groups import GROUP_TV
+
+        return self.service_device_info(
+            "tv_guide", "Guide TV Freebox", "Guide TV Freebox", GROUP_TV
+        )
 
     def group_device_id(self, group: str | None) -> str | None:
         """device_id du parent virtuel (Sécurité/Volets/Réseau), sinon le Freebox Server."""

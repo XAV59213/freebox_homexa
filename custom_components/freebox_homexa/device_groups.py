@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 import re
 from typing import Any
 
@@ -10,6 +11,14 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers import device_registry as dr
 
 from .const import DOMAIN, FreeboxHomeCategory
+from .registry_compat import (
+    device_owned_by,
+    entry_devices,
+    get_device_by_identifier,
+    remove_device,
+)
+
+_LOGGER = logging.getLogger(__name__)
 
 # 4 services de premier niveau : Freebox Server, Freebox Player, Maison connectée, TNT.
 GROUP_SERVER = "server"
@@ -306,8 +315,9 @@ def _has_entities(hass: HomeAssistant, device_id: str) -> bool:
     )
 
 
-def _has_children(registry: Any, device_id: str) -> bool:
-    return any(d.via_device_id == device_id for d in registry.devices.values())
+def _has_children(registry: Any, device_id: str, entry_id: str | None = None) -> bool:
+    devices = entry_devices(registry, entry_id) if entry_id else registry.devices.values()
+    return any(d.via_device_id == device_id for d in devices)
 
 
 def async_remove_unused_group_devices(
@@ -325,12 +335,12 @@ def async_remove_unused_group_devices(
     if GROUP_HOME not in used:
         candidates.append(group_identifier(router_mac, GROUP_HOME))
     for ident in candidates:
-        device = registry.async_get_device(identifiers={ident})
-        if device is None or entry.entry_id not in device.config_entries:
+        device = get_device_by_identifier(registry, ident, entry.entry_id)
+        if device is None:
             continue
-        if _has_entities(hass, device.id) or _has_children(registry, device.id):
+        if _has_entities(hass, device.id) or _has_children(registry, device.id, entry.entry_id):
             continue
-        registry.async_update_device(device.id, remove_config_entry_id=entry.entry_id)
+        remove_device(registry, device.id)
         removed.append(device.name or ident[1])
     return removed
 
@@ -341,8 +351,8 @@ def async_detach_top_level_devices(
     """Players et TNT : services de premier niveau (plus de via_device)."""
     registry = dr.async_get(hass)
     for ident in idents:
-        device = registry.async_get_device(identifiers={ident})
-        if device is not None and entry.entry_id in device.config_entries and device.via_device_id:
+        device = get_device_by_identifier(registry, ident, entry.entry_id)
+        if device is not None and device.via_device_id:
             registry.async_update_device(device.id, via_device_id=None)
 
 
@@ -356,14 +366,14 @@ def async_remove_merged_node_devices(
     entities = er.async_get(hass)
     removed = 0
     for node_id in node_ids:
-        device = registry.async_get_device(identifiers={(DOMAIN, node_id)})
-        if device is None or entry.entry_id not in device.config_entries:
+        device = get_device_by_identifier(registry, (DOMAIN, node_id), entry.entry_id)
+        if device is None:
             continue
         if er.async_entries_for_device(entities, device.id, include_disabled_entities=True):
             continue
-        if _has_children(registry, device.id):
+        if _has_children(registry, device.id, entry.entry_id):
             continue
-        registry.async_update_device(device.id, remove_config_entry_id=entry.entry_id)
+        remove_device(registry, device.id)
         removed += 1
     return removed
 
@@ -390,7 +400,7 @@ def async_remove_lan_client_devices(
         macs = {c[1] for c in device.connections if c[0] == dr.CONNECTION_NETWORK_MAC}
         if not macs or router_mac in macs:
             continue
-        registry.async_update_device(device.id, remove_config_entry_id=entry.entry_id)
+        remove_device(registry, device.id)
         removed += 1
     return removed
 
@@ -519,7 +529,7 @@ def async_merge_repeater_devices(
     merged = 0
     devices = [
         d
-        for d in dr.async_entries_for_config_entry(registry, entry.entry_id)
+        for d in entry_devices(registry, entry.entry_id)
         if (DOMAIN, router_mac) not in d.identifiers
     ]
     for canon, payload in repeaters.items():
@@ -536,6 +546,11 @@ def async_merge_repeater_devices(
             )
 
         group = [d for d in devices if _belongs(d)]
+        _LOGGER.debug(
+            "Répéteur %s : appareils trouvés %s",
+            canon,
+            [(d.id, d.name, d.model, sorted(i for _, i in d.identifiers)) for d in group],
+        )
         # Entités par AP des anciennes MAC (une seule par répéteur désormais).
         for alias in payload.get("macs") or []:
             if _norm_mac(alias) == _norm_mac(canon):
@@ -557,6 +572,7 @@ def async_merge_repeater_devices(
         keeper = next((d for d in group if canon_ident in d.identifiers), None) or max(
             group, key=lambda d: counts[d.id]
         )
+        _LOGGER.debug("Répéteur %s : appareil conservé %s (%s)", canon, keeper.id, keeper.name)
         area_id = keeper.area_id
         name_by_user = keeper.name_by_user
         for dup in group:
@@ -564,15 +580,12 @@ def async_merge_repeater_devices(
                 continue
             for ent in er.async_entries_for_device(entities, dup.id, include_disabled_entities=True):
                 entities.async_update_entity(ent.entity_id, device_id=keeper.id)
-            for child in list(registry.devices.values()):
+            for child in entry_devices(registry, entry.entry_id):
                 if child.via_device_id == dup.id:
                     registry.async_update_device(child.id, via_device_id=keeper.id)
             area_id = area_id or dup.area_id
             name_by_user = name_by_user or dup.name_by_user
-            if dup.config_entries == {entry.entry_id}:
-                registry.async_remove_device(dup.id)
-            else:
-                registry.async_update_device(dup.id, remove_config_entry_id=entry.entry_id)
+            remove_device(registry, dup.id)
             devices = [d for d in devices if d.id != dup.id]
             merged += 1
         try:

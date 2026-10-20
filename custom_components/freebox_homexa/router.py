@@ -35,6 +35,7 @@ from .const import (
     HOME_COMPATIBLE_CATEGORIES,
     REPEATER_MODEL,
 )
+from .registry_compat import get_device_by_identifier
 from .wifi_ap import build_wifi_aps
 
 _LOGGER = logging.getLogger(__name__)
@@ -312,6 +313,18 @@ class FreeboxRouter:
         }
         if self.repeaters:
             _LOGGER.info("Répéteurs Wi-Fi détectés : %s", list(self.repeaters.keys()))
+        _LOGGER.debug(
+            "API /repeater/ : %s",
+            [
+                (r.get("id"), r.get("name"), r.get("model"), r.get("main_mac"), r.get("sn"))
+                for r in self.api_repeaters
+            ],
+        )
+        for canon, payload in self.repeaters.items():
+            _LOGGER.debug(
+                "Répéteur physique %s (%s, %s) : MAC %s",
+                canon, payload.get("name"), payload.get("model"), payload.get("macs"),
+            )
 
     async def _enrich_wifi_stations(self) -> None:
         """Merge /wifi/ap/{id}/stations signal data onto LAN hosts."""
@@ -517,7 +530,7 @@ class FreeboxRouter:
         if identifier and identifier != self.mac:
             registry = dr.async_get(self.hass)
             for ident in (identifier, f"repeater_{identifier}"):
-                device = registry.async_get_device(identifiers={(DOMAIN, ident)})
+                device = get_device_by_identifier(registry, (DOMAIN, ident), self.entry_id)
                 if device is not None:
                     return device.id
         return self.device_id
@@ -558,7 +571,7 @@ class FreeboxRouter:
                 else [(DOMAIN, i) for i in sorted(self.player_identifiers)]
             )
             for ident in idents:
-                device = registry.async_get_device(identifiers={ident})
+                device = get_device_by_identifier(registry, ident, self.entry_id)
                 if device is not None:
                     return device.id
         return self.device_id

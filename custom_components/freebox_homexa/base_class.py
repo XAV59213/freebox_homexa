@@ -59,7 +59,7 @@ class FreeboxBaseClass(Entity):
             "manufacturer": self._manufacturer,
             "model": self._model,
             "sw_version": self._firmware,
-            "via_device": (DOMAIN, self._router.mac),   # ← Correction principale
+            "via_device_id": self._router.device_id,
         }
 
     # === Méthodes API (inchangées) ===

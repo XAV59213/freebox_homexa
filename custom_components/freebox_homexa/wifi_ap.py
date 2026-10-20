@@ -53,7 +53,23 @@ def _repeater_distance(a: str, b: str) -> int | None:
     return None
 
 
-def cluster_repeater_macs(macs: list[str], anchors: list[str] | None = None) -> dict[str, str]:
+def api_repeater_macs(repeater: dict[str, Any]) -> list[str]:
+    """Toutes les MAC d'un répéteur de l'API /repeater/ (principale, backhaul, BSSID).
+
+    Ex. réel : main_mac 8C:97:EA:55:BB:B6, backhaul 16:E4:EF:… (eth) et 8E:97:EA:9B:1F:9x
+    (wifi), fronthaul 8C/8E:97:EA:9B:1F:90/94 : ces MAC n'ont rien de « proche ».
+    """
+    macs = [repeater.get("main_mac")]
+    macs += [b.get("mac") for b in repeater.get("backhaul") or [] if isinstance(b, dict)]
+    macs += [f.get("bssid") for f in repeater.get("fronthaul") or [] if isinstance(f, dict)]
+    return [m for m in macs if m]
+
+
+def cluster_repeater_macs(
+    macs: list[str],
+    anchors: list[str] | None = None,
+    known: dict[str, list[str]] | None = None,
+) -> dict[str, str]:
     """MAC normalisée -> MAC canonique (affichage) du répéteur physique.
 
     `anchors` : MAC principales de l'API /repeater/ (une par répéteur) ; à défaut,
@@ -61,6 +77,20 @@ def cluster_repeater_macs(macs: list[str], anchors: list[str] | None = None) -> 
     """
     result: dict[str, str] = {}
     anchor_norms: list[str] = []
+    # MAC connues par l'API : rattachement exact, prioritaire sur la proximité.
+    # Toutes servent ensuite de référence pour les MAC voisines (BSSID invités…).
+    refs: dict[str, str] = {}
+    for anchor, members in (known or {}).items():
+        a_norm = normalize_mac(anchor)
+        if not a_norm:
+            continue
+        if a_norm not in anchor_norms:
+            anchor_norms.append(a_norm)
+        for member in [anchor, *members]:
+            m_norm = normalize_mac(member)
+            if m_norm and m_norm not in result:
+                result[m_norm] = display_mac(a_norm)
+                refs[m_norm] = a_norm
     for anchor in anchors or []:
         norm = normalize_mac(anchor)
         if norm and norm not in anchor_norms:
@@ -70,8 +100,8 @@ def cluster_repeater_macs(macs: list[str], anchors: list[str] | None = None) -> 
         if norm in result:
             continue
         best: tuple[int, str] | None = None
-        for anchor in anchor_norms:
-            dist = _repeater_distance(norm, anchor)
+        for ref, anchor in [*refs.items(), *((a, a) for a in anchor_norms)]:
+            dist = _repeater_distance(norm, ref)
             if dist is not None and (best is None or dist < best[0]):
                 best = (dist, anchor)
         if best is None:
@@ -209,7 +239,9 @@ def build_wifi_aps(
         if is_freebox_repeater(device, router_mac)
     }
     aliases = cluster_repeater_macs(
-        [*hosts, *repeater_clients], [r.get("main_mac") for r in api_repeaters]
+        [*hosts, *repeater_clients],
+        [r.get("main_mac") for r in api_repeaters],
+        {r["main_mac"]: api_repeater_macs(r) for r in api_repeaters if r.get("main_mac")},
     )
     canon_macs: dict[str, list[str]] = {}
     for norm, canon in aliases.items():

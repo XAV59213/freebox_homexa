@@ -6,14 +6,13 @@ import logging
 from typing import Any
 from datetime import timedelta
 from homeassistant.core import HomeAssistant
-from homeassistant.config_entries import ConfigEntry
 from homeassistant.components.cover import CoverEntity, CoverDeviceClass, CoverState
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.entity_registry import async_get
-from .const import DOMAIN, FreeboxHomeCategory
+from .const import FreeboxHomeCategory
 from .entity import FreeboxHomeEntity
-from .errors import is_shutdown_error
-from .router import FreeboxRouter
+from .errors import is_shutdown_error, poll_log_level
+from .router import FreeboxConfigEntry, FreeboxRouter
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -21,8 +20,12 @@ _LOGGER = logging.getLogger(__name__)
 SCAN_INTERVAL = timedelta(seconds=30)
 
 # SECTION: Configuration des entités
+# Une seule action / mise à jour à la fois vers la Freebox pour cette plateforme.
+PARALLEL_UPDATES = 1
+
+
 async def async_setup_entry(
-    hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback
+    hass: HomeAssistant, entry: FreeboxConfigEntry, async_add_entities: AddEntitiesCallback
 ) -> None:
     """Configure les entités de volets Freebox.
 
@@ -33,7 +36,7 @@ async def async_setup_entry(
         entry: Entrée de configuration pour l'intégration Freebox.
         async_add_entities: Fonction pour ajouter des entités à Home Assistant.
     """
-    router: FreeboxRouter = hass.data[DOMAIN][entry.unique_id]
+    router: FreeboxRouter = entry.runtime_data
     entities = []
 
     for nodeid, node in router.home_devices.items():
@@ -154,7 +157,7 @@ class FreeboxBasicShutter(FreeboxHomeEntity, CoverEntity):
             if is_shutdown_error(err, self._router):
                 _LOGGER.debug("État de %s non lu (rechargement) : %s", self._attr_unique_id, err)
                 return
-            _LOGGER.error("Échec de la mise à jour de l'état pour %s : %s", self._attr_unique_id, err)
+            _LOGGER.log(poll_log_level(self._router), "Échec de la mise à jour de l'état pour %s : %s", self._attr_unique_id, err)
             self._state = None
 
     def convert_state(self, state: Any) -> str | None:
@@ -304,6 +307,6 @@ class FreeboxShutter(FreeboxHomeEntity, CoverEntity):
             if is_shutdown_error(err, self._router):
                 _LOGGER.debug("Position de %s non lue (rechargement) : %s", self._attr_unique_id, err)
                 return
-            _LOGGER.error("Échec de la mise à jour de la position pour %s : %s", self._attr_unique_id, err)
+            _LOGGER.log(poll_log_level(self._router), "Échec de la mise à jour de la position pour %s : %s", self._attr_unique_id, err)
             self._current_cover_position = None
 

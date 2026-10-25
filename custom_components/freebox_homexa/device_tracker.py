@@ -6,7 +6,6 @@ from typing import Any
 import logging
 
 from homeassistant.components.device_tracker import ScannerEntity
-from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.dispatcher import async_dispatcher_connect
@@ -18,11 +17,10 @@ from .const import (
     DEFAULT_CREATE_LAN_DEVICES,
     DEFAULT_TRACK_LAN_CLIENTS,
     DEVICE_ICONS,
-    DOMAIN,
     option_enabled,
 )
 from .device_groups import lan_client_name
-from .router import FreeboxRouter, is_freebox_repeater, normalize_mac
+from .router import FreeboxConfigEntry, FreeboxRouter, is_freebox_repeater, normalize_mac
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -34,10 +32,14 @@ def _is_lan_client(device: dict[str, Any], router_mac: str) -> bool:
     return not is_freebox_repeater(device, router_mac)
 
 
+# Entités mises à jour par le relevé central du routeur (dispatcher) : pas de limite.
+PARALLEL_UPDATES = 0
+
+
 async def async_setup_entry(
-    hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback
+    hass: HomeAssistant, entry: FreeboxConfigEntry, async_add_entities: AddEntitiesCallback
 ) -> None:
-    router: FreeboxRouter = hass.data[DOMAIN][entry.unique_id]
+    router: FreeboxRouter = entry.runtime_data
     tracked: set[str] = set()
     track_lan = option_enabled(entry, CONF_TRACK_LAN_CLIENTS, DEFAULT_TRACK_LAN_CLIENTS)
     create_devices = option_enabled(

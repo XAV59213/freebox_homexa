@@ -34,7 +34,7 @@ from .const import (
 )
 from .entity import FreeboxHomeEntity
 from .device_groups import GROUP_SERVER, lan_client_name
-from .router import FreeboxRouter, is_freebox_repeater
+from .router import FreeboxConfigEntry, FreeboxRouter, is_freebox_repeater
 from .tnt_const import selected_channels
 from .tnt_setup import TNT_COORDINATORS_KEY
 from .tnt_sensor import HomexaTntSensor
@@ -116,10 +116,14 @@ def _async_remove_unselected_tnt_entities(
             registry.async_remove(reg_entry.entity_id)
 
 
+# Entités mises à jour par le relevé central du routeur (dispatcher) : pas de limite.
+PARALLEL_UPDATES = 0
+
+
 async def async_setup_entry(
-    hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback
+    hass: HomeAssistant, entry: FreeboxConfigEntry, async_add_entities: AddEntitiesCallback
 ) -> None:
-    router: FreeboxRouter = hass.data[DOMAIN][entry.unique_id]
+    router: FreeboxRouter = entry.runtime_data
     entities: list[SensorEntity] = []
     create_wifi = option_enabled(
         entry, CONF_CREATE_WIFI_SENSORS, DEFAULT_CREATE_WIFI_SENSORS

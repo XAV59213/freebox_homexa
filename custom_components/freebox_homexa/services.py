@@ -32,7 +32,7 @@ def _loaded_entries(hass: HomeAssistant) -> list[ConfigEntry]:
         entry
         for entry in hass.config_entries.async_entries(DOMAIN)
         if entry.state is ConfigEntryState.LOADED
-        and hass.data.get(DOMAIN, {}).get(entry.unique_id) is not None
+        and getattr(entry, "runtime_data", None) is not None
     ]
 
 
@@ -88,7 +88,7 @@ def async_resolve_entries(
 
 
 def _router(hass: HomeAssistant, entry: ConfigEntry) -> Any:
-    return hass.data[DOMAIN][entry.unique_id]
+    return entry.runtime_data
 
 
 async def _save_config(hass: HomeAssistant) -> None:

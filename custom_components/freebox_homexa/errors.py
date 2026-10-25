@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from typing import Any
 
 import aiohttp
@@ -27,3 +28,14 @@ def is_shutdown_error(err: BaseException, router: Any = None) -> bool:
         message = str(err).lower()
         return any(text in message for text in _CLOSED_MESSAGES)
     return False
+
+
+def poll_log_level(router: Any, level: int = logging.ERROR) -> int:
+    """Niveau de journal d'un échec de relevé d'entité.
+
+    Quand le routeur a déjà signalé « Freebox injoignable » (une seule fois, niveau
+    info), les échecs suivants des entités passent en debug pour éviter le spam.
+    """
+    if router is not None and getattr(router, "reachable", True) is False:
+        return logging.DEBUG
+    return level

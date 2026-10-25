@@ -4,7 +4,6 @@ import logging
 import homeassistant.helpers.config_validation as cv
 from homeassistant.const import CONF_HOST, CONF_PORT, EVENT_HOMEASSISTANT_STOP
 from datetime import datetime, timedelta
-from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import Event, HomeAssistant, callback
 from homeassistant.exceptions import ConfigEntryAuthFailed, ConfigEntryNotReady
 from homeassistant.helpers.event import async_call_later, async_track_time_interval
@@ -31,7 +30,7 @@ from .device_groups import (
     async_remove_unused_group_devices,
     migrate_overrides,
 )
-from .router import FreeboxRouter, get_api
+from .router import FreeboxConfigEntry, FreeboxRouter, get_api
 from .tnt_setup import (
     TNT_COORDINATORS_KEY,
     async_setup_bundled_tnt,
@@ -62,7 +61,7 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
     return True
 
 
-async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
+async def async_setup_entry(hass: HomeAssistant, entry: FreeboxConfigEntry) -> bool:
     hass.data.setdefault(DOMAIN, {})
 
     if not hass.data[DOMAIN].get("_card_registered"):
@@ -188,7 +187,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     )
     entry.async_on_unload(entry.add_update_listener(async_reload_entry))
 
-    hass.data[DOMAIN][entry.unique_id] = router
+    entry.runtime_data = router
     try:
         await async_setup_bundled_tnt(hass, entry)
     except Exception:
@@ -238,8 +237,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     return True
 
 
-async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
-    router = hass.data.get(DOMAIN, {}).get(entry.unique_id)
+async def async_unload_entry(hass: HomeAssistant, entry: FreeboxConfigEntry) -> bool:
+    router: FreeboxRouter | None = getattr(entry, "runtime_data", None)
     if router is not None:
         # Déchargement / rechargement : les relevés encore en vol ne journalisent plus
         # « Connector is closed » comme une erreur.
@@ -250,7 +249,6 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             router.closing = False
         return False
     async_unload_bundled_tnt(hass, entry)
-    router = hass.data[DOMAIN].pop(entry.unique_id, None)
     if router is not None:
         await router.close()
     store = hass.data[DOMAIN].get("store")
@@ -261,5 +259,5 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     return True
 
 
-async def async_reload_entry(hass: HomeAssistant, entry: ConfigEntry) -> None:
+async def async_reload_entry(hass: HomeAssistant, entry: FreeboxConfigEntry) -> None:
     await hass.config_entries.async_reload(entry.entry_id)

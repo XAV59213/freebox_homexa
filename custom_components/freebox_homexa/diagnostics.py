@@ -13,7 +13,6 @@ from homeassistant.components.diagnostics import async_redact_data
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 
-from .const import DOMAIN
 from .device_groups import repeater_registry_devices
 from .wifi_ap import is_freebox_repeater
 
@@ -55,7 +54,7 @@ def _count_links(links: dict[str, str]) -> dict[str, int]:
 async def async_get_config_entry_diagnostics(
     hass: HomeAssistant, entry: ConfigEntry
 ) -> dict[str, Any]:
-    router = hass.data.get(DOMAIN, {}).get(entry.unique_id)
+    router = getattr(entry, "runtime_data", None)
     data: dict[str, Any] = {
         "entry": {"title": entry.title, "version": entry.version, "options": dict(entry.options)},
         "repeater_devices_in_registry": repeater_registry_devices(hass, entry),

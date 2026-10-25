@@ -1,5 +1,11 @@
 # Changelog
 
+## Non publié
+- Qualité (Integration Quality Scale) :
+  - **runtime-data** : le routeur Freebox est rangé dans `entry.runtime_data` (entrée typée `FreeboxConfigEntry`) au lieu de `hass.data[freebox_homexa][unique_id]`. Plateformes, actions, diagnostics, options et déchargement lisent `entry.runtime_data`. `hass.data` ne garde que l'état global (cache de configuration, carte Lovelace, coordinateurs TNT). Aucun changement visible
+  - **parallel-updates** : `PARALLEL_UPDATES = 0` pour les plateformes mises à jour par le relevé central (capteurs, capteurs binaires, suivi d'appareils, calendrier) ; `PARALLEL_UPDATES = 1` pour les plateformes d'action (boutons, interrupteurs, volets, caméras, alarme, télécommande, lecteur multimédia) : une seule commande ou mise à jour à la fois par plateforme vers la Freebox
+  - **log-when-unavailable** : quand la Freebox ne répond plus, le journal affiche **une seule fois** « Freebox injoignable » (niveau info), puis « Freebox de nouveau joignable » à son retour. Avant, chaque relevé (toutes les 40 s) écrivait une erreur ou une trace complète. Pendant la coupure, les échecs de relevé des volets, caméras, Wi-Fi et nœuds Freebox Home passent en debug
+
 ## 28.8.59
 - Actions : `tv_guide` et `play_channel` retirées de `services.yaml`. Elles y étaient décrites depuis la 28.8.8 mais n'ont **jamais été enregistrées** par le code : elles apparaissaient dans Outils de développement et échouaient à l'appel. Le guide TV reste disponible via le calendrier « Guide TV » et les capteurs TNT. Pour changer de chaîne, on utilise le lecteur multimédia du Player (`media_player.select_source`, `media_player.play_media`) ou les touches de la télécommande. La constante inutilisée `SERVICE_TV_GUIDE` est supprimée
 - Tests : `tests/check_translations.py` vérifie aussi que `services.yaml`, les sections « services » de `strings.json` / `translations/*.json` et les actions réellement enregistrées (`services.py`, `tnt_reminders.py`) sont exactement les mêmes

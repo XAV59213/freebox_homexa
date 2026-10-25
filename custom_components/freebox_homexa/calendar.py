@@ -7,24 +7,26 @@ import logging
 from typing import Any
 
 from homeassistant.components.calendar import CalendarEntity, CalendarEvent
-from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.util import dt as dt_util
 
-from .const import DOMAIN
 from .tnt_sensor import TNT_DEVICE_INFO
-from .router import FreeboxRouter
+from .router import FreeboxConfigEntry, FreeboxRouter
 from .tv_guide import summarize_guide
 
 _LOGGER = logging.getLogger(__name__)
 MAX_EVENTS = 80
 
 
+# Entités mises à jour par le relevé central du routeur (dispatcher) : pas de limite.
+PARALLEL_UPDATES = 0
+
+
 async def async_setup_entry(
-    hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback
+    hass: HomeAssistant, entry: FreeboxConfigEntry, async_add_entities: AddEntitiesCallback
 ) -> None:
-    router: FreeboxRouter = hass.data[DOMAIN][entry.unique_id]
+    router: FreeboxRouter = entry.runtime_data
     async_add_entities([FreeboxTvGuideCalendar(router)], True)
 
 

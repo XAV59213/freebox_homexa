@@ -15,23 +15,26 @@ from homeassistant.components.ffmpeg.camera import (
     DEFAULT_ARGUMENTS,
     FFmpegCamera,
 )
-from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_NAME
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers import entity_platform
 from homeassistant.helpers.dispatcher import async_dispatcher_connect
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
-from .const import ATTR_DETECTION, DOMAIN, FreeboxHomeCategory
+from .const import ATTR_DETECTION, FreeboxHomeCategory
 from .entity import FreeboxHomeEntity
-from .errors import is_shutdown_error
-from .router import FreeboxRouter
+from .errors import is_shutdown_error, poll_log_level
+from .router import FreeboxConfigEntry, FreeboxRouter
 
 _LOGGER = logging.getLogger(__name__)
 
 # SECTION: Configuration des entités
+# Une seule action / mise à jour à la fois vers la Freebox pour cette plateforme.
+PARALLEL_UPDATES = 1
+
+
 async def async_setup_entry(
-    hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback
+    hass: HomeAssistant, entry: FreeboxConfigEntry, async_add_entities: AddEntitiesCallback
 ) -> None:
     """Configure les entités de caméras Freebox.
 
@@ -42,7 +45,7 @@ async def async_setup_entry(
         entry: Entrée de configuration pour l'intégration Freebox.
         async_add_entities: Fonction pour ajouter des entités à Home Assistant.
     """
-    router: FreeboxRouter = hass.data[DOMAIN][entry.unique_id]
+    router: FreeboxRouter = entry.runtime_data
     tracked: set[str] = set()
 
     @callback
@@ -180,7 +183,7 @@ class FreeboxCamera(FreeboxHomeEntity, FFmpegCamera):
             if is_shutdown_error(err, self._router):
                 _LOGGER.debug("Mise à jour de la caméra %s interrompue (rechargement) : %s", self._node_id, err)
                 return
-            _LOGGER.error("Échec de la mise à jour de la caméra %s : %s", self._node_id, err)
+            _LOGGER.log(poll_log_level(self._router), "Échec de la mise à jour de la caméra %s : %s", self._node_id, err)
 
     def update_node(self, node: dict[str, Any]) -> None:
         """Met à jour les paramètres de la caméra à partir des données du nœud.

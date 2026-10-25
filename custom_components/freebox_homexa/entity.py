@@ -12,7 +12,7 @@ from homeassistant.helpers.entity import Entity
 from freebox_api.exceptions import HttpRequestError
 from .const import CATEGORY_TO_MODEL, DOMAIN, FreeboxHomeCategory
 from .device_groups import GROUP_HOME, group_identifier, home_node_group, home_node_name, suggested_area
-from .errors import is_shutdown_error
+from .errors import is_shutdown_error, poll_log_level
 from .router import FreeboxRouter
 from .registry_compat import as_version
 
@@ -149,7 +149,8 @@ class FreeboxHomeEntity(Entity):
                     command_id, self._id, err,
                 )
                 return None
-            _LOGGER.warning(
+            _LOGGER.log(
+                poll_log_level(self._router, logging.WARNING),
                 "Erreur inattendue sur endpoint %s (appareil %s) : %s", command_id, self._id, err
             )
             return None
@@ -198,7 +199,7 @@ class FreeboxHomeEntity(Entity):
             if is_shutdown_error(err, self._router):
                 _LOGGER.debug("Mise à jour de %s interrompue (rechargement) : %s", self._attr_name, err)
                 return
-            _LOGGER.error("Échec mise à jour entité %s : %s", self._attr_name, err)
+            _LOGGER.log(poll_log_level(self._router), "Échec mise à jour entité %s : %s", self._attr_name, err)
 
     async def async_added_to_hass(self) -> None:
         self._remove_signal_update = async_dispatcher_connect(

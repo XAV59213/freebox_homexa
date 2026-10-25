@@ -92,7 +92,7 @@ PUT  /wifi/config/
 GET  /wifi/ap/
 GET  /wifi/ap/{ap_id}/
 GET  /wifi/ap/{ap_id}/stations/
-GET  /wifi/bss/                         (non utilise)
+GET  /wifi/bss/                         (etat des BSS, capteur Wi-Fi box)
 GET  /wifi/planning/                    (non utilise)
 GET  /wifi/mac_filter/                  (non utilise)
 GET  /wifi/custom_key/                  (non utilise)
@@ -104,6 +104,14 @@ Usage Homexa :
                         (enrichissement RSSI / bande / BSSID)
   - switch.py           wifi.get_global_config() / set_global_config()
                         interrupteur Wi-Fi on/off
+  - router.py/wifi_ap.py  capteur binaire « Wi-Fi Freebox » : en ligne si
+                        /wifi/config/ enabled et un AP (/wifi/ap/ status.state)
+                        ou un BSS (/wifi/bss/ status.state) « active », ou un
+                        client Wi-Fi actif sur la box ; coupe si enabled=false.
+                        Etats AP : scanning, no_param, bad_param, disabled,
+                        disabled_planning, no_active_bss, starting, acs,
+                        ht_scan, dfs, active, failed. Etats BSS : phy_stopped,
+                        no_param, bad_param, disabled, starting, active, failed
   - sensor.py           capteurs RSSI par client
   - wifi_ap_sensors.py  synthese box + repeteurs + listes de clients
 Limite API : /wifi/ap/*/stations/ ne voit que les clients de la box,
@@ -270,7 +278,6 @@ WEBSOCKET         /ws/
   Flux evenementiel temps reel (remplace une partie du polling).
 
 WIFI avance (non utilise)
-  /wifi/bss/            identifiants BSS / SSID secondaires
   /wifi/planning/       plages horaires Wi-Fi
   /wifi/mac_filter/     liste blanche / noire
   /wifi/custom_key/     cle Wi-Fi temporaire invite

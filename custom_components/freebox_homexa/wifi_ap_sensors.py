@@ -30,9 +30,25 @@ def _ap_device_info(router: FreeboxRouter, access_point: dict[str, Any]) -> Devi
     )
 
 
-def _client_label(access_point: dict[str, Any]) -> str:
+# Home Assistant refuse un état de plus de 255 caractères (il passe à « Inconnu »).
+MAX_STATE_LENGTH = 255
+
+
+def _client_label(access_point: dict[str, Any], max_length: int = MAX_STATE_LENGTH) -> str:
+    """Noms des clients séparés par des virgules, tronqués à 255 caractères (« … +N »)."""
     names = [str(name) for name in (access_point.get("client_names") or []) if name]
-    return ", ".join(names) if names else "Aucun"
+    if not names:
+        return "Aucun"
+    label = ", ".join(names)
+    if len(label) <= max_length:
+        return label
+    for kept in range(len(names) - 1, -1, -1):
+        suffix = f"… +{len(names) - kept}"
+        head = ", ".join(names[:kept])
+        candidate = f"{head}, {suffix}" if head else suffix
+        if len(candidate) <= max_length:
+            return candidate
+    return f"{len(names)} appareils"[:max_length]
 
 
 class FreeboxRepeaterCountSensor(SensorEntity):
@@ -153,6 +169,7 @@ class FreeboxWifiClientListSensor(SensorEntity):
         self._attr_extra_state_attributes = {
             "nombre": access_point.get("client_count", 0),
             "etat": access_point.get("state"),
+            "appareils": access_point.get("client_names") or [],
             "detail_appareils": access_point.get("clients") or [],
         }
 

@@ -2,10 +2,13 @@
 
 from __future__ import annotations
 
+import logging
 from typing import Any
 
 from .const import REPEATER_MODEL
 from .device_groups import is_specific_repeater_name, lan_client_name, ul_twin
+
+_LOGGER = logging.getLogger(__name__)
 
 
 def normalize_mac(mac: str | None) -> str:
@@ -302,13 +305,64 @@ def _is_wifi_client(device: dict[str, Any], router_mac: str) -> bool:
     return bool(access_point.get("wifi_information"))
 
 
-def _gateway_state(radio_status: list[dict[str, Any]]) -> str:
-    states = [item.get("state") for item in radio_status if item.get("state")]
-    if "active" in states:
-        return "active"
+# États documentés (API Freebox OS, /wifi/ap/ status.state et /wifi/bss/ status.state).
+_ACTIVE_STATES = frozenset({"active"})
+# Radio en cours de démarrage / sélection de canal : Wi-Fi allumé mais pas encore émis.
+_TRANSIENT_STATES = frozenset({"scanning", "starting", "acs", "ht_scan", "dfs"})
+# Radio / BSS arrêté(e) ou en erreur.
+_OFF_STATES = frozenset(
+    {"no_param", "bad_param", "disabled", "disabled_planning", "no_active_bss", "failed", "phy_stopped"}
+)
+_KNOWN_STATES = _ACTIVE_STATES | _TRANSIENT_STATES | _OFF_STATES
+_LOGGED_UNKNOWN_STATES: set[str] = set()
+
+
+def _states(items: list[dict[str, Any]] | None) -> list[str]:
+    states: list[str] = []
+    for item in items or []:
+        if not isinstance(item, dict):
+            continue
+        state = item.get("state")
+        if state is None or state == "":
+            continue
+        state = str(state).strip().lower()
+        if state not in _KNOWN_STATES and state not in _LOGGED_UNKNOWN_STATES:
+            _LOGGED_UNKNOWN_STATES.add(state)
+            _LOGGER.debug("État Wi-Fi inconnu « %s » (AP/BSS %s)", state, item.get("id"))
+        states.append(state)
+    return states
+
+
+def gateway_wifi_state(
+    radio_status: list[dict[str, Any]] | None,
+    bss_status: list[dict[str, Any]] | None = None,
+    global_enabled: bool | None = None,
+    active_clients: int = 0,
+) -> tuple[bool | None, str]:
+    """État du Wi-Fi de la box : (en ligne, état).
+
+    - /wifi/config/ ``enabled`` à False : Wi-Fi coupé (comme l'interrupteur).
+    - Un AP (/wifi/ap/) ou un BSS (/wifi/bss/) ``active`` : en ligne.
+    - Un client Wi-Fi actif rattaché à la box : en ligne.
+    - Wi-Fi activé mais AP/BSS illisibles, ou états inconnus : en ligne (« enabled »).
+    - Sinon : hors ligne avec l'état de la radio ; None si rien n'est lisible.
+    """
+    if global_enabled is False:
+        return False, "disabled"
+    ap_states = _states(radio_status)
+    bss_states = _states(bss_status)
+    states = ap_states + bss_states
+    if any(state in _ACTIVE_STATES for state in states):
+        return True, "active"
+    if active_clients > 0:
+        return True, "active"
+    unknown = [state for state in states if state not in _KNOWN_STATES]
+    if global_enabled is True and (not states or unknown):
+        return True, "enabled"
     if states:
-        return str(states[0])
-    return "unknown"
+        transient = next((state for state in states if state in _TRANSIENT_STATES), None)
+        return False, transient or states[0]
+    return None, "unknown"
 
 
 def annotate_wifi_parents(
@@ -344,6 +398,8 @@ def build_wifi_aps(
     radio_status: list[dict[str, Any]] | None = None,
     api_repeaters: list[dict[str, Any]] | None = None,
     manual_links: dict[str, str] | None = None,
+    bss_status: list[dict[str, Any]] | None = None,
+    wifi_enabled: bool | None = None,
 ) -> tuple[dict[str, dict[str, Any]], dict[str, dict[str, Any]]]:
     """Group Wi-Fi clients by gateway / repeater access point."""
     radio_status = radio_status or []
@@ -362,7 +418,12 @@ def build_wifi_aps(
         else:
             gateway_clients.append(summary)
 
-    state = _gateway_state(radio_status)
+    online, state = gateway_wifi_state(
+        radio_status,
+        bss_status,
+        wifi_enabled,
+        sum(1 for item in gateway_clients if item.get("active")),
+    )
     wifi_aps: dict[str, dict[str, Any]] = {
         "gateway": {
             "id": "gateway",
@@ -371,9 +432,11 @@ def build_wifi_aps(
             "mac": router_mac,
             "model": router_model,
             "vendor_name": "Freebox SAS",
-            "online": state == "active",
+            "online": online,
             "state": state,
+            "wifi_enabled": wifi_enabled,
             "radios": radio_status,
+            "bss": bss_status or [],
             "client_count": len(gateway_clients),
             "clients": gateway_clients,
             "client_names": [item["name"] for item in gateway_clients],

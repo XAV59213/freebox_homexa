@@ -1,6 +1,6 @@
 # Changelog
 
-## Non publié
+## 28.8.59
 - Actions : `tv_guide` et `play_channel` retirées de `services.yaml`. Elles y étaient décrites depuis la 28.8.8 mais n'ont **jamais été enregistrées** par le code : elles apparaissaient dans Outils de développement et échouaient à l'appel. Le guide TV reste disponible via le calendrier « Guide TV » et les capteurs TNT. Pour changer de chaîne, on utilise le lecteur multimédia du Player (`media_player.select_source`, `media_player.play_media`) ou les touches de la télécommande. La constante inutilisée `SERVICE_TV_GUIDE` est supprimée
 - Tests : `tests/check_translations.py` vérifie aussi que `services.yaml`, les sections « services » de `strings.json` / `translations/*.json` et les actions réellement enregistrées (`services.py`, `tnt_reminders.py`) sont exactement les mêmes
 

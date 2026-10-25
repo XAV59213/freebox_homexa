@@ -369,11 +369,17 @@ class FreeboxRouter:
         )
         from .wifi_ap import normalize_mac
 
-        self.repeater_aliases = {
-            normalize_mac(alias): canon
-            for canon, payload in self.repeaters.items()
-            for alias in payload.get("macs") or [canon]
-        }
+        # « ap_aliases » : MAC de point d'accès non Free (rattachement des clients
+        # uniquement) ; jamais un hôte LAN, ni une connexion de l'appareil répéteur.
+        lan_norms = {normalize_mac(m) for m in self.devices}
+        self.repeater_aliases = {}
+        for canon, payload in self.repeaters.items():
+            for alias in payload.get("ap_aliases") or []:
+                if normalize_mac(alias) not in lan_norms:
+                    self.repeater_aliases[normalize_mac(alias)] = canon
+        for canon, payload in self.repeaters.items():
+            for alias in payload.get("macs") or [canon]:
+                self.repeater_aliases[normalize_mac(alias)] = canon
         if self.repeaters:
             # À chaque relevé (40 s) : debug, le détail est journalisé en info s'il change.
             _LOGGER.debug("Répéteurs Wi-Fi détectés : %s", list(self.repeaters.keys()))
@@ -1015,6 +1021,12 @@ class FreeboxRouter:
 
     def _sync_lan_client_parents(self) -> None:
         """Crée / déplace les appareils des clients LAN quand leur parent change."""
+        try:
+            from .device_groups import async_clean_repeater_connections
+
+            async_clean_repeater_connections(self.hass, self.entry_id, self.mac, self.repeaters)
+        except Exception:  # noqa: BLE001 — le nettoyage ne doit jamais bloquer le poll
+            _LOGGER.debug("Nettoyage des connexions des répéteurs impossible", exc_info=True)
         for mac, device in self.devices.items():
             if not self._is_lan_client(device):
                 continue

@@ -343,9 +343,7 @@ class FreeboxWifiSignalSensor(SensorEntity):
                 "manufacturer": device.get("vendor_name") or "Inconnu",
                 "name": name,
             }
-            parent_id = self._router.parent_for(
-                f"mac:{self._mac.lower()}", name, GROUP_SERVER
-            )
+            parent_id = self._router.lan_client_parent(self._mac, name)
             if parent_id:
                 device_info["via_device_id"] = parent_id
             self._attr_device_info = DeviceInfo(**device_info)

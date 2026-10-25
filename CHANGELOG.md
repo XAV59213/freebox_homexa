@@ -1,5 +1,11 @@
 # Changelog
 
+## Non publié
+- Répéteurs : fusion du **jumeau « locally administered » exact** d'une MAC principale (ex. `22:66:CF:4B:49:69` = `20:66:CF:4B:49:69` avec le seul bit 0x02 du 1er octet inversé, les 5 autres octets identiques). Ce n'était pas le jumeau qui fusionnait « Garage » à tort avant la 28.8.49, mais l'ancienne règle « MAC voisines » (mêmes octets 2 à 5, dernier octet proche : `20:66:CF:4B:49:69` ~ `20:66:CF:4B:49:63`). Le jumeau exact ne dépend que de la MAC du répéteur lui-même : il est fiable. Fonctionne aussi pour un doublon resté seul dans le registre (absent de lan/browser)
+- Répéteurs : fusion par **bloc de BSSID** : une MAC Free `22:66:CF:A:B:xx` dont les 5 premiers octets sont ceux des BSSID connus d'un seul répéteur (fronthaul de l'API `/repeater/`, `access_point.mac` des clients Wi-Fi) est une interface de ce répéteur (ex. `22:66:CF:C6:92:D4` pour les BSSID `…C6:92:D2` / `D6` de Chambre fille). Jamais sur moins de 5 octets (Garage `…96:92:D2` et Chambre fille `…C6:92:D2` ne diffèrent que par le 4e octet), et jamais entre deux répéteurs ayant chacun leur MAC principale
+- Répéteurs : nouvelle option **« Fusionner un répéteur en double »** (Options de l'intégration) : choisir l'appareil en double et le répéteur cible, pour les cas où la Freebox ne donne aucun lien fiable (API `/repeater/` indisponible et BSSID non reliés à la MAC principale). Fusion mémorisée, annulable depuis le même écran
+- Répéteurs : à la fusion, l'appareil conservé est celui de la MAC principale (`20:66:CF…`) ; il récupère la pièce, le nom personnalisé et les entités du doublon s'il ne les a pas. Un nom explicite (« Repeteur Wifi Freebox Garage ») est préféré à un nom générique (« Repeteur Wifi Freebox #2 »)
+
 ## 28.8.49
 - Correction : la fusion des répéteurs plantait (`AttributeError: 'int' object has no attribute 'startswith'`) sur les appareils dont l'identifiant n'est pas du texte (id entier des nœuds Freebox Home) ; tous les parcours d'identifiants ignorent désormais les valeurs non texte
 - Répéteurs : un hôte n'est retenu comme répéteur que si sa MAC est un OUI Free (ex. `20:66:CF`) ou son jumeau « locally administered » (`22:66:CF`). Les hôtes nommés « Repeteur… » avec une MAC non Free (ex. `AC:E2:D3…`, `C0:F8:53…`) redeviennent des clients réseau ordinaires (entités conservées)

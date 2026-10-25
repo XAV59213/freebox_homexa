@@ -60,6 +60,7 @@
         "menu_options": {
           "general": "General settings",
           "groups": "Device groups",
+          "repeaters": "Merge a duplicate repeater",
           "tnt": "TNT guide",
           "profiles": "Reminder profiles"
         },
@@ -113,13 +114,23 @@
       "groups": {
         "title": "Device groups",
         "description": "{count} Homexa devices. “Automatic” keeps the computed group (shown in brackets); pick a group to force it. Applied on reload (automatic after saving)."
+      },
+      "repeaters": {
+        "title": "Merge a duplicate repeater",
+        "description": "{count} repeater devices. If one physical repeater shows up twice, pick the duplicate device and the repeater to merge it into (the one with the 20:66:CF:… main MAC shown in the Freebox app). Entities, area and name are kept on the target. Applied on reload (automatic after saving).\n\nCurrent manual merges:\n{merges}",
+        "data": {
+          "duplicate": "Duplicate device",
+          "target": "Merge into repeater",
+          "clear": "Cancel all manual merges"
+        }
       }
     },
     "error": {
       "no_channels": "Select at least one channel.",
       "no_name": "Enter a name for this profile.",
       "duplicate_name": "A profile with this name already exists.",
-      "device_conflict": "The same device cannot be both a notification target and a voice speaker (it would be announced twice)."
+      "device_conflict": "The same device cannot be both a notification target and a voice speaker (it would be announced twice).",
+      "repeater_same": "Pick two different devices: the duplicate and the target repeater."
     },
     "abort": {
       "no_devices": "No Homexa device loaded: reload the integration and try again."

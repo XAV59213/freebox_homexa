@@ -38,6 +38,13 @@ TO_REDACT = {
 }
 
 
+def _count_links(links: dict[str, str]) -> dict[str, int]:
+    counts: dict[str, int] = {}
+    for link in links.values():
+        counts[link] = counts.get(link, 0) + 1
+    return dict(sorted(counts.items()))
+
+
 async def async_get_config_entry_diagnostics(
     hass: HomeAssistant, entry: ConfigEntry
 ) -> dict[str, Any]:
@@ -83,6 +90,8 @@ async def async_get_config_entry_diagnostics(
                 key: (router.wifi_aps.get("gateway") or {}).get(key)
                 for key in ("online", "state", "wifi_enabled", "client_count")
             },
+            # Classement des clients : nombre par lien (filaire, Wi-Fi box, répéteur).
+            "lan_client_links": _count_links(getattr(router, "lan_links", {}) or {}),
         }
     )
     return async_redact_data(data, TO_REDACT)

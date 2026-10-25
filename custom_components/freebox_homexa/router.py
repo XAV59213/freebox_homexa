@@ -35,10 +35,12 @@ from .const import (
     HOME_COMPATIBLE_CATEGORIES,
     REPEATER_MODEL,
 )
-from .registry_compat import as_version, get_device_by_identifier
+from .registry_compat import as_version, get_device_by_connection, get_device_by_identifier
 from .wifi_ap import build_wifi_aps
 
 _LOGGER = logging.getLogger(__name__)
+
+GROUP_SERVER_SERVICE = "server"
 
 SCAN_INTERVAL = timedelta(seconds=120)
 
@@ -244,6 +246,10 @@ class FreeboxRouter:
         self.player_identifiers: set[str] = set()
         # clé stable -> (nom, groupe automatique) pour l'écran d'options
         self.grouped_devices: dict[str, tuple[str, str]] = {}
+        # Client LAN (MAC normalisée) -> lien retenu : « wired », « wifi », « repeater:<MAC> ».
+        # Dernier classement connu : conservé tant que l'appareil est hors ligne.
+        self.lan_links: dict[str, str] = {}
+        self._lan_link_pending: dict[str, tuple[str, int]] = {}
         self._home_update_lock = asyncio.Lock()
 
         self.supports_hosts = True
@@ -317,7 +323,10 @@ class FreeboxRouter:
         }
         if payload.get("serial"):
             info["serial_number"] = payload["serial"]
-        parent_id = self.parent_for(f"repeater_{canon}", name, "server")
+        from .device_groups import LINK_WIFI
+
+        # Les répéteurs se rangent sous « Clients Wi-Fi » (avec leurs propres clients).
+        parent_id = self.parent_for(f"repeater_{canon}", name, "server", LINK_WIFI)
         if parent_id:
             info["via_device_id"] = parent_id
         return DeviceInfo(**info)
@@ -486,6 +495,11 @@ class FreeboxRouter:
         await self._fetch_wifi_global_state()
         await self._fetch_api_repeaters()
         self._refresh_repeaters()
+        try:
+            self._update_lan_links()
+            self._sync_lan_client_parents()
+        except Exception:  # noqa: BLE001 — le classement ne doit jamais bloquer le poll
+            _LOGGER.debug("Classement filaire / Wi-Fi des clients impossible", exc_info=True)
         async_dispatcher_send(self.hass, self.signal_device_update)
         if new_device:
             async_dispatcher_send(self.hass, self.signal_device_new)
@@ -615,25 +629,161 @@ class FreeboxRouter:
                     return device.id
         return self.device_id
 
-    def parent_for(self, key: str, name: str, auto_group: str | None) -> str | None:
+    def parent_for(
+        self, key: str, name: str, auto_group: str | None, auto_link: str | None = None
+    ) -> str | None:
         """device_id du service parent (surcharge utilisateur, sinon automatique).
 
         4 services : Freebox Server (défaut), Freebox Maison connectée, Freebox Player, TNT.
         `key` est la clé stable de l'appareil, utilisée par l'écran « Groupes des appareils ».
+        `auto_link` (clients LAN, répéteurs) : parent automatique filaire / Wi-Fi / répéteur,
+        sous le Freebox Server ; une surcharge de l'utilisateur reste prioritaire.
         """
-        from .device_groups import GROUP_AUTO, SERVICE_CHOICES, to_service
+        from .device_groups import GROUP_AUTO, SERVICE_CHOICES, link_group, to_service
 
         auto = to_service(auto_group)
+        override = self.group_overrides.get(key) or GROUP_AUTO
+        if override in SERVICE_CHOICES:
+            self.grouped_devices[key] = (name, link_group(auto_link) or auto)
+            self.used_groups.add(override)
+            return self.group_device_id(override)
+        if auto_link and auto == GROUP_SERVER_SERVICE:
+            parent_id = self.lan_link_parent_id(auto_link)
+            if parent_id:
+                self.grouped_devices[key] = (name, link_group(auto_link) or auto)
+                return parent_id
         self.grouped_devices[key] = (name, auto)
-        group = self.group_overrides.get(key) or GROUP_AUTO
-        if group not in SERVICE_CHOICES:
-            group = auto
+        self.used_groups.add(auto)
+        return self.group_device_id(auto)
+
+    # --- Clients filaires / Wi-Fi ------------------------------------------
+
+    def lan_link_parent_id(self, link: str | None) -> str | None:
+        """device_id du parent d'un lien : groupe filaire, groupe Wi-Fi ou répéteur."""
+        from .device_groups import (
+            GROUP_LAN_WIFI,
+            GROUP_LAN_WIRED,
+            LINK_REPEATER,
+            LINK_WIFI,
+            LINK_WIRED,
+        )
+
+        if not link:
+            return None
+        if link.startswith(LINK_REPEATER):
+            canon = self.repeater_canonical_mac(link[len(LINK_REPEATER):])
+            registry = dr.async_get(self.hass)
+            device = get_device_by_identifier(
+                registry, (DOMAIN, f"repeater_{canon}"), self.entry_id
+            )
+            if device is not None:
+                return device.id
+            # Répéteur pas encore enregistré : « Clients Wi-Fi » en attendant.
+            link = LINK_WIFI
+        group = {LINK_WIRED: GROUP_LAN_WIRED, LINK_WIFI: GROUP_LAN_WIFI}.get(link)
+        if group is None:
+            return None
         self.used_groups.add(group)
         return self.group_device_id(group)
 
+    def lan_client_parent(self, mac: str, name: str) -> str | None:
+        """Parent d'un client LAN : surcharge, sinon filaire / Wi-Fi box / répéteur."""
+        from .device_groups import GROUP_SERVER
+
+        link = self.lan_links.get(normalize_mac(mac))
+        return self.parent_for(f"mac:{mac.lower()}", name, GROUP_SERVER, link)
+
+    def _is_lan_client(self, device: dict[str, Any]) -> bool:
+        return device.get("attrs") is None and not self.is_repeater_host(device)
+
+    def _link_from_registry(self, mac: str) -> str | None:
+        """Classement déjà appliqué (redémarrage) : déduit du via_device actuel."""
+        from .device_groups import (
+            GROUP_LAN_WIFI,
+            GROUP_LAN_WIRED,
+            LINK_REPEATER,
+            LINK_WIFI,
+            LINK_WIRED,
+            group_identifier,
+        )
+
+        registry = dr.async_get(self.hass)
+        device = get_device_by_connection(
+            registry, (CONNECTION_NETWORK_MAC, mac.lower()), self.entry_id
+        )
+        via = getattr(device, "via_device_id", None)
+        if not via:
+            return None
+        for group, link in ((GROUP_LAN_WIRED, LINK_WIRED), (GROUP_LAN_WIFI, LINK_WIFI)):
+            parent = get_device_by_identifier(
+                registry, group_identifier(self.mac, group), self.entry_id
+            )
+            if parent is not None and parent.id == via:
+                return link
+        for canon in self.repeaters:
+            parent = get_device_by_identifier(
+                registry, (DOMAIN, f"repeater_{canon}"), self.entry_id
+            )
+            if parent is not None and parent.id == via:
+                return f"{LINK_REPEATER}{canon}"
+        return None
+
+    def _update_lan_links(self) -> None:
+        """Classe chaque client LAN (filaire / Wi-Fi box / répéteur), sans va-et-vient."""
+        from .device_groups import lan_client_link, next_lan_link
+
+        def repeater_of(mac: str) -> str:
+            return self.repeater_aliases.get(normalize_mac(mac), "")
+
+        for mac, device in self.devices.items():
+            if not self._is_lan_client(device):
+                continue
+            norm = normalize_mac(mac)
+            current = self.lan_links.get(norm)
+            if current is None:
+                current = self._link_from_registry(mac)
+            seen = lan_client_link(device, repeater_of)
+            new, pending = next_lan_link(
+                current, seen, bool(device.get("active")), self._lan_link_pending.get(norm)
+            )
+            if pending:
+                self._lan_link_pending[norm] = pending
+            else:
+                self._lan_link_pending.pop(norm, None)
+            if new:
+                if current and new != current:
+                    _LOGGER.debug("Client %s : %s -> %s", mac, current, new)
+                self.lan_links[norm] = new
+
+    def _sync_lan_client_parents(self) -> None:
+        """Déplace les appareils clients déjà enregistrés quand leur parent change."""
+        from .device_groups import lan_client_name
+
+        registry = dr.async_get(self.hass)
+        for mac, device in self.devices.items():
+            if not self._is_lan_client(device):
+                continue
+            entry = get_device_by_connection(
+                registry, (CONNECTION_NETWORK_MAC, str(mac).lower()), self.entry_id
+            )
+            if entry is None or any(i[0] == DOMAIN for i in entry.identifiers):
+                continue  # pas (encore) d'appareil, ou appareil Homexa (Player, répéteur…)
+            parent_id = self.lan_client_parent(mac, lan_client_name(device))
+            if parent_id and parent_id != entry.id and entry.via_device_id != parent_id:
+                registry.async_update_device(entry.id, via_device_id=parent_id)
+
     def group_device_id(self, group: str | None) -> str | None:
         """device_id du service ; repli sur le Freebox Server."""
-        from .device_groups import GROUP_HOME, GROUP_PLAYER, GROUP_TNT
+        from .device_groups import GROUP_HOME, GROUP_PLAYER, GROUP_TNT, LAN_GROUPS
+
+        if group in LAN_GROUPS:
+            if group not in self.group_device_ids:
+                from .device_groups import async_get_lan_group_device
+
+                self.group_device_ids[group] = async_get_lan_group_device(
+                    self.hass, self.entry_id, self.mac, group, self.device_id
+                )
+            return self.group_device_ids[group]
 
         if group == GROUP_HOME:
             if group not in self.group_device_ids:

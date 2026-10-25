@@ -294,6 +294,10 @@ def _is_wifi_client(device: dict[str, Any], router_mac: str) -> bool:
         return False
     access_point = device.get("access_point") or {}
     wifi = device.get("wifi") or {}
+    # Hôte branché en Ethernet (sur la box ou un port du répéteur) : access_point.type
+    # vaut aussi « gateway » / « repeater », mais ce n'est pas un client Wi-Fi.
+    if str(access_point.get("connectivity_type") or "").lower() == "ethernet":
+        return False
     if access_point.get("type") in {"repeater", "gateway"}:
         return True
     if access_point.get("connectivity_type") == "wifi":

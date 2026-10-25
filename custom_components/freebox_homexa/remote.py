@@ -44,7 +44,7 @@ class FreeboxRemote(RemoteEntity):
 
     _attr_supported_features = RemoteEntityFeature(0)
     _attr_has_entity_name = True
-    _attr_name = "Télécommande"
+    _attr_translation_key = "remote"
 
     def __init__(
         self, router: FreeboxRouter, player: dict[str, Any], entry: ConfigEntry

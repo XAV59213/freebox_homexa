@@ -18,6 +18,11 @@
       "accueil": {
         "default": "mdi:home"
       }
+    },
+    "sensor": {
+      "lan_group_clients": {
+        "default": "mdi:lan-connect"
+      }
     }
   }
 }

@@ -82,7 +82,7 @@ class FreeboxTvGuideCalendar(CalendarEntity):
     """Programmes TV en cours et à venir."""
 
     _attr_has_entity_name = True
-    _attr_name = "Guide TV"
+    _attr_translation_key = "tv_guide"
     _attr_icon = "mdi:television-guide"
 
     def __init__(self, router: FreeboxRouter) -> None:

@@ -17,6 +17,7 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.util import slugify
 
 from .const import DOMAIN
+from .errors import is_shutdown_error
 from .router import FreeboxRouter
 from .entity import FreeboxHomeEntity
 
@@ -53,7 +54,7 @@ async def async_setup_entry(
         entities.append(FreeboxSwitch(router, entity_description))
 
     async_add_entities(entities, True)
-    _LOGGER.debug(f"{len(entities)} entités interrupteurs ajoutées pour {router.name}")
+    _LOGGER.debug("%s entités interrupteurs ajoutées pour %s", len(entities), router.name)
 
 
 class FreeboxSwitch(SwitchEntity):
@@ -70,7 +71,7 @@ class FreeboxSwitch(SwitchEntity):
     async def _async_set_state(self, enabled: bool) -> None:
         try:
             await self._router.wifi.set_global_config({"enabled": enabled})
-            _LOGGER.info(f"WiFi {'activé' if enabled else 'désactivé'} pour {self._router.name}")
+            _LOGGER.info("WiFi %s pour %s", 'activé' if enabled else 'désactivé', self._router.name)
         except InsufficientPermissionsError:
             _LOGGER.warning("Home Assistant n'a pas les permissions WiFi.")
 
@@ -84,8 +85,11 @@ class FreeboxSwitch(SwitchEntity):
         try:
             data = await self._router.wifi.get_global_config()
             self._attr_is_on = bool(data["enabled"])
-        except Exception as err:
-            _LOGGER.error(f"Échec de la mise à jour du WiFi: {err}")
+        except Exception as err:  # noqa: BLE001
+            if is_shutdown_error(err, self._router):
+                _LOGGER.debug("État du Wi-Fi non lu (rechargement) : %s", err)
+                return
+            _LOGGER.error("Échec de la mise à jour du WiFi : %s", err)
             self._attr_is_on = None
 
 
@@ -119,13 +123,13 @@ class FreeboxShutterInvertSwitchEntity(FreeboxHomeEntity, SwitchEntity):
         await self.hass.async_add_executor_job(self._write, "1")
         self._state = True
         self.async_write_ha_state()
-        _LOGGER.info(f"Inversion activée pour {self._attr_name}")
+        _LOGGER.info("Inversion activée pour %s", self._attr_name)
 
     async def async_turn_off(self, **kwargs: Any) -> None:
         await self.hass.async_add_executor_job(self._write, "0")
         self._state = False
         self.async_write_ha_state()
-        _LOGGER.info(f"Inversion désactivée pour {self._attr_name}")
+        _LOGGER.info("Inversion désactivée pour %s", self._attr_name)
 
     @property
     def available(self) -> bool:
@@ -145,5 +149,5 @@ class FreeboxShutterInvertSwitchEntity(FreeboxHomeEntity, SwitchEntity):
             else:
                 self._state = False
         except OSError as err:
-            _LOGGER.error(f"Erreur lecture inversion {self._attr_name}: {err}")
+            _LOGGER.error("Erreur lecture inversion %s: %s", self._attr_name, err)
             self._state = False

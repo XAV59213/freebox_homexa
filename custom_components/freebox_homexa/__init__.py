@@ -8,6 +8,7 @@ from datetime import datetime, timedelta
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import Event, HomeAssistant, ServiceCall, callback
 from homeassistant.exceptions import ConfigEntryAuthFailed, ConfigEntryNotReady
+from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.event import async_call_later, async_track_time_interval
 from homeassistant.helpers.storage import Store
 from freebox_api.exceptions import AuthorizationError, HttpRequestError
@@ -260,19 +261,20 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
                 "Paramètres → Homexa → Configurer, ou Player : Réglages → Système → Informations."
             )
             return
-        async with aiohttp.ClientSession() as session:
-            for code in code_list.split(","):
-                url = PLAYER_PATH_TEMPLATE.format(
-                    host=entry.data[CONF_HOST],
-                    remote_code=remote_code,
-                    key=code.strip(),
-                )
-                try:
-                    async with session.get(url, ssl=False) as response:
-                        if response.status != 200:
-                            _LOGGER.error("Remote %s HTTP %s", code, response.status)
-                except aiohttp.ClientError as err:
-                    _LOGGER.error("Remote %s : %s", code, err)
+        # Session aiohttp partagée de Home Assistant (pas de session créée / fermée ici).
+        session = async_get_clientsession(hass)
+        for code in code_list.split(","):
+            url = PLAYER_PATH_TEMPLATE.format(
+                host=entry.data[CONF_HOST],
+                remote_code=remote_code,
+                key=code.strip(),
+            )
+            try:
+                async with session.get(url, ssl=False) as response:
+                    if response.status != 200:
+                        _LOGGER.error("Remote %s HTTP %s", code, response.status)
+            except aiohttp.ClientError as err:
+                _LOGGER.error("Remote %s : %s", code, err)
 
     if not hass.services.has_service(DOMAIN, SERVICE_REBOOT):
         hass.services.async_register(DOMAIN, SERVICE_REBOOT, async_reboot)
@@ -286,8 +288,15 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
 
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
+    router = hass.data.get(DOMAIN, {}).get(entry.unique_id)
+    if router is not None:
+        # Déchargement / rechargement : les relevés encore en vol ne journalisent plus
+        # « Connector is closed » comme une erreur.
+        router.closing = True
     unload_ok = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
     if not unload_ok:
+        if router is not None:
+            router.closing = False
         return False
     async_unload_bundled_tnt(hass, entry)
     router = hass.data[DOMAIN].pop(entry.unique_id, None)

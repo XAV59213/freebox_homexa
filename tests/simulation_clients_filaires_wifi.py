@@ -25,9 +25,17 @@ ha["homeassistant.core"].HomeAssistant = object
 ha["homeassistant.const"].CONF_HOST = "host"; ha["homeassistant.const"].CONF_PORT = "port"
 ha["homeassistant.helpers.dispatcher"].async_dispatcher_send = lambda *a: None
 ha["homeassistant.util"].slugify = lambda s: s
+try:
+    import aiohttp  # noqa: F401
+except ImportError:  # bouchon minimal (HA fournit aiohttp)
+    _aio = types.ModuleType("aiohttp")
+    _aio.ClientError = type("ClientError", (Exception,), {})
+    _aio.ClientConnectionError = type("ClientConnectionError", (_aio.ClientError,), {})
+    sys.modules["aiohttp"] = _aio
 ha["freebox_api"].Freepybox = object
 ha["freebox_api.api.call"].Call = object; ha["freebox_api.api.home"].Home = object; ha["freebox_api.api.wifi"].Wifi = object
-ha["freebox_api.exceptions"].HttpRequestError = Exception; ha["freebox_api.exceptions"].NotOpenError = Exception
+ha["freebox_api.exceptions"].HttpRequestError = type("HttpRequestError", (Exception,), {})
+ha["freebox_api.exceptions"].NotOpenError = type("NotOpenError", (Exception,), {})
 
 
 class Dev:
@@ -93,7 +101,7 @@ def load(name):
     return m
 
 
-load("registry_compat"); dg = load("device_groups"); wa = load("wifi_ap"); rt = load("router")
+load("registry_compat"); er_mod = load("errors"); dg = load("device_groups"); wa = load("wifi_ap"); rt = load("router")
 
 RM = "34:27:92:D9:E0:30"
 TRUTH = {"Grange": ("20:66:CF:4A:05:93", "192.168.1.165", ["22:66:CF:C9:A0:52", "22:66:CF:C9:A0:56"]),
@@ -598,4 +606,59 @@ assert by_name("Équipements réseau (filaire)") is None, tree()
 assert by_name("Clients réseau filaires") is not None  # NAS, PC… encore dedans
 assert by_name("Serveurs (filaire)") is not None
 print("OK : sous-groupes vides retirés en continu, non vides conservés")
+
+# --- 10. Capteurs « Clients connectés » par groupe -----------------------------
+DEV.clear(); ENT.clear()
+r16 = make_router()
+hosts16 = lan()
+hosts16[CISCO] = cisco(eth_ap("gateway", RM))
+PVE = "BC:24:11:B4:3D:38"
+hosts16[PVE] = host(PVE, "pve", eth_ap("gateway", RM), host_type="workstation")
+hosts16[PVE]["vendor_name"] = "Proxmox Server Solutions GmbH"
+hosts16["AA:00:00:00:00:02"]["active"] = False  # NAS hors ligne
+poll(r16, hosts16)
+for m, h in hosts16.items():
+    if h.get("attrs") is None and not r16.is_repeater_host(h):
+        r16.tracked_lan_macs.add(wa.normalize_mac(m))
+register_entities(r16, hosts16)
+poll(r16, hosts16)
+names = lambda key: sorted(dg.lan_client_name(d) for d in r16.lan_group_members(key) if d.get("active"))
+assert names("lan_wired_net_network") == [f"Cisco Systems, Inc ({CISCO})"], names("lan_wired_net_network")
+assert names("lan_wired_net_servers") == ["pve"]  # NAS hors ligne non compté
+assert len(r16.lan_group_members("lan_wired_net_servers")) == 2  # total = en ligne + hors ligne
+assert set(names("lan_wired")) >= {"PC-Bureau", "TV-Garage", "pve", f"Cisco Systems, Inc ({CISCO})"}
+# « Clients Wi-Fi » : clients de la box ET des répéteurs (rangés sous lui).
+assert set(names("lan_wifi")) == {"iPhone-Xav", "Echo-Salon", "Tel-Fille", "Shelly-Garage", "Camera-Grange"}, names("lan_wifi")
+assert names("lan_wifi_net_phones") == ["iPhone-Xav"]
+# Le capteur d'un groupe n'empêche pas son retrait quand il est vide.
+sub_id = r16.group_device_ids["lan_wired_net_network"]
+ENT[f"{RM}_lan_group_clients_lan_wired_net_network"] = sub_id
+class _E:  # entrée de registre d'entité (unique_id)
+    def __init__(s, uid): s.unique_id = uid
+er.async_entries_for_device = lambda r, did, include_disabled_entities=True: [
+    _E(e) for e, d in ENT.items() if d == did]
+assert not dg._has_entities(None, sub_id)
+ENT["autre_entite"] = sub_id
+assert dg._has_entities(None, sub_id)
+ENT.pop("autre_entite")
+DEV.pop(R.async_get_device_by_connection(("mac", CISCO.lower()), "E").id)
+r16.tracked_lan_macs.discard(wa.normalize_mac(CISCO))
+poll(r16, hosts16)
+assert "lan_wired_net_network" not in r16.group_device_ids and sub_id not in DEV
+assert names("lan_wired_net_network") == []
+print("OK : capteurs Clients connectés (membres par groupe, retrait avec le groupe)")
+
+# --- 11. « Connector is closed » pendant un rechargement : pas une erreur -------
+import aiohttp
+assert er_mod.is_shutdown_error(aiohttp.ClientConnectionError("Connector is closed."))
+assert er_mod.is_shutdown_error(RuntimeError("Session is closed"))
+assert er_mod.is_shutdown_error(ha["freebox_api.exceptions"].NotOpenError("x"))
+assert er_mod.is_shutdown_error(ValueError("boom"), types.SimpleNamespace(closing=True))
+assert not er_mod.is_shutdown_error(ValueError("boom"), types.SimpleNamespace(closing=False))
+assert not er_mod.is_shutdown_error(aiohttp.ClientConnectionError("Cannot connect to host"))
+assert not er_mod.is_shutdown_error(RuntimeError("autre erreur"))
+r17 = make_router(); r17.closing = True
+import asyncio
+asyncio.run(r17.update_all())  # ne fait rien, ne lève rien
+print("OK : erreurs de fermeture rétrogradées en debug, vraies erreurs conservées")
 print("SIMULATION_CLIENTS_FILAIRES_WIFI_OK")

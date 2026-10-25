@@ -13,13 +13,12 @@ from homeassistant.components.binary_sensor import (
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import EntityCategory
 from homeassistant.core import HomeAssistant, callback
-from homeassistant.helpers.device_registry import CONNECTION_NETWORK_MAC, DeviceInfo
 from homeassistant.helpers.dispatcher import async_dispatcher_connect
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from .const import DOMAIN, REPEATER_MODEL, FreeboxHomeCategory
-from .device_groups import GROUP_SERVER
 from .entity import FreeboxHomeEntity
+from .errors import is_shutdown_error
 from .router import FreeboxRouter
 
 _LOGGER = logging.getLogger(__name__)
@@ -139,8 +138,11 @@ class FreeboxHomeBinarySensor(FreeboxHomeEntity, BinarySensorEntity):
             value = await self.get_home_endpoint_value(self._command_id)
             self._attr_is_on = self._edit_state(value)
             await super().async_update_signal()
-        except Exception as err:
-            _LOGGER.error(f"Échec de la mise à jour du capteur {self._node_id}: {err}")
+        except Exception as err:  # noqa: BLE001
+            if is_shutdown_error(err, self._router):
+                _LOGGER.debug("Mise à jour du capteur %s interrompue (rechargement) : %s", self._node_id, err)
+                return
+            _LOGGER.error("Échec de la mise à jour du capteur %s : %s", self._node_id, err)
             self._attr_is_on = None
 
     def _edit_state(self, state: bool | None) -> bool | None:
@@ -195,7 +197,7 @@ class FreeboxWifiApSensor(BinarySensorEntity):
         self._ap_id = ap_id
         kind = access_point.get("kind") or "repeater"
         if kind == "gateway":
-            self._attr_name = "Wi-Fi Freebox"
+            self._attr_translation_key = "wifi_box"
             self._attr_device_info = router.device_info
             self._attr_unique_id = f"{router.mac}_wifi_ap_gateway"
         else:
@@ -204,7 +206,7 @@ class FreeboxWifiApSensor(BinarySensorEntity):
             self._attr_device_info = router.repeater_device_info(
                 mac, name, access_point.get("model") or REPEATER_MODEL, access_point.get("vendor_name")
             )
-            self._attr_name = "En ligne"
+            self._attr_translation_key = "repeater_online"
             self._attr_unique_id = f"{router.mac}_repeater_{mac}"
             self._attr_icon = "mdi:wifi-sync"
         self._attr_is_on = _ap_online(access_point)

@@ -12,7 +12,7 @@ class FreeboxBaseClass(Entity):
     """Classe de base pour toutes les entités Freebox Home."""
 
     def __init__(self, hass, router: FreeboxRouter, node: Dict[str, any], sub_node=None) -> None:
-        _LOGGER.debug(f"Initialisation de l'entité pour le nœud: {node}")
+        _LOGGER.debug("Initialisation de l'entité pour le nœud: %s", node)
         self._hass = hass
         self._router = router
         self._id = node["id"]

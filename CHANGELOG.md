@@ -1,6 +1,6 @@
 # Changelog
 
-## Non publié
+## 28.8.54
 - Correction : les **clients réseau sans appareil** (ex. switch Cisco) n'apparaissaient dans aucun groupe, et « Équipements réseau (filaire) » restait **vide**. Home Assistant ignore le `device_info` des entités `device_tracker` (`ScannerEntity.device_info` est figé à `None`) : un appareil n'existait que si une autre intégration (DHCP, UniFi…) connaissait déjà la MAC, et l'entité était sinon créée **désactivée** et sans appareil. Homexa crée maintenant lui-même l'appareil de chaque client dont l'entité `device_tracker` est **active** (option « Créer les appareils des clients LAN »), le range dans « Clients réseau filaires › type », « Clients Wi-Fi › type » ou sous le répéteur, et y rattache l'entité. Rien n'est créé pour une entité désactivée
 - Correction : la MAC d'un client restée dans les **connexions d'un appareil répéteur** (reste d'anciennes versions, ex. Grange) rattachait l'entité du client au répéteur (« Grange ▸ Cisco… ») et faisait lire son classement depuis le répéteur (« Clients Wi-Fi ») : la MAC est retirée du répéteur et le client reçoit son propre appareil. Un identifiant `repeater_<MAC>` périmé sur l'appareil d'un client (ancien faux répéteur) est retiré
 - Les sous-groupes « (filaire) » / « (Wi-Fi) » et les groupes filaires / Wi-Fi devenus vides sont retirés à chaque relevé (jamais un groupe qui contient encore un appareil), et ne sont plus créés pour des clients sans appareil

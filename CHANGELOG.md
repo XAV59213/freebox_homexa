@@ -1,6 +1,6 @@
 # Changelog
 
-## Non publié
+## 28.8.60
 - Qualité (Integration Quality Scale) :
   - **runtime-data** : le routeur Freebox est rangé dans `entry.runtime_data` (entrée typée `FreeboxConfigEntry`) au lieu de `hass.data[freebox_homexa][unique_id]`. Plateformes, actions, diagnostics, options et déchargement lisent `entry.runtime_data`. `hass.data` ne garde que l'état global (cache de configuration, carte Lovelace, coordinateurs TNT). Aucun changement visible
   - **parallel-updates** : `PARALLEL_UPDATES = 0` pour les plateformes mises à jour par le relevé central (capteurs, capteurs binaires, suivi d'appareils, calendrier) ; `PARALLEL_UPDATES = 1` pour les plateformes d'action (boutons, interrupteurs, volets, caméras, alarme, télécommande, lecteur multimédia) : une seule commande ou mise à jour à la fois par plateforme vers la Freebox

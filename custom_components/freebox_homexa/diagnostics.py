@@ -97,6 +97,9 @@ async def async_get_config_entry_diagnostics(
                 {k: v[1] for k, v in (getattr(router, "lan_client_types", {}) or {}).items()}
             ),
             "lan_type_overrides": len(getattr(router, "type_overrides", {}) or {}),
+            # Clients dont l'entité device_tracker est active / appareils clients rangés.
+            "lan_tracked_entities": len(getattr(router, "tracked_lan_macs", set()) or set()),
+            "lan_client_devices": len(getattr(router, "lan_device_ids", {}) or {}),
         }
     )
     return async_redact_data(data, TO_REDACT)

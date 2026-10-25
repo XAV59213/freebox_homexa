@@ -248,6 +248,13 @@ class FreeboxRouter:
         )
         # clé stable « mac:… » -> (nom, type automatique) pour l'écran des types
         self.lan_client_types: dict[str, tuple[str, str]] = {}
+        # Clients LAN dont l'entité device_tracker est ACTIVE (ajoutée à HA) : MAC normalisées.
+        # Seuls ceux-là reçoivent un appareil (pas de groupes vides pour des entités désactivées).
+        self.tracked_lan_macs: set[str] = set()
+        # MAC normalisée -> device_id de l'appareil du client (pour relier l'entité).
+        self.lan_device_ids: dict[str, str] = {}
+        # Option « Créer les appareils des clients LAN » (renseignée par device_tracker).
+        self.create_lan_devices: bool = True
         self.used_groups: set[str] = set()
         # nœuds Home dont les entités vivent sur un appareil de groupe (module d'alarme)
         self.merged_node_ids: set[Any] = set()
@@ -788,6 +795,12 @@ class FreeboxRouter:
         device = get_device_by_connection(
             registry, (CONNECTION_NETWORK_MAC, mac.lower()), self.entry_id
         )
+        if device is not None and any(
+            len(i) >= 1 and i[0] == DOMAIN for i in getattr(device, "identifiers", None) or ()
+        ):
+            # Appareil Homexa (répéteur portant encore la MAC d'un client, Player…) :
+            # son parent n'est pas le classement du client.
+            return None
         via = getattr(device, "via_device_id", None)
         if not via:
             return None
@@ -839,22 +852,133 @@ class FreeboxRouter:
                     _LOGGER.debug("Client %s : %s -> %s", mac, current, new)
                 self.lan_links[norm] = new
 
-    def _sync_lan_client_parents(self) -> None:
-        """Déplace les appareils clients déjà enregistrés quand leur parent change."""
+    def _stale_repeater_idents(self, device_entry: Any) -> set[tuple[str, str]]:
+        """Identifiants « repeater_<MAC> » d'un appareil qui n'est plus un répéteur reconnu."""
+        stale: set[tuple[str, str]] = set()
+        for ident in getattr(device_entry, "identifiers", None) or ():
+            if len(ident) < 2 or ident[0] != DOMAIN or not isinstance(ident[1], str):
+                continue
+            if ident[1].startswith("repeater_") and normalize_mac(ident[1][9:]) not in self.repeater_aliases:
+                stale.add(ident)
+        return stale
+
+    def _is_current_repeater_device(self, device_entry: Any) -> bool:
+        for ident in getattr(device_entry, "identifiers", None) or ():
+            if (
+                len(ident) >= 2
+                and ident[0] == DOMAIN
+                and isinstance(ident[1], str)
+                and ident[1].startswith("repeater_")
+                and normalize_mac(ident[1][9:]) in self.repeater_aliases
+            ):
+                return True
+        return False
+
+    def _lan_client_device(self, registry: Any, mac: str) -> Any:
+        """Appareil de ce client LAN, après nettoyage des restes d'anciennes versions.
+
+        - MAC d'un client (non répéteur) restée dans les connexions d'un appareil
+          répéteur (Grange…) : retirée du répéteur (sinon l'entité du client est rattachée
+          au répéteur et le client ne peut pas avoir son propre appareil) ;
+        - identifiant « repeater_<MAC> » périmé (ancien faux répéteur) : retiré, l'appareil
+          redevient un client réseau ordinaire.
+        Renvoie None pour un appareil Homexa légitime (Server, Player…) ou absent.
+        """
+        connection = (CONNECTION_NETWORK_MAC, str(mac).lower())
+        entry = get_device_by_connection(registry, connection, self.entry_id)
+        if entry is None:
+            return None
+        if self._is_current_repeater_device(entry):
+            conns = {
+                c for c in entry.connections
+                if not (c[0] == CONNECTION_NETWORK_MAC and normalize_mac(c[1]) == normalize_mac(mac))
+            }
+            if conns != set(entry.connections) and conns:
+                _LOGGER.warning(
+                    "MAC %s (client réseau) retirée de l'appareil répéteur %s",
+                    mac, getattr(entry, "name_by_user", None) or entry.name,
+                )
+                registry.async_update_device(entry.id, new_connections=conns)
+            return None
+        stale = self._stale_repeater_idents(entry)
+        if stale:
+            idents = set(entry.identifiers) - stale
+            _LOGGER.warning(
+                "Appareil %s (%s) : identifiant répéteur périmé %s retiré (client réseau)",
+                getattr(entry, "name_by_user", None) or entry.name, mac, sorted(i[1] for i in stale),
+            )
+            entry = registry.async_update_device(entry.id, new_identifiers=idents) or entry
+        if any(len(i) >= 1 and i[0] == DOMAIN for i in entry.identifiers):
+            return None  # appareil Homexa (Server, Player, disque…)
+        return entry
+
+    def ensure_lan_client_device(self, mac: str) -> str | None:
+        """Crée / range l'appareil d'un client LAN dont l'entité est active ; renvoie son id.
+
+        Les entités device_tracker (ScannerEntity) ne créent pas d'appareil elles-mêmes
+        (device_info figé à None par HA) : Homexa le crée ici, rangé sous « Clients réseau
+        filaires › type », « Clients Wi-Fi › type » ou le répéteur.
+        """
         from .device_groups import lan_client_name
 
+        norm = normalize_mac(mac)
+        device = self.devices.get(mac) or next(
+            (d for m, d in self.devices.items() if normalize_mac(m) == norm), None
+        )
+        self.lan_device_ids.pop(norm, None)
+        if device is None or not self._is_lan_client(device):
+            return None
         registry = dr.async_get(self.hass)
+        entry = self._lan_client_device(registry, mac)
+        if entry is None:
+            if not self.create_lan_devices or norm not in self.tracked_lan_macs:
+                return None
+            if get_device_by_connection(
+                registry, (CONNECTION_NETWORK_MAC, str(mac).lower()), self.entry_id
+            ) is not None:
+                return None  # MAC portée par un appareil Homexa (Player…)
+            name = lan_client_name(device)
+            entry = registry.async_get_or_create(
+                config_entry_id=self.entry_id,
+                connections={(CONNECTION_NETWORK_MAC, str(mac).lower())},
+                manufacturer=device.get("vendor_name") or None,
+                name=name,
+            )
+            _LOGGER.debug("Appareil créé pour le client réseau %s (%s)", name, mac)
+        parent_id = self.lan_client_parent(mac, lan_client_name(device))
+        if parent_id and parent_id != entry.id and entry.via_device_id != parent_id:
+            registry.async_update_device(entry.id, via_device_id=parent_id)
+        self.lan_device_ids[norm] = entry.id
+        return entry.id
+
+    def _sync_lan_client_parents(self) -> None:
+        """Crée / déplace les appareils des clients LAN quand leur parent change."""
         for mac, device in self.devices.items():
             if not self._is_lan_client(device):
                 continue
-            entry = get_device_by_connection(
-                registry, (CONNECTION_NETWORK_MAC, str(mac).lower()), self.entry_id
-            )
-            if entry is None or any(i[0] == DOMAIN for i in entry.identifiers):
-                continue  # pas (encore) d'appareil, ou appareil Homexa (Player, répéteur…)
-            parent_id = self.lan_client_parent(mac, lan_client_name(device))
-            if parent_id and parent_id != entry.id and entry.via_device_id != parent_id:
-                registry.async_update_device(entry.id, via_device_id=parent_id)
+            try:
+                self.ensure_lan_client_device(mac)
+            except Exception:  # noqa: BLE001 — un client ne doit pas bloquer les autres
+                _LOGGER.debug("Rangement de l'appareil %s impossible", mac, exc_info=True)
+        self._prune_empty_lan_groups()
+
+    def _prune_empty_lan_groups(self) -> None:
+        """Retire les (sous-)groupes filaires / Wi-Fi devenus vides (jamais un non vide)."""
+        from .device_groups import LAN_GROUPS, LAN_TYPE_GROUPS, _has_entities
+        from .registry_compat import entry_devices, remove_device
+
+        registry = dr.async_get(self.hass)
+        for keys in (list(LAN_TYPE_GROUPS), list(LAN_GROUPS)):  # sous-groupes d'abord
+            children = {d.via_device_id for d in entry_devices(registry, self.entry_id)}
+            for key in keys:
+                device_id = self.group_device_ids.get(key)
+                if device_id is None:
+                    continue
+                if device_id in children or _has_entities(self.hass, device_id):
+                    continue
+                remove_device(registry, device_id)
+                self.group_device_ids.pop(key, None)
+                self.used_groups.discard(key)
 
     def group_device_id(self, group: str | None) -> str | None:
         """device_id du service ; repli sur le Freebox Server."""

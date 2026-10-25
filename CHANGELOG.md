@@ -1,5 +1,11 @@
 # Changelog
 
+## Non publié
+- Documentation :
+  - README : nouvelles sections « Actions » (les 6 actions ; `freebox_homexa.remote` avec `code`, `player_id`, `device_id`, liste des touches, exemples YAML, erreurs), « Disponibilité et journal » (entités indisponibles quand la Freebox est injoignable, nœuds Home « unreachable » hors RTS, journal unique, astuce `not_from` pour les automatisations d'alarme) et « Suppression ». L'option « Créer des appareils pour les clients réseau » est mise à jour (décochée par défaut sur une nouvelle installation, conservée sur une existante, retrait automatique des appareils clients 100 % Homexa). Dépannage complété
+  - info.md complété
+  - `quality_scale.yaml` : `docs-actions` et `docs-removal-instructions` passent à « done »
+
 ## 28.8.63
 - Correction : l'action **`freebox_homexa.remote`** envoyait les touches à `http://<adresse du Freebox Server>/pub/remote_control`, une adresse qui n'existe pas sur le Server : la commande ne faisait rien. Elle passe désormais par le même chemin que l'entité « Télécommande » du Player (ex. `remote.salon_freebox_player_telecommande`), c'est-à-dire `freebox_api` → Freebox Player, avec le même code télécommande réseau (celui du Player, sinon le code commun des options). Code partagé dans `player_remote.py`
   - compatible avec les appels existants : `code: power`, ou plusieurs touches séparées par des virgules (`code: "1,2"`) ; majuscules et espaces tolérés

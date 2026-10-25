@@ -19,13 +19,13 @@ rules:
     status: done
     comment: freebox-api>=1.3.1 (hassfest refuse un « == » sur un paquet épinglé par le cœur, 1.3.1 aujourd'hui).
   docs-actions:
-    status: todo
-    comment: Actions décrites dans services.yaml, pas encore dans le README.
+    status: done
+    comment: README, section « Actions » (6 actions, champs et exemples de freebox_homexa.remote).
   docs-high-level-description: done
   docs-installation-instructions: done
   docs-removal-instructions:
-    status: todo
-    comment: Procédure de suppression à ajouter au README.
+    status: done
+    comment: README, section « Suppression ».
   entity-event-setup: done
   entity-unique-id: done
   has-entity-name:

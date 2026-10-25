@@ -152,11 +152,19 @@
     },
     "remote": {
       "name": "Send remote command",
-      "description": "Send a remote command to Freebox Player",
+      "description": "Sends remote keys to the Freebox Player, like the Player Remote entity (network remote code from the options).",
       "fields": {
         "code": {
-          "name": "Command Code",
-          "description": "The code of the command to send (e.g., power, play, pause)."
+          "name": "Keys",
+          "description": "One key or several separated by commas (e.g. power, or 1,2 for channel 12). Valid keys: power, ok, up, down, left, right, back, home, 0-9, vol_inc, vol_dec, mute, prgm_inc, prgm_dec, play, …"
+        },
+        "player_id": {
+          "name": "Player",
+          "description": "Freebox Player id (1, 2…). Optional with a single Player."
+        },
+        "device_id": {
+          "name": "Player device",
+          "description": "Homexa Player device to control (alternative to player_id)."
         }
       }
     },
@@ -466,6 +474,24 @@
     },
     "reminder_too_late": {
       "message": "Too late to schedule this reminder: not enough time left before the programme starts."
+    },
+    "remote_no_player": {
+      "message": "No Freebox Player detected and no remote code configured."
+    },
+    "remote_multiple_players": {
+      "message": "Several Freebox Players: set player_id or device_id (or a shared remote code in the options)."
+    },
+    "remote_code_missing": {
+      "message": "No network remote code for Player {player}: Freebox Homexa → Configure (Player: Settings → System → Information)."
+    },
+    "remote_invalid_key": {
+      "message": "Unknown remote key: {key}."
+    },
+    "remote_invalid_player": {
+      "message": "Invalid Player id: {player}."
+    },
+    "remote_failed": {
+      "message": "Remote key {key} could not be sent to the Player: {error}"
     }
   }
 }

@@ -152,11 +152,19 @@
     },
     "remote": {
       "name": "Envoyer une commande",
-      "description": "Envoie une commande au Freebox Player",
+      "description": "Envoie des touches de télécommande au Freebox Player, comme l'entité « Télécommande » du Player (code télécommande réseau des options).",
       "fields": {
         "code": {
-          "name": "Code de la commande",
-          "description": "Le code de la commande à envoyer (ex: power, play, pause)."
+          "name": "Touches",
+          "description": "Une touche ou plusieurs séparées par des virgules (ex. power, ou 1,2 pour la chaîne 12). Touches : power, ok, up, down, left, right, back, home, 0-9, vol_inc, vol_dec, mute, prgm_inc, prgm_dec, play, …"
+        },
+        "player_id": {
+          "name": "Player",
+          "description": "Numéro du Freebox Player (1, 2…). Facultatif avec un seul Player."
+        },
+        "device_id": {
+          "name": "Appareil Player",
+          "description": "Appareil Player Homexa à piloter (à la place de player_id)."
         }
       }
     },
@@ -466,6 +474,24 @@
     },
     "reminder_too_late": {
       "message": "Trop tard pour programmer ce rappel : il ne reste plus assez de temps avant le debut du programme."
+    },
+    "remote_no_player": {
+      "message": "Aucun Freebox Player détecté et aucun code télécommande configuré."
+    },
+    "remote_multiple_players": {
+      "message": "Plusieurs Freebox Player : précisez player_id ou device_id (ou un code télécommande commun dans les options)."
+    },
+    "remote_code_missing": {
+      "message": "Pas de code télécommande réseau pour le Player {player} : Freebox Homexa → Configurer (Player : Réglages → Système → Informations)."
+    },
+    "remote_invalid_key": {
+      "message": "Touche de télécommande inconnue : {key}."
+    },
+    "remote_invalid_player": {
+      "message": "Numéro de Player invalide : {player}."
+    },
+    "remote_failed": {
+      "message": "La touche {key} n'a pas pu être envoyée au Player : {error}"
     }
   }
 }

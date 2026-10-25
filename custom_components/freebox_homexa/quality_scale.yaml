@@ -47,8 +47,9 @@ rules:
   action-exceptions:
     status: todo
     comment: >-
-      Erreurs de validation traduites (aucune entrée chargée, rappels) ; les échecs de
-      l'API Freebox pendant reboot / remote sont encore seulement journalisés.
+      Erreurs de validation traduites (aucune entrée chargée, rappels, télécommande) ;
+      remote lève une erreur traduite si une touche n'est pas envoyée ; les échecs de
+      l'API Freebox pendant reboot sont encore seulement journalisés.
   config-entry-unloading: done
   docs-configuration-parameters: done
   docs-installation-parameters: done

@@ -9,11 +9,27 @@ reload:
   description: "Reload the integration, reconnect to the Freebox and rediscover Home devices."
 
 remote:
-  description: Call remote code to the Freebox Player
+  name: "Send remote command"
+  description: "Send remote keys to the Freebox Player (same path as the Remote entity)."
   fields:
     code:
-      description: Code Number
-      example: 'power'
+      required: true
+      example: "power"
+      selector:
+        text:
+    player_id:
+      required: false
+      example: 1
+      selector:
+        number:
+          min: 1
+          max: 99
+          mode: box
+    device_id:
+      required: false
+      selector:
+        device:
+          integration: freebox_homexa
 
 # Rappels du guide TNT (adapted from cyclope205/programme-tnt-fr v3.0.8, MIT)
 schedule_reminder:

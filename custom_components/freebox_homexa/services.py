@@ -9,20 +9,23 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-import aiohttp
-
 from homeassistant.config_entries import ConfigEntry, ConfigEntryState
-from homeassistant.const import CONF_HOST
 from homeassistant.core import HomeAssistant, ServiceCall, callback
-from homeassistant.exceptions import ServiceValidationError
+from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
 from homeassistant.helpers import device_registry as dr
-from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
-from .const import DOMAIN, SERVICE_REBOOT, SERVICE_RELOAD, SERVICE_REMOTE, option_remote_code
+from .const import DOMAIN, SERVICE_REBOOT, SERVICE_RELOAD, SERVICE_REMOTE
+from .player_remote import (
+    VALID_COMMANDS,
+    async_send_player_keys,
+    parse_keys,
+    player_id_from_identifiers,
+    resolve_remote_code,
+)
 
 _LOGGER = logging.getLogger(__name__)
 
-PLAYER_PATH_TEMPLATE = "http://{host}/pub/remote_control?code={remote_code}&key={key}"
+ATTR_PLAYER_ID = "player_id"
 ATTR_CONFIG_ENTRY_ID = "config_entry_id"
 ATTR_DEVICE_ID = "device_id"
 
@@ -87,6 +90,29 @@ def async_resolve_entries(
     return loaded
 
 
+def _player_id_from_call(hass: HomeAssistant, call: ServiceCall) -> int | None:
+    """Player visé : `player_id`, sinon un `device_id` d'appareil Player Homexa."""
+    raw = call.data.get(ATTR_PLAYER_ID)
+    if raw not in (None, ""):
+        try:
+            return int(raw)
+        except (TypeError, ValueError) as err:
+            raise ServiceValidationError(
+                translation_domain=DOMAIN,
+                translation_key="remote_invalid_player",
+                translation_placeholders={"player": str(raw)},
+            ) from err
+    value = call.data.get(ATTR_DEVICE_ID)
+    values = value if isinstance(value, (list, tuple, set)) else [value] if value else []
+    for item in values:
+        device = dr.async_get(hass).async_get(str(item))
+        if device is not None:
+            found = player_id_from_identifiers(getattr(device, "identifiers", None))
+            if found is not None:
+                return found
+    return None
+
+
 def _router(hass: HomeAssistant, entry: ConfigEntry) -> Any:
     return entry.runtime_data
 
@@ -128,31 +154,53 @@ def async_setup_services(hass: HomeAssistant) -> None:
             await hass.config_entries.async_reload(entry.entry_id)
 
     async def async_freebox_player_remote(call: ServiceCall) -> None:
-        code_list = call.data.get("code", "")
-        if not code_list:
+        """Touches de télécommande vers le Freebox Player (même chemin que l'entité).
+
+        Cible facultative : `player_id`, ou `device_id` d'un appareil Player Homexa.
+        """
+        keys = parse_keys(call.data.get("code", ""))
+        if not keys:
             return
+        invalid = [key for key in keys if key not in VALID_COMMANDS]
+        if invalid:
+            raise ServiceValidationError(
+                translation_domain=DOMAIN,
+                translation_key="remote_invalid_key",
+                translation_placeholders={"key": ", ".join(invalid)},
+            )
+        player_id = _player_id_from_call(hass, call)
         for entry in async_resolve_entries(hass, call):
-            remote_code = option_remote_code(entry)
+            router = _router(hass, entry)
+            try:
+                players = list(await router._api.player.get_players() or [])
+            except Exception as err:  # noqa: BLE001 — liste facultative (code commun possible)
+                _LOGGER.debug("Liste des Player indisponible : %s", err)
+                players = []
+            remote_code, target = resolve_remote_code(entry, player_id, players)
             if not remote_code:
-                _LOGGER.warning(
-                    "Code télécommande Player manquant. "
-                    "Paramètres → Homexa → Configurer, ou Player : Réglages → Système → Informations."
+                if player_id is None and not players:
+                    raise ServiceValidationError(
+                        translation_domain=DOMAIN, translation_key="remote_no_player"
+                    )
+                if player_id is None and len(players) > 1:
+                    raise ServiceValidationError(
+                        translation_domain=DOMAIN, translation_key="remote_multiple_players"
+                    )
+                raise ServiceValidationError(
+                    translation_domain=DOMAIN,
+                    translation_key="remote_code_missing",
+                    translation_placeholders={
+                        "player": str(target) if target is not None else "-"
+                    },
                 )
-                continue
-            # Session aiohttp partagée de Home Assistant (pas de session créée / fermée ici).
-            session = async_get_clientsession(hass)
-            for code in str(code_list).split(","):
-                url = PLAYER_PATH_TEMPLATE.format(
-                    host=entry.data[CONF_HOST],
-                    remote_code=remote_code,
-                    key=code.strip(),
+            failures = await async_send_player_keys(router, remote_code, keys)
+            if failures:
+                key, err = failures[0]
+                raise HomeAssistantError(
+                    translation_domain=DOMAIN,
+                    translation_key="remote_failed",
+                    translation_placeholders={"key": key, "error": str(err)},
                 )
-                try:
-                    async with session.get(url, ssl=False) as response:
-                        if response.status != 200:
-                            _LOGGER.error("Remote %s HTTP %s", code, response.status)
-                except aiohttp.ClientError as err:
-                    _LOGGER.error("Remote %s : %s", code, err)
 
     for service, handler in (
         (SERVICE_REBOOT, async_reboot),

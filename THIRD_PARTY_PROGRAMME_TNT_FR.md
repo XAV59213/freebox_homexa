@@ -8,7 +8,7 @@ https://github.com/cyclope205/programme-tnt-fr (v3.0.8).
 - `custom_components/freebox_homexa/tnt_const.py` — XMLTV slots, TNT / extra / RTBF channel lists
 - `custom_components/freebox_homexa/tnt_coordinator.py` — XMLTV coordinator (current / next / prime time / second part, day guide)
 - `custom_components/freebox_homexa/tnt_sensor.py` — per-channel sensors
-- `custom_components/freebox_homexa/tnt_ws.py` — websocket commands `programme_tnt_fr/*` and `freebox_homexa/tnt_*`
+- `custom_components/freebox_homexa/tnt_ws.py` — websocket commands `freebox_homexa/tnt_*` only (no command in the `programme_tnt_fr` namespace)
 - `custom_components/freebox_homexa/tnt_setup.py` — setup of the built-in guide
 - `custom_components/freebox_homexa/config_flow.py` — options steps « Guide TNT » (channel selection, personal TMDB key) and « Profils de rappel » (reminder profiles, notify/media_player conflict check)
 - `custom_components/freebox_homexa/tnt_reminders.py` — persistent reminders and services `schedule_reminder` / `cancel_reminder` / `get_reminder_status`

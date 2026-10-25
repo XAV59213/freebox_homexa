@@ -1,7 +1,6 @@
 """Constants adapted from cyclope205/programme-tnt-fr (MIT)."""
 from datetime import time
 
-DOMAIN = "programme_tnt_fr"
 XMLTV_URL = "https://xmltvfr.fr/xmltv/xmltv_fr.xml"
 CONF_CHANNELS = "channels"
 CONF_REMINDER_PROFILES = "reminder_profiles"

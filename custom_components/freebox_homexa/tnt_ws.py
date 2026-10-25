@@ -1,7 +1,7 @@
 """WebSocket API du guide TNT (adapted from cyclope205/programme-tnt-fr, MIT).
 
-- programme_tnt_fr/* : compatibilité, seulement si l'intégration séparée est absente.
-- freebox_homexa/tnt_* : utilisées par la carte homexa-tnt-card, toujours enregistrées.
+Seules les commandes de l'espace de noms freebox_homexa (freebox_homexa/tnt_*)
+sont enregistrées ; elles sont utilisées par la carte homexa-tnt-card.
 """
 from __future__ import annotations
 
@@ -10,68 +10,9 @@ import voluptuous as vol
 from homeassistant.components import websocket_api
 from homeassistant.core import HomeAssistant, callback
 
-from .tnt_const import (
-    CHANNEL_ORDER,
-    CONF_REMINDER_PROFILES,
-    DOMAIN,
-    TNT_CARD_VERSION,
-)
+from .tnt_const import CHANNEL_ORDER, CONF_REMINDER_PROFILES, TNT_CARD_VERSION
 
 HOMEXA_DOMAIN = "freebox_homexa"
-
-
-@callback
-def async_register_websocket_api(hass: HomeAssistant) -> None:
-    websocket_api.async_register_command(hass, websocket_get_programmes)
-    websocket_api.async_register_command(hass, websocket_get_reminder_profiles)
-
-
-@websocket_api.websocket_command(
-    {
-        vol.Required("type"): "programme_tnt_fr/programmes",
-        vol.Required("channels"): [str],
-        vol.Optional("date"): str,
-    }
-)
-@callback
-def websocket_get_programmes(hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg: dict) -> None:
-    channels = msg["channels"]
-    date_str = msg.get("date")
-    programmes: dict[str, list[dict]] = {}
-    sources = list(hass.data.get(DOMAIN, {}).values())
-    sources.extend(
-        hass.data.get("freebox_homexa", {}).get("tnt_coordinators", {}).values()
-    )
-    for coordinator in sources:
-        get_day = getattr(coordinator, "get_programmes_for_day", None)
-        if get_day is None:
-            continue
-        for channel_id in channels:
-            if channel_id in programmes:
-                continue
-            day_progs = get_day(channel_id, date_str)
-            if day_progs is not None:
-                programmes[channel_id] = day_progs
-    connection.send_result(msg["id"], {"programmes": programmes})
-
-
-@websocket_api.websocket_command({vol.Required("type"): "programme_tnt_fr/reminder_profiles"})
-@callback
-def websocket_get_reminder_profiles(hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg: dict) -> None:
-    names: list[str] = []
-    entries = [
-        *hass.config_entries.async_entries("freebox_homexa"),
-        *hass.config_entries.async_entries(DOMAIN),
-    ]
-    for entry in entries:
-        for profile in entry.options.get(CONF_REMINDER_PROFILES, []):
-            name = profile.get("name")
-            if name and name not in names:
-                names.append(name)
-    connection.send_result(msg["id"], {"profiles": names})
-
-
-# --- Commandes propres à Homexa, pour la carte homexa-tnt-card ---
 
 
 def _homexa_coordinators(hass: HomeAssistant) -> list:

@@ -20,6 +20,17 @@ function _prefer(ids, needles) {
   return ids.find((id) => lower.some((n) => id.toLowerCase().includes(n))) || ids[0] || "";
 }
 
+// Échappe toute valeur insérée dans un gabarit innerHTML (noms, états,
+// attributs, configuration) : un nom d'entité ne doit jamais injecter de HTML.
+function _esc(value) {
+  return String(value ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
 function _name(hass, entityId) {
   const st = hass.states[entityId];
   return (st && st.attributes && st.attributes.friendly_name) || entityId;
@@ -255,28 +266,28 @@ class FreeboxHomexaCard extends HTMLElement {
       <div class="wrap">
         <div class="grid">
           <div class="card">
-            <div class="head"><span class="title">Alarme</span><span class="sub">${alarmLabel}</span></div>
-            ${e.alarm ? `<div class="modes">${ALARM_MODES.map((m) => `<button type="button" class="mode ${alarmState === m.state ? "active" : ""}" data-alarm="${m.service}"><div>${m.icon}</div><span>${m.label}</span></button>`).join("")}</div><div class="hint">Code requis</div>` : `<div class="empty">Aucune alarme Homexa</div>`}
+            <div class="head"><span class="title">Alarme</span><span class="sub">${_esc(alarmLabel)}</span></div>
+            ${e.alarm ? `<div class="modes">${ALARM_MODES.map((m) => `<button type="button" class="mode ${alarmState === m.state ? "active" : ""}" data-alarm="${_esc(m.service)}"><div>${_esc(m.icon)}</div><span>${_esc(m.label)}</span></button>`).join("")}</div><div class="hint">Code requis</div>` : `<div class="empty">Aucune alarme Homexa</div>`}
           </div>
           <div class="card">
-            <div class="head"><span class="title">${cover ? _name(hass, e.cover) : "Volet"}</span><span class="sub">${coverLabel}</span></div>
+            <div class="head"><span class="title">${_esc(cover ? _name(hass, e.cover) : "Volet")}</span><span class="sub">${_esc(coverLabel)}</span></div>
             ${e.cover ? `<div class="cover-art">${`<div class='slat'></div>`.repeat(6)}</div><div class="btns"><button type="button" class="btn" data-cover="open_cover">Ouvrir</button><button type="button" class="btn" data-cover="close_cover">Fermer</button></div>` : `<div class="empty">Aucun volet Homexa</div>`}
           </div>
         </div>
         <div class="row3">
           <div class="card center">
-            <div class="head"><span class="title">${pir ? _name(hass, e.pir) : "PIR"}</span></div>
+            <div class="head"><span class="title">${_esc(pir ? _name(hass, e.pir) : "PIR")}</span></div>
             <div class="sub" style="margin:0;display:block;">${pirOn ? "Actif" : "Inactif"}</div>
             <div class="walk ${pirOn ? "on" : ""}">PIR</div>
-            <div class="hint">Dernier déclencheur : ${pirTime || "—"}</div>
+            <div class="hint">Dernier déclencheur : ${_esc(pirTime || "—")}</div>
           </div>
           <div class="card center">
-            <div class="head"><span class="title">${player ? _name(hass, e.player) : "Freebox Player"}</span><span class="sub">${playerLabel}</span></div>
+            <div class="head"><span class="title">${_esc(player ? _name(hass, e.player) : "Freebox Player")}</span><span class="sub">${_esc(playerLabel)}</span></div>
             ${e.player ? `<div class="apps"><button type="button" class="app yt" data-src="YouTube">YT</button><button type="button" class="app nf" data-src="Netflix">N</button><button type="button" class="app pr" data-prime="1">prime</button></div><div class="transport"><button type="button" data-media="media_previous_track">|◀</button><button type="button" data-media="media_play_pause">▮▶</button><button type="button" data-media="media_next_track">▶|</button></div>` : `<div class="empty">Aucun Player Homexa</div>`}
           </div>
           <div class="card center">
             <div class="head"><span class="title">WiFi RSSI</span></div>
-            ${rssiOk ? `<div class="rssi-val">${Math.round(rssi)} dBm</div><div class="bars">${[1, 2, 3, 4].map((i) => `<div class="bar ${i <= bars ? "on" : ""}" style="height:${8 + i * 4}px"></div>`).join("")}</div><div class="ok">${_rssiLabel(rssi)}</div>` : `<div class="empty">Aucun capteur RSSI</div>`}
+            ${rssiOk ? `<div class="rssi-val">${_esc(Math.round(rssi))} dBm</div><div class="bars">${[1, 2, 3, 4].map((i) => `<div class="bar ${i <= bars ? "on" : ""}" style="height:${8 + i * 4}px"></div>`).join("")}</div><div class="ok">${_esc(_rssiLabel(rssi))}</div>` : `<div class="empty">Aucun capteur RSSI</div>`}
           </div>
         </div>
       </div>
@@ -299,7 +310,7 @@ class FreeboxHomexaCardEditor extends HTMLElement {
   set hass(_hass) {}
   _draw() {
     const fields = [["alarm_entity", "Alarme"], ["cover_entity", "Volet"], ["pir_entity", "PIR"], ["player_entity", "Player"], ["rssi_entity", "RSSI"]];
-    this.shadowRoot.innerHTML = `<div style="display:flex;flex-direction:column;gap:8px;padding:8px 0;">${fields.map(([key, label]) => `<label>${label}</label><input data-key="${key}" value="${this._config[key] || ""}" placeholder="auto" />`).join("")}</div>`;
+    this.shadowRoot.innerHTML = `<div style="display:flex;flex-direction:column;gap:8px;padding:8px 0;">${fields.map(([key, label]) => `<label>${_esc(label)}</label><input data-key="${_esc(key)}" value="${_esc(this._config[key] || "")}" placeholder="auto" />`).join("")}</div>`;
     this.shadowRoot.querySelectorAll("input").forEach((input) => {
       input.addEventListener("change", (ev) => {
         const next = { ...this._config };

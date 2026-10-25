@@ -115,7 +115,7 @@ class ProgrammeTntFrCoordinator(DataUpdateCoordinator):
         super().__init__(
             hass,
             _LOGGER,
-            name="programme_tnt_fr",
+            name="freebox_homexa_tnt",
             update_interval=timedelta(minutes=UPDATE_INTERVAL_MINUTES),
         )
         self._channels = channels

@@ -202,7 +202,7 @@ var SLOT_DEFS = [
   // the very first render (before the backend round-trip in _checkVersion
   // below resolves) is already correctly ordered - the authoritative copy
   // now lives in const.py's CHANNEL_ORDER and overrides this one via the
-  // programme_tnt_fr/version websocket response, so a channel added only
+  // freebox_homexa/tnt_version websocket response, so a channel added only
   // on the backend gets ordered correctly here too instead of silently
   // falling back to rank 999 forever.
   var CHANNEL_ORDER = {

@@ -1,6 +1,6 @@
 # Changelog
 
-## Non publié
+## 28.8.57
 - Correction : les **connexions MAC d'un appareil répéteur** ne contiennent plus que les MAC du répéteur lui-même : MAC principale (ex. `20:66:CF:4B:49:69`), son jumeau « locally administered » (`22:66:CF:4B:49:69`), ses BSSID Free (`22:66:CF:96:92:Dx`), les hôtes LAN reconnus comme répéteur et les interfaces déclarées par l'API `/repeater/` pour ce répéteur (principale, backhaul, fronthaul). Une MAC non Free vue seulement comme `access_point.mac` d'un client (ex. `4E:C4:E5:8E:62:A7`, adresse aléatoire d'un téléphone, sur « Répéteur Wifi Garage ») sert encore à ranger ce client sous le répéteur, mais n'est plus ajoutée à l'appareil. Une MAC présente dans `lan/browser` comme client n'est jamais traitée comme une MAC de répéteur
 - Nettoyage du registre à chaque relevé (appareils de l'entrée Homexa uniquement) : les MAC non Free étrangères restées dans les connexions d'un répéteur (Home Assistant ajoute les connexions sans jamais en retirer) sont retirées ; les MAC Free du répéteur ne sont jamais retirées. Un appareil Homexa sans identifiant dont toutes les MAC sont celles d'un répéteur (ex. appareil « 22:66:CF:4B:49:69 » créé pour le jumeau) est supprimé, ses entités et enfants passent sur le répéteur. Les appareils des autres intégrations (ex. intégration **Freebox** native, affichée dans « Appareils connectés — partagent le matériel ») ne sont jamais modifiés
 

@@ -1,5 +1,12 @@
 # Changelog
 
+## Non publié
+- Correction : l'action **`freebox_homexa.remote`** envoyait les touches à `http://<adresse du Freebox Server>/pub/remote_control`, une adresse qui n'existe pas sur le Server : la commande ne faisait rien. Elle passe désormais par le même chemin que l'entité « Télécommande » du Player (ex. `remote.salon_freebox_player_telecommande`), c'est-à-dire `freebox_api` → Freebox Player, avec le même code télécommande réseau (celui du Player, sinon le code commun des options). Code partagé dans `player_remote.py`
+  - compatible avec les appels existants : `code: power`, ou plusieurs touches séparées par des virgules (`code: "1,2"`) ; majuscules et espaces tolérés
+  - nouveau, facultatif : `player_id` (numéro du Player) ou `device_id` (appareil Player Homexa) pour viser un Player. Avec un seul Player, rien à préciser
+  - erreurs claires et traduites (fr / en) au lieu d'un simple journal : aucun Player détecté, code télécommande manquant (avec le numéro du Player), plusieurs Player sans cible ni code commun, touche inconnue (rien n'est envoyé), numéro de Player invalide, touche non envoyée (Player injoignable)
+- Tests : `tests/simulation_action_remote.py`
+
 ## 28.8.62
 - Option **« Créer des appareils pour les clients réseau »** : **décochée par défaut pour les nouvelles installations**. C'est la règle de Home Assistant : un `device_tracker` (ScannerEntity) ne crée pas d'appareil, il se relie seul à l'appareil d'une autre intégration qui a la même MAC (ex. Shelly, ESPHome)
   - **installations existantes : aucun changement**. Une migration (entrée 1.1 → 1.2) écrit l'option **cochée** si elle n'avait jamais été réglée. Un choix déjà fait (coché ou décoché) est conservé. Appareils clients, groupes « Clients réseau filaires / Clients Wi-Fi », capteurs « Clients connectés », entity_id et unique_id restent identiques

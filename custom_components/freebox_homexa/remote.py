@@ -11,18 +11,15 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from .const import option_remote_code
+from .player_remote import VALID_COMMANDS as PLAYER_VALID_COMMANDS, async_send_player_keys
 from .media_player import player_device_info
 from .availability import FreeboxReachableMixin
 from .router import FreeboxConfigEntry, FreeboxRouter
 
 _LOGGER = logging.getLogger(__name__)
 
-VALID_COMMANDS = {
-    "red", "green", "blue", "yellow", "power", "list", "tv", "1", "2", "3", "4", "5", "6", "7", "8", "9",
-    "back", "0", "swap", "info", "epg", "mail", "media", "help", "options", "pip", "vol_inc", "vol_dec",
-    "ok", "up", "right", "down", "left", "prgm_inc", "prgm_dec", "mute", "home", "rec", "bwd", "prev",
-    "play", "fwd", "next"
-}
+# Conservé pour compatibilité (importé ailleurs) : liste partagée dans player_remote.
+VALID_COMMANDS = PLAYER_VALID_COMMANDS
 
 
 # Une seule action / mise à jour à la fois vers la Freebox pour cette plateforme.
@@ -88,19 +85,16 @@ class FreeboxRemote(FreeboxReachableMixin, RemoteEntity):
                 self._player_id,
             )
             return
+        valid = []
         for cmd in commands:
             if cmd not in VALID_COMMANDS:
                 _LOGGER.error("Commande invalide '%s'", cmd)
                 continue
-            try:
-                await self._router._api.remote.send_key(
-                    code=str(remote_code),
-                    key=cmd,
-                    long_press=long_press,
-                    repeat=repeat,
-                )
-            except Exception as err:
-                _LOGGER.error("Échec commande %s Player %s : %s", cmd, self._player_id, err)
+            valid.append(cmd)
+        for cmd, err in await async_send_player_keys(
+            self._router, str(remote_code), valid, long_press, repeat
+        ):
+            _LOGGER.error("Échec commande %s Player %s : %s", cmd, self._player_id, err)
 
     async def async_update(self) -> None:
         try:

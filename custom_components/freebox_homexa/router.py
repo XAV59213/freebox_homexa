@@ -256,6 +256,9 @@ class FreeboxRouter:
         self.api_repeaters_error: str | None = None
         self.wifi_aps: dict[str, dict[str, Any]] = {}
         self.wifi_radio_status: list[dict[str, Any]] = []
+        self.wifi_bss_status: list[dict[str, Any]] = []
+        self.wifi_global_enabled: bool | None = None
+        self.wifi_api_errors: dict[str, str] = {}
         self.disks: dict[int, dict[str, Any]] = {}
         self.supports_raid = True
         self.raids: dict[int, dict[str, Any]] = {}
@@ -329,6 +332,8 @@ class FreeboxRouter:
             radio_status=self.wifi_radio_status,
             api_repeaters=self.api_repeaters,
             manual_links=self.repeater_merges,
+            bss_status=self.wifi_bss_status,
+            wifi_enabled=self.wifi_global_enabled,
         )
         from .wifi_ap import normalize_mac
 
@@ -358,21 +363,63 @@ class FreeboxRouter:
                     canon, name, model, macs, grouping or "aucun (MAC seule)",
                 )
 
+    def _wifi_api_error(self, key: str, path: str, err: Exception) -> None:
+        """Mémorise l'erreur d'une API Wi-Fi ; journal (info) une seule fois par API."""
+        first = key not in self.wifi_api_errors
+        self.wifi_api_errors[key] = f"{type(err).__name__}: {err}"
+        if first:
+            _LOGGER.info("API Freebox %s indisponible (état « Wi-Fi Freebox ») : %s", path, err)
+
+    async def _fetch_wifi_global_state(self) -> None:
+        """/wifi/config/ (enabled, comme l'interrupteur) et /wifi/bss/ (état des BSS)."""
+        try:
+            config = await self._api.wifi.get_global_config() or {}
+            enabled = config.get("enabled") if isinstance(config, dict) else None
+            self.wifi_global_enabled = enabled if isinstance(enabled, bool) else None
+            self.wifi_api_errors.pop("config", None)
+        except Exception as err:  # noqa: BLE001
+            self.wifi_global_enabled = None
+            self._wifi_api_error("config", "wifi/config/", err)
+        try:
+            bss_list = await self._api.wifi.get_bss() or []
+            self.wifi_api_errors.pop("bss", None)
+        except Exception as err:  # noqa: BLE001 — API absente selon firmware
+            self._wifi_api_error("bss", "wifi/bss/", err)
+            bss_list = []
+        self.wifi_bss_status = []
+        for bss in bss_list if isinstance(bss_list, list) else []:
+            if not isinstance(bss, dict):
+                continue
+            status = bss.get("status") or {}
+            config = bss.get("config") or {}
+            self.wifi_bss_status.append(
+                {
+                    "id": bss.get("id"),
+                    "phy_id": bss.get("phy_id"),
+                    "ssid": config.get("ssid") if isinstance(config, dict) else None,
+                    "state": status.get("state") if isinstance(status, dict) else None,
+                }
+            )
+
     async def _enrich_wifi_stations(self) -> None:
         """Merge /wifi/ap/{id}/stations signal data onto LAN hosts."""
         try:
             access_points = await self._api.wifi.get_ap_list() or []
-        except HttpRequestError as err:
-            _LOGGER.debug("Liste des AP Wi-Fi indisponible : %s", err)
-            access_points = []
+            self.wifi_api_errors.pop("ap", None)
         except Exception as err:  # noqa: BLE001 — API wifi absente selon firmware
-            _LOGGER.debug("API Wi-Fi stations non utilisable : %s", err)
+            self._wifi_api_error("ap", "wifi/ap/", err)
+            access_points = []
+        if not isinstance(access_points, list):
             access_points = []
 
         self.wifi_radio_status = []
         stations_by_mac: dict[str, dict[str, Any]] = {}
         for access_point in access_points:
+            if not isinstance(access_point, dict):
+                continue
             status = access_point.get("status") or {}
+            if not isinstance(status, dict):
+                status = {}
             self.wifi_radio_status.append(
                 {
                     "id": access_point.get("id"),
@@ -436,6 +483,7 @@ class FreeboxRouter:
             self.devices[device_mac] = fbx_device
 
         await self._enrich_wifi_stations()
+        await self._fetch_wifi_global_state()
         await self._fetch_api_repeaters()
         self._refresh_repeaters()
         async_dispatcher_send(self.hass, self.signal_device_update)

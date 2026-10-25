@@ -34,6 +34,14 @@ RAID_SENSORS: tuple[BinarySensorEntityDescription, ...] = (
 )
 
 
+def _ap_online(access_point: dict[str, Any]) -> bool | None:
+    """En ligne ; None (inconnu) pour la box quand aucune API Wi-Fi n'est lisible."""
+    online = access_point.get("online")
+    if online is None and access_point.get("kind") == "gateway":
+        return None
+    return bool(online)
+
+
 def _ap_attributes(access_point: dict[str, Any]) -> dict[str, Any]:
     return {
         "type": access_point.get("kind"),
@@ -43,6 +51,11 @@ def _ap_attributes(access_point: dict[str, Any]) -> dict[str, Any]:
         "appareils": access_point.get("client_names") or [],
         "detail_appareils": access_point.get("clients") or [],
         "radios": access_point.get("radios") or [],
+        **(
+            {"wifi_actif": access_point.get("wifi_enabled"), "bss": access_point.get("bss") or []}
+            if access_point.get("kind") == "gateway"
+            else {}
+        ),
     }
 
 
@@ -194,7 +207,7 @@ class FreeboxWifiApSensor(BinarySensorEntity):
             self._attr_name = "En ligne"
             self._attr_unique_id = f"{router.mac}_repeater_{mac}"
             self._attr_icon = "mdi:wifi-sync"
-        self._attr_is_on = bool(access_point.get("online"))
+        self._attr_is_on = _ap_online(access_point)
         self._attr_extra_state_attributes = _ap_attributes(access_point)
 
     @callback
@@ -204,7 +217,7 @@ class FreeboxWifiApSensor(BinarySensorEntity):
             self._attr_is_on = False
             self._attr_extra_state_attributes = {"clients": 0, "appareils": []}
             return
-        self._attr_is_on = bool(access_point.get("online"))
+        self._attr_is_on = _ap_online(access_point)
         self._attr_extra_state_attributes = _ap_attributes(access_point)
 
     @callback

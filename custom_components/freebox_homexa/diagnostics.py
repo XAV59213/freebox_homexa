@@ -76,6 +76,13 @@ async def async_get_config_entry_diagnostics(
             },
             "repeater_aliases": dict(getattr(router, "repeater_aliases", {}) or {}),
             "wifi_radio_status": router.wifi_radio_status,
+            "wifi_bss_status": getattr(router, "wifi_bss_status", []),
+            "wifi_global_enabled": getattr(router, "wifi_global_enabled", None),
+            "wifi_api_errors": dict(getattr(router, "wifi_api_errors", {}) or {}),
+            "wifi_gateway_state": {
+                key: (router.wifi_aps.get("gateway") or {}).get(key)
+                for key in ("online", "state", "wifi_enabled", "client_count")
+            },
         }
     )
     return async_redact_data(data, TO_REDACT)

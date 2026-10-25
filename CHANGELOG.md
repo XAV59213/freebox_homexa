@@ -1,6 +1,6 @@
 # Changelog
 
-## Non publié
+## 28.8.61
 - Qualité (Integration Quality Scale) — **entity-unavailable** :
   - quand la Freebox est **injoignable** (journal « Freebox injoignable »), les entités Homexa passent **indisponibles** au lieu de garder une valeur figée ou de passer « inconnu » : capteurs (débits, températures, appels, disques, Wi-Fi, répéteurs, groupes de clients), capteurs binaires, interrupteur Wi-Fi, boutons, télécommande et lecteurs Player, calendrier Guide TV, et toutes les entités Freebox Home (volets, alarme, caméras, détecteurs, batteries). Elles redeviennent disponibles dès le retour de la Freebox (« Freebox de nouveau joignable ») ; les entités pilotées par signal sont réécrites tout de suite, les autres au relevé suivant
   - nœud Freebox Home signalé **« unreachable »** par la Freebox (ex. détecteur hors de portée, caméra débranchée) : ses entités passent indisponibles. Les volets **RTS** (Somfy, radio sans retour d'état) ne sont jamais rendus indisponibles pour ce motif

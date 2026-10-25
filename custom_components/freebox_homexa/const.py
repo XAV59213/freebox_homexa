@@ -16,7 +16,7 @@ VALUE_NOT_SET = -1
 DEFAULT_DEVICE_NAME = "Unknown device"
 REPEATER_MODEL = "F-RP01A"
 
-VERSION = "28.8.60"
+VERSION = "28.8.61"
 URL_BASE = "/freebox_homexa"
 CARD_FILENAME = "freebox-homexa-card.js"
 STATIC_CARD_PATH = f"{URL_BASE}/{CARD_FILENAME}"

@@ -1,6 +1,6 @@
 # Changelog
 
-## Non publié
+## 28.8.55
 - Types des clients réseau : un client dont le **nom** désigne un serveur (`pve`, `proxmox`, `serveur`/`server`, `hyperviseur`, `truenas`…) va dans **Serveurs** même avec une MAC virtuelle. Depuis Proxmox VE 8, le pont `vmbr0` de l'**hôte** Proxmox a lui aussi une MAC `BC:24:11` : il était classé « VM et conteneurs ». Le nom par défaut de la Freebox « Proxmox Server Solutions GmbH (MAC) » (fabricant + MAC) ne compte pas : une VM / un LXC sans nom reste dans « VM et conteneurs »
 - Types des clients réseau : le mot **« tv »** dans le nom (ex. « Tv chambre papa ») classe le client dans **TV et multimédia** avant le fabricant (Realtek, Intel…) ou le type Freebox ; les Fire TV restent dans « Amazon / Alexa »
 

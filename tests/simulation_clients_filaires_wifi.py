@@ -47,16 +47,18 @@ class Reg:
     def async_get_device_by_connection(s, c, e):
         return next((d for d in DEV.values() if c in d.connections and d.config_entry_id == e), None)
 
-    def async_get_or_create(s, config_entry_id, identifiers, name, **kw):
-        d = next((d for d in DEV.values() if d.identifiers & set(identifiers)), None)
+    def async_get_or_create(s, config_entry_id, identifiers=(), name=None, connections=(), **kw):
+        d = next((d for d in DEV.values() if d.identifiers & set(identifiers)
+                  or d.connections & set(connections)), None)
         if d is None:
-            d = Dev(f"dev{next(ids)}", identifiers, name=name); DEV[d.id] = d
+            d = Dev(f"dev{next(ids)}", identifiers, connections, name=name); DEV[d.id] = d
+            CREATED.append(name)
         return d
 
     def async_update_device(s, i, **kw):
         d = DEV[i]
         for k, v in kw.items():
-            setattr(d, k, v)
+            setattr(d, {"new_connections": "connections", "new_identifiers": "identifiers"}.get(k, k), v)
         UPDATES.append((d.name, kw))
         return d
 
@@ -65,6 +67,7 @@ class Reg:
 
 
 UPDATES = []
+CREATED = []
 R = Reg()
 dr = types.ModuleType("dr"); dr.async_get = lambda h: R; dr.CONNECTION_NETWORK_MAC = "mac"
 dr.DeviceInfo = dict; dr.DeviceEntryType = types.SimpleNamespace(SERVICE="service")
@@ -452,7 +455,7 @@ register_entities(r9, hosts9)
 poll(r9, hosts9)
 t = tree()
 print("   hiérarchie utilisateur :", {k: v for k, v in t.items() if k != "Freebox Server"})
-assert parent_name(CISCO) == "Équipements réseau (filaire)"
+assert parent_name(CISCO) == "Équipements réseau (filaire)", (parent_name(CISCO), tree())
 assert parent_name(PROXMOX) == "Serveurs (filaire)"
 assert parent_name(LXC) == "VM et conteneurs (filaire)"
 assert parent_name("AA:00:00:00:00:03") == "Téléphones et tablettes (Wi-Fi)"  # Wi-Fi box
@@ -493,4 +496,81 @@ r12 = make_router({"device_type_overrides": {f"mac:{LXC.lower()}": dg.NET_SERVER
 poll(r12, hosts9)
 assert parent_name(LXC) == "Serveurs (Wi-Fi)"
 print("OK : hiérarchie par type (filaires / Wi-Fi box), répéteurs sans couche de type, types forcés")
+
+# --- 9. Appareil du client créé par Homexa (28.8.53 : switch Cisco sans appareil) -----
+# HA fige device_info à None pour les device_tracker : l'appareil n'existait que si une
+# autre intégration connaissait la MAC. Homexa le crée pour les entités ACTIVES.
+DEV.clear(); UPDATES.clear(); CREATED.clear()
+GRANGE = "20:66:CF:4A:05:93"
+
+
+def by_name(name):
+    return next((d for d in DEV.values() if d.name == name), None)
+
+
+r13 = make_router()
+hosts13 = lan()
+hosts13[CISCO] = cisco(eth_ap("gateway", RM))
+poll(r13, hosts13)
+register_entities(r13, {m: h for m, h in hosts13.items() if m != CISCO})  # Cisco : pas d'appareil
+poll(r13, hosts13)
+# Entité désactivée (jamais ajoutée) : ni appareil, ni sous-groupe vide.
+assert R.async_get_device_by_connection(("mac", CISCO.lower()), "E") is None
+assert by_name("Équipements réseau (filaire)") is None, tree()
+# L'utilisateur active l'entité : ajoutée à HA -> appareil créé et rangé.
+r13.tracked_lan_macs.add(wa.normalize_mac(CISCO))
+poll(r13, hosts13)
+assert parent_name(CISCO) == "Équipements réseau (filaire)", parent_name(CISCO)
+assert parent_name_of("Équipements réseau (filaire)") == "Clients réseau filaires"
+cisco_dev = R.async_get_device_by_connection(("mac", CISCO.lower()), "E")
+assert r13.lan_device_ids[wa.normalize_mac(CISCO)] == cisco_dev.id
+assert cisco_dev.name == f"Cisco Systems, Inc ({CISCO})"
+n = len(CREATED)
+poll(r13, hosts13); poll(r13, hosts13)
+assert len(CREATED) == n  # pas de doublon
+# Option « Créer les appareils des clients LAN » désactivée : rien n'est créé.
+r13b = make_router(); r13b.create_lan_devices = False
+r13b.tracked_lan_macs.add("AABBCCDDEEFF")
+hosts13["AA:BB:CC:DD:EE:FF"] = host("AA:BB:CC:DD:EE:FF", "Nouveau-PC", eth_ap("gateway", RM), host_type="workstation")
+poll(r13b, hosts13)
+assert R.async_get_device_by_connection(("mac", "aa:bb:cc:dd:ee:ff"), "E") is None
+hosts13.pop("AA:BB:CC:DD:EE:FF")
+print("OK : appareil créé pour une entité active seulement, rangé dans Équipements réseau (filaire)")
+
+# MAC du Cisco restée dans les connexions de l'appareil répéteur Grange (ancienne version) :
+# l'entité était rattachée à Grange (« Grange ▸ Cisco… ») et le Cisco n'avait pas d'appareil.
+DEV.pop(cisco_dev.id)
+grange = R.async_get_device_by_identifier(("d", f"repeater_{GRANGE}"), "E")
+assert grange is not None
+grange.connections = set(grange.connections) | {("mac", CISCO.lower())}
+r14 = make_router()
+r14.tracked_lan_macs.add(wa.normalize_mac(CISCO))
+poll(r14, hosts13)
+assert ("mac", CISCO.lower()) not in grange.connections, grange.connections
+assert grange.connections, "le répéteur garde ses propres MAC"
+cisco_dev = R.async_get_device_by_connection(("mac", CISCO.lower()), "E")
+assert cisco_dev is not None and cisco_dev.id != grange.id
+assert parent_name(CISCO) == "Équipements réseau (filaire)", (parent_name(CISCO), tree())
+assert r14.lan_device_ids[wa.normalize_mac(CISCO)] == cisco_dev.id  # l'entité est reliée ici
+print("OK : MAC du client retirée de l'appareil répéteur, appareil propre créé")
+
+# Identifiant « repeater_<MAC Cisco> » périmé (ancien faux répéteur) : retiré, appareil rangé.
+cisco_dev.identifiers = {("d", f"repeater_{CISCO}")}
+cisco_dev.via_device_id = "srv"
+r15 = make_router()
+poll(r15, hosts13)  # même sans entité suivie : l'appareil existe déjà
+assert cisco_dev.identifiers == set(), cisco_dev.identifiers
+assert parent_name(CISCO) == "Équipements réseau (filaire)", (parent_name(CISCO), tree())
+# Un vrai répéteur garde son identifiant.
+assert ("d", f"repeater_{GRANGE}") in grange.identifiers
+print("OK : identifiant répéteur périmé retiré")
+
+# Sous-groupe vidé (appareil supprimé) : retiré au relevé suivant ; groupe non vide conservé.
+DEV.pop(cisco_dev.id)
+r15.tracked_lan_macs.discard(wa.normalize_mac(CISCO))
+poll(r15, hosts13)
+assert by_name("Équipements réseau (filaire)") is None, tree()
+assert by_name("Clients réseau filaires") is not None  # NAS, PC… encore dedans
+assert by_name("Serveurs (filaire)") is not None
+print("OK : sous-groupes vides retirés en continu, non vides conservés")
 print("SIMULATION_CLIENTS_FILAIRES_WIFI_OK")

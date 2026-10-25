@@ -8,7 +8,7 @@ import logging
 from homeassistant.components.device_tracker import ScannerEntity
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, callback
-from homeassistant.helpers.device_registry import CONNECTION_NETWORK_MAC, DeviceInfo
+from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.dispatcher import async_dispatcher_connect
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
@@ -21,8 +21,8 @@ from .const import (
     DOMAIN,
     option_enabled,
 )
-from .device_groups import lan_client_name, suggested_area
-from .router import FreeboxRouter, is_freebox_repeater
+from .device_groups import lan_client_name
+from .router import FreeboxRouter, is_freebox_repeater, normalize_mac
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -43,6 +43,7 @@ async def async_setup_entry(
     create_devices = option_enabled(
         entry, CONF_CREATE_LAN_DEVICES, DEFAULT_CREATE_LAN_DEVICES
     )
+    router.create_lan_devices = create_devices
 
     @callback
     def update_router() -> None:
@@ -94,31 +95,25 @@ class FreeboxDevice(ScannerEntity):
         self._attr_unique_id = f"{router.mac}_{self._mac}"
         self._active = False
         self._attr_extra_state_attributes: dict[str, Any] = {}
-        self._attr_device_info = self._build_device_info(device)
+        # HA crée / relie l'appareil d'un ScannerEntity sous ce nom (sinon la MAC).
+        self._attr_hostname = self._name
+        self._norm_mac = normalize_mac(self._mac)
+        # device_info est figé à None par HA pour les ScannerEntity : l'appareil d'un
+        # client LAN est créé et rangé par le routeur (ensure_lan_client_device).
+        self._lan_client = router._is_lan_client(device)
 
-    def _build_device_info(self, device: dict[str, Any]) -> DeviceInfo | None:
-        if device.get("attrs") is not None:
-            return self._router.device_info
-
-        if self._router.is_repeater_host(device):
-            return self._router.repeater_device_info(
-                self._mac, self._name, device.get("model") or "F-RP01A", device.get("vendor_name")
+    @callback
+    def _async_link_device(self) -> None:
+        """Rattache l'entité à l'appareil de son client (créé / rangé par Homexa)."""
+        if not self._lan_client or self.registry_entry is None or self.hass is None:
+            return
+        device_id = self._router.lan_device_ids.get(self._norm_mac)
+        if device_id is None:
+            device_id = self._router.ensure_lan_client_device(self._mac)
+        if device_id and self.registry_entry.device_id != device_id:
+            self.registry_entry = er.async_get(self.hass).async_update_entity(
+                self.entity_id, device_id=device_id
             )
-
-        if not self._create_lan_devices:
-            return None
-
-        info: dict[str, Any] = {
-            "connections": {(CONNECTION_NETWORK_MAC, self._mac)},
-            "manufacturer": self._manufacturer,
-            "name": self._name,
-            # Clients réseau filaires / Clients Wi-Fi / répéteur (surcharge prioritaire).
-            "via_device_id": self._router.lan_client_parent(self._mac, self._name),
-        }
-        area = suggested_area(self._name)
-        if area:
-            info["suggested_area"] = area
-        return DeviceInfo(**info)
 
     @callback
     def async_update_state(self) -> None:
@@ -129,7 +124,6 @@ class FreeboxDevice(ScannerEntity):
             return
 
         self._active = device.get("active", False)
-        self._attr_device_info = self._build_device_info(device)
 
         if device.get("attrs") is None:
             last_reachable = device.get("last_time_reachable")
@@ -166,9 +160,14 @@ class FreeboxDevice(ScannerEntity):
     @callback
     def async_on_demand_update(self) -> None:
         self.async_update_state()
+        self._async_link_device()
         self.async_write_ha_state()
 
     async def async_added_to_hass(self) -> None:
+        if self._lan_client:
+            # Entité active : son client reçoit un appareil (pas pour une entité désactivée).
+            self._router.tracked_lan_macs.add(self._norm_mac)
+            self._async_link_device()
         self.async_update_state()
         self.async_on_remove(
             async_dispatcher_connect(
@@ -177,6 +176,9 @@ class FreeboxDevice(ScannerEntity):
                 self.async_on_demand_update,
             )
         )
+
+    async def async_will_remove_from_hass(self) -> None:
+        self._router.tracked_lan_macs.discard(self._norm_mac)
 
 
 def icon_for_freebox_device(device: dict[str, Any]) -> str:

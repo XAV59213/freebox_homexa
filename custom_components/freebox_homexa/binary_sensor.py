@@ -253,7 +253,8 @@ class FreeboxRaidDegradedSensor(BinarySensorEntity):
         self._router = router
         self._attr_device_info = router.device_info
         self._raid = raid
-        self._attr_name = f"Array RAID {raid['id']} {description.name}"
+        self._attr_translation_key = "raid_degraded"
+        self._attr_translation_placeholders = {"raid_id": str(raid["id"])}
         self._attr_unique_id = f"{router.mac}_{description.key}_{raid['name']}_{raid['id']}"
 
     @callback

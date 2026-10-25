@@ -195,20 +195,22 @@ class _ReminderManager:
             ]
         if not targets and not media_player_targets:
             raise ServiceValidationError(
-                "Aucun profil de rappel correspondant : crée-en un dans "
-                "Freebox Homexa → Configurer → Profils de rappel (indique profile_name "
-                "s'il y en a plusieurs)."
+                translation_domain=DOMAIN,
+                translation_key="no_reminder_profile",
             )
 
         start_time = dt_util.parse_datetime(start_time_raw)
         if start_time is None:
-            raise ServiceValidationError("Heure de debut de programme invalide.")
+            raise ServiceValidationError(
+                translation_domain=DOMAIN,
+                translation_key="invalid_start_time",
+            )
 
         fire_time = start_time - timedelta(minutes=minutes_before)
         if fire_time <= dt_util.now():
             raise ServiceValidationError(
-                "Trop tard pour programmer ce rappel : il ne reste plus assez "
-                "de temps avant le debut du programme."
+                translation_domain=DOMAIN,
+                translation_key="reminder_too_late",
             )
 
         reminder_id = _reminder_id(

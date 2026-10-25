@@ -272,6 +272,9 @@
       },
       "repeater_online": {
         "name": "En ligne"
+      },
+      "raid_degraded": {
+        "name": "Array RAID {raid_id} degradé"
       }
     },
     "calendar": {
@@ -305,7 +308,164 @@
       },
       "lan_group_clients": {
         "name": "Clients connectés"
+      },
+      "wifi_signal": {
+        "name": "Signal Wi-Fi"
       }
+    },
+    "button": {
+      "reboot": {
+        "name": "Redémarrer Freebox"
+      },
+      "mark_calls_as_read": {
+        "name": "Marquer les appels comme lus"
+      },
+      "remote_key_home": {
+        "name": "Accueil"
+      },
+      "remote_key_back": {
+        "name": "Retour"
+      },
+      "remote_key_ok": {
+        "name": "OK"
+      },
+      "remote_key_up": {
+        "name": "Haut"
+      },
+      "remote_key_down": {
+        "name": "Bas"
+      },
+      "remote_key_left": {
+        "name": "Gauche"
+      },
+      "remote_key_right": {
+        "name": "Droite"
+      },
+      "remote_key_tv": {
+        "name": "TV"
+      },
+      "remote_key_mute": {
+        "name": "Muet"
+      },
+      "remote_key_vol_inc": {
+        "name": "Volume +"
+      },
+      "remote_key_vol_dec": {
+        "name": "Volume -"
+      },
+      "remote_key_prgm_inc": {
+        "name": "Programme +"
+      },
+      "remote_key_prgm_dec": {
+        "name": "Programme -"
+      },
+      "remote_key_play": {
+        "name": "Lecture"
+      },
+      "remote_key_info": {
+        "name": "Info"
+      },
+      "remote_key_epg": {
+        "name": "Guide TV"
+      },
+      "remote_key_list": {
+        "name": "Liste"
+      },
+      "remote_key_red": {
+        "name": "Rouge"
+      },
+      "remote_key_green": {
+        "name": "Vert"
+      },
+      "remote_key_yellow": {
+        "name": "Jaune"
+      },
+      "remote_key_blue": {
+        "name": "Bleu"
+      },
+      "remote_key_0": {
+        "name": "0"
+      },
+      "remote_key_1": {
+        "name": "1"
+      },
+      "remote_key_2": {
+        "name": "2"
+      },
+      "remote_key_3": {
+        "name": "3"
+      },
+      "remote_key_4": {
+        "name": "4"
+      },
+      "remote_key_5": {
+        "name": "5"
+      },
+      "remote_key_6": {
+        "name": "6"
+      },
+      "remote_key_7": {
+        "name": "7"
+      },
+      "remote_key_8": {
+        "name": "8"
+      },
+      "remote_key_9": {
+        "name": "9"
+      },
+      "player_app_youtube": {
+        "name": "YouTube"
+      },
+      "player_app_netflix": {
+        "name": "Netflix"
+      },
+      "player_app_disney": {
+        "name": "Disney+"
+      },
+      "player_app_prime": {
+        "name": "Prime Video"
+      },
+      "player_app_browser": {
+        "name": "Navigateur"
+      },
+      "player_app_canal": {
+        "name": "Canal+"
+      },
+      "player_app_max": {
+        "name": "Max"
+      },
+      "player_app_appletv": {
+        "name": "Apple TV"
+      }
+    }
+  },
+  "exceptions": {
+    "auth_pending": {
+      "message": "En attente de la flèche droite sur la Freebox (token déjà enregistré conservé)"
+    },
+    "auth_failed": {
+      "message": "Autorisation Freebox refusée ou révoquée. Réautorise depuis Freebox OS."
+    },
+    "cannot_connect": {
+      "message": "Freebox injoignable ({host}) : {error}"
+    },
+    "no_loaded_entry": {
+      "message": "Action {service} impossible : aucune Freebox Homexa n'est chargée."
+    },
+    "entry_not_loaded": {
+      "message": "Action {service} impossible : la Freebox visée n'est pas chargée."
+    },
+    "multiple_entries": {
+      "message": "Action {service} : plusieurs Freebox sont configurées, indique config_entry_id ou device_id."
+    },
+    "no_reminder_profile": {
+      "message": "Aucun profil de rappel correspondant : crée-en un dans Freebox Homexa → Configurer → Profils de rappel (indique profile_name s'il y en a plusieurs)."
+    },
+    "invalid_start_time": {
+      "message": "Heure de debut de programme invalide."
+    },
+    "reminder_too_late": {
+      "message": "Trop tard pour programmer ce rappel : il ne reste plus assez de temps avant le debut du programme."
     }
   }
 }

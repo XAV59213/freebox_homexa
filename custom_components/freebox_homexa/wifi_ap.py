@@ -394,6 +394,41 @@ def annotate_wifi_parents(
             device["wifi_parent"] = parent
 
 
+def repeater_own_macs(
+    canon: str,
+    members: list[str],
+    hosts: dict[str, dict[str, Any]],
+    api_repeaters: list[dict[str, Any]] | None = None,
+    manual_norms: set[str] | None = None,
+) -> tuple[list[str], list[str]]:
+    """Sépare les MAC d'un répéteur : (MAC propres, MAC de point d'accès seulement).
+
+    MAC propres (connexions de l'appareil) : MAC canonique, MAC Free (OUI Free ou jumeau
+    « locally administered » : principale 20:66:CF:…, jumeau et BSSID 22:66:CF:…), hôtes
+    LAN reconnus comme répéteur, interfaces déclarées par l'API /repeater/ pour CE
+    répéteur (main_mac, backhaul, fronthaul) et fusions manuelles. Toute autre MAC (ex.
+    4E:C4:E5:8E:62:A7, adresse aléatoire de téléphone vue en access_point.mac d'un client)
+    n'est jamais une connexion du répéteur.
+    """
+    member_set = set(members)
+    api_own: set[str] = set()
+    for rep in api_repeaters or []:
+        rep_macs = {normalize_mac(m) for m in api_repeater_macs(rep)} - {""}
+        if rep_macs & member_set:
+            api_own |= rep_macs
+    manual = manual_norms or set()
+    own: list[str] = []
+    ap_only: list[str] = []
+    for n in sorted(member_set):
+        if n == canon or is_free_mac(n) or n in hosts or n in api_own or n in manual:
+            own.append(n)
+        else:
+            ap_only.append(n)
+    if canon and canon not in own:
+        own.append(canon)
+    return own, ap_only
+
+
 def build_wifi_aps(
     *,
     router_mac: str,
@@ -470,10 +505,19 @@ def build_wifi_aps(
     for norm, canon in aliases.items():
         canon_macs.setdefault(canon, []).append(display_mac(norm))
 
+    manual_norms = {
+        normalize_mac(m) for pair in (manual_links or {}).items() for m in pair if m
+    }
     repeaters: dict[str, dict[str, Any]] = {}
     for canon, macs in canon_macs.items():
         norms = [normalize_mac(m) for m in macs]
         canon_norm = normalize_mac(canon)
+        own, ap_only = repeater_own_macs(canon_norm, norms, hosts, api_repeaters, manual_norms)
+        if ap_only:
+            _LOGGER.debug(
+                "Répéteur %s : MAC non Free ignorées dans les connexions %s",
+                canon, [display_mac(n) for n in ap_only],
+            )
         member_hosts = [hosts[n] for n in sorted(norms, key=lambda n: (n != canon_norm, n)) if n in hosts]
         api = api_by_norm.get(canon_norm) or {}
         if not member_hosts and not api and not any(n in repeater_clients for n in norms):
@@ -506,7 +550,11 @@ def build_wifi_aps(
                 "kind": "repeater",
                 "name": name,
                 "mac": canon,
-                "macs": sorted(macs),
+                # Connexions de l'appareil : uniquement les MAC propres au répéteur.
+                "macs": sorted(display_mac(n) for n in own),
+                # MAC de point d'accès non Free vues chez les clients : rattachement des
+                # clients au répéteur seulement, jamais en connexion de l'appareil.
+                "ap_aliases": sorted(display_mac(n) for n in ap_only),
                 "l2ident": {"id": canon},
                 "serial": api.get("sn"),
                 "model": api.get("model") or host.get("model") or REPEATER_MODEL,

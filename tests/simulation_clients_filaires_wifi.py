@@ -648,6 +648,78 @@ assert "lan_wired_net_network" not in r16.group_device_ids and sub_id not in DEV
 assert names("lan_wired_net_network") == []
 print("OK : capteurs Clients connectés (membres par groupe, retrait avec le groupe)")
 
+# --- 12. Connexions MAC des répéteurs : uniquement leurs propres MAC (28.8.57) ---
+# Rapport utilisateur : l'appareil « Répéteur Wifi Garage » portait 4E:C4:E5:8E:62:A7
+# (adresse aléatoire de téléphone) parmi ses MAC, à côté des BSSID 22:66:CF:96:92:Dx.
+DEV.clear(); UPDATES.clear(); CREATED.clear()
+GARAGE = "20:66:CF:4B:49:69"
+TWIN = "22:66:CF:4B:49:69"
+PHONE = "4E:C4:E5:8E:62:A7"
+
+
+class _ER:
+    def async_update_entity(s, e, device_id):
+        ENT[e] = device_id
+
+
+_entries_for_device = er.async_entries_for_device
+er.async_get = lambda h: _ER()
+er.async_entries_for_device = lambda r, did, include_disabled_entities=True: [
+    types.SimpleNamespace(entity_id=e, unique_id=e) for e, d in ENT.items() if d == did]
+r18 = make_router()
+hosts18 = lan()
+# Jumeau « locally administered » du Garage, listé par la Freebox comme hôte répéteur.
+hosts18[TWIN] = {"l2ident": {"id": TWIN}, "primary_name": "Repeteur Wifi Freebox Garage",
+                 "host_type": "networking_device", "vendor_name": "Freebox SAS", "active": False}
+# Client du Garage dont access_point.mac est une MAC non Free (même uid que le BSSID D2).
+odd_ap = wifi_ap("repeater", PHONE); odd_ap["uid"] = "uid-22:66:CF:96:92:D2"
+hosts18["AA:00:00:00:00:12"] = host("AA:00:00:00:00:12", "Tablette-Garage", odd_ap)
+poll(r18, hosts18)
+garage = r18.repeaters[GARAGE]
+assert PHONE not in garage["macs"], garage["macs"]
+assert PHONE in garage["ap_aliases"], garage
+assert {GARAGE, TWIN, "22:66:CF:96:92:D2", "22:66:CF:96:92:D6"} <= set(garage["macs"]), garage["macs"]
+assert all(wa.is_free_mac(wa.normalize_mac(m)) for m in garage["macs"]), garage["macs"]
+info = r18.repeater_device_info(GARAGE, garage["name"])
+assert ("mac", PHONE.lower()) not in info["connections"] and ("mac", TWIN.lower()) in info["connections"]
+# Le client reste rangé sous le Garage (rattachement par ap_aliases), sans devenir un répéteur.
+assert r18.repeater_canonical_mac(PHONE) == GARAGE
+assert not r18.is_repeater_host(hosts18["AA:00:00:00:00:12"])
+register_entities(r18, hosts18)
+poll(r18, hosts18)
+assert parent_name("AA:00:00:00:00:12") == "Garage", (parent_name("AA:00:00:00:00:12"), tree())
+
+# Registre hérité d'une ancienne version : MAC du téléphone + BSSID D0 (non vu ce relevé).
+gdev = R.async_get_device_by_identifier(("d", f"repeater_{GARAGE}"), "E")
+gdev.connections = set(gdev.connections) | {("mac", PHONE.lower()), ("mac", "22:66:cf:96:92:d0")}
+# Appareil Homexa orphelin pour le jumeau (sans identifiant Homexa), avec une entité.
+stale = Dev("stale_twin", (), [("mac", TWIN.lower())], TWIN); DEV[stale.id] = stale
+ENT["sensor.twin_signal"] = stale.id
+# Même MAC portée par un appareil d'une autre intégration (Freebox native) : intouchable.
+core = Dev("core_twin", [("freebox", TWIN)], [("mac", TWIN.lower())], TWIN); core.config_entry_id = "CORE"
+DEV[core.id] = core
+poll(r18, hosts18)
+assert ("mac", PHONE.lower()) not in gdev.connections, gdev.connections
+assert ("mac", "22:66:cf:96:92:d0") in gdev.connections  # MAC Free conservée
+assert ("mac", TWIN.lower()) in gdev.connections and ("mac", GARAGE.lower()) in gdev.connections
+assert "stale_twin" not in DEV and ENT.pop("sensor.twin_signal") == gdev.id
+assert DEV["core_twin"].connections == {("mac", TWIN.lower())} and DEV["core_twin"].config_entry_id == "CORE"
+n = len(UPDATES)
+poll(r18, hosts18); poll(r18, hosts18)
+assert not [u for u in UPDATES[n:] if "new_connections" in u[1]], UPDATES[n:]  # stable
+print("OK : MAC étrangère retirée du répéteur, doublon du jumeau supprimé, autres intégrations intactes")
+
+# Le téléphone à MAC aléatoire est lui-même un client LAN : jamais une MAC du répéteur.
+hosts18[PHONE] = host(PHONE, "Pixel-Xav", wifi_ap("repeater", "22:66:CF:96:92:D2"))
+gdev.connections = set(gdev.connections) | {("mac", PHONE.lower())}
+poll(r18, hosts18)
+assert PHONE not in r18.repeaters[GARAGE]["macs"] and not r18.is_repeater_host(hosts18[PHONE])
+assert wa.normalize_mac(PHONE) not in r18.repeater_aliases
+assert ("mac", PHONE.lower()) not in gdev.connections, gdev.connections
+print("OK : téléphone à MAC aléatoire traité en client, retiré du répéteur")
+er.async_get = lambda h: None
+er.async_entries_for_device = _entries_for_device
+
 # --- 11. « Connector is closed » pendant un rechargement : pas une erreur -------
 import aiohttp
 assert er_mod.is_shutdown_error(aiohttp.ClientConnectionError("Connector is closed."))

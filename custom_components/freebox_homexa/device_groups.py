@@ -1085,7 +1085,11 @@ def async_merge_repeater_devices(
             )
         except Exception:  # noqa: BLE001 — collision éventuelle : on garde l'existant
             pass
-    known = {_norm_mac(m) for p in repeaters.values() for m in p.get("macs") or []}
+    known = {
+        _norm_mac(m)
+        for p in repeaters.values()
+        for m in [*(p.get("macs") or []), *(p.get("ap_aliases") or [])]
+    }
     rejected = {_norm_mac(m) for m in rejected_macs or []}
     lan = {_norm_mac(m) for m in lan_macs or set()}
     for device in entry_devices(registry, entry.entry_id):
@@ -1112,6 +1116,92 @@ def async_merge_repeater_devices(
             "" if macs & lan else " — absent de lan/browser (débranché ?), supprimable à la main",
         )
     return merged
+
+
+def async_clean_repeater_connections(
+    hass: HomeAssistant,
+    entry_id: str,
+    router_mac: str,
+    repeaters: dict[str, dict[str, Any]],
+) -> int:
+    """Nettoie le registre des appareils répéteurs de CETTE entrée (à chaque relevé).
+
+    1. Connexions d'un appareil répéteur : les MAC non Free qui ne sont plus des MAC
+       propres du répéteur (ex. 4E:C4:E5:8E:62:A7, adresse aléatoire d'un téléphone
+       ajoutée par une ancienne version ; HA fusionne les connexions sans jamais en
+       retirer) sont retirées. Les MAC Free (principale, jumeau 22:66:CF, BSSID) ne sont
+       jamais retirées ici, même si un relevé ne les voit pas.
+    2. Appareil sans identifiant Homexa dont toutes les connexions MAC sont des MAC d'un
+       répéteur (ex. appareil « 22:66:CF:4B:49:69 » créé pour le jumeau) : entités et
+       enfants déplacés vers le répéteur, puis appareil supprimé.
+    Les appareils des autres intégrations (Freebox native…) ne sont jamais touchés.
+    """
+    from homeassistant.helpers import entity_registry as er
+
+    registry = dr.async_get(hass)
+    router_norm = _norm_mac(router_mac)
+    owner: dict[str, str] = {}
+    for canon, payload in repeaters.items():
+        for m in payload.get("macs") or [canon]:
+            owner[_norm_mac(m)] = canon
+    owner.pop(router_norm, None)
+    changed = 0
+    repeater_ids: dict[str, Any] = {}
+    for canon, payload in repeaters.items():
+        device = get_device_by_identifier(registry, (DOMAIN, f"repeater_{canon}"), entry_id)
+        if device is None:
+            continue
+        repeater_ids[canon] = device
+        own = {_norm_mac(m) for m in payload.get("macs") or [canon]}
+        current = set(device.connections)
+        conns = {
+            c for c in current
+            if c[0] != dr.CONNECTION_NETWORK_MAC
+            or _norm_mac(c[1]) in own
+            or _is_free_norm(_norm_mac(c[1]))
+        }
+        if conns == current or not conns:
+            continue
+        _LOGGER.warning(
+            "Répéteur %s : MAC étrangère(s) %s retirée(s) des connexions de l'appareil",
+            getattr(device, "name_by_user", None) or device.name,
+            sorted(c[1] for c in current - conns),
+        )
+        try:
+            registry.async_update_device(device.id, new_connections=conns)
+            changed += 1
+        except Exception:  # noqa: BLE001 — collision éventuelle : on garde l'existant
+            _LOGGER.debug("Mise à jour des connexions de %s impossible", canon, exc_info=True)
+    if not repeater_ids:
+        return changed
+    keeper_ids = {d.id for d in repeater_ids.values()}
+    for device in entry_devices(registry, entry_id):
+        if device.id in keeper_ids:
+            continue
+        if any(isinstance(i, tuple) and len(i) > 0 and i[0] == DOMAIN for i in device.identifiers):
+            continue
+        macs = {_norm_mac(c[1]) for c in device.connections if c[0] == dr.CONNECTION_NETWORK_MAC}
+        if not macs or len(macs) != len(device.connections):
+            continue
+        canons = {owner.get(m) for m in macs}
+        if None in canons or len(canons) != 1:
+            continue
+        keeper = repeater_ids.get(next(iter(canons)))
+        if keeper is None:
+            continue
+        entities = er.async_get(hass)
+        for ent in er.async_entries_for_device(entities, device.id, include_disabled_entities=True):
+            entities.async_update_entity(ent.entity_id, device_id=keeper.id)
+        for child in entry_devices(registry, entry_id):
+            if child.via_device_id == device.id:
+                registry.async_update_device(child.id, via_device_id=keeper.id)
+        _LOGGER.warning(
+            "Appareil %s (MAC du répéteur %s) supprimé : doublon du répéteur",
+            device.name, keeper.name,
+        )
+        remove_device(registry, device.id)
+        changed += 1
+    return changed
 
 
 def repeater_registry_devices(hass: HomeAssistant, entry: ConfigEntry) -> list[dict[str, Any]]:

@@ -327,7 +327,7 @@ class FreeboxWifiSignalSensor(SensorEntity):
         self._apply_device_info(device, name)
 
     def _apply_device_info(self, device: dict[str, Any], name: str) -> None:
-        if is_freebox_repeater(device, self._router.mac):
+        if self._router.is_repeater_host(device):
             self._attr_has_entity_name = True
             self._attr_name = "Signal Wi-Fi"
             self._attr_device_info = self._router.repeater_device_info(

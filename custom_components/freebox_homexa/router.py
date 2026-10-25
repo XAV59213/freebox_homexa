@@ -274,6 +274,13 @@ class FreeboxRouter:
         if isinstance(data, list):
             self.api_repeaters = [r for r in data if isinstance(r, dict)]
 
+    def is_repeater_host(self, device: dict[str, Any]) -> bool:
+        """Hôte LAN rattaché à un répéteur physique reconnu (OUI Free ou lié à une MAC Free)."""
+        from .wifi_ap import normalize_mac
+
+        mac = normalize_mac((device.get("l2ident") or {}).get("id"))
+        return bool(mac) and mac in self.repeater_aliases
+
     def repeater_canonical_mac(self, mac: str | None) -> str:
         """MAC canonique du répéteur physique auquel appartient `mac`."""
         from .wifi_ap import normalize_mac

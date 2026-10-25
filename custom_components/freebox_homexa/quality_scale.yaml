@@ -35,8 +35,10 @@ rules:
       températures, Wi-Fi, TNT, partitions) gardent leur nom complet pour ne pas
       changer les noms existants des utilisateurs.
   runtime-data:
-    status: todo
-    comment: Le routeur est encore rangé dans hass.data[DOMAIN].
+    status: done
+    comment: >-
+      Routeur dans entry.runtime_data (type FreeboxConfigEntry). hass.data[DOMAIN] ne garde
+      que l'état global (cache de configuration, carte Lovelace, coordinateurs TNT).
   test-before-configure: done
   test-before-setup: done
   unique-config-entry: done
@@ -55,11 +57,16 @@ rules:
     comment: Seuls Player et signal Wi-Fi passent indisponibles ; autres plateformes à revoir.
   integration-owner: done
   log-when-unavailable:
-    status: todo
-    comment: Pas encore de journal unique « indisponible / de retour ».
+    status: done
+    comment: >-
+      Relevé du routeur : « Freebox injoignable » une seule fois (info), puis « Freebox de
+      nouveau joignable » ; entre les deux, les échecs des entités passent en debug.
   parallel-updates:
-    status: todo
-    comment: PARALLEL_UPDATES non défini par plateforme.
+    status: done
+    comment: >-
+      PARALLEL_UPDATES = 0 pour les plateformes alimentées par le relevé central (sensor,
+      binary_sensor, device_tracker, calendar) ; 1 pour les plateformes d'action (button,
+      switch, cover, camera, alarm_control_panel, remote, media_player).
   reauthentication-flow: done
   test-coverage:
     status: todo

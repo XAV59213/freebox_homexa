@@ -17,9 +17,9 @@ from homeassistant.const import EntityCategory
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
-from .const import DOMAIN, option_remote_code
+from .const import option_remote_code
 from .media_player import player_device_info
-from .router import FreeboxRouter
+from .router import FreeboxConfigEntry, FreeboxRouter
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -102,10 +102,14 @@ def _player_api_version(player: dict[str, Any]) -> str:
     return f"v{major}"
 
 
+# Une seule action / mise à jour à la fois vers la Freebox pour cette plateforme.
+PARALLEL_UPDATES = 1
+
+
 async def async_setup_entry(
-    hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback
+    hass: HomeAssistant, entry: FreeboxConfigEntry, async_add_entities: AddEntitiesCallback
 ) -> None:
-    router: FreeboxRouter = hass.data[DOMAIN][entry.unique_id]
+    router: FreeboxRouter = entry.runtime_data
     entities: list[ButtonEntity] = [
         FreeboxButton(router, description) for description in BUTTON_DESCRIPTIONS
     ]

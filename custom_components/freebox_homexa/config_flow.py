@@ -483,7 +483,7 @@ class FreeboxOptionsFlowHandler(OptionsFlow):
         self._editing_profile: str | None = None
 
     async def _list_players(self) -> list[dict[str, Any]]:
-        router = self.hass.data.get(DOMAIN, {}).get(self.config_entry.unique_id)
+        router = getattr(self.config_entry, "runtime_data", None)
         if router is None:
             return []
         try:
@@ -499,7 +499,7 @@ class FreeboxOptionsFlowHandler(OptionsFlow):
 
     def _group_fields(self) -> dict[str, str]:
         """Libellé affiché -> clé stable de l'appareil (libellés uniques)."""
-        router = self.hass.data.get(DOMAIN, {}).get(self.config_entry.unique_id)
+        router = getattr(self.config_entry, "runtime_data", None)
         devices = dict(getattr(router, "grouped_devices", {}) or {})
         overrides = migrate_overrides(self.config_entry.options.get(CONF_DEVICE_GROUP_OVERRIDES))
         for key in overrides:  # appareils surchargés mais absents ce coup-ci
@@ -553,7 +553,7 @@ class FreeboxOptionsFlowHandler(OptionsFlow):
 
     def _type_fields(self) -> dict[str, str]:
         """Clients réseau : libellé affiché (« nom (auto : Serveurs) ») -> clé stable."""
-        router = self.hass.data.get(DOMAIN, {}).get(self.config_entry.unique_id)
+        router = getattr(self.config_entry, "runtime_data", None)
         devices = dict(getattr(router, "lan_client_types", {}) or {})
         overrides = migrate_type_overrides(self.config_entry.options.get(CONF_DEVICE_TYPE_OVERRIDES))
         for key in overrides:  # clients forcés mais absents ce coup-ci

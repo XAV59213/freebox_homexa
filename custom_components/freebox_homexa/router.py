@@ -264,6 +264,8 @@ class FreeboxRouter:
         self.used_groups: set[str] = set()
         # Entrée en cours de déchargement / rechargement (erreurs de connexion attendues).
         self.closing: bool = False
+        # Journalisation unique de l'indisponibilité (règle log-when-unavailable).
+        self.reachable: bool = True
         # nœuds Home dont les entités vivent sur un appareil de groupe (module d'alarme)
         self.merged_node_ids: set[Any] = set()
         self.player_identifiers: set[str] = set()
@@ -496,6 +498,13 @@ class FreeboxRouter:
             device["wifi"] = extract_wifi_details(device)
 
     async def update_all(self, now: datetime | None = None) -> None:
+        """Relevé principal (appareils + capteurs).
+
+        Appel direct (``now is None``, mise en place) : l'erreur est propagée.
+        Relevé périodique : la perte de la Freebox est journalisée une seule fois
+        (« Freebox injoignable »), puis son retour (« Freebox de nouveau joignable »),
+        sans répéter l'erreur à chaque cycle.
+        """
         if self.closing:
             return
         try:
@@ -505,7 +514,17 @@ class FreeboxRouter:
             if is_shutdown_error(err, self):
                 _LOGGER.debug("Relevé interrompu (connexion fermée, rechargement) : %s", err)
                 return
-            raise
+            if now is None:
+                raise
+            if self.reachable:
+                self.reachable = False
+                _LOGGER.info("Freebox injoignable (%s) : %s", self._host, err)
+            else:
+                _LOGGER.debug("Freebox toujours injoignable : %s", err)
+            return
+        if not self.reachable:
+            self.reachable = True
+            _LOGGER.info("Freebox de nouveau joignable (%s)", self._host)
 
     async def update_device_trackers(self) -> None:
         new_device = False
@@ -1123,3 +1142,7 @@ class FreeboxRouter:
     @property
     def home(self) -> Home:
         return self._api.home
+
+
+# Entrée de configuration typée : le routeur est rangé dans entry.runtime_data.
+type FreeboxConfigEntry = ConfigEntry[FreeboxRouter]

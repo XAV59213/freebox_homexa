@@ -10,15 +10,14 @@ from homeassistant.components.alarm_control_panel import (
     AlarmControlPanelEntityFeature,
     AlarmControlPanelState,
 )
-from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.event import async_track_time_interval
 from datetime import datetime, timedelta
 
-from .const import DOMAIN, FreeboxHomeCategory
+from .const import FreeboxHomeCategory
 from .entity import FreeboxHomeEntity
-from .router import FreeboxRouter
+from .router import FreeboxConfigEntry, FreeboxRouter
 
 # Signal endpoints that must never be exposed in Home Assistant attributes.
 HIDDEN_SIGNAL_ATTRIBUTES = frozenset({"pin"})
@@ -35,11 +34,15 @@ FREEBOX_TO_STATUS = {
 }
 
 
+# Une seule action / mise à jour à la fois vers la Freebox pour cette plateforme.
+PARALLEL_UPDATES = 1
+
+
 async def async_setup_entry(
-    hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback
+    hass: HomeAssistant, entry: FreeboxConfigEntry, async_add_entities: AddEntitiesCallback
 ) -> None:
     """Set up alarm panel."""
-    router: FreeboxRouter = hass.data[DOMAIN][entry.unique_id]
+    router: FreeboxRouter = entry.runtime_data
 
     async_add_entities(
         (

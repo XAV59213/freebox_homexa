@@ -10,16 +10,15 @@ from homeassistant.components.binary_sensor import (
     BinarySensorEntity,
     BinarySensorEntityDescription,
 )
-from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import EntityCategory
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.dispatcher import async_dispatcher_connect
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
-from .const import DOMAIN, REPEATER_MODEL, FreeboxHomeCategory
+from .const import REPEATER_MODEL, FreeboxHomeCategory
 from .entity import FreeboxHomeEntity
 from .errors import is_shutdown_error
-from .router import FreeboxRouter
+from .router import FreeboxConfigEntry, FreeboxRouter
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -58,11 +57,15 @@ def _ap_attributes(access_point: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+# Entités mises à jour par le relevé central du routeur (dispatcher) : pas de limite.
+PARALLEL_UPDATES = 0
+
+
 async def async_setup_entry(
-    hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback
+    hass: HomeAssistant, entry: FreeboxConfigEntry, async_add_entities: AddEntitiesCallback
 ) -> None:
     """Configure les entités de capteurs binaires Freebox."""
-    router: FreeboxRouter = hass.data[DOMAIN][entry.unique_id]
+    router: FreeboxRouter = entry.runtime_data
 
     binary_entities: list[BinarySensorEntity] = [
         FreeboxRaidDegradedSensor(router, raid, description)

@@ -10,15 +10,13 @@ from typing import Any
 from freebox_api.exceptions import InsufficientPermissionsError
 
 from homeassistant.components.switch import SwitchEntity, SwitchEntityDescription
-from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import EntityCategory
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.util import slugify
 
-from .const import DOMAIN
-from .errors import is_shutdown_error
-from .router import FreeboxRouter
+from .errors import is_shutdown_error, poll_log_level
+from .router import FreeboxConfigEntry, FreeboxRouter
 from .entity import FreeboxHomeEntity
 
 _LOGGER = logging.getLogger(__name__)
@@ -39,11 +37,15 @@ SWITCH_DESCRIPTIONS = [
 ]
 
 
+# Une seule action / mise à jour à la fois vers la Freebox pour cette plateforme.
+PARALLEL_UPDATES = 1
+
+
 async def async_setup_entry(
-    hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback
+    hass: HomeAssistant, entry: FreeboxConfigEntry, async_add_entities: AddEntitiesCallback
 ) -> None:
     """Configure les entités interrupteurs pour la Freebox."""
-    router: FreeboxRouter = hass.data[DOMAIN][entry.unique_id]
+    router: FreeboxRouter = entry.runtime_data
     entities = []
 
     for nodeid, node in router.home_devices.items():
@@ -89,7 +91,7 @@ class FreeboxSwitch(SwitchEntity):
             if is_shutdown_error(err, self._router):
                 _LOGGER.debug("État du Wi-Fi non lu (rechargement) : %s", err)
                 return
-            _LOGGER.error("Échec de la mise à jour du WiFi : %s", err)
+            _LOGGER.log(poll_log_level(self._router), "Échec de la mise à jour du WiFi : %s", err)
             self._attr_is_on = None
 
 

@@ -68,3 +68,27 @@ aps, _ = wa.build_wifi_aps(router_mac=RM, router_name="F", router_model="m", dev
                            radio_status=[{"id": 0, "state": "active"}])
 assert aps["gateway"]["online"] is True
 print("OK : capteur Wi-Fi Freebox")
+
+# Capteur « Appareils sur le Wi-Fi box » : état limité à 255 caractères par Home Assistant
+# (au-delà, l'état passe à « Inconnu »). Fonction extraite sans importer Home Assistant.
+import ast
+src = open("custom_components/freebox_homexa/wifi_ap_sensors.py").read()
+tree = ast.parse(src)
+keep = [n for n in tree.body if (isinstance(n, ast.FunctionDef) and n.name == "_client_label")
+        or (isinstance(n, ast.Assign) and any(getattr(t, "id", "") == "MAX_STATE_LENGTH" for t in n.targets))]
+ns = {"Any": object}
+exec(compile(ast.Module(body=keep, type_ignores=[]), "wifi_ap_sensors", "exec"), ns)
+label = ns["_client_label"]
+assert label({}) == "Aucun" and label({"client_names": []}) == "Aucun"
+assert label({"client_names": ["iPhone", "TV"]}) == "iPhone, TV"
+# Cas utilisateur : 30 clients Wi-Fi sur la box.
+names = [f"Appareil-Wi-Fi-{i:02d} de la maison" for i in range(30)]
+out = label({"client_names": names})
+assert len(out) <= 255, len(out)
+assert out.startswith(names[0] + ", ") and out.endswith(f"… +{30 - out.count(', ')}"), out
+assert len(", ".join(names)) > 255  # l'ancien calcul dépassait la limite
+assert len(label({"client_names": ["x" * 400]})) <= 255
+assert label({"client_names": ["x" * 400]}) == "… +1"
+for n in range(1, 60):
+    assert len(label({"client_names": [f"Nom long numéro {i}" for i in range(n)]})) <= 255
+print("OK : capteur Appareils sur le Wi-Fi box :", out[-30:])

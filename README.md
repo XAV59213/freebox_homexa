@@ -61,7 +61,7 @@ Dès l’installation, ou ensuite : **Paramètres → Appareils et services → 
 |---|---|---|
 | Suivre les clients LAN | oui | `device_tracker` des téléphones / PC / objets |
 | Créer les capteurs RSSI Wi-Fi | oui | Signal en dBm dès que le client est vu en Wi-Fi |
-| Créer des appareils pour les clients réseau | oui | Désactivé : pas de device par client, et les devices clients existants sont retirés au rechargement |
+| Créer des appareils pour les clients réseau | non pour une nouvelle installation ; oui conservé pour une installation existante (migration automatique) | Activé : un appareil par client, rangé sous « Clients réseau filaires / Clients Wi-Fi › type » ou son répéteur, avec les capteurs « Clients connectés ». Désactivé : comportement standard de Home Assistant — le `device_tracker` ne crée pas d’appareil et se relie seul à l’appareil d’une autre intégration ayant la même MAC ; le RSSI reste une entité seule ; pas de groupes de clients. En désactivant, les appareils clients créés par Homexa seuls sont retirés au rechargement (ceux partagés avec une autre intégration sont gardés) |
 | Intervalle Home (secondes) | 15 | PIR, contacts, alarme, volets : 5 / 10 / 15 / 20 / 25 / 30 |
 | Code télécommande Player | vide | 8 chiffres, Player : Réglages → Système → Informations |
 

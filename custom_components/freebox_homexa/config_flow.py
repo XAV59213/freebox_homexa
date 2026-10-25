@@ -173,6 +173,8 @@ class FreeboxFlowHandler(ConfigFlow, domain=DOMAIN):
     """Gère le flux de configuration pour l'intégration Freebox."""
 
     VERSION = 1
+    # 1.2 : « create_lan_devices » écrit explicitement (True) pour les entrées existantes.
+    MINOR_VERSION = 2
 
     def __init__(self) -> None:
         self._data: dict[str, Any] = {}

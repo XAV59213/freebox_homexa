@@ -1,5 +1,17 @@
 # Changelog
 
+## Non publié
+- Option **« Créer des appareils pour les clients réseau »** : **décochée par défaut pour les nouvelles installations**. C'est la règle de Home Assistant : un `device_tracker` (ScannerEntity) ne crée pas d'appareil, il se relie seul à l'appareil d'une autre intégration qui a la même MAC (ex. Shelly, ESPHome)
+  - **installations existantes : aucun changement**. Une migration (entrée 1.1 → 1.2) écrit l'option **cochée** si elle n'avait jamais été réglée. Un choix déjà fait (coché ou décoché) est conservé. Appareils clients, groupes « Clients réseau filaires / Clients Wi-Fi », capteurs « Clients connectés », entity_id et unique_id restent identiques
+  - option décochée :
+    - Homexa ne crée plus d'appareil client et ne modifie plus le registre pour y rattacher les trackers ;
+    - un appareil existant, même celui d'une autre intégration, n'est plus déplacé sous un groupe ;
+    - les capteurs RSSI Wi-Fi restent des entités seules, pas rattachées à la Freebox Server pour ne pas la surcharger ;
+    - les groupes de clients et leurs capteurs « Clients connectés » ne sont pas créés : ils n'ont de sens qu'avec des appareils clients
+  - en décochant l'option, seuls les appareils clients **créés uniquement par Homexa** sont retirés au rechargement. Un appareil partagé avec une autre intégration n'est plus jamais supprimé (avant, il pouvait l'être)
+  - à noter, option décochée (nouvelles installations) : Home Assistant crée **désactivé par défaut** le tracker d'un client qu'aucune autre intégration ne connaît. On l'active dans la liste des entités, comme avec l'intégration Freebox officielle
+- Tests : `tests/simulation_option_appareils_clients.py` (défaut, migration, choix conservé, option décochée)
+
 ## 28.8.61
 - Qualité (Integration Quality Scale) — **entity-unavailable** :
   - quand la Freebox est **injoignable** (journal « Freebox injoignable »), les entités Homexa passent **indisponibles** au lieu de garder une valeur figée ou de passer « inconnu » : capteurs (débits, températures, appels, disques, Wi-Fi, répéteurs, groupes de clients), capteurs binaires, interrupteur Wi-Fi, boutons, télécommande et lecteurs Player, calendrier Guide TV, et toutes les entités Freebox Home (volets, alarme, caméras, détecteurs, batteries). Elles redeviennent disponibles dès le retour de la Freebox (« Freebox de nouveau joignable ») ; les entités pilotées par signal sont réécrites tout de suite, les autres au relevé suivant

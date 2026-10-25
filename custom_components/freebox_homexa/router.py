@@ -639,10 +639,21 @@ class FreeboxRouter:
         `auto_link` (clients LAN, répéteurs) : parent automatique filaire / Wi-Fi / répéteur,
         sous le Freebox Server ; une surcharge de l'utilisateur reste prioritaire.
         """
-        from .device_groups import GROUP_AUTO, SERVICE_CHOICES, link_group, to_service
+        from .device_groups import (
+            GROUP_AUTO,
+            LAN_GROUPS,
+            SERVICE_CHOICES,
+            link_group,
+            to_service,
+        )
 
         auto = to_service(auto_group)
         override = self.group_overrides.get(key) or GROUP_AUTO
+        if override in LAN_GROUPS:
+            # Forcé dans « Clients réseau filaires » / « Clients Wi-Fi » (sous le Server).
+            self.grouped_devices[key] = (name, link_group(auto_link) or auto)
+            self.used_groups.add(override)
+            return self.group_device_id(override)
         if override in SERVICE_CHOICES:
             self.grouped_devices[key] = (name, link_group(auto_link) or auto)
             self.used_groups.add(override)

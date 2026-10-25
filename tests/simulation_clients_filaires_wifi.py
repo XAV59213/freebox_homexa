@@ -272,4 +272,95 @@ for d in list(DEV.values()):
         d.via_device_id = "srv"
 removed = dg.async_remove_unused_group_devices(None, entry, RM, {dg.GROUP_LAN_WIFI})
 assert removed == ["Clients réseau filaires"], removed
+
+# --- 6. Switch Cisco (rapport utilisateur, Freebox OS 4.13) ----------------------
+# « Cisco Systems, Inc (A4:56:30:73:AF:C0) », type « Périphérique réseau », joignable.
+CISCO = "A4:56:30:73:AF:C0"
+
+
+def cisco(ap=None, active=True):
+    h = host(CISCO, f"Cisco Systems, Inc ({CISCO})", ap, active=active, host_type="networking_device")
+    h["vendor_name"] = "Cisco Systems, Inc"
+    return h
+
+
+def gw_no_conn(mac=RM):
+    return {"type": "gateway", "mac": mac, "uid": f"uid-{mac}"}
+
+
+# Classement pur : sans access_point, ou « gateway » sans connectivity_type -> filaire.
+for ap in (None, gw_no_conn(), {}):
+    h = cisco(ap)
+    h["wifi"] = rt.extract_wifi_details(h)
+    assert not wa._is_wifi_client(h, RM), ap
+    assert dg.lan_client_link(h) == dg.LINK_WIRED, ap
+assert not wa.is_freebox_repeater(cisco(), RM)
+# Ethernet sans connectivity_type mais avec ethernet_information : filaire, même hors ligne.
+eth_only = {"type": "gateway", "mac": RM, "ethernet_information": {"speed": 1000, "link": "up"}}
+assert dg.lan_client_link(cisco(eth_only, active=False)) == dg.LINK_WIRED
+# Hors ligne sans indice : non classé (dernier classement conservé).
+assert dg.lan_client_link(cisco(None, active=False)) is None
+assert dg.lan_client_link(cisco(gw_no_conn(), active=False)) is None
+# Wi-Fi reconnu par le signal (station de la box), même sans connectivity_type.
+ph = host("AA:00:00:00:00:0A", "Tel", gw_no_conn())
+ph["_wifi_station"] = {"signal": -60, "bssid": "34:27:92:D9:E0:31"}
+ph["wifi"] = rt.extract_wifi_details(ph)
+assert wa._is_wifi_client(ph, RM) and dg.lan_client_link(ph) == dg.LINK_WIFI
+# Client d'un répéteur sans détail : reste Wi-Fi (répéteur).
+rp = host("AA:00:00:00:00:0B", "Tel2", {"type": "repeater", "mac": "22:66:CF:96:92:D2"})
+assert wa._is_wifi_client(rp, RM)
+assert dg.lan_client_link(rp, lambda m: "20:66:CF:4B:49:69") == "repeater:20:66:CF:4B:49:69"
+print("OK : switch sans access_point / gateway sans connectivity_type -> filaire")
+
+# Bout en bout : switch sans access_point -> « Clients réseau filaires » dès le 1er relevé.
+for d in list(DEV.values()):
+    if d.via_device_id and DEV.get(d.via_device_id) is None:
+        d.via_device_id = "srv"
+r6 = make_router()
+hosts6 = lan()
+hosts6[CISCO] = cisco(None)
+poll(r6, hosts6)
+register_entities(r6, hosts6)
+poll(r6, hosts6)
+assert parent_name(CISCO) == "Clients réseau filaires", parent_name(CISCO)
+assert r6.grouped_devices[f"mac:{CISCO.lower()}"][1] == dg.GROUP_LAN_WIRED
+assert "Cisco" not in " ".join(r6.wifi_aps["gateway"]["client_names"])
+
+# Mal classé par l'ancienne logique (gateway sans connectivity_type = Wi-Fi box) :
+# après mise à jour, corrigé en 2 relevés tant qu'il est en ligne.
+d_cisco = R.async_get_device_by_connection(("mac", CISCO.lower()), "E")
+d_cisco.via_device_id = r6.group_device_id(dg.GROUP_LAN_WIFI)
+r7 = make_router()
+hosts6[CISCO] = cisco(gw_no_conn())
+poll(r7, hosts6)
+assert parent_name(CISCO) == "Clients Wi-Fi"  # 1 relevé : anti va-et-vient
+poll(r7, hosts6)
+assert parent_name(CISCO) == "Clients réseau filaires", parent_name(CISCO)
+assert r7.lan_links[wa.normalize_mac(CISCO)] == dg.LINK_WIRED
+
+# Téléphone Wi-Fi hors ligne (sans access_point) : reste sous son point d'accès Wi-Fi.
+hosts6["AA:00:00:00:00:04"]["active"] = False
+hosts6["AA:00:00:00:00:04"].pop("access_point")
+for _ in range(3):
+    poll(r7, hosts6)
+assert parent_name("AA:00:00:00:00:04") == "Clients Wi-Fi", parent_name("AA:00:00:00:00:04")
+assert r7.lan_links["AA0000000004"] == dg.LINK_WIFI
+# Même chose hors ligne avec un access_point « gateway » sans détail.
+hosts6["AA:00:00:00:00:04"]["access_point"] = gw_no_conn()
+for _ in range(3):
+    poll(r7, hosts6)
+assert parent_name("AA:00:00:00:00:04") == "Clients Wi-Fi"
+print("OK : switch Cisco filaire, correction d'un ancien classement Wi-Fi, téléphone hors ligne conservé")
+
+# --- 7. Surcharge « Clients réseau filaires » / « Clients Wi-Fi » --------------
+assert dg.migrate_overrides({"mac:x": "lan_wired", "mac:y": "lan_wifi", "mac:z": "net_other"}) == {
+    "mac:x": "lan_wired", "mac:y": "lan_wifi", "mac:z": "server"}
+assert "lan_wired" in dg.group_choices() and "lan_wifi" in dg.group_choices()
+r8 = make_router({"device_group_overrides": {f"mac:{CISCO.lower()}": "lan_wifi",
+                                             "mac:aa:00:00:00:00:09": "lan_wired"}})
+hosts6[CISCO] = cisco(None)
+poll(r8, hosts6)
+assert parent_name(CISCO) == "Clients Wi-Fi"  # surcharge prioritaire
+assert parent_name("AA:00:00:00:00:09") == "Clients réseau filaires"  # Vieux-PC hors ligne forcé
+print("OK : surcharges vers les groupes filaires / Wi-Fi")
 print("SIMULATION_CLIENTS_FILAIRES_WIFI_OK")

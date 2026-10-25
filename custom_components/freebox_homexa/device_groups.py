@@ -132,7 +132,7 @@ def migrate_overrides(overrides: dict[str, str] | None) -> dict[str, str]:
     result: dict[str, str] = {}
     for key, value in (overrides or {}).items():
         new = migrate_group(value)
-        if new in SERVICE_CHOICES:
+        if new in SERVICE_CHOICES or new in LAN_GROUPS:
             result[key] = new
     return result
 
@@ -300,39 +300,74 @@ def classify_lan_client(device: dict[str, Any]) -> str:
 # --- Filaire / Wi-Fi --------------------------------------------------------
 
 
+def has_wifi_evidence(device: dict[str, Any]) -> bool:
+    """Preuve explicite d'une liaison Wi-Fi dans lan/browser (ou /wifi/ap/*/stations/).
+
+    `access_point.type` seul (« gateway » / « repeater ») ne suffit pas : la Freebox le
+    renseigne aussi pour les hôtes Ethernet (ex. switch Cisco branché sur la box).
+    """
+    access_point = device.get("access_point") or {}
+    if not isinstance(access_point, dict):
+        access_point = {}
+    wifi = device.get("wifi") or {}
+    if not isinstance(wifi, dict):
+        wifi = {}
+    if str(access_point.get("connectivity_type") or "").lower() == "wifi":
+        return True
+    if access_point.get("wifi_information"):
+        return True
+    if device.get("_wifi_station"):
+        return True
+    if str(wifi.get("connectivity") or "").lower() == "wifi":
+        return True
+    return any(
+        wifi.get(key) is not None for key in ("wifi_signal_dbm", "wifi_band", "wifi_ssid", "wifi_bssid")
+    )
+
+
+def has_ethernet_evidence(device: dict[str, Any]) -> bool:
+    """Preuve explicite d'une liaison Ethernet (connectivity_type / ethernet_information)."""
+    access_point = device.get("access_point") or {}
+    if not isinstance(access_point, dict):
+        return False
+    if str(access_point.get("connectivity_type") or "").lower() == "ethernet":
+        return True
+    return bool(access_point.get("ethernet_information"))
+
+
 def lan_client_link(device: dict[str, Any], repeater_of: Any = None) -> str | None:
     """Mode de connexion d'un client LAN d'après lan/browser.
 
     - Wi-Fi d'un répéteur reconnu : « repeater:<MAC canonique> » ;
     - Wi-Fi de la box (ou point d'accès Wi-Fi non identifié) : « wifi » ;
-    - Ethernet (sur la box ou sur un port d'un répéteur) : « wired » ;
-    - rien de lisible (hôte hors ligne sans access_point) : None.
+    - Ethernet (sur la box, sur un port d'un répéteur ou derrière un switch) : « wired » ;
+      un hôte EN LIGNE sans aucun indice Wi-Fi (pas d'access_point, ou access_point
+      « gateway » sans connectivity_type, ex. switch Cisco) est filaire ;
+    - rien de lisible (hôte hors ligne sans indice) : None, dernier classement conservé
+      (un téléphone Wi-Fi hors ligne ne passe jamais en filaire).
     `repeater_of(mac)` renvoie la MAC canonique du répéteur physique, sinon "".
     """
     parent = device.get("wifi_parent") or {}
     access_point = device.get("access_point") or {}
     if not isinstance(access_point, dict):
         access_point = {}
-    wifi = device.get("wifi") or {}
     if parent.get("kind") == "repeater" and parent.get("ap_id"):
         return f"{LINK_REPEATER}{parent['ap_id']}"
     if parent.get("kind") == "gateway":
         return LINK_WIFI
-    connectivity = str(
-        access_point.get("connectivity_type") or wifi.get("connectivity") or ""
-    ).lower()
-    if connectivity == "ethernet":
+    if has_ethernet_evidence(device):
         return LINK_WIRED
-    if (
-        connectivity == "wifi"
-        or wifi.get("wifi_signal_dbm") is not None
-        or access_point.get("wifi_information")
-    ):
-        if access_point.get("type") == "repeater" and access_point.get("mac") and repeater_of:
+    ap_type = access_point.get("type")
+    if has_wifi_evidence(device) or (ap_type == "repeater" and access_point.get("mac")):
+        # Client d'un répéteur sans détail : Wi-Fi (les ports Ethernet du répéteur
+        # remontent connectivity_type « ethernet »).
+        if ap_type == "repeater" and access_point.get("mac") and repeater_of:
             canon = repeater_of(access_point["mac"])
             if canon:
                 return f"{LINK_REPEATER}{canon}"
         return LINK_WIFI
+    if device.get("active"):
+        return LINK_WIRED
     return None
 
 
@@ -492,7 +527,7 @@ def async_remove_merged_node_devices(
 
 def group_choices() -> list[str]:
     """Valeurs proposées dans l'écran « Groupes des appareils »."""
-    return [GROUP_AUTO, *SERVICE_CHOICES]
+    return [GROUP_AUTO, *SERVICE_CHOICES, *LAN_GROUPS]
 
 
 def async_remove_lan_client_devices(

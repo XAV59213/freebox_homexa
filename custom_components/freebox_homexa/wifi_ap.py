@@ -6,7 +6,13 @@ import logging
 from typing import Any
 
 from .const import REPEATER_MODEL
-from .device_groups import is_specific_repeater_name, lan_client_name, ul_twin
+from .device_groups import (
+    has_ethernet_evidence,
+    has_wifi_evidence,
+    is_specific_repeater_name,
+    lan_client_name,
+    ul_twin,
+)
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -292,21 +298,16 @@ def _is_wifi_client(device: dict[str, Any], router_mac: str) -> bool:
         return False
     if is_freebox_repeater(device, router_mac):
         return False
-    access_point = device.get("access_point") or {}
-    wifi = device.get("wifi") or {}
-    # Hôte branché en Ethernet (sur la box ou un port du répéteur) : access_point.type
-    # vaut aussi « gateway » / « repeater », mais ce n'est pas un client Wi-Fi.
-    if str(access_point.get("connectivity_type") or "").lower() == "ethernet":
+    # Hôte branché en Ethernet (sur la box, un port du répéteur ou derrière un switch) :
+    # access_point.type vaut aussi « gateway » / « repeater », mais ce n'est pas un client
+    # Wi-Fi. « gateway » seul (sans connectivity_type) n'est pas une preuve de Wi-Fi.
+    if has_ethernet_evidence(device):
         return False
-    if access_point.get("type") in {"repeater", "gateway"}:
+    if has_wifi_evidence(device):
         return True
-    if access_point.get("connectivity_type") == "wifi":
-        return True
-    if wifi.get("connectivity") == "wifi":
-        return True
-    if wifi.get("wifi_signal_dbm") is not None:
-        return True
-    return bool(access_point.get("wifi_information"))
+    access_point = device.get("access_point") or {}
+    # Client d'un répéteur sans détail : Wi-Fi (voir lan_client_link).
+    return access_point.get("type") == "repeater" and bool(access_point.get("mac"))
 
 
 # États documentés (API Freebox OS, /wifi/ap/ status.state et /wifi/bss/ status.state).

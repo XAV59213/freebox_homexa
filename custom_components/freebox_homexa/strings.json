@@ -237,7 +237,9 @@
         "server": "Freebox Server",
         "home": "Freebox Smart home",
         "player": "Freebox Player",
-        "tnt": "TNT"
+        "tnt": "TNT",
+        "lan_wired": "Wired network clients",
+        "lan_wifi": "Wi-Fi clients"
       }
     }
   }

@@ -439,6 +439,31 @@ assert cls(primary_name="iPhone-Xav", vendor_name="Apple, Inc.", host_type="smar
 assert cls(primary_name="Echo Dot", vendor_name="Amazon Technologies Inc.") == dg.NET_AMAZON
 assert cls(primary_name="Bluebank") == dg.NET_OTHER
 assert cls(primary_name="Freebox Player", host_type="freebox_player") == dg.NET_MEDIA
+# Proxmox VE 8+ : le pont vmbr0 de l'HÔTE a aussi une MAC BC:24:11 (données réelles).
+PVE_VENDOR = "Proxmox Server Solutions GmbH"
+assert cls(mac="BC:24:11:B4:3D:38", primary_name="pve", vendor_name=PVE_VENDOR) == dg.NET_SERVERS
+assert cls(mac="BC:24:11:B4:3D:38", primary_name="Proxmox", vendor_name=PVE_VENDOR) == dg.NET_SERVERS
+assert cls(mac="BC:24:11:B4:3D:38", primary_name="Serveur Proxmox", vendor_name=PVE_VENDOR) == dg.NET_SERVERS
+assert cls(mac="BC:24:11:B4:3D:38", primary_name="pve-hpdle", vendor_name=PVE_VENDOR,
+           names=[{"name": "Proxmox Server Solutions GmbH (BC:24:11:B4:3D:38)"}]) == dg.NET_SERVERS
+# Nom par défaut « fabricant (MAC) » : ses mots Proxmox / Server ne comptent pas -> VM.
+for mac in ("BC:24:11:B4:3D:38", "BC:24:11:63:90:C9"):
+    assert cls(mac=mac, primary_name=f"{PVE_VENDOR} ({mac})", vendor_name=PVE_VENDOR) == dg.NET_VIRTUAL
+assert cls(mac="BC:24:11:63:90:C9", primary_name=PVE_VENDOR, vendor_name=PVE_VENDOR) == dg.NET_VIRTUAL
+assert cls(mac="BC:24:11:63:90:C9", primary_name="", default_name=f"{PVE_VENDOR} (BC:24:11:63:90:C9)",
+           vendor_name=PVE_VENDOR) == dg.NET_VIRTUAL
+# VM / LXC de l'utilisateur.
+for mac, name in (("BC:24:11:07:7A:6B", "frigate"), ("BC:24:11:96:80:58", "uptimekuma"),
+                  ("BC:24:11:F6:AC:35", "inventree")):
+    assert cls(mac=mac, primary_name=name, vendor_name=PVE_VENDOR) == dg.NET_VIRTUAL, name
+# « Server » dans un nom par défaut d'un autre fabricant : pas un serveur.
+assert cls(primary_name="Super Server Corp (AA:BB:CC:00:00:01)", vendor_name="Super Server Corp") == dg.NET_OTHER
+# « tv » (mot entier) dans le nom : TV et multimédia avant le fabricant / host_type.
+assert cls(primary_name="Tv chambre papa", vendor_name="Realtek Semiconductor Corp.") == dg.NET_MEDIA
+assert cls(primary_name="Tv chambre papa", vendor_name="Intel Corporate", host_type="workstation") == dg.NET_MEDIA
+assert cls(primary_name="TV-Salon", vendor_name="Hon Hai Precision") == dg.NET_MEDIA
+assert cls(primary_name="Fire TV Stick", vendor_name="Amazon Technologies Inc.") == dg.NET_AMAZON
+assert cls(primary_name="tvheadend", vendor_name="Intel Corporate") == dg.NET_COMPUTERS  # pas le mot « tv »
 print("OK : règles Serveurs / VM et conteneurs / Équipements réseau")
 
 PROXMOX, LXC = "70:5A:0F:11:22:33", "BC:24:11:AA:BB:CC"

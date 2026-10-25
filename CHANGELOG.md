@@ -1,5 +1,9 @@
 # Changelog
 
+## Non publié
+- Types des clients réseau : un client dont le **nom** désigne un serveur (`pve`, `proxmox`, `serveur`/`server`, `hyperviseur`, `truenas`…) va dans **Serveurs** même avec une MAC virtuelle. Depuis Proxmox VE 8, le pont `vmbr0` de l'**hôte** Proxmox a lui aussi une MAC `BC:24:11` : il était classé « VM et conteneurs ». Le nom par défaut de la Freebox « Proxmox Server Solutions GmbH (MAC) » (fabricant + MAC) ne compte pas : une VM / un LXC sans nom reste dans « VM et conteneurs »
+- Types des clients réseau : le mot **« tv »** dans le nom (ex. « Tv chambre papa ») classe le client dans **TV et multimédia** avant le fabricant (Realtek, Intel…) ou le type Freebox ; les Fire TV restent dans « Amazon / Alexa »
+
 ## 28.8.54
 - Correction : les **clients réseau sans appareil** (ex. switch Cisco) n'apparaissaient dans aucun groupe, et « Équipements réseau (filaire) » restait **vide**. Home Assistant ignore le `device_info` des entités `device_tracker` (`ScannerEntity.device_info` est figé à `None`) : un appareil n'existait que si une autre intégration (DHCP, UniFi…) connaissait déjà la MAC, et l'entité était sinon créée **désactivée** et sans appareil. Homexa crée maintenant lui-même l'appareil de chaque client dont l'entité `device_tracker` est **active** (option « Créer les appareils des clients LAN »), le range dans « Clients réseau filaires › type », « Clients Wi-Fi › type » ou sous le répéteur, et y rattache l'entité. Rien n'est créé pour une entité désactivée
 - Correction : la MAC d'un client restée dans les **connexions d'un appareil répéteur** (reste d'anciennes versions, ex. Grange) rattachait l'entité du client au répéteur (« Grange ▸ Cisco… ») et faisait lire son classement depuis le répéteur (« Clients Wi-Fi ») : la MAC est retirée du répéteur et le client reçoit son propre appareil. Un identifiant `repeater_<MAC>` périmé sur l'appareil d'un client (ancien faux répéteur) est retiré

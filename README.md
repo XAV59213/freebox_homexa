@@ -67,7 +67,11 @@ Dès l’installation, ou ensuite : **Paramètres → Appareils et services → 
 
 Le Server, les répéteurs et le pack Home (alarme, PIR, caméras, volets) gardent toujours leurs devices.
 
-Si vous désactivez « device par client » après coup, rechargez l’intégration puis supprimez à la main les anciens devices Homexa devenus vides.
+« Créer des appareils pour les clients réseau » :
+
+- **décochée par défaut** sur une nouvelle installation : règle de Home Assistant, un `device_tracker` ne crée pas d’appareil. Home Assistant crée alors **désactivé** le tracker d’un client qu’aucune autre intégration ne connaît : activez-le dans la liste des entités si besoin (comme avec l’intégration Freebox officielle) ;
+- **installation existante** (avant la 28.8.62) : l’option est conservée **cochée** à la mise à jour, rien ne change ;
+- en la décochant après coup : au rechargement, les appareils clients créés **uniquement** par Homexa sont retirés automatiquement ; un appareil partagé avec une autre intégration (Shelly, ESPHome…) est conservé.
 
 Pour 5 s, désactivez l’intégration officielle Freebox : les deux en parallèle saturent l’API.
 
@@ -100,6 +104,69 @@ Volume et lecture passent par l’API Player, sans ce code.
 
 ---
 
+## Actions
+
+| Action | Rôle |
+|---|---|
+| `freebox_homexa.reboot` | Redémarre la Freebox |
+| `freebox_homexa.reload` | Recharge l’intégration (reconnexion, redécouverte des appareils Home) |
+| `freebox_homexa.remote` | Envoie des touches de télécommande au **Freebox Player** |
+| `freebox_homexa.schedule_reminder` | Programme un rappel TNT (notification et/ou annonce vocale) 5, 10 ou 15 min avant un programme |
+| `freebox_homexa.cancel_reminder` | Annule un rappel TNT |
+| `freebox_homexa.get_reminder_status` | Indique si un rappel est programmé (réponse de l’action) |
+
+Avec plusieurs Freebox, `config_entry_id` ou `device_id` choisit la Freebox visée par `reboot`, `reload` et `remote`.
+
+### `freebox_homexa.remote`
+
+Même chemin que l’entité « Télécommande » du Player, avec le **code télécommande réseau** réglé dans Configurer (celui du Player, sinon le code commun).
+
+| Champ | Obligatoire | Rôle |
+|---|---|---|
+| `code` | oui | Une touche, ou plusieurs séparées par des virgules (`"1,2"` → chaîne 12) |
+| `player_id` | non | Numéro du Player (1, 2…) ; inutile avec un seul Player |
+| `device_id` | non | Appareil Player Homexa à piloter (à la place de `player_id`) |
+
+Touches : `power`, `ok`, `up`, `down`, `left`, `right`, `back`, `home`, `0` à `9`, `vol_inc`, `vol_dec`, `mute`, `prgm_inc`, `prgm_dec`, `play`, `bwd`, `fwd`, `prev`, `next`, `rec`, `red`, `green`, `blue`, `yellow`, `tv`, `list`, `info`, `epg`, `mail`, `media`, `help`, `options`, `pip`, `swap`.
+
+```yaml
+action: freebox_homexa.remote
+data:
+  code: "power"
+```
+
+```yaml
+# Chaîne 12 sur le Player n° 2
+action: freebox_homexa.remote
+data:
+  code: "1,2"
+  player_id: 2
+```
+
+Erreurs affichées (au lieu d’un échec silencieux) : aucun Player détecté, code télécommande manquant, plusieurs Player sans `player_id` / `device_id` ni code commun, touche inconnue (rien n’est envoyé), numéro de Player invalide, touche non envoyée.
+
+---
+
+## Disponibilité et journal
+
+- **Freebox injoignable** : le journal affiche **une seule fois** « Freebox injoignable » (niveau info), puis « Freebox de nouveau joignable » à son retour, sans erreur répétée à chaque relevé. Entre les deux, les entités Homexa passent **indisponibles** (capteurs, Wi-Fi, boutons, Player, Guide TV, entités Freebox Home…).
+- **Nœud Freebox Home injoignable** (la Freebox le signale « unreachable », ex. détecteur hors de portée) : ses entités passent indisponibles. Les volets **RTS** (sans retour d’état) ne sont jamais rendus indisponibles pour ce motif.
+- Non concernés : les `device_tracker` gardent leur dernier état (la présence n’est pas perturbée) ; l’interrupteur « inversion » des volets (réglage local) et les capteurs TNT (source Internet) ne dépendent pas de la Freebox.
+
+Automatisation sur l’alarme (ou un volet) avec `to:` : au retour de la Freebox, l’état passe de `unavailable` à sa vraie valeur et peut la relancer. Ajoutez `not_from` :
+
+```yaml
+triggers:
+  - trigger: state
+    entity_id: alarm_control_panel.systeme_d_alarme
+    to: disarmed
+    not_from:
+      - unavailable
+      - unknown
+```
+
+---
+
 ## Tableau de bord (carte prête à coller)
 
 Vue Lovelace **Alarme / Volet / PIR / Player / RSSI** :
@@ -129,6 +196,12 @@ HACS → Frontend → [Mushroom](https://github.com/piitaya/lovelace-mushroom), 
 
 HACS → Freebox Homexa → **Mettre à jour** → redémarrer Home Assistant.
 
+## Suppression
+
+1. **Paramètres → Appareils et services → Freebox Homexa** → ⋮ → **Supprimer**
+2. HACS → Freebox Homexa → ⋮ → **Supprimer**, puis redémarrer Home Assistant
+3. Facultatif : Freebox OS → Paramètres → Applications → retirer l’application Home Assistant
+
 ---
 
 ## Dépannage
@@ -142,6 +215,9 @@ HACS → Freebox Homexa → **Mettre à jour** → redémarrer Home Assistant.
 | Répéteur en double | Options → **Fusionner un répéteur en double** : choisir le doublon puis le répéteur portant la MAC principale `20:66:CF…` (visible dans l'app Freebox) ; pièce, nom et entités sont conservés |
 | Player absent | Droits Player dans Freebox OS + redémarrage |
 | Télécommande sans effet | Renseigner le code Player dans Configurer |
+| Action `remote` en erreur | Lire le message : code manquant → Configurer ; plusieurs Player → ajouter `player_id` ou `device_id` ; touche inconnue → voir la liste des touches |
+| Entités indisponibles | Freebox injoignable (journal « Freebox injoignable ») ou nœud Home hors de portée ; elles reviennent seules |
+| Automatisation relancée au retour de la Freebox | Ajouter `not_from: [unavailable, unknown]` au déclencheur `to:` |
 | HDMI ne change pas l’entrée TV | Normal : CEC réveille la TV, ça ne sélectionne pas HDMI 1/2/3 |
 | Pas de RSSI Wi-Fi | Client Ethernet, ou droit LAN / Wi-Fi manquant dans Freebox OS |
 | Devices en doublon (HA 2026.8) | Désactivez « Créer des appareils pour les clients réseau » |

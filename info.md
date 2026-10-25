@@ -21,6 +21,9 @@ Doc complète : [Wiki](https://github.com/XAV59213/freebox_homexa/wiki)
 - Player Devialet / Mini 4K / Pop + télécommande
 - Sources TV / HDMI (CEC) / YouTube / Netflix
 - Code télécommande Player réglable dans Configurer
+- Action `freebox_homexa.remote` vers le Player (touches, `player_id` / `device_id` facultatifs)
+- Entités indisponibles si la Freebox est injoignable (journal unique « Freebox injoignable » / « de nouveau joignable »)
+- Appareils par client réseau sur option (décochée par défaut sur une nouvelle installation)
 
 HDMI = sortie Player vers la TV (CEC), pas un switch d’entrée HDMI.
 

@@ -1,6 +1,6 @@
 # Changelog
 
-## Non publié
+## 28.8.52
 - Nouveau : les **clients réseau sont séparés en filaires et Wi-Fi**. Sous le Freebox Server, deux appareils de regroupement sont créés (seulement s'ils servent) : **« Clients réseau filaires »** (appareils branchés en Ethernet, sur la box ou sur le port d'un répéteur) et **« Clients Wi-Fi »**. Dans « Clients Wi-Fi » : les appareils connectés au Wi-Fi de la box, et les répéteurs (Grange, Chambre fille, Garage…), qui portent chacun leurs propres clients Wi-Fi. Classement d'après `lan/browser` (`access_point.connectivity_type` et point d'accès), le point d'accès étant relié au répéteur physique avec les règles de regroupement existantes (MAC principale, jumeau `22:66:CF`, bloc de BSSID)
 - Stabilité : un appareil hors ligne garde son dernier classement (mémorisé, et relu dans le registre après un redémarrage) ; un appareil actif qui change de point d'accès n'est déplacé qu'après 2 relevés consécutifs (pas de va-et-vient d'un téléphone entre la box et un répéteur). Un appareil jamais classé (hors ligne, sans information de connexion) reste directement sous le Freebox Server
 - Les choix de **« Groupes des appareils »** restent prioritaires (un appareil forcé sur « Freebox Server », « Player », « Maison connectée » ou « TNT » y reste) ; l'écran affiche le regroupement automatique (« auto : Clients Wi-Fi » / « Clients réseau filaires »)

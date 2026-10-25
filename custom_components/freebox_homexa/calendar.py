@@ -12,6 +12,7 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.util import dt as dt_util
 
 from .tnt_sensor import TNT_DEVICE_INFO
+from .availability import FreeboxReachableMixin
 from .router import FreeboxConfigEntry, FreeboxRouter
 from .tv_guide import summarize_guide
 
@@ -80,7 +81,7 @@ def _program_to_event(program: dict[str, Any], channel_name: str) -> CalendarEve
     )
 
 
-class FreeboxTvGuideCalendar(CalendarEntity):
+class FreeboxTvGuideCalendar(FreeboxReachableMixin, CalendarEntity):
     """Programmes TV en cours et à venir."""
 
     _attr_has_entity_name = True

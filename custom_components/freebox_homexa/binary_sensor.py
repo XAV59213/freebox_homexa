@@ -18,6 +18,7 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from .const import REPEATER_MODEL, FreeboxHomeCategory
 from .entity import FreeboxHomeEntity
 from .errors import is_shutdown_error
+from .availability import FreeboxReachableMixin
 from .router import FreeboxConfigEntry, FreeboxRouter
 
 _LOGGER = logging.getLogger(__name__)
@@ -187,7 +188,7 @@ class FreeboxCoverSensor(FreeboxHomeBinarySensor):
         super().__init__(hass, router, node, cover_node)
 
 
-class FreeboxWifiApSensor(BinarySensorEntity):
+class FreeboxWifiApSensor(FreeboxReachableMixin, BinarySensorEntity):
     """État d'un point d'accès Wi-Fi : box ou répéteur."""
 
     _attr_should_poll = False
@@ -241,7 +242,7 @@ class FreeboxWifiApSensor(BinarySensorEntity):
         )
 
 
-class FreeboxRaidDegradedSensor(BinarySensorEntity):
+class FreeboxRaidDegradedSensor(FreeboxReachableMixin, BinarySensorEntity):
     """Représentation d'un capteur RAID dégradé Freebox."""
     _attr_should_poll = False
     _attr_has_entity_name = True

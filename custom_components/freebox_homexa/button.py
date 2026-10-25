@@ -20,6 +20,7 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from .const import option_remote_code
 from .media_player import player_device_info
 from .router import FreeboxConfigEntry, FreeboxRouter
+from .availability import FreeboxReachableMixin
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -138,7 +139,7 @@ async def async_setup_entry(
     _LOGGER.debug("%s boutons ajoutés pour %s", len(entities), router.mac)
 
 
-class FreeboxButton(ButtonEntity):
+class FreeboxButton(FreeboxReachableMixin, ButtonEntity):
     """Bouton d'action sur le Freebox Server."""
 
     entity_description: FreeboxButtonEntityDescription
@@ -163,7 +164,7 @@ class FreeboxButton(ButtonEntity):
             )
 
 
-class FreeboxPlayerRemoteButton(ButtonEntity):
+class FreeboxPlayerRemoteButton(FreeboxReachableMixin, ButtonEntity):
     """Touche de la télécommande réseau du Player."""
 
     _attr_has_entity_name = True
@@ -210,7 +211,7 @@ class FreeboxPlayerRemoteButton(ButtonEntity):
             )
 
 
-class FreeboxPlayerAppButton(ButtonEntity):
+class FreeboxPlayerAppButton(FreeboxReachableMixin, ButtonEntity):
     """Ouvre une app / URL sur le Freebox Player."""
 
     _attr_has_entity_name = True

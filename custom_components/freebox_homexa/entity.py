@@ -12,6 +12,7 @@ from homeassistant.helpers.entity import Entity
 from freebox_api.exceptions import HttpRequestError
 from .const import CATEGORY_TO_MODEL, DOMAIN, FreeboxHomeCategory
 from .device_groups import GROUP_HOME, group_identifier, home_node_group, home_node_name, suggested_area
+from .availability import home_node_reachable, router_reachable
 from .errors import is_shutdown_error, poll_log_level
 from .router import FreeboxRouter
 from .registry_compat import as_version
@@ -184,6 +185,15 @@ class FreeboxHomeEntity(Entity):
         if node is None:
             return None
         return node.get("value")
+
+    @property
+    def available(self) -> bool:
+        """Indisponible si la Freebox est injoignable ou si elle signale le nœud « unreachable »."""
+        if not router_reachable(self._router):
+            return False
+        if not home_node_reachable(self._node):
+            return False
+        return super().available
 
     async def async_update_signal(self) -> None:
         if self._id not in self._router.home_devices:

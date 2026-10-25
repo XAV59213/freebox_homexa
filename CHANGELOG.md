@@ -1,6 +1,6 @@
 # Changelog
 
-## Non publié
+## 28.8.56
 - Journal : l'erreur sans gravité **« Connector is closed »** (ex. endpoint 6, appareil 48) pendant un **rechargement** de l'intégration n'apparaît plus comme une erreur. Pendant le déchargement / rechargement de l'entrée, ou quand la session vers la Freebox est fermée (`NotOpenError`, « Connector is closed », « Session is closed »), les relevés (appareils réseau, capteurs, nœuds Freebox Home, volets, caméras, Wi-Fi) s'arrêtent sans bruit (niveau debug). Les vraies erreurs restent signalées
 - Nouveau : capteur **« Clients connectés »** sur chaque groupe de clients réseau (« Clients réseau filaires », « Clients Wi-Fi » et chaque sous-groupe de type, ex. « Serveurs (filaire) ») : nombre de clients **en ligne** rangés dans le groupe, attributs `appareils` (en ligne), `hors_ligne` et `total` (listes limitées à 50 noms, non enregistrées dans l'historique). « Clients Wi-Fi » compte aussi les clients des répéteurs. Le capteur est créé avec le groupe et disparaît avec lui (il n'empêche pas le retrait d'un groupe vide). Pas de doublon sur les répéteurs, qui ont déjà leur capteur « Clients Wi-Fi »
 - Qualité (revue HACS) :

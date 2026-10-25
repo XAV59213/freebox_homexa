@@ -1,6 +1,6 @@
 # Changelog
 
-## Non publié
+## 28.8.48
 - Guide TNT (revue de frenck) : suppression des commandes websocket `programme_tnt_fr/programmes` et `programme_tnt_fr/reminder_profiles` (et de `async_register_websocket_api`), qui occupaient l'espace de noms d'une autre intégration. Homexa ne lit plus `hass.data["programme_tnt_fr"]` ni les entrées de configuration de l'intégration séparée Programme TNT FR. Seules les commandes `freebox_homexa/tnt_programmes`, `freebox_homexa/tnt_reminder_profiles` et `freebox_homexa/tnt_version` (utilisées par la carte `homexa-tnt-card`) restent enregistrées
 - Rappels TNT : les services de rappel Homexa sont toujours enregistrés (ils ne dépendent plus de la présence de l'intégration séparée)
 - Calendrier « Guide TV » : les programmes TNT viennent désormais du guide TNT embarqué de Homexa (plus des capteurs `sensor.programme_tnt_fr_*` de l'intégration séparée) ; repli sur l'EPG Freebox sinon. Attribut `guide_source` : `tnt` au lieu de `programme_tnt_fr`

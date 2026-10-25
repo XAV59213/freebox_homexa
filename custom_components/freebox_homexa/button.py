@@ -146,8 +146,9 @@ class FreeboxButton(ButtonEntity):
         self.entity_description = description
         self._router = router
         self._attr_device_info = router.device_info
+        # unique_id historique construit sur le nom français : inchangé.
         self._attr_unique_id = f"{router.mac} {description.name}"
-        self._attr_name = description.name
+        self._attr_translation_key = description.key
 
     async def async_press(self) -> None:
         try:
@@ -177,7 +178,7 @@ class FreeboxPlayerRemoteButton(ButtonEntity):
         self._entry = entry
         self._player_id = player["id"]
         self._key = key
-        self._attr_name = name
+        self._attr_translation_key = f"remote_key_{key}"
         self._attr_icon = icon
         self._attr_unique_id = f"{router.mac}_player_{self._player_id}_key_{key}"
         self._attr_device_info = player_device_info(router, player)
@@ -224,7 +225,8 @@ class FreeboxPlayerAppButton(ButtonEntity):
         self._player_id = player["id"]
         self._api_version = _player_api_version(player)
         self._url = url
-        self._attr_name = name
+        self._app_name = name
+        self._attr_translation_key = f"player_app_{key}"
         self._attr_icon = icon
         self._attr_unique_id = f"{router.mac}_player_{self._player_id}_app_{key}"
         self._attr_device_info = player_device_info(router, player)
@@ -237,7 +239,7 @@ class FreeboxPlayerAppButton(ButtonEntity):
         except Exception as err:
             _LOGGER.error(
                 "Impossible d'ouvrir %s sur Player %s : %s",
-                self._attr_name,
+                self._app_name,
                 self._player_id,
                 err,
             )

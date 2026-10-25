@@ -331,7 +331,7 @@ class FreeboxWifiSignalSensor(SensorEntity):
     def _apply_device_info(self, device: dict[str, Any], name: str) -> None:
         if self._router.is_repeater_host(device):
             self._attr_has_entity_name = True
-            self._attr_name = "Signal Wi-Fi"
+            self._attr_translation_key = "wifi_signal"
             self._attr_device_info = self._router.repeater_device_info(
                 self._mac, name, device.get("model"), device.get("vendor_name")
             )
@@ -339,7 +339,7 @@ class FreeboxWifiSignalSensor(SensorEntity):
 
         if self._create_lan_devices:
             self._attr_has_entity_name = True
-            self._attr_name = "Signal Wi-Fi"
+            self._attr_translation_key = "wifi_signal"
             device_info: dict[str, Any] = {
                 "connections": {(CONNECTION_NETWORK_MAC, self._mac)},
                 "manufacturer": device.get("vendor_name") or "Inconnu",

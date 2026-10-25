@@ -272,6 +272,9 @@
       },
       "repeater_online": {
         "name": "Online"
+      },
+      "raid_degraded": {
+        "name": "RAID array {raid_id} degraded"
       }
     },
     "calendar": {
@@ -305,7 +308,164 @@
       },
       "lan_group_clients": {
         "name": "Connected clients"
+      },
+      "wifi_signal": {
+        "name": "Wi-Fi signal"
       }
+    },
+    "button": {
+      "reboot": {
+        "name": "Restart Freebox"
+      },
+      "mark_calls_as_read": {
+        "name": "Mark calls as read"
+      },
+      "remote_key_home": {
+        "name": "Home"
+      },
+      "remote_key_back": {
+        "name": "Back"
+      },
+      "remote_key_ok": {
+        "name": "OK"
+      },
+      "remote_key_up": {
+        "name": "Up"
+      },
+      "remote_key_down": {
+        "name": "Down"
+      },
+      "remote_key_left": {
+        "name": "Left"
+      },
+      "remote_key_right": {
+        "name": "Right"
+      },
+      "remote_key_tv": {
+        "name": "TV"
+      },
+      "remote_key_mute": {
+        "name": "Mute"
+      },
+      "remote_key_vol_inc": {
+        "name": "Volume +"
+      },
+      "remote_key_vol_dec": {
+        "name": "Volume -"
+      },
+      "remote_key_prgm_inc": {
+        "name": "Channel +"
+      },
+      "remote_key_prgm_dec": {
+        "name": "Channel -"
+      },
+      "remote_key_play": {
+        "name": "Play"
+      },
+      "remote_key_info": {
+        "name": "Info"
+      },
+      "remote_key_epg": {
+        "name": "TV guide"
+      },
+      "remote_key_list": {
+        "name": "List"
+      },
+      "remote_key_red": {
+        "name": "Red"
+      },
+      "remote_key_green": {
+        "name": "Green"
+      },
+      "remote_key_yellow": {
+        "name": "Yellow"
+      },
+      "remote_key_blue": {
+        "name": "Blue"
+      },
+      "remote_key_0": {
+        "name": "0"
+      },
+      "remote_key_1": {
+        "name": "1"
+      },
+      "remote_key_2": {
+        "name": "2"
+      },
+      "remote_key_3": {
+        "name": "3"
+      },
+      "remote_key_4": {
+        "name": "4"
+      },
+      "remote_key_5": {
+        "name": "5"
+      },
+      "remote_key_6": {
+        "name": "6"
+      },
+      "remote_key_7": {
+        "name": "7"
+      },
+      "remote_key_8": {
+        "name": "8"
+      },
+      "remote_key_9": {
+        "name": "9"
+      },
+      "player_app_youtube": {
+        "name": "YouTube"
+      },
+      "player_app_netflix": {
+        "name": "Netflix"
+      },
+      "player_app_disney": {
+        "name": "Disney+"
+      },
+      "player_app_prime": {
+        "name": "Prime Video"
+      },
+      "player_app_browser": {
+        "name": "Browser"
+      },
+      "player_app_canal": {
+        "name": "Canal+"
+      },
+      "player_app_max": {
+        "name": "Max"
+      },
+      "player_app_appletv": {
+        "name": "Apple TV"
+      }
+    }
+  },
+  "exceptions": {
+    "auth_pending": {
+      "message": "Waiting for the right arrow to be pressed on the Freebox (saved token kept)"
+    },
+    "auth_failed": {
+      "message": "Freebox authorization denied or revoked. Authorize again from Freebox OS."
+    },
+    "cannot_connect": {
+      "message": "Cannot reach the Freebox ({host}): {error}"
+    },
+    "no_loaded_entry": {
+      "message": "Cannot run {service}: no Freebox Homexa entry is loaded."
+    },
+    "entry_not_loaded": {
+      "message": "Cannot run {service}: the targeted Freebox is not loaded."
+    },
+    "multiple_entries": {
+      "message": "{service}: several Freeboxes are configured, set config_entry_id or device_id."
+    },
+    "no_reminder_profile": {
+      "message": "No matching reminder profile: create one in Freebox Homexa → Configure → Reminder profiles (set profile_name if there are several)."
+    },
+    "invalid_start_time": {
+      "message": "Invalid programme start time."
+    },
+    "reminder_too_late": {
+      "message": "Too late to schedule this reminder: not enough time left before the programme starts."
     }
   }
 }

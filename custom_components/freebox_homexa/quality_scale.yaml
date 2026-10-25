@@ -1,33 +1,81 @@
-# Quality scale tracking for Freebox_HomeXa integration
-quality_scale: silver  # Niveau actuel (peut être "silver", "gold", "platinum")
-
+# Suivi honnête des règles de l'Integration Quality Scale de Home Assistant
+# (https://developers.home-assistant.io/docs/core/integration-quality-scale/).
+# Format identique à celui des intégrations du cœur : done / todo / exempt (+ comment).
+# Le niveau « silver » n'est PAS revendiqué dans manifest.json tant que des règles
+# bronze / silver restent « todo » ci-dessous.
 rules:
-  - rule: has_tests
-    implemented: true
+  # --- Bronze ---
+  action-setup:
+    status: done
+    comment: reboot / reload / remote et rappels TNT enregistrés une fois dans async_setup.
+  appropriate-polling: done
+  brands: done
+  common-modules: done
+  config-flow-test-coverage:
+    status: todo
+    comment: Simulations hors HA dans tests/, pas encore de tests pytest du config flow.
+  config-flow: done
+  dependency-transparency:
+    status: done
+    comment: freebox-api>=1.3.1 (hassfest refuse un « == » sur un paquet épinglé par le cœur, 1.3.1 aujourd'hui).
+  docs-actions:
+    status: todo
+    comment: Actions décrites dans services.yaml, pas encore dans le README.
+  docs-high-level-description: done
+  docs-installation-instructions: done
+  docs-removal-instructions:
+    status: todo
+    comment: Procédure de suppression à ajouter au README.
+  entity-event-setup: done
+  entity-unique-id: done
+  has-entity-name:
+    status: todo
+    comment: >-
+      Entités récentes en has_entity_name ; capteurs historiques (débit, IP, appels,
+      températures, Wi-Fi, TNT, partitions) gardent leur nom complet pour ne pas
+      changer les noms existants des utilisateurs.
+  runtime-data:
+    status: todo
+    comment: Le routeur est encore rangé dans hass.data[DOMAIN].
+  test-before-configure: done
+  test-before-setup: done
+  unique-config-entry: done
 
-  - rule: has_docs_url
-    implemented: true
+  # --- Silver ---
+  action-exceptions:
+    status: todo
+    comment: >-
+      Erreurs de validation traduites (aucune entrée chargée, rappels) ; les échecs de
+      l'API Freebox pendant reboot / remote sont encore seulement journalisés.
+  config-entry-unloading: done
+  docs-configuration-parameters: done
+  docs-installation-parameters: done
+  entity-unavailable:
+    status: todo
+    comment: Seuls Player et signal Wi-Fi passent indisponibles ; autres plateformes à revoir.
+  integration-owner: done
+  log-when-unavailable:
+    status: todo
+    comment: Pas encore de journal unique « indisponible / de retour ».
+  parallel-updates:
+    status: todo
+    comment: PARALLEL_UPDATES non défini par plateforme.
+  reauthentication-flow: done
+  test-coverage:
+    status: todo
+    comment: Simulations hors HA uniquement.
 
-  - rule: has_codeowners
-    implemented: true
-
-  - rule: uses_config_flow
-    implemented: false
-    exempted: true
-    reason: "Configuration is handled manually due to API limitations."
-
-  - rule: has_translation_keys
-    implemented: true
-
-  - rule: supports_options_flow
-    implemented: false
-    exempted: false
-
-  - rule: uses_async
-    implemented: true
-
-  - rule: has_debug_logging
-    implemented: true
-
-  - rule: follows_integration_standards
-    implemented: true
+  # --- Gold (partiel) ---
+  diagnostics: done
+  discovery: done
+  entity-translations:
+    status: todo
+    comment: >-
+      Boutons, signal Wi-Fi, RAID, capteurs Wi-Fi / groupes traduits ; noms historiques
+      sans has_entity_name et noms d'appareils de groupe encore en dur (français).
+  exception-translations:
+    status: done
+    comment: Erreurs de configuration et d'actions via translation_key (fr / en).
+  reconfiguration-flow: todo
+  repair-issues: todo
+  stale-devices: done

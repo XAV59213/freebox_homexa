@@ -1,18 +1,16 @@
 """Support pour les appareils Freebox (Freebox v6 et Freebox mini 4K)."""
 
 import logging
-import voluptuous as vol
 import homeassistant.helpers.config_validation as cv
 from homeassistant.const import CONF_HOST, CONF_PORT, EVENT_HOMEASSISTANT_STOP
 from datetime import datetime, timedelta
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.core import Event, HomeAssistant, ServiceCall, callback
+from homeassistant.core import Event, HomeAssistant, callback
 from homeassistant.exceptions import ConfigEntryAuthFailed, ConfigEntryNotReady
-from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.event import async_call_later, async_track_time_interval
 from homeassistant.helpers.storage import Store
+from homeassistant.helpers.typing import ConfigType
 from freebox_api.exceptions import AuthorizationError, HttpRequestError
-import aiohttp
 import homeassistant.helpers.device_registry as dr
 
 from .const import (
@@ -20,12 +18,8 @@ from .const import (
     DEFAULT_CREATE_LAN_DEVICES,
     DOMAIN,
     PLATFORMS,
-    SERVICE_REBOOT,
-    SERVICE_RELOAD,
-    SERVICE_REMOTE,
     option_enabled,
     option_home_poll_interval,
-    option_remote_code,
 )
 from .frontend import JSModuleRegistration
 from .device_groups import (
@@ -43,39 +37,29 @@ from .tnt_setup import (
     async_setup_bundled_tnt,
     async_unload_bundled_tnt,
 )
-from .tnt_reminders import async_setup_reminders, async_unload_reminders
+from .services import async_setup_services
+from .tnt_reminders import async_setup_reminders
 from .registry_compat import as_version
 
 SCAN_INTERVAL = timedelta(seconds=40)
 STORAGE_VERSION = 1
 STORAGE_KEY = f"{DOMAIN}_config"
-PLAYER_PATH_TEMPLATE = "http://{host}/pub/remote_control?code={remote_code}&key={key}"
-_RESERVED_DATA_KEYS = {
-    "config",
-    "store",
-    "tnt_coordinator",
-    "tnt",
-    TNT_COORDINATORS_KEY,
-    "_card_registered",
-}
 
-CONFIG_SCHEMA = vol.Schema(
-    {
-        DOMAIN: vol.Schema(
-            {
-                vol.Required(CONF_HOST): cv.string,
-                vol.Optional("remote_code"): cv.string,
-            }
-        )
-    },
-    extra=vol.ALLOW_EXTRA,
-)
+# Configuration par l'interface uniquement (aucune option YAML lue).
+CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)
 
 _LOGGER = logging.getLogger(__name__)
 
 
-def _router_keys(hass: HomeAssistant) -> list[str]:
-    return [key for key in hass.data.get(DOMAIN, {}) if key not in _RESERVED_DATA_KEYS]
+async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
+    """Services de l'intégration, enregistrés une seule fois (pas par entrée)."""
+    hass.data.setdefault(DOMAIN, {})
+    async_setup_services(hass)
+    try:
+        await async_setup_reminders(hass)
+    except Exception:  # noqa: BLE001
+        _LOGGER.exception("Rappels TNT indisponibles (le reste de l'intégration n'est pas affecté)")
+    return True
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
@@ -109,15 +93,21 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         if "timed out" in message:
             _LOGGER.warning("Autorisation Freebox en attente pour %s : %s", host, err)
             raise ConfigEntryNotReady(
-                "En attente de la flèche droite sur la Freebox (token déjà enregistré conservé)"
+                translation_domain=DOMAIN,
+                translation_key="auth_pending",
             ) from err
         _LOGGER.error("Autorisation Freebox refusée pour %s: %s", host, err)
         raise ConfigEntryAuthFailed(
-            "Autorisation Freebox refusée ou révoquée. Réautorise depuis Freebox OS."
+            translation_domain=DOMAIN,
+            translation_key="auth_failed",
         ) from err
     except HttpRequestError as err:
         _LOGGER.error("Erreur réseau Freebox %s: %s", host, err)
-        raise ConfigEntryNotReady from err
+        raise ConfigEntryNotReady(
+            translation_domain=DOMAIN,
+            translation_key="cannot_connect",
+            translation_placeholders={"host": host, "error": str(err)},
+        ) from err
 
     freebox_config = await api.system.get_config()
 
@@ -203,6 +193,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         await async_setup_bundled_tnt(hass, entry)
     except Exception:
         _LOGGER.exception("Guide TNT embarqué indisponible")
+    # Rappels TNT : services et rappels en attente chargés par async_setup (idempotent).
     try:
         await async_setup_reminders(hass)
     except Exception:  # noqa: BLE001
@@ -235,13 +226,6 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
     entry.async_on_unload(async_call_later(hass, 120, _cleanup_groups))
 
-    async def async_reboot(call: ServiceCall) -> None:
-        await router.reboot()
-        await save_data()
-
-    async def async_reload_config(call: ServiceCall) -> None:
-        await hass.config_entries.async_reload(entry.entry_id)
-
     async def async_close_connection(event: Event) -> None:
         await router.close()
         await save_data()
@@ -249,39 +233,6 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     entry.async_on_unload(
         hass.bus.async_listen_once(EVENT_HOMEASSISTANT_STOP, async_close_connection)
     )
-
-    async def async_freebox_player_remote(call: ServiceCall) -> None:
-        code_list = call.data.get("code", "")
-        if not code_list:
-            return
-        remote_code = option_remote_code(entry)
-        if not remote_code:
-            _LOGGER.warning(
-                "Code télécommande Player manquant. "
-                "Paramètres → Homexa → Configurer, ou Player : Réglages → Système → Informations."
-            )
-            return
-        # Session aiohttp partagée de Home Assistant (pas de session créée / fermée ici).
-        session = async_get_clientsession(hass)
-        for code in code_list.split(","):
-            url = PLAYER_PATH_TEMPLATE.format(
-                host=entry.data[CONF_HOST],
-                remote_code=remote_code,
-                key=code.strip(),
-            )
-            try:
-                async with session.get(url, ssl=False) as response:
-                    if response.status != 200:
-                        _LOGGER.error("Remote %s HTTP %s", code, response.status)
-            except aiohttp.ClientError as err:
-                _LOGGER.error("Remote %s : %s", code, err)
-
-    if not hass.services.has_service(DOMAIN, SERVICE_REBOOT):
-        hass.services.async_register(DOMAIN, SERVICE_REBOOT, async_reboot)
-    if not hass.services.has_service(DOMAIN, SERVICE_RELOAD):
-        hass.services.async_register(DOMAIN, SERVICE_RELOAD, async_reload_config)
-    if not hass.services.has_service(DOMAIN, SERVICE_REMOTE):
-        hass.services.async_register(DOMAIN, SERVICE_REMOTE, async_freebox_player_remote)
 
     _LOGGER.info("Freebox Homexa prêt")
     return True
@@ -305,11 +256,8 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     store = hass.data[DOMAIN].get("store")
     if store is not None and "config" in hass.data[DOMAIN]:
         await store.async_save(hass.data[DOMAIN]["config"])
-    if not _router_keys(hass):
-        for service in (SERVICE_REBOOT, SERVICE_RELOAD, SERVICE_REMOTE):
-            if hass.services.has_service(DOMAIN, service):
-                hass.services.async_remove(DOMAIN, service)
-        async_unload_reminders(hass)
+    # Services enregistrés une fois dans async_setup : conservés (ils renvoient une
+    # erreur traduite tant qu'aucune entrée n'est chargée). Rappels TNT conservés.
     return True
 
 

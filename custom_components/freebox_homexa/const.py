@@ -11,7 +11,6 @@ DOMAIN = "freebox_homexa"
 SERVICE_REBOOT = "reboot"
 SERVICE_RELOAD = "reload"
 SERVICE_REMOTE = "remote"
-SERVICE_TV_GUIDE = "tv_guide"
 
 VALUE_NOT_SET = -1
 DEFAULT_DEVICE_NAME = "Unknown device"

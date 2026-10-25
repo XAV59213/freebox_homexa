@@ -1,6 +1,6 @@
 # Changelog
 
-## Non publié
+## 28.8.64
 - Documentation :
   - README : nouvelles sections « Actions » (les 6 actions ; `freebox_homexa.remote` avec `code`, `player_id`, `device_id`, liste des touches, exemples YAML, erreurs), « Disponibilité et journal » (entités indisponibles quand la Freebox est injoignable, nœuds Home « unreachable » hors RTS, journal unique, astuce `not_from` pour les automatisations d'alarme) et « Suppression ». L'option « Créer des appareils pour les clients réseau » est mise à jour (décochée par défaut sur une nouvelle installation, conservée sur une existante, retrait automatique des appareils clients 100 % Homexa). Dépannage complété
   - info.md complété

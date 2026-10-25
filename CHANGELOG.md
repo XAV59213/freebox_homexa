@@ -1,6 +1,6 @@
 # Changelog
 
-## Non publié
+## 28.8.62
 - Option **« Créer des appareils pour les clients réseau »** : **décochée par défaut pour les nouvelles installations**. C'est la règle de Home Assistant : un `device_tracker` (ScannerEntity) ne crée pas d'appareil, il se relie seul à l'appareil d'une autre intégration qui a la même MAC (ex. Shelly, ESPHome)
   - **installations existantes : aucun changement**. Une migration (entrée 1.1 → 1.2) écrit l'option **cochée** si elle n'avait jamais été réglée. Un choix déjà fait (coché ou décoché) est conservé. Appareils clients, groupes « Clients réseau filaires / Clients Wi-Fi », capteurs « Clients connectés », entity_id et unique_id restent identiques
   - option décochée :

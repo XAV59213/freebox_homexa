@@ -19,6 +19,9 @@
         "data": {
           "host": "Nom d'hôte ou adresse IP",
           "port": "Port"
+        },
+        "data_description": {
+          "host": "Nom d'hôte ou adresse IP de votre Freebox (ex. mafreebox.freebox.fr)."
         }
       },
       "lan_options": {
@@ -259,6 +262,49 @@
         "net_cameras": "Caméras",
         "net_amazon": "Amazon / Alexa",
         "net_other": "Autres"
+      }
+    }
+  },
+  "entity": {
+    "binary_sensor": {
+      "wifi_box": {
+        "name": "Wi-Fi Freebox"
+      },
+      "repeater_online": {
+        "name": "En ligne"
+      }
+    },
+    "calendar": {
+      "tv_guide": {
+        "name": "Guide TV"
+      }
+    },
+    "remote": {
+      "remote": {
+        "name": "Télécommande"
+      }
+    },
+    "sensor": {
+      "wifi_repeaters": {
+        "name": "Répéteurs Wi-Fi"
+      },
+      "wifi_clients": {
+        "name": "Clients Wi-Fi"
+      },
+      "wifi_clients_box": {
+        "name": "Clients Wi-Fi box"
+      },
+      "wifi_client_list": {
+        "name": "Appareils connectés"
+      },
+      "wifi_client_list_box": {
+        "name": "Appareils sur le Wi-Fi box"
+      },
+      "wifi_clients_total": {
+        "name": "Clients Wi-Fi total"
+      },
+      "lan_group_clients": {
+        "name": "Clients connectés"
       }
     }
   }

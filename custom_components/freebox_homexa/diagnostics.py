@@ -35,6 +35,13 @@ TO_REDACT = {
     "tnt_tmdb_api_key",
     "api_key",
     "Stream",
+    # Données personnelles des hôtes LAN (IP, SSID) : inutiles au diagnostic des répéteurs.
+    "addr",
+    "l3connectivities",
+    "ipv4",
+    "ipv6",
+    "ssid",
+    "wifi_ssid",
 }
 
 

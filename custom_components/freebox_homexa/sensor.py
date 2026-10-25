@@ -38,6 +38,7 @@ from .router import FreeboxRouter, is_freebox_repeater
 from .tnt_const import selected_channels
 from .tnt_setup import TNT_COORDINATORS_KEY
 from .tnt_sensor import HomexaTntSensor
+from .lan_group_sensors import async_setup_lan_group_sensors
 from .wifi_ap_sensors import async_setup_wifi_ap_sensors
 from .registry_compat import as_version
 
@@ -195,6 +196,7 @@ async def async_setup_entry(
     )
     add_wifi_signal_sensors()
     async_setup_wifi_ap_sensors(router, entry, async_add_entities)
+    async_setup_lan_group_sensors(router, entry, async_add_entities)
 
 
 class FreeboxSensor(SensorEntity):

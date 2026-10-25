@@ -231,8 +231,8 @@ class FreeboxFlowHandler(ConfigFlow, domain=DOMAIN):
     async def _cleanup_invalid_token(self) -> None:
         try:
             token_file = resolve_token_file(self.hass, self._data.get(CONF_HOST, ""))
-            if token_file.exists():
-                await self.hass.async_add_executor_job(token_file.unlink)
+            # unlink(missing_ok) dans l'exécuteur : aucune E/S disque dans la boucle.
+            await self.hass.async_add_executor_job(lambda: token_file.unlink(missing_ok=True))
         except Exception as err:
             _LOGGER.debug("Impossible de supprimer le token : %s", err)
 

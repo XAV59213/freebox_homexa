@@ -687,11 +687,19 @@ def async_get_lan_type_device(
     return device.id
 
 
+# Capteur « Clients connectés » d'un groupe : vit et meurt avec son groupe, il ne doit
+# pas empêcher le retrait d'un groupe vide.
+GROUP_SENSOR_UID_PART = "_lan_group_clients_"
+
+
 def _has_entities(hass: HomeAssistant, device_id: str) -> bool:
     from homeassistant.helpers import entity_registry as er
 
-    return bool(
-        er.async_entries_for_device(er.async_get(hass), device_id, include_disabled_entities=True)
+    return any(
+        GROUP_SENSOR_UID_PART not in str(getattr(entry, "unique_id", "") or "")
+        for entry in er.async_entries_for_device(
+            er.async_get(hass), device_id, include_disabled_entities=True
+        )
     )
 
 
@@ -1013,7 +1021,7 @@ def async_merge_repeater_devices(
             )
 
         group = [d for d in devices if _belongs(d)]
-        _LOGGER.info(
+        _LOGGER.debug(
             "Répéteur %s : appareils trouvés %s",
             canon,
             [(d.id, d.name, d.model, _repeater_idents(d)) for d in group],
@@ -1039,7 +1047,7 @@ def async_merge_repeater_devices(
         keeper = next((d for d in group if canon_ident in d.identifiers), None) or max(
             group, key=lambda d: counts[d.id]
         )
-        _LOGGER.info("Répéteur %s : appareil conservé %s (%s)", canon, keeper.id, keeper.name)
+        _LOGGER.debug("Répéteur %s : appareil conservé %s (%s)", canon, keeper.id, keeper.name)
         area_id = keeper.area_id
         name_by_user = keeper.name_by_user
         for dup in group:

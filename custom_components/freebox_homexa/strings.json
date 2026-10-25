@@ -264,5 +264,48 @@
         "net_other": "Other"
       }
     }
+  },
+  "entity": {
+    "binary_sensor": {
+      "wifi_box": {
+        "name": "Freebox Wi-Fi"
+      },
+      "repeater_online": {
+        "name": "Online"
+      }
+    },
+    "calendar": {
+      "tv_guide": {
+        "name": "TV guide"
+      }
+    },
+    "remote": {
+      "remote": {
+        "name": "Remote"
+      }
+    },
+    "sensor": {
+      "wifi_repeaters": {
+        "name": "Wi-Fi repeaters"
+      },
+      "wifi_clients": {
+        "name": "Wi-Fi clients"
+      },
+      "wifi_clients_box": {
+        "name": "Box Wi-Fi clients"
+      },
+      "wifi_client_list": {
+        "name": "Connected devices"
+      },
+      "wifi_client_list_box": {
+        "name": "Devices on box Wi-Fi"
+      },
+      "wifi_clients_total": {
+        "name": "Total Wi-Fi clients"
+      },
+      "lan_group_clients": {
+        "name": "Connected clients"
+      }
+    }
   }
 }

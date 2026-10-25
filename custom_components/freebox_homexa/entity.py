@@ -12,6 +12,7 @@ from homeassistant.helpers.entity import Entity
 from freebox_api.exceptions import HttpRequestError
 from .const import CATEGORY_TO_MODEL, DOMAIN, FreeboxHomeCategory
 from .device_groups import GROUP_HOME, group_identifier, home_node_group, home_node_name, suggested_area
+from .errors import is_shutdown_error
 from .router import FreeboxRouter
 from .registry_compat import as_version
 
@@ -115,10 +116,13 @@ class FreeboxHomeEntity(Entity):
             )
             return True
         except asyncio.TimeoutError:
-            _LOGGER.warning(f"Timeout lors de la commande sur l'appareil {self._id}")
+            _LOGGER.warning("Timeout lors de la commande sur l'appareil %s", self._id)
             return False
-        except Exception as err:
-            _LOGGER.error(f"Erreur lors de la commande sur l'appareil {self._id}: {err}")
+        except Exception as err:  # noqa: BLE001
+            if is_shutdown_error(err, self._router):
+                _LOGGER.debug("Commande sur l'appareil %s ignorée (rechargement) : %s", self._id, err)
+                return False
+            _LOGGER.error("Erreur lors de la commande sur l'appareil %s : %s", self._id, err)
             return False
 
     async def get_home_endpoint_value(self, command_id: int | None) -> Any | None:
@@ -132,13 +136,22 @@ class FreeboxHomeEntity(Entity):
             )
             return node.get("value")
         except asyncio.TimeoutError:
-            _LOGGER.debug(f"Timeout sur la lecture de l'endpoint {command_id} (appareil {self._id})")
+            _LOGGER.debug("Timeout sur la lecture de l'endpoint %s (appareil %s)", command_id, self._id)
             return None
         except HttpRequestError as err:
-            _LOGGER.debug(f"Erreur HTTP sur endpoint {command_id} (appareil {self._id}): {err}")
+            _LOGGER.debug("Erreur HTTP sur endpoint %s (appareil %s) : %s", command_id, self._id, err)
             return None
-        except Exception as err:
-            _LOGGER.warning(f"Erreur inattendue sur endpoint {command_id} (appareil {self._id}): {err}")
+        except Exception as err:  # noqa: BLE001
+            if is_shutdown_error(err, self._router):
+                # « Connector is closed » pendant un rechargement : normal, rien à signaler.
+                _LOGGER.debug(
+                    "Lecture de l'endpoint %s (appareil %s) interrompue (rechargement) : %s",
+                    command_id, self._id, err,
+                )
+                return None
+            _LOGGER.warning(
+                "Erreur inattendue sur endpoint %s (appareil %s) : %s", command_id, self._id, err
+            )
             return None
 
     def get_command_id(self, nodes: list, ep_type: str, name: str) -> int | None:
@@ -146,7 +159,7 @@ class FreeboxHomeEntity(Entity):
             (x for x in nodes if x.get("name") == name and x.get("ep_type") == ep_type), None
         )
         if not node:
-            _LOGGER.warning(f"Commande manquante : {name}/{ep_type}")
+            _LOGGER.warning("Commande manquante : %s/%s", name, ep_type)
             return None
         return node.get("id")
 
@@ -181,8 +194,11 @@ class FreeboxHomeEntity(Entity):
             else:
                 self._attr_name = f"{self._node['label'].strip()} {self._sub_node['label'].strip()}"
             self.async_write_ha_state()
-        except Exception as err:
-            _LOGGER.error(f"Échec mise à jour entité {self._attr_name}: {err}")
+        except Exception as err:  # noqa: BLE001
+            if is_shutdown_error(err, self._router):
+                _LOGGER.debug("Mise à jour de %s interrompue (rechargement) : %s", self._attr_name, err)
+                return
+            _LOGGER.error("Échec mise à jour entité %s : %s", self._attr_name, err)
 
     async def async_added_to_hass(self) -> None:
         self._remove_signal_update = async_dispatcher_connect(

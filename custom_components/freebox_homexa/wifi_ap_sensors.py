@@ -8,13 +8,12 @@ from homeassistant.components.sensor import SensorEntity, SensorStateClass
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import EntityCategory
 from homeassistant.core import callback
-from homeassistant.helpers.device_registry import CONNECTION_NETWORK_MAC, DeviceInfo
+from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.dispatcher import async_dispatcher_connect
 from homeassistant.helpers.entity import Entity
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
-from .const import DOMAIN, REPEATER_MODEL
-from .device_groups import GROUP_SERVER
+from .const import REPEATER_MODEL
 from .router import FreeboxRouter
 
 
@@ -54,7 +53,7 @@ def _client_label(access_point: dict[str, Any], max_length: int = MAX_STATE_LENG
 class FreeboxRepeaterCountSensor(SensorEntity):
     _attr_should_poll = False
     _attr_has_entity_name = True
-    _attr_name = "Répéteurs Wi-Fi"
+    _attr_translation_key = "wifi_repeaters"
     _attr_icon = "mdi:wifi-sync"
     _attr_state_class = SensorStateClass.MEASUREMENT
 
@@ -95,7 +94,7 @@ class FreeboxRepeaterCountSensor(SensorEntity):
 class FreeboxWifiClientCountSensor(SensorEntity):
     _attr_should_poll = False
     _attr_has_entity_name = True
-    _attr_name = "Clients Wi-Fi"
+    _attr_translation_key = "wifi_clients"
     _attr_icon = "mdi:account-multiple"
     _attr_state_class = SensorStateClass.MEASUREMENT
 
@@ -105,7 +104,7 @@ class FreeboxWifiClientCountSensor(SensorEntity):
         access_point = router.wifi_aps.get(ap_id) or {}
         kind = access_point.get("kind")
         if ap_id == "gateway" or kind == "gateway":
-            self._attr_name = "Clients Wi-Fi box"
+            self._attr_translation_key = "wifi_clients_box"
             self._attr_unique_id = f"{router.mac}_wifi_clients_gateway"
         else:
             mac = access_point.get("mac") or ap_id
@@ -144,7 +143,7 @@ class FreeboxWifiClientListSensor(SensorEntity):
 
     _attr_should_poll = False
     _attr_has_entity_name = True
-    _attr_name = "Appareils connectés"
+    _attr_translation_key = "wifi_client_list"
     _attr_icon = "mdi:devices"
 
     def __init__(self, router: FreeboxRouter, ap_id: str) -> None:
@@ -153,7 +152,7 @@ class FreeboxWifiClientListSensor(SensorEntity):
         access_point = router.wifi_aps.get(ap_id) or {}
         kind = access_point.get("kind")
         if ap_id == "gateway" or kind == "gateway":
-            self._attr_name = "Appareils sur le Wi-Fi box"
+            self._attr_translation_key = "wifi_client_list_box"
             self._attr_unique_id = f"{router.mac}_wifi_client_list_gateway"
         else:
             mac = access_point.get("mac") or ap_id
@@ -190,7 +189,7 @@ class FreeboxWifiClientListSensor(SensorEntity):
 class FreeboxWifiTotalClientSensor(SensorEntity):
     _attr_should_poll = False
     _attr_has_entity_name = True
-    _attr_name = "Clients Wi-Fi total"
+    _attr_translation_key = "wifi_clients_total"
     _attr_icon = "mdi:wifi"
     _attr_state_class = SensorStateClass.MEASUREMENT
     _attr_entity_category = EntityCategory.DIAGNOSTIC

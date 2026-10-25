@@ -1,5 +1,16 @@
 # Changelog
 
+## Non publié
+- Journal : l'erreur sans gravité **« Connector is closed »** (ex. endpoint 6, appareil 48) pendant un **rechargement** de l'intégration n'apparaît plus comme une erreur. Pendant le déchargement / rechargement de l'entrée, ou quand la session vers la Freebox est fermée (`NotOpenError`, « Connector is closed », « Session is closed »), les relevés (appareils réseau, capteurs, nœuds Freebox Home, volets, caméras, Wi-Fi) s'arrêtent sans bruit (niveau debug). Les vraies erreurs restent signalées
+- Nouveau : capteur **« Clients connectés »** sur chaque groupe de clients réseau (« Clients réseau filaires », « Clients Wi-Fi » et chaque sous-groupe de type, ex. « Serveurs (filaire) ») : nombre de clients **en ligne** rangés dans le groupe, attributs `appareils` (en ligne), `hors_ligne` et `total` (listes limitées à 50 noms, non enregistrées dans l'historique). « Clients Wi-Fi » compte aussi les clients des répéteurs. Le capteur est créé avec le groupe et disparaît avec lui (il n'empêche pas le retrait d'un groupe vide). Pas de doublon sur les répéteurs, qui ont déjà leur capteur « Clients Wi-Fi »
+- Qualité (revue HACS) :
+  - noms traduits (fr / en) pour les capteurs Wi-Fi (« Répéteurs Wi-Fi », « Clients Wi-Fi », « Clients Wi-Fi box », « Appareils connectés », « Appareils sur le Wi-Fi box », « Clients Wi-Fi total »), « Wi-Fi Freebox », « En ligne » (répéteurs), « Télécommande », « Guide TV » et le nouveau capteur ; en français, les noms ne changent pas ; aide du champ « Hôte » traduite
+  - plus d'accès disque dans la boucle d'événements (lecture du token, suppression d'un token invalide)
+  - télécommande Player : session HTTP partagée de Home Assistant au lieu d'une session créée à chaque appel
+  - journaux : messages au format `%s` (plus de f-strings), « Répéteurs Wi-Fi détectés » et le détail de fusion des répéteurs passent en debug (ils étaient écrits à chaque relevé / démarrage)
+  - diagnostics : adresses IP et SSID des hôtes masqués
+  - imports inutilisés retirés
+
 ## 28.8.55
 - Types des clients réseau : un client dont le **nom** désigne un serveur (`pve`, `proxmox`, `serveur`/`server`, `hyperviseur`, `truenas`…) va dans **Serveurs** même avec une MAC virtuelle. Depuis Proxmox VE 8, le pont `vmbr0` de l'**hôte** Proxmox a lui aussi une MAC `BC:24:11` : il était classé « VM et conteneurs ». Le nom par défaut de la Freebox « Proxmox Server Solutions GmbH (MAC) » (fabricant + MAC) ne compte pas : une VM / un LXC sans nom reste dans « VM et conteneurs »
 - Types des clients réseau : le mot **« tv »** dans le nom (ex. « Tv chambre papa ») classe le client dans **TV et multimédia** avant le fabricant (Realtek, Intel…) ou le type Freebox ; les Fire TV restent dans « Amazon / Alexa »

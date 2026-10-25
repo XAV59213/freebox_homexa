@@ -5,7 +5,6 @@ from __future__ import annotations
 
 import asyncio
 import logging
-import os
 import re
 import json
 from pathlib import Path
@@ -36,6 +35,7 @@ from .const import (
     REPEATER_MODEL,
 )
 from .registry_compat import as_version, get_device_by_connection, get_device_by_identifier
+from .errors import is_shutdown_error
 from .wifi_ap import build_wifi_aps
 
 _LOGGER = logging.getLogger(__name__)
@@ -175,7 +175,7 @@ async def get_api(hass: HomeAssistant, host: str) -> Freepybox:
     await hass.async_add_executor_job(_ensure_directory)
 
     app_desc = APP_DESC
-    if token_file.is_file():
+    if await hass.async_add_executor_job(token_file.is_file):  # pas d'E/S dans la boucle
         app_desc = await hass.async_add_executor_job(_app_desc_from_token, token_file)
         _LOGGER.info("Token Freebox réutilisé : %s", token_file)
 
@@ -253,9 +253,17 @@ class FreeboxRouter:
         self.tracked_lan_macs: set[str] = set()
         # MAC normalisée -> device_id de l'appareil du client (pour relier l'entité).
         self.lan_device_ids: dict[str, str] = {}
+        # MAC normalisée -> (sous-)groupe où l'appareil du client est rangé :
+        # « lan_wired_net_servers », « lan_wifi », « repeater:<MAC canonique> »… (capteurs
+        # « Clients connectés » des groupes).
+        self.lan_client_placements: dict[str, str] = {}
+        # MAC canonique d'un répéteur -> device_id (rangement des clients sous le répéteur).
+        self.repeater_device_ids: dict[str, str] = {}
         # Option « Créer les appareils des clients LAN » (renseignée par device_tracker).
         self.create_lan_devices: bool = True
         self.used_groups: set[str] = set()
+        # Entrée en cours de déchargement / rechargement (erreurs de connexion attendues).
+        self.closing: bool = False
         # nœuds Home dont les entités vivent sur un appareil de groupe (module d'alarme)
         self.merged_node_ids: set[Any] = set()
         self.player_identifiers: set[str] = set()
@@ -290,7 +298,7 @@ class FreeboxRouter:
         self.home_devices: dict[str, Any] = {}
         self.listeners: list = []
 
-        _LOGGER.debug(f"Routeur Freebox {self.name} initialisé")
+        _LOGGER.debug("Routeur Freebox %s initialisé", self.name)
 
     async def _fetch_api_repeaters(self) -> None:
         """Liste /repeater/ (une entrée par répéteur physique : main_mac, sn, nom)."""
@@ -367,7 +375,8 @@ class FreeboxRouter:
             for alias in payload.get("macs") or [canon]
         }
         if self.repeaters:
-            _LOGGER.info("Répéteurs Wi-Fi détectés : %s", list(self.repeaters.keys()))
+            # À chaque relevé (40 s) : debug, le détail est journalisé en info s'il change.
+            _LOGGER.debug("Répéteurs Wi-Fi détectés : %s", list(self.repeaters.keys()))
         _LOGGER.debug(
             "API /repeater/ : %s",
             [
@@ -481,8 +490,16 @@ class FreeboxRouter:
             device["wifi"] = extract_wifi_details(device)
 
     async def update_all(self, now: datetime | None = None) -> None:
-        await self.update_device_trackers()
-        await self.update_sensors()
+        if self.closing:
+            return
+        try:
+            await self.update_device_trackers()
+            await self.update_sensors()
+        except Exception as err:
+            if is_shutdown_error(err, self):
+                _LOGGER.debug("Relevé interrompu (connexion fermée, rechargement) : %s", err)
+                return
+            raise
 
     async def update_device_trackers(self) -> None:
         new_device = False
@@ -551,7 +568,7 @@ class FreeboxRouter:
             async_dispatcher_send(self.hass, self.signal_sensor_update)
             _LOGGER.debug("Mise à jour des capteurs terminée")
         except HttpRequestError as err:
-            _LOGGER.error(f"Erreur lors de la mise à jour des capteurs: {err}")
+            _LOGGER.error("Erreur lors de la mise à jour des capteurs : %s", err)
 
     async def _update_disks_sensors(self) -> None:
         try:
@@ -565,7 +582,7 @@ class FreeboxRouter:
                 self.disks[fbx_disk["id"]] = disk
             _LOGGER.debug("Mise à jour des disques terminée")
         except HttpRequestError as err:
-            _LOGGER.error(f"Erreur lors de la mise à jour des disques: {err}")
+            _LOGGER.error("Erreur lors de la mise à jour des disques : %s", err)
 
     async def _update_raids_sensors(self) -> None:
         if not self.supports_raid:
@@ -580,7 +597,7 @@ class FreeboxRouter:
             _LOGGER.warning("L'API du routeur %s ne supporte pas les RAID", self.name)
 
     async def update_home_devices(self, now: datetime | None = None) -> None:
-        if not self.home_granted:
+        if not self.home_granted or self.closing:
             return
         if self._home_update_lock.locked():
             _LOGGER.debug("Poll Home déjà en cours, cycle ignoré")
@@ -602,7 +619,10 @@ class FreeboxRouter:
                 _LOGGER.debug("Mise à jour des appareils domestiques terminée")
             except TimeoutError:
                 _LOGGER.debug("Timeout API home/nodes — prochain poll dans 15 s")
-            except HttpRequestError:
+            except HttpRequestError as err:
+                if is_shutdown_error(err, self):
+                    _LOGGER.debug("Poll Home interrompu (rechargement) : %s", err)
+                    return
                 self.home_granted = False
                 _LOGGER.warning("L'accès aux appareils domestiques n'est pas autorisé")
 
@@ -611,9 +631,11 @@ class FreeboxRouter:
             await self._api.system.reboot()
             _LOGGER.info("Redémarrage de la Freebox effectué")
         except HttpRequestError as err:
-            _LOGGER.error(f"Échec du redémarrage de la Freebox: {err}")
+            _LOGGER.error("Échec du redémarrage de la Freebox : %s", err)
 
     async def close(self) -> None:
+        # Les relevés / mises à jour en vol ne journalisent plus d'erreur à partir d'ici.
+        self.closing = True
         with suppress(NotOpenError):
             await self._api.close()
             _LOGGER.debug("Connexion à la Freebox fermée")
@@ -745,6 +767,7 @@ class FreeboxRouter:
                 registry, (DOMAIN, f"repeater_{canon}"), self.entry_id
             )
             if device is not None:
+                self.repeater_device_ids[canon] = device.id
                 return device.id  # clients Wi-Fi d'un répéteur : directement sous lui
             # Répéteur pas encore enregistré : « Clients Wi-Fi » en attendant.
             link = LINK_WIFI
@@ -926,6 +949,7 @@ class FreeboxRouter:
             (d for m, d in self.devices.items() if normalize_mac(m) == norm), None
         )
         self.lan_device_ids.pop(norm, None)
+        self.lan_client_placements.pop(norm, None)
         if device is None or not self._is_lan_client(device):
             return None
         registry = dr.async_get(self.hass)
@@ -949,7 +973,45 @@ class FreeboxRouter:
         if parent_id and parent_id != entry.id and entry.via_device_id != parent_id:
             registry.async_update_device(entry.id, via_device_id=parent_id)
         self.lan_device_ids[norm] = entry.id
+        placement = self._placement_of(parent_id)
+        if placement:
+            self.lan_client_placements[norm] = placement
         return entry.id
+
+    def _placement_of(self, parent_id: str | None) -> str | None:
+        """Clé du (sous-)groupe ou du répéteur correspondant à un device_id parent."""
+        from .device_groups import LAN_GROUPS, LAN_TYPE_GROUPS, LINK_REPEATER
+
+        if not parent_id:
+            return None
+        for key, device_id in self.group_device_ids.items():
+            if device_id == parent_id and (key in LAN_GROUPS or key in LAN_TYPE_GROUPS):
+                return key
+        for canon, device_id in self.repeater_device_ids.items():
+            if device_id == parent_id:
+                return f"{LINK_REPEATER}{canon}"
+        return None
+
+    def lan_group_members(self, key: str) -> list[dict[str, Any]]:
+        """Clients LAN rangés dans ce (sous-)groupe (ou ses sous-groupes / répéteurs).
+
+        « lan_wired » : ses sous-groupes ; « lan_wifi » : ses sous-groupes et les clients
+        des répéteurs (rangés sous « Clients Wi-Fi ») ; « lan_wired_net_servers » : lui seul.
+        """
+        from .device_groups import GROUP_LAN_WIFI, LAN_GROUPS, LINK_REPEATER
+
+        members: list[dict[str, Any]] = []
+        by_norm = {normalize_mac(m): d for m, d in self.devices.items()}
+        for norm, placement in self.lan_client_placements.items():
+            if key in LAN_GROUPS:
+                match = placement == key or placement.startswith(f"{key}_") or (
+                    key == GROUP_LAN_WIFI and placement.startswith(LINK_REPEATER)
+                )
+            else:
+                match = placement == key
+            if match and norm in by_norm:
+                members.append(by_norm[norm])
+        return members
 
     def _sync_lan_client_parents(self) -> None:
         """Crée / déplace les appareils des clients LAN quand leur parent change."""

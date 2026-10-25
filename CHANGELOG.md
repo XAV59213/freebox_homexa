@@ -1,6 +1,6 @@
 # Changelog
 
-## Non publié
+## 28.8.50
 - Répéteurs : fusion du **jumeau « locally administered » exact** d'une MAC principale (ex. `22:66:CF:4B:49:69` = `20:66:CF:4B:49:69` avec le seul bit 0x02 du 1er octet inversé, les 5 autres octets identiques). Ce n'était pas le jumeau qui fusionnait « Garage » à tort avant la 28.8.49, mais l'ancienne règle « MAC voisines » (mêmes octets 2 à 5, dernier octet proche : `20:66:CF:4B:49:69` ~ `20:66:CF:4B:49:63`). Le jumeau exact ne dépend que de la MAC du répéteur lui-même : il est fiable. Fonctionne aussi pour un doublon resté seul dans le registre (absent de lan/browser)
 - Répéteurs : fusion par **bloc de BSSID** : une MAC Free `22:66:CF:A:B:xx` dont les 5 premiers octets sont ceux des BSSID connus d'un seul répéteur (fronthaul de l'API `/repeater/`, `access_point.mac` des clients Wi-Fi) est une interface de ce répéteur (ex. `22:66:CF:C6:92:D4` pour les BSSID `…C6:92:D2` / `D6` de Chambre fille). Jamais sur moins de 5 octets (Garage `…96:92:D2` et Chambre fille `…C6:92:D2` ne diffèrent que par le 4e octet), et jamais entre deux répéteurs ayant chacun leur MAC principale
 - Répéteurs : nouvelle option **« Fusionner un répéteur en double »** (Options de l'intégration) : choisir l'appareil en double et le répéteur cible, pour les cas où la Freebox ne donne aucun lien fiable (API `/repeater/` indisponible et BSSID non reliés à la MAC principale). Fusion mémorisée, annulable depuis le même écran

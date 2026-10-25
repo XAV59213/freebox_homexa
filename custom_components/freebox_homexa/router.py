@@ -223,7 +223,17 @@ class FreeboxRouter:
         self.device_id: str | None = None
         self.group_device_ids: dict[str, str] = {}
         self.entry_id: str = entry.entry_id
-        from .device_groups import CONF_DEVICE_GROUP_OVERRIDES, migrate_overrides
+        from .device_groups import (
+            CONF_DEVICE_GROUP_OVERRIDES,
+            CONF_REPEATER_MERGES,
+            migrate_overrides,
+            migrate_repeater_merges,
+        )
+
+        # Fusions manuelles de répéteurs choisies dans les options (doublon -> cible).
+        self.repeater_merges: dict[str, str] = migrate_repeater_merges(
+            entry.options.get(CONF_REPEATER_MERGES)
+        )
 
         self.group_overrides: dict[str, str] = migrate_overrides(
             entry.options.get(CONF_DEVICE_GROUP_OVERRIDES)
@@ -318,6 +328,7 @@ class FreeboxRouter:
             devices=self.devices,
             radio_status=self.wifi_radio_status,
             api_repeaters=self.api_repeaters,
+            manual_links=self.repeater_merges,
         )
         from .wifi_ap import normalize_mac
 

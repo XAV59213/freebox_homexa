@@ -139,6 +139,7 @@ HACS → Freebox Homexa → **Mettre à jour** → redémarrer Home Assistant.
 | `bad_json` sur l’alarme | Version **28.8.2** (payload `{\"value\": ...}`) |
 | Seulement 2 boutons d’alarme | 28.8+ expose Présent / Absent / Désarmé |
 | Répéteur invisible | Redémarre HA ; le F-RP01A est détecté via les hôtes LAN |
+| Répéteur en double | Options → **Fusionner un répéteur en double** : choisir le doublon puis le répéteur portant la MAC principale `20:66:CF…` (visible dans l'app Freebox) ; pièce, nom et entités sont conservés |
 | Player absent | Droits Player dans Freebox OS + redémarrage |
 | Télécommande sans effet | Renseigner le code Player dans Configurer |
 | HDMI ne change pas l’entrée TV | Normal : CEC réveille la TV, ça ne sélectionne pas HDMI 1/2/3 |

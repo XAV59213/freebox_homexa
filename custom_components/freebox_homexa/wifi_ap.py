@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import Any
 
 from .const import REPEATER_MODEL
-from .device_groups import lan_client_name
+from .device_groups import is_specific_repeater_name, lan_client_name, ul_twin
 
 
 def normalize_mac(mac: str | None) -> str:
@@ -94,6 +94,7 @@ def group_repeater_macs(
     hosts: dict[str, dict[str, Any]],
     ap_uids: dict[str, str],
     api_repeaters: list[dict[str, Any]] | None = None,
+    manual_links: dict[str, str] | None = None,
 ) -> tuple[dict[str, str], dict[str, list[str]]]:
     """Regroupe toutes les MAC vues par répéteur PHYSIQUE (union-find).
 
@@ -106,7 +107,15 @@ def group_repeater_macs(
       2. même access_point.uid ;
       3. adresse IP (v4/v6) commune entre hôtes (interfaces pontées du répéteur) ;
       4. IPv6 EUI-64 d'un hôte qui encode la MAC d'un autre hôte ;
-    Aucune fusion sur la seule proximité des MAC.
+      5. jumeau « locally administered » EXACT : 22:66:CF:4B:49:69 = 20:66:CF:4B:49:69
+         avec le seul bit 0x02 du 1er octet inversé (les 5 autres octets identiques) ;
+      6. bloc de BSSID : une MAC Free 22:66:CF:A:B:xx dont les 5 premiers octets sont
+         ceux des BSSID connus d'UN SEUL répéteur (fronthaul de l'API /repeater/,
+         access_point.mac des clients) ;
+      7. fusions manuelles choisies dans les options (`manual_links` doublon -> cible).
+    Les règles 5 et 6 ne réunissent jamais deux répéteurs ayant chacun leur propre MAC
+    principale. Aucune fusion sur la seule proximité des MAC (ex. Garage 22:66:CF:96:92:D2
+    et Chambre fille 22:66:CF:C6:92:D2 ne diffèrent que par le 4e octet).
     Retourne (MAC -> MAC canonique, MAC canonique -> raisons du regroupement).
     """
     parent: dict[str, str] = {}
@@ -167,8 +176,59 @@ def group_repeater_macs(
             elif encoded and encoded in nodes:
                 union(encoded, mac, "EUI-64")
                 main_macs.add(encoded)
-    # Pas de regroupement par simple proximité de MAC (plages consécutives d'un
-    # répéteur à l'autre, jumeau 20/22 non fiable) : en cas de doute, pas de fusion.
+    # MAC principale = adresse universelle (bit 0x02 à 0) d'un hôte ou de l'API.
+    def _mains_of(root: str) -> set[str]:
+        return {
+            m for m in nodes
+            if find(m) == root and (m in main_macs or (m in hosts and not int(m[:2], 16) & 0x02))
+        }
+
+    def safe_union(a: str, b: str, why: str) -> bool:
+        ra, rb = find(a), find(b)
+        if ra == rb:
+            return False
+        ma, mb = _mains_of(ra), _mains_of(rb)
+        if ma and mb and ma != mb:
+            return False  # deux répéteurs distincts : jamais fusionnés automatiquement
+        union(a, b, why)
+        return True
+
+    # 5. Jumeau « locally administered » exact. (L'ancienne règle « MAC voisines »,
+    # retirée en 28.8.49, fusionnait Garage 20:66:CF:4B:49:69 avec Chambre fille
+    # 20:66:CF:4B:49:63 car mêmes octets 2 à 5 et dernier octet proche ; le jumeau
+    # exact, lui, ne dépend que de la MAC du répéteur lui-même.)
+    for n in sorted(nodes):
+        if len(n) != 12 or not int(n[:2], 16) & 0x02 or not is_free_mac(n):
+            continue
+        univ = ul_twin(n)
+        if univ in nodes and is_free_mac(univ):
+            if safe_union(univ, n, "jumeau U/L"):
+                main_macs.add(univ)
+    # 6. Bloc de BSSID (5 premiers octets) d'un seul répéteur.
+    bssids = {m for m in ap_uids if is_free_mac(m)}
+    for rep in api_repeaters or []:
+        for f in rep.get("fronthaul") or []:
+            if isinstance(f, dict) and f.get("bssid"):
+                bssids.add(normalize_mac(f.get("bssid")))
+    for n in sorted(nodes):
+        if len(n) != 12 or not int(n[:2], 16) & 0x02 or not is_free_mac(n):
+            continue
+        if ul_twin(n) in nodes:
+            continue  # jumeau d'une MAC connue : règle 5 uniquement
+        roots = {find(b) for b in bssids if b != n and b[:10] == n[:10]}
+        if len(roots) == 1:
+            root = next(iter(roots))
+            if root != find(n):
+                safe_union(root, n, f"bloc BSSID {display_mac(n)[:14]}")
+    # 7. Fusions manuelles (choix explicite de l'utilisateur).
+    for dup, target in (manual_links or {}).items():
+        d, t = normalize_mac(dup), normalize_mac(target)
+        if len(d) == 12 and len(t) == 12 and d != t:
+            nodes.update((d, t))
+            if not int(t[:2], 16) & 0x02:
+                main_macs.add(t)
+            union(t, d, "fusion manuelle")
+    # Pas de regroupement par simple proximité de MAC : en cas de doute, pas de fusion.
 
     clusters: dict[str, list[str]] = {}
     for n in nodes:
@@ -283,6 +343,7 @@ def build_wifi_aps(
     devices: dict[str, dict[str, Any]],
     radio_status: list[dict[str, Any]] | None = None,
     api_repeaters: list[dict[str, Any]] | None = None,
+    manual_links: dict[str, str] | None = None,
 ) -> tuple[dict[str, dict[str, Any]], dict[str, dict[str, Any]]]:
     """Group Wi-Fi clients by gateway / repeater access point."""
     radio_status = radio_status or []
@@ -335,7 +396,7 @@ def build_wifi_aps(
             ap_uids.setdefault(ap_norm, str(access_point.get("uid") or f"mac:{ap_norm}"))
     for ap_norm in repeater_clients:
         ap_uids.setdefault(ap_norm, f"mac:{ap_norm}")
-    aliases, grouping = group_repeater_macs(hosts, ap_uids, api_repeaters)
+    aliases, grouping = group_repeater_macs(hosts, ap_uids, api_repeaters, manual_links)
     wifi_aps["gateway"]["rejected_repeater_macs"] = grouping.pop("_rejected", [])
     canon_macs: dict[str, list[str]] = {}
     for norm, canon in aliases.items():
@@ -351,8 +412,18 @@ def build_wifi_aps(
             continue
         clients = [c for n in norms for c in repeater_clients.get(n, [])]
         host = member_hosts[0] if member_hosts else {}
+        # Nom choisi par l'utilisateur sur une des MAC (ex. « … Garage ») plutôt que « #2 ».
+        specific = next(
+            (
+                (h.get("primary_name") or "").strip()
+                for h in member_hosts
+                if is_specific_repeater_name(h.get("primary_name"))
+            ),
+            "",
+        )
         name = (
             (api.get("name") or "").strip()
+            or specific
             or (host.get("primary_name") or "").strip()
             or f"Répéteur Wi-Fi {canon[-5:]}"
         )

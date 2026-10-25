@@ -22,11 +22,14 @@ from homeassistant.helpers.storage import Store
 
 from .device_groups import (
     CONF_DEVICE_GROUP_OVERRIDES,
+    CONF_REPEATER_MERGES,
     GROUP_AUTO,
     GROUP_NAMES,
     group_choices,
     migrate_group,
     migrate_overrides,
+    migrate_repeater_merges,
+    repeater_registry_devices,
 )
 from .const import (
     CONF_CREATE_LAN_DEVICES,
@@ -489,7 +492,7 @@ class FreeboxOptionsFlowHandler(OptionsFlow):
     async def async_step_init(
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
-        return self.async_show_menu(step_id="init", menu_options=["general", "groups", "tnt", "profiles"])
+        return self.async_show_menu(step_id="init", menu_options=["general", "groups", "repeaters", "tnt", "profiles"])
 
     def _group_fields(self) -> dict[str, str]:
         """Libellé affiché -> clé stable de l'appareil (libellés uniques)."""
@@ -730,4 +733,50 @@ class FreeboxOptionsFlowHandler(OptionsFlow):
             step_id="general",
             data_schema=_options_schema(defaults, players),
             description_placeholders={"players": names},
+        )
+
+    async def async_step_repeaters(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """Fusion manuelle d'un appareil répéteur en double dans le bon répéteur."""
+        current = dict(self.config_entry.options)
+        merges = migrate_repeater_merges(current.get(CONF_REPEATER_MERGES))
+        devices = repeater_registry_devices(self.hass, self.config_entry)
+        choices: list[selector.SelectOptionDict] = []
+        for dev in devices:
+            for ident in dev["identifiers"]:
+                mac = ident[len("repeater_") :]
+                name = dev.get("name_by_user") or dev.get("name") or mac
+                area = f" — {dev['area_id']}" if dev.get("area_id") else ""
+                choices.append({"value": mac, "label": f"{name} ({mac}){area}"})
+        errors: dict[str, str] = {}
+        if user_input is not None:
+            if user_input.get("clear"):
+                merges = {}
+            dup = user_input.get("duplicate") or ""
+            target = user_input.get("target") or ""
+            if dup or target:
+                if not dup or not target or dup == target:
+                    errors["base"] = "repeater_same"
+                else:
+                    merges[dup] = target
+            if not errors:
+                current[CONF_REPEATER_MERGES] = migrate_repeater_merges(merges)
+                return self.async_create_entry(title="", data=current)
+        if not choices and not merges:
+            return self.async_abort(reason="no_devices")
+        pick = selector.selector({"select": {"options": choices, "mode": "dropdown"}})
+        schema = vol.Schema(
+            {
+                vol.Optional("duplicate"): pick,
+                vol.Optional("target"): pick,
+                vol.Optional("clear", default=False): bool,
+            }
+        )
+        current_txt = "\n".join(f"- {d} → {t}" for d, t in merges.items()) or "aucune"
+        return self.async_show_form(
+            step_id="repeaters",
+            data_schema=schema,
+            errors=errors,
+            description_placeholders={"merges": current_txt, "count": str(len(devices))},
         )

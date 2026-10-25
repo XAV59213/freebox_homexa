@@ -27,6 +27,8 @@ GROUP_PLAYER = "player"
 GROUP_TNT = "tnt"
 GROUP_AUTO = "auto"
 CONF_DEVICE_GROUP_OVERRIDES = "device_group_overrides"
+# Fusions manuelles de répéteurs (options) : MAC du doublon -> MAC du répéteur cible.
+CONF_REPEATER_MERGES = "repeater_merges"
 SERVICE_CHOICES = (GROUP_SERVER, GROUP_HOME, GROUP_PLAYER, GROUP_TNT)
 
 # Anciens groupes (28.8.36 → 28.8.42) : valeurs « automatiques » encore produites
@@ -518,6 +520,49 @@ def _norm_mac(value: str | None) -> str:
     return (value or "").upper().replace(":", "").replace("-", "")
 
 
+def ul_twin(norm: str) -> str:
+    """Même MAC (normalisée) avec le bit « locally administered » (0x02 du 1er octet) inversé."""
+    if len(norm) != 12:
+        return ""
+    try:
+        first = int(norm[:2], 16)
+    except ValueError:
+        return ""
+    return f"{first ^ 0x02:02X}{norm[2:]}"
+
+
+_REPEATER_NAME_WORDS = {"repeteur", "répéteur", "repeater", "wifi", "wi", "fi", "freebox", "free"}
+
+
+def is_specific_repeater_name(name: str | None) -> bool:
+    """Nom choisi (« Grange », « Repeteur Wifi Freebox Garage ») et non générique
+    (« Repeteur Wifi Freebox », « #2 », « Repeteur-Wifi-Freebox-2 », MAC)."""
+    if _is_generic(name):
+        return False
+    words = re.findall(r"[^\W\d_]+", (name or "").lower())
+    return any(w not in _REPEATER_NAME_WORDS for w in words)
+
+
+def migrate_repeater_merges(value: Any) -> dict[str, str]:
+    """Options « fusion manuelle » : {MAC doublon: MAC cible} au format AA:BB:..."""
+    result: dict[str, str] = {}
+    if not isinstance(value, dict):
+        return result
+    for dup, target in value.items():
+        d, t = _norm_mac(str(dup)), _norm_mac(str(target))
+        if len(d) == 12 and len(t) == 12 and d != t:
+            result[":".join(d[i : i + 2] for i in range(0, 12, 2))] = ":".join(
+                t[i : i + 2] for i in range(0, 12, 2)
+            )
+    return result
+
+
+def _is_free_norm(norm: str) -> bool:
+    from .wifi_ap import is_free_mac
+
+    return is_free_mac(norm)
+
+
 def async_merge_repeater_devices(
     hass: HomeAssistant,
     entry: ConfigEntry,
@@ -546,13 +591,41 @@ def async_merge_repeater_devices(
         for d in entry_devices(registry, entry.entry_id)
         if (DOMAIN, router_mac) not in d.identifiers
     ]
+    all_macs = {_norm_mac(m) for p in repeaters.values() for m in p.get("macs") or []}
+
+    def _bssid_like(norm: str) -> bool:
+        # MAC Free « locally administered » qui n'est pas le jumeau d'une MAC connue.
+        return (
+            len(norm) == 12
+            and bool(int(norm[:2], 16) & 0x02)
+            and _is_free_norm(norm)
+            and ul_twin(norm) not in all_macs
+        )
+
+    # Bloc de BSSID (5 premiers octets) -> répéteurs qui le possèdent.
+    block_owner: dict[str, set[str]] = {}
+    for canon, payload in repeaters.items():
+        for m in payload.get("macs") or []:
+            n = _norm_mac(m)
+            if _bssid_like(n):
+                block_owner.setdefault(n[:10], set()).add(canon)
     for canon, payload in repeaters.items():
         norms = {_norm_mac(m) for m in payload.get("macs") or [canon]} - {router_norm}
         canon_ident = (DOMAIN, f"repeater_{canon}")
 
         def _belongs(device: dr.DeviceEntry) -> bool:
             for ident in _repeater_idents(device):
-                if _norm_mac(ident[9:]) in norms:
+                mac = _norm_mac(ident[9:])
+                if mac in norms:
+                    return True
+                # Jumeau « locally administered » exact (22:66:CF:4B:49:69 pour la MAC
+                # principale 20:66:CF:4B:49:69) d'une MAC Free du répéteur : même appareil.
+                twin = ul_twin(mac)
+                if twin in norms and int(mac[:2], 16) & 0x02 and _is_free_norm(twin):
+                    return True
+                # Interface du bloc de BSSID d'UN SEUL répéteur (ex. 22:66:CF:C6:92:D4 pour
+                # les BSSID 22:66:CF:C6:92:D2 / D6 de Chambre fille).
+                if _bssid_like(mac) and block_owner.get(mac[:10]) == {canon}:
                     return True
             return any(
                 c[0] == dr.CONNECTION_NETWORK_MAC and _norm_mac(c[1]) in norms
@@ -598,7 +671,20 @@ def async_merge_repeater_devices(
                 if child.via_device_id == dup.id:
                     registry.async_update_device(child.id, via_device_id=keeper.id)
             area_id = area_id or dup.area_id
-            name_by_user = name_by_user or dup.name_by_user
+            if not name_by_user:
+                if dup.name_by_user:
+                    name_by_user = dup.name_by_user
+                elif (
+                    is_specific_repeater_name(dup.name)
+                    and not is_specific_repeater_name(keeper.name)
+                    and not is_specific_repeater_name(payload.get("name"))
+                ):
+                    # ex. « Repeteur Wifi Freebox Garage » fusionné dans « … #2 » : on garde Garage.
+                    name_by_user = dup.name
+            _LOGGER.info(
+                "Répéteur %s : doublon %s (%s) fusionné dans %s", canon, dup.name,
+                _repeater_idents(dup), keeper.name,
+            )
             remove_device(registry, dup.id)
             devices = [d for d in devices if d.id != dup.id]
             merged += 1

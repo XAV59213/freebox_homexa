@@ -57,6 +57,7 @@
         "menu_options": {
           "general": "Paramètres généraux",
           "groups": "Groupes des appareils",
+          "repeaters": "Fusionner un répéteur en double",
           "tnt": "Guide TNT",
           "profiles": "Profils de rappel"
         },
@@ -110,13 +111,23 @@
       "groups": {
         "title": "Groupes des appareils",
         "description": "{count} appareils Homexa. « Automatique » garde le classement calculé (indiqué entre parenthèses) ; choisissez un groupe pour le forcer. Appliqué au rechargement (automatique après validation)."
+      },
+      "repeaters": {
+        "title": "Fusionner un répéteur en double",
+        "description": "{count} appareils répéteurs. Si un même répéteur physique apparaît deux fois, choisissez l'appareil en double puis le répéteur dans lequel le fusionner (celui qui porte la MAC principale 20:66:CF:…, visible dans l'app Freebox). Entités, pièce et nom sont conservés sur le répéteur cible. Appliqué au rechargement (automatique après validation).\n\nFusions manuelles actuelles :\n{merges}",
+        "data": {
+          "duplicate": "Appareil en double",
+          "target": "Fusionner dans le répéteur",
+          "clear": "Annuler toutes les fusions manuelles"
+        }
       }
     },
     "error": {
       "no_channels": "Sélectionnez au moins une chaîne.",
       "no_name": "Indiquez un nom pour ce profil.",
       "duplicate_name": "Un profil porte déjà ce nom.",
-      "device_conflict": "Un même appareil ne peut pas être à la fois cible de notification et enceinte vocale (il serait annoncé deux fois)."
+      "device_conflict": "Un même appareil ne peut pas être à la fois cible de notification et enceinte vocale (il serait annoncé deux fois).",
+      "repeater_same": "Choisissez deux appareils différents : le doublon et le répéteur cible."
     },
     "abort": {
       "no_devices": "Aucun appareil Homexa chargé : rechargez l'intégration puis réessayez."

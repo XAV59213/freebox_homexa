@@ -22,12 +22,15 @@ from homeassistant.helpers.storage import Store
 
 from .device_groups import (
     CONF_DEVICE_GROUP_OVERRIDES,
+    CONF_DEVICE_TYPE_OVERRIDES,
     CONF_REPEATER_MERGES,
     GROUP_AUTO,
-    GROUP_NAMES,
+    LAN_TYPE_NAMES,
     group_choices,
-    migrate_group,
+    group_label,
     migrate_overrides,
+    migrate_type_overrides,
+    type_choices,
     migrate_repeater_merges,
     repeater_registry_devices,
 )
@@ -492,7 +495,7 @@ class FreeboxOptionsFlowHandler(OptionsFlow):
     async def async_step_init(
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
-        return self.async_show_menu(step_id="init", menu_options=["general", "groups", "repeaters", "tnt", "profiles"])
+        return self.async_show_menu(step_id="init", menu_options=["general", "groups", "types", "repeaters", "tnt", "profiles"])
 
     def _group_fields(self) -> dict[str, str]:
         """Libellé affiché -> clé stable de l'appareil (libellés uniques)."""
@@ -502,8 +505,9 @@ class FreeboxOptionsFlowHandler(OptionsFlow):
         for key in overrides:  # appareils surchargés mais absents ce coup-ci
             devices.setdefault(key, (key, ""))
         fields: dict[str, str] = {}
+        repeater_names = router.repeater_names() if router is not None else {}
         for key, (name, auto) in sorted(devices.items(), key=lambda kv: kv[1][0].lower()):
-            auto_label = GROUP_NAMES.get(migrate_group(auto) or "", "")
+            auto_label = group_label(auto, repeater_names)
             label = f"{name} (auto : {auto_label})" if auto_label else name
             if label in fields:
                 label = f"{label} [{key}]"
@@ -543,6 +547,60 @@ class FreeboxOptionsFlowHandler(OptionsFlow):
         )
         return self.async_show_form(
             step_id="groups",
+            data_schema=schema,
+            description_placeholders={"count": str(len(fields))},
+        )
+
+    def _type_fields(self) -> dict[str, str]:
+        """Clients réseau : libellé affiché (« nom (auto : Serveurs) ») -> clé stable."""
+        router = self.hass.data.get(DOMAIN, {}).get(self.config_entry.unique_id)
+        devices = dict(getattr(router, "lan_client_types", {}) or {})
+        overrides = migrate_type_overrides(self.config_entry.options.get(CONF_DEVICE_TYPE_OVERRIDES))
+        for key in overrides:  # clients forcés mais absents ce coup-ci
+            devices.setdefault(key, (key, ""))
+        fields: dict[str, str] = {}
+        for key, (name, auto) in sorted(devices.items(), key=lambda kv: kv[1][0].lower()):
+            auto_label = LAN_TYPE_NAMES.get(auto, "")
+            label = f"{name} (auto : {auto_label})" if auto_label else name
+            if label in fields:
+                label = f"{label} [{key}]"
+            fields[label] = key
+        return fields
+
+    async def async_step_types(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """Type forcé d'un client réseau (sous-groupe dans « filaires » / « Wi-Fi »)."""
+        fields = self._type_fields()
+        current = dict(self.config_entry.options)
+        overrides = migrate_type_overrides(current.get(CONF_DEVICE_TYPE_OVERRIDES))
+        if user_input is not None:
+            new_overrides: dict[str, str] = {}
+            for label, key in fields.items():
+                value = user_input.get(label, GROUP_AUTO)
+                if value and value != GROUP_AUTO:
+                    new_overrides[key] = value
+            current[CONF_DEVICE_TYPE_OVERRIDES] = new_overrides
+            return self.async_create_entry(title="", data=current)
+        if not fields:
+            return self.async_abort(reason="no_devices")
+        choice = selector.selector(
+            {
+                "select": {
+                    "options": type_choices(),
+                    "mode": "dropdown",
+                    "translation_key": "device_type",
+                }
+            }
+        )
+        schema = vol.Schema(
+            {
+                vol.Optional(label, default=overrides.get(key, GROUP_AUTO)): choice
+                for label, key in fields.items()
+            }
+        )
+        return self.async_show_form(
+            step_id="types",
             data_schema=schema,
             description_placeholders={"count": str(len(fields))},
         )

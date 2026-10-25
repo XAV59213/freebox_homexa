@@ -133,7 +133,7 @@ def lan():
     hosts["AA:00:00:00:00:06"] = host("AA:00:00:00:00:06", "Shelly-Garage", wifi_ap("repeater", "22:66:CF:96:92:D2"))
     hosts["AA:00:00:00:00:07"] = host("AA:00:00:00:00:07", "Camera-Grange", wifi_ap("repeater", "22:66:CF:C9:A0:52"))
     # Branché sur le port Ethernet du répéteur Garage : client filaire.
-    hosts["AA:00:00:00:00:08"] = host("AA:00:00:00:00:08", "TV-Garage", eth_ap("repeater", "20:66:CF:4B:49:69"))
+    hosts["AA:00:00:00:00:08"] = host("AA:00:00:00:00:08", "TV-Garage", eth_ap("repeater", "20:66:CF:4B:49:69"), host_type="television")
     # Hors ligne depuis longtemps, sans access_point : non classé (reste sous le Freebox Server).
     hosts["AA:00:00:00:00:09"] = host("AA:00:00:00:00:09", "Vieux-PC", None, active=False)
     hosts[RM] = {"l2ident": {"id": RM}, "primary_name": "Freebox Server", "attrs": {}, "active": True}
@@ -183,6 +183,11 @@ def parent_name(mac):
     return DEV[d.via_device_id].name if d and d.via_device_id else None
 
 
+def parent_name_of(name):
+    d = next(d for d in DEV.values() if d.name == name)
+    return DEV[d.via_device_id].name if d.via_device_id else None
+
+
 def tree():
     out = {}
     for d in DEV.values():
@@ -220,8 +225,13 @@ poll(r, hosts)
 t = tree()
 print("   hiérarchie :", t)
 assert t["Freebox Server"] == ["Clients Wi-Fi", "Clients réseau filaires", "Vieux-PC"], t
-assert t["Clients réseau filaires"] == ["NAS", "PC-Bureau", "TV-Garage"], t
-assert t["Clients Wi-Fi"] == ["Chambre fille", "Echo-Salon", "Garage", "Grange", "iPhone-Xav"], t
+assert t["Clients réseau filaires"] == ["Ordinateurs (filaire)", "Serveurs (filaire)", "TV et multimédia (filaire)"], t
+assert t["Serveurs (filaire)"] == ["NAS"] and t["Ordinateurs (filaire)"] == ["PC-Bureau"], t
+assert t["TV et multimédia (filaire)"] == ["TV-Garage"], t
+assert t["Clients Wi-Fi"] == ["Amazon / Alexa (Wi-Fi)", "Chambre fille", "Garage", "Grange",
+                              "Téléphones et tablettes (Wi-Fi)"], t
+assert t["Téléphones et tablettes (Wi-Fi)"] == ["iPhone-Xav"] and t["Amazon / Alexa (Wi-Fi)"] == ["Echo-Salon"], t
+# Clients des répéteurs : directement sous le répéteur, sans couche de type.
 assert t["Grange"] == ["Camera-Grange"] and t["Chambre fille"] == ["Tel-Fille"] and t["Garage"] == ["Shelly-Garage"], t
 gw = r.wifi_aps["gateway"]
 assert sorted(gw["client_names"]) == ["Echo-Salon", "iPhone-Xav"], gw["client_names"]  # plus de PC/NAS filaires
@@ -238,11 +248,11 @@ assert parent_name("AA:00:00:00:00:05") == "Chambre fille"
 UPDATES.clear()
 hosts["AA:00:00:00:00:03"]["access_point"] = wifi_ap("repeater", "22:66:CF:C9:A0:56")  # iPhone -> Grange
 poll(r, hosts)
-assert parent_name("AA:00:00:00:00:03") == "Clients Wi-Fi" and not UPDATES  # 1 relevé : on attend
+assert parent_name("AA:00:00:00:00:03") == "Téléphones et tablettes (Wi-Fi)" and not UPDATES  # 1 relevé : on attend
 hosts["AA:00:00:00:00:03"]["access_point"] = wifi_ap("gateway", RM)  # revenu : rien ne bouge
 poll(r, hosts)
 hosts["AA:00:00:00:00:03"]["access_point"] = wifi_ap("repeater", "22:66:CF:C9:A0:56")
-poll(r, hosts); assert parent_name("AA:00:00:00:00:03") == "Clients Wi-Fi"
+poll(r, hosts); assert parent_name("AA:00:00:00:00:03") == "Téléphones et tablettes (Wi-Fi)"
 poll(r, hosts); assert parent_name("AA:00:00:00:00:03") == "Grange"
 assert len(UPDATES) == 1, UPDATES
 # Redémarrage de HA : mémoire vide, classement relu depuis le registre (via_device).
@@ -261,17 +271,40 @@ DEV["pl"] = Dev("pl", [("d", "player1")], name="Freebox Player")
 poll(r3, hosts)
 assert parent_name("AA:00:00:00:00:04") == "Freebox Player"
 assert parent_name("AA:00:00:00:00:02") == "Freebox Server"
-assert r3.grouped_devices["mac:aa:00:00:00:00:01"][1] == dg.GROUP_LAN_WIRED
+assert r3.grouped_devices["mac:aa:00:00:00:00:01"][1] == "lan_wired_net_computers"
+assert dg.group_label(r3.grouped_devices["mac:aa:00:00:00:00:01"][1]) == "Clients réseau filaires › Ordinateurs"
+assert dg.group_label(r3.grouped_devices["mac:aa:00:00:00:00:02"][1]) == "Clients réseau filaires › Serveurs"
+assert dg.group_label(r3.grouped_devices["mac:aa:00:00:00:00:06"][1], r3.repeater_names()) == "Clients Wi-Fi › Garage"
 print("OK : surcharges utilisateur prioritaires")
 
 # --- 5. Nettoyage : groupes conservés tant qu'ils ont des enfants -------------
+def sub_devices():
+    idents = {dg.group_identifier(RM, k) for k in dg.LAN_TYPE_GROUPS}
+    return [d for d in DEV.values() if d.identifiers & idents]
+
+
+def has_kids(d):
+    return any(x.via_device_id == d.id for x in DEV.values())
+
+
+empty = sorted(d.name for d in sub_devices() if not has_kids(d))
+full = sorted(d.name for d in sub_devices() if has_kids(d))
+assert full, full
 removed = dg.async_remove_unused_group_devices(None, entry, RM, set())
-assert not removed, removed  # groupes non « utilisés » mais avec enfants : conservés
+assert sorted(removed) == empty, (removed, empty)  # seuls les sous-groupes vides partent
+assert sorted(d.name for d in sub_devices()) == full  # les non vides restent, même « inutilisés »
+assert any(d.name == "Clients réseau filaires" for d in DEV.values())
+wired_subs = [d.id for d in sub_devices() if d.name.endswith("(filaire)")]
 for d in list(DEV.values()):
-    if d.via_device_id == r.group_device_ids.get(dg.GROUP_LAN_WIRED):
+    if d.via_device_id in wired_subs:
         d.via_device_id = "srv"
 removed = dg.async_remove_unused_group_devices(None, entry, RM, {dg.GROUP_LAN_WIFI})
-assert removed == ["Clients réseau filaires"], removed
+assert "Clients réseau filaires" in removed and all(n.endswith("(filaire)") or n == "Clients réseau filaires"
+                                                    for n in removed), removed
+assert all(d.name.endswith("(Wi-Fi)") for d in sub_devices()), [d.name for d in sub_devices()]
+# Identifiants distincts des anciens sous-groupes réseau (28.8.36 → 28.8.42, ex. « net_phones »).
+assert not set(dg.LAN_TYPE_GROUPS) & set(dg.LEGACY_GROUPS)
+print("OK : nettoyage des sous-groupes vides, non vides conservés")
 
 # --- 6. Switch Cisco (rapport utilisateur, Freebox OS 4.13) ----------------------
 # « Cisco Systems, Inc (A4:56:30:73:AF:C0) », type « Périphérique réseau », joignable.
@@ -322,8 +355,8 @@ hosts6[CISCO] = cisco(None)
 poll(r6, hosts6)
 register_entities(r6, hosts6)
 poll(r6, hosts6)
-assert parent_name(CISCO) == "Clients réseau filaires", parent_name(CISCO)
-assert r6.grouped_devices[f"mac:{CISCO.lower()}"][1] == dg.GROUP_LAN_WIRED
+assert parent_name(CISCO) == "Équipements réseau (filaire)", parent_name(CISCO)
+assert dg.group_label(r6.grouped_devices[f"mac:{CISCO.lower()}"][1]) == "Clients réseau filaires › Équipements réseau"
 assert "Cisco" not in " ".join(r6.wifi_aps["gateway"]["client_names"])
 
 # Mal classé par l'ancienne logique (gateway sans connectivity_type = Wi-Fi box) :
@@ -333,9 +366,9 @@ d_cisco.via_device_id = r6.group_device_id(dg.GROUP_LAN_WIFI)
 r7 = make_router()
 hosts6[CISCO] = cisco(gw_no_conn())
 poll(r7, hosts6)
-assert parent_name(CISCO) == "Clients Wi-Fi"  # 1 relevé : anti va-et-vient
+assert parent_name(CISCO) == "Équipements réseau (Wi-Fi)"  # 1 relevé : anti va-et-vient
 poll(r7, hosts6)
-assert parent_name(CISCO) == "Clients réseau filaires", parent_name(CISCO)
+assert parent_name(CISCO) == "Équipements réseau (filaire)", parent_name(CISCO)
 assert r7.lan_links[wa.normalize_mac(CISCO)] == dg.LINK_WIRED
 
 # Téléphone Wi-Fi hors ligne (sans access_point) : reste sous son point d'accès Wi-Fi.
@@ -343,13 +376,13 @@ hosts6["AA:00:00:00:00:04"]["active"] = False
 hosts6["AA:00:00:00:00:04"].pop("access_point")
 for _ in range(3):
     poll(r7, hosts6)
-assert parent_name("AA:00:00:00:00:04") == "Clients Wi-Fi", parent_name("AA:00:00:00:00:04")
+assert parent_name("AA:00:00:00:00:04") == "Amazon / Alexa (Wi-Fi)", parent_name("AA:00:00:00:00:04")
 assert r7.lan_links["AA0000000004"] == dg.LINK_WIFI
 # Même chose hors ligne avec un access_point « gateway » sans détail.
 hosts6["AA:00:00:00:00:04"]["access_point"] = gw_no_conn()
 for _ in range(3):
     poll(r7, hosts6)
-assert parent_name("AA:00:00:00:00:04") == "Clients Wi-Fi"
+assert parent_name("AA:00:00:00:00:04") == "Amazon / Alexa (Wi-Fi)"
 print("OK : switch Cisco filaire, correction d'un ancien classement Wi-Fi, téléphone hors ligne conservé")
 
 # --- 7. Surcharge « Clients réseau filaires » / « Clients Wi-Fi » --------------
@@ -360,7 +393,104 @@ r8 = make_router({"device_group_overrides": {f"mac:{CISCO.lower()}": "lan_wifi",
                                              "mac:aa:00:00:00:00:09": "lan_wired"}})
 hosts6[CISCO] = cisco(None)
 poll(r8, hosts6)
-assert parent_name(CISCO) == "Clients Wi-Fi"  # surcharge prioritaire
-assert parent_name("AA:00:00:00:00:09") == "Clients réseau filaires"  # Vieux-PC hors ligne forcé
+assert parent_name(CISCO) == "Équipements réseau (Wi-Fi)"  # surcharge prioritaire (type conservé)
+assert parent_name("AA:00:00:00:00:09") == "Téléphones et tablettes (filaire)"  # Vieux-PC hors ligne forcé
 print("OK : surcharges vers les groupes filaires / Wi-Fi")
+
+# --- 8. Sous-groupes de type : données proches de l'installation de l'utilisateur --
+cls = lambda **kw: dg.lan_client_type({"l2ident": {"id": kw.pop("mac", "AA:BB:CC:00:00:01")}, **kw})
+# Équipements réseau : switch Cisco (networking_device non Free), fabricants réseau.
+assert cls(mac=CISCO, primary_name=f"Cisco Systems, Inc ({CISCO})", vendor_name="Cisco Systems, Inc",
+           host_type="networking_device") == dg.NET_NETWORK
+assert cls(primary_name="GS308", vendor_name="NETGEAR") == dg.NET_NETWORK
+assert cls(primary_name="UniFi-AP", vendor_name="Ubiquiti Inc") == dg.NET_NETWORK
+assert cls(primary_name="Tapo-P100", vendor_name="TP-LINK TECHNOLOGIES") == dg.NET_IOT  # TP-Link reste IoT
+assert cls(primary_name="Deco", vendor_name="TP-LINK TECHNOLOGIES", host_type="networking_device") == dg.NET_NETWORK
+assert cls(primary_name="Nintendo Switch", vendor_name="Nintendo Co.,Ltd") == dg.NET_CONSOLES
+# Serveurs : Proxmox, NAS, hyperviseurs.
+assert cls(primary_name="pve-hpdle", vendor_name="Hewlett Packard") == dg.NET_SERVERS
+assert cls(primary_name="proxmox", vendor_name="Intel Corporate") == dg.NET_SERVERS
+assert cls(primary_name="DS920", vendor_name="Synology Incorporated") == dg.NET_SERVERS
+assert cls(primary_name="nas1", vendor_name="") == dg.NET_SERVERS
+assert cls(primary_name="TrueNAS-Scale", vendor_name="") == dg.NET_SERVERS
+assert cls(primary_name="Stockage", host_type="nas") == dg.NET_SERVERS
+assert cls(primary_name="esxi01", vendor_name="Dell Inc.") == dg.NET_SERVERS
+assert cls(primary_name="Nastya-iPhone", vendor_name="Apple, Inc.") == dg.NET_PHONES  # pas « nas »
+# VM et conteneurs (y compris sites hébergés) : OUI virtuels ou nom.
+assert cls(mac="BC:24:11:12:34:56", primary_name="homeassistant") == dg.NET_VIRTUAL  # LXC / VM Proxmox
+assert cls(mac="52:54:00:AB:CD:EF", primary_name="debian") == dg.NET_VIRTUAL  # QEMU/KVM
+assert cls(mac="00:16:3E:00:00:01", primary_name="x") == dg.NET_VIRTUAL  # Xen / LXC
+assert cls(mac="08:00:27:00:00:01", primary_name="x") == dg.NET_VIRTUAL  # VirtualBox
+assert cls(mac="00:50:56:00:00:01", primary_name="x") == dg.NET_VIRTUAL  # VMware
+assert cls(mac="00:15:5D:00:00:01", primary_name="x") == dg.NET_VIRTUAL  # Hyper-V
+assert cls(mac="02:11:22:33:44:55", primary_name="ct-101-pihole") == dg.NET_VIRTUAL
+assert cls(mac="02:11:22:33:44:56", primary_name="lxc-nextcloud") == dg.NET_VIRTUAL
+assert cls(primary_name="vm-windows") == dg.NET_VIRTUAL
+assert cls(primary_name="docker01") == dg.NET_VIRTUAL
+assert cls(primary_name="site-vitrine") == dg.NET_VIRTUAL
+assert cls(primary_name="wordpress") == dg.NET_VIRTUAL
+assert cls(primary_name="web") == dg.NET_VIRTUAL
+assert cls(primary_name="Webcam-Entree", host_type="ip_camera") == dg.NET_CAMERAS  # « webcam » != « web »
+# Autres types inchangés.
+assert cls(primary_name="iPhone-Xav", vendor_name="Apple, Inc.", host_type="smartphone") == dg.NET_PHONES
+assert cls(primary_name="Echo Dot", vendor_name="Amazon Technologies Inc.") == dg.NET_AMAZON
+assert cls(primary_name="Bluebank") == dg.NET_OTHER
+assert cls(primary_name="Freebox Player", host_type="freebox_player") == dg.NET_MEDIA
+print("OK : règles Serveurs / VM et conteneurs / Équipements réseau")
+
+PROXMOX, LXC = "70:5A:0F:11:22:33", "BC:24:11:AA:BB:CC"
+r9 = make_router()
+hosts9 = lan()
+hosts9[CISCO] = cisco(None)
+hosts9[PROXMOX] = host(PROXMOX, "pve-hpdle", eth_ap("gateway", RM), host_type="workstation")
+hosts9[LXC] = host(LXC, "nextcloud", None, host_type="other")  # LXC derrière le pont Proxmox
+hosts9["AA:00:00:00:00:0C"] = host("AA:00:00:00:00:0C", "Galaxy-S23", wifi_ap("repeater", "22:66:CF:96:92:D6"))
+for h in (hosts9[PROXMOX], hosts9[LXC]):
+    h["vendor_name"] = ""
+poll(r9, hosts9)
+register_entities(r9, hosts9)
+poll(r9, hosts9)
+t = tree()
+print("   hiérarchie utilisateur :", {k: v for k, v in t.items() if k != "Freebox Server"})
+assert parent_name(CISCO) == "Équipements réseau (filaire)"
+assert parent_name(PROXMOX) == "Serveurs (filaire)"
+assert parent_name(LXC) == "VM et conteneurs (filaire)"
+assert parent_name("AA:00:00:00:00:03") == "Téléphones et tablettes (Wi-Fi)"  # Wi-Fi box
+assert parent_name("AA:00:00:00:00:0C") == "Garage"  # Wi-Fi répéteur : directement sous lui
+for sub in ("Équipements réseau (filaire)", "Serveurs (filaire)", "VM et conteneurs (filaire)"):
+    assert parent_name_of(sub) == "Clients réseau filaires", sub
+assert parent_name_of("Téléphones et tablettes (Wi-Fi)") == "Clients Wi-Fi"
+assert parent_name_of("Garage") == "Clients Wi-Fi"
+# Aucun sous-groupe de type sous un répéteur.
+rep_ids = {d.id for d in DEV.values() if d.name in ("Grange", "Chambre fille", "Garage")}
+assert not [d.name for d in sub_devices() if d.via_device_id in rep_ids]
+# Libellés de l'écran « Groupes des appareils » et « Types des clients réseau ».
+assert dg.group_label(r9.grouped_devices[f"mac:{PROXMOX.lower()}"][1]) == "Clients réseau filaires › Serveurs"
+assert dg.group_label(r9.grouped_devices["mac:aa:00:00:00:00:0c"][1], r9.repeater_names()) == "Clients Wi-Fi › Garage"
+assert r9.lan_client_types[f"mac:{LXC.lower()}"][1] == dg.NET_VIRTUAL
+
+# Redémarrage : le lien est relu depuis le sous-groupe (pas de reclassement, pas de mouvement).
+UPDATES.clear()
+r10 = make_router()
+hosts9[PROXMOX]["active"] = False
+hosts9[PROXMOX].pop("access_point")
+poll(r10, hosts9)
+assert r10.lan_links[wa.normalize_mac(PROXMOX)] == dg.LINK_WIRED
+assert parent_name(PROXMOX) == "Serveurs (filaire)" and not UPDATES, UPDATES
+
+# Type forcé dans les options : immédiat (pas d'anti va-et-vient pour le type).
+assert dg.migrate_type_overrides({"a": "net_servers", "b": "bad", "c": "auto"}) == {"a": "net_servers"}
+assert dg.type_choices()[0] == "auto" and set(dg.type_choices()[1:]) == set(dg.LAN_TYPES)
+r11 = make_router({"device_type_overrides": {f"mac:{LXC.lower()}": dg.NET_SERVERS,
+                                             "mac:aa:00:00:00:00:03": dg.NET_IOT}})
+poll(r11, hosts9)
+assert parent_name(LXC) == "Serveurs (filaire)"
+assert parent_name("AA:00:00:00:00:03") == "Objets connectés (Wi-Fi)"
+assert r11.lan_client_types[f"mac:{LXC.lower()}"][1] == dg.NET_VIRTUAL  # auto affiché inchangé
+# Type forcé + groupe forcé « Clients Wi-Fi » : sous-groupe de type du groupe forcé.
+r12 = make_router({"device_type_overrides": {f"mac:{LXC.lower()}": dg.NET_SERVERS},
+                   "device_group_overrides": {f"mac:{LXC.lower()}": "lan_wifi"}})
+poll(r12, hosts9)
+assert parent_name(LXC) == "Serveurs (Wi-Fi)"
+print("OK : hiérarchie par type (filaires / Wi-Fi box), répéteurs sans couche de type, types forcés")
 print("SIMULATION_CLIENTS_FILAIRES_WIFI_OK")

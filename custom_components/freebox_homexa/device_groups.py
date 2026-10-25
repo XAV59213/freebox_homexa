@@ -77,6 +77,33 @@ NETWORK_SUBGROUPS = (
     NET_IOT, NET_CONSOLES, NET_PRINTERS, NET_OTHER,
 )
 
+# Types des clients réseau (sous-groupes de « Clients réseau filaires » / « Clients Wi-Fi »).
+NET_SERVERS = "net_servers"
+NET_VIRTUAL = "net_virtual"
+NET_NETWORK = "net_network"
+NET_CAMERAS = "net_cameras"
+LAN_TYPES = (
+    NET_SERVERS, NET_VIRTUAL, NET_NETWORK, NET_COMPUTERS, NET_PHONES, NET_MEDIA,
+    NET_IOT, NET_CONSOLES, NET_PRINTERS, NET_CAMERAS, NET_AMAZON, NET_OTHER,
+)
+LAN_TYPE_NAMES = {
+    NET_SERVERS: "Serveurs",
+    NET_VIRTUAL: "VM et conteneurs",
+    NET_NETWORK: "Équipements réseau",
+    NET_COMPUTERS: "Ordinateurs",
+    NET_PHONES: "Téléphones et tablettes",
+    NET_MEDIA: "TV et multimédia",
+    NET_IOT: "Objets connectés",
+    NET_CONSOLES: "Consoles",
+    NET_PRINTERS: "Imprimantes",
+    NET_CAMERAS: "Caméras",
+    NET_AMAZON: "Amazon / Alexa",
+    NET_OTHER: "Autres",
+}
+CONF_DEVICE_TYPE_OVERRIDES = "device_type_overrides"
+# Séparateur des libellés « Clients réseau filaires › Serveurs ».
+LABEL_SEP = " › "
+
 # "player" : ancien parent virtuel « Freebox Player » (28.8.40), source de doublon.
 LEGACY_GROUPS = (*LEGACY_GROUP_MAP, *NETWORK_SUBGROUPS, GROUP_PLAYER)
 
@@ -145,7 +172,7 @@ _HOST_TYPE_GROUPS = {
     "ip_phone": NET_PHONES,
     "workstation": NET_COMPUTERS,
     "laptop": NET_COMPUTERS,
-    "nas": NET_COMPUTERS,
+    "nas": NET_SERVERS,
     "television": NET_MEDIA,
     "multimedia_device": NET_MEDIA,
     "freebox_player": GROUP_PLAYER,
@@ -220,8 +247,8 @@ _VENDOR_GROUPS = (
     ("asustek", NET_COMPUTERS),
     ("intel", NET_COMPUTERS),
     ("micro-star", NET_COMPUTERS),
-    ("synology", NET_COMPUTERS),
-    ("qnap", NET_COMPUTERS),
+    ("synology", NET_SERVERS),
+    ("qnap", NET_SERVERS),
     ("oneplus", NET_PHONES),
     ("oppo", NET_PHONES),
     ("realme", NET_PHONES),
@@ -295,6 +322,144 @@ def classify_lan_client(device: dict[str, Any]) -> str:
         if any(k in names for k in keywords):
             return kw_group
     return NET_OTHER
+
+
+# OUI des cartes réseau virtuelles : Proxmox (BC:24:11), QEMU/KVM (52:54:00),
+# Xen / LXC (00:16:3E), VMware (00:50:56, 00:0C:29, 00:05:69, 00:1C:14),
+# Hyper-V (00:15:5D), VirtualBox (08:00:27).
+VIRTUAL_OUIS = frozenset(
+    {"BC2411", "525400", "00163E", "005056", "000C29", "000569", "001C14", "00155D", "080027"}
+)
+# Mots (entiers) du nom d'hôte : conteneur / VM / site hébergé.
+_VIRTUAL_TOKENS = frozenset(
+    {"lxc", "ct", "vm", "vms", "docker", "container", "containers", "conteneur", "conteneurs",
+     "site", "sites", "web", "www", "nginx", "apache", "wordpress", "portainer", "k3s", "k8s"}
+)
+_VIRTUAL_PREFIXES = ("lxc", "docker", "wordpress", "nginx", "apache", "container", "conteneur")
+# Mots (entiers) / préfixes du nom d'hôte : serveurs, NAS, hyperviseurs.
+_SERVER_TOKENS = frozenset(
+    {"pve", "proxmox", "nas", "synology", "diskstation", "qnap", "truenas", "freenas",
+     "unraid", "esxi", "vmware", "hyperviseur", "hypervisor", "server", "serveur", "srv",
+     "openmediavault", "omv", "xcp", "xcpng"}
+)
+_SERVER_PREFIXES = ("pve", "proxmox", "truenas", "unraid", "esxi", "hyperviseur", "hypervisor",
+                    "serveur", "server", "synology", "diskstation")
+# « nas1 », « srv02 » : préfixe court suivi de chiffres seulement.
+_SERVER_NUMBERED = re.compile(r"^(nas|srv)\d+$")
+# Fabricants d'équipements réseau (switch, routeur, point d'accès tiers).
+_NETWORK_VENDORS = (
+    "cisco", "netgear", "d-link", "dlink", "ubiquiti", "mikrotik", "routerboard", "zyxel",
+    "aruba", "juniper", "fortinet", "ruckus", "edgecore", "draytek", "linksys", "meraki",
+)
+_NETWORK_TOKENS = frozenset({"routeur", "router", "firewall", "pfsense", "opnsense", "unifi"})
+
+
+def _name_tokens(names: str) -> list[str]:
+    return [t for t in re.split(r"[^0-9a-zà-ÿ]+", names) if t]
+
+
+def _mac_norm(device: dict[str, Any]) -> str:
+    mac = (device.get("l2ident") or {}).get("id") or ""
+    return re.sub(r"[^0-9A-Fa-f]", "", str(mac)).upper()
+
+
+def is_virtual_client(device: dict[str, Any]) -> bool:
+    """VM / conteneur (LXC, Docker…) ou site hébergé, d'après l'OUI ou le nom d'hôte."""
+    mac = _mac_norm(device)
+    if mac[:6] in VIRTUAL_OUIS:
+        return True
+    tokens = _name_tokens(_client_names(device))
+    if any(t in _VIRTUAL_TOKENS for t in tokens):
+        return True
+    return any(t.startswith(_VIRTUAL_PREFIXES) for t in tokens)
+
+
+def is_server_client(device: dict[str, Any]) -> bool:
+    """Serveur, NAS ou hyperviseur (Proxmox, Synology, TrueNAS, ESXi…)."""
+    if device.get("host_type") == "nas":
+        return True
+    vendor = (device.get("vendor_name") or "").lower()
+    if "synology" in vendor or "qnap" in vendor:
+        return True
+    tokens = _name_tokens(_client_names(device))
+    if any(t in _SERVER_TOKENS or _SERVER_NUMBERED.match(t) for t in tokens):
+        return True
+    return any(t.startswith(_SERVER_PREFIXES) for t in tokens)
+
+
+def is_network_client(device: dict[str, Any]) -> bool:
+    """Switch, routeur, point d'accès tiers (pas un répéteur Free, exclu en amont)."""
+    vendor = (device.get("vendor_name") or "").lower()
+    if device.get("host_type") == "networking_device" and "free" not in vendor:
+        return True
+    if any(v in vendor for v in _NETWORK_VENDORS):
+        return True
+    tokens = _name_tokens(_client_names(device))
+    return any(t in _NETWORK_TOKENS for t in tokens)
+
+
+def lan_client_type(device: dict[str, Any]) -> str:
+    """Type d'un client réseau (sous-groupe sous « filaires » / « Wi-Fi »), un de LAN_TYPES.
+
+    Ordre : VM et conteneurs (OUI virtuel ou nom lxc / ct / vm / docker / site…),
+    Serveurs (NAS, Proxmox, hyperviseurs), Équipements réseau (switch, routeur), puis
+    le classement existant (host_type Freebox, fabricant, nom d'hôte).
+    """
+    if is_virtual_client(device):
+        return NET_VIRTUAL
+    if is_server_client(device):
+        return NET_SERVERS
+    if is_network_client(device):
+        return NET_NETWORK
+    group = classify_lan_client(device)
+    if group == GROUP_CAMERAS:
+        return NET_CAMERAS
+    if group == GROUP_PLAYER:
+        return NET_MEDIA
+    return group if group in LAN_TYPES else NET_OTHER
+
+
+def lan_type_group(lan_group: str, lan_type: str) -> str:
+    """Clé du sous-groupe, ex. « lan_wired_net_servers » (identifiant distinct des anciens net_*)."""
+    return f"{lan_group}_{lan_type}"
+
+
+LAN_TYPE_GROUPS = {
+    lan_type_group(g, t): (g, t) for g in (GROUP_LAN_WIRED, GROUP_LAN_WIFI) for t in LAN_TYPES
+}
+
+
+def lan_type_name(lan_group: str, lan_type: str) -> str:
+    """Nom de l'appareil sous-groupe : unique dans la liste des appareils de HA."""
+    suffix = "filaire" if lan_group == GROUP_LAN_WIRED else "Wi-Fi"
+    return f"{LAN_TYPE_NAMES[lan_type]} ({suffix})"
+
+
+def group_label(value: str | None, repeater_names: dict[str, str] | None = None) -> str:
+    """Libellé « auto : … » : « Clients réseau filaires › Serveurs », « Clients Wi-Fi › Grange »."""
+    if not value:
+        return ""
+    if value in LAN_TYPE_GROUPS:
+        group, lan_type = LAN_TYPE_GROUPS[value]
+        return f"{GROUP_NAMES[group]}{LABEL_SEP}{LAN_TYPE_NAMES[lan_type]}"
+    if value.startswith(LINK_REPEATER):
+        name = (repeater_names or {}).get(value[len(LINK_REPEATER):]) or "répéteur"
+        return f"{GROUP_NAMES[GROUP_LAN_WIFI]}{LABEL_SEP}{name}"
+    if value in LAN_TYPE_NAMES:
+        return LAN_TYPE_NAMES[value]
+    return GROUP_NAMES.get(migrate_group(value) or "", "")
+
+
+def migrate_type_overrides(overrides: Any) -> dict[str, str]:
+    """Types forcés enregistrés (valeurs inconnues ignorées)."""
+    if not isinstance(overrides, dict):
+        return {}
+    return {str(k): v for k, v in overrides.items() if v in LAN_TYPES}
+
+
+def type_choices() -> list[str]:
+    """Valeurs proposées dans l'écran « Types des clients réseau »."""
+    return [GROUP_AUTO, *LAN_TYPES]
 
 
 # --- Filaire / Wi-Fi --------------------------------------------------------
@@ -453,6 +618,35 @@ def async_get_lan_group_device(
     return device.id
 
 
+def async_get_lan_type_device(
+    hass: HomeAssistant,
+    entry_id: str,
+    router_mac: str,
+    lan_group: str,
+    lan_type: str,
+    parent_id: str | None,
+) -> str:
+    """Crée au besoin le sous-groupe de type (ex. « Serveurs (filaire) ») sous son groupe."""
+    registry = dr.async_get(hass)
+    name = lan_type_name(lan_group, lan_type)
+    device = registry.async_get_or_create(
+        config_entry_id=entry_id,
+        identifiers={group_identifier(router_mac, lan_type_group(lan_group, lan_type))},
+        manufacturer="Freebox SAS",
+        model=f"{GROUP_NAMES[lan_group]}{LABEL_SEP}{LAN_TYPE_NAMES[lan_type]}",
+        name=name,
+        entry_type=dr.DeviceEntryType.SERVICE,
+    )
+    updates: dict[str, Any] = {}
+    if device.name != name:
+        updates["name"] = name
+    if parent_id and device.via_device_id != parent_id:
+        updates["via_device_id"] = parent_id
+    if updates:
+        device = registry.async_update_device(device.id, **updates) or device
+    return device.id
+
+
 def _has_entities(hass: HomeAssistant, device_id: str) -> bool:
     from homeassistant.helpers import entity_registry as er
 
@@ -478,7 +672,8 @@ def async_remove_unused_group_devices(
     removed: list[str] = []
     candidates = [group_identifier(router_mac, g) for g in LEGACY_GROUPS]
     candidates += [(DOMAIN, f"{router_mac}_service_{k}") for k in LEGACY_SERVICE_KEYS]
-    for group in (GROUP_HOME, *LAN_GROUPS):
+    # Sous-groupes de type d'abord (un groupe filaire / Wi-Fi vidé peut alors partir aussi).
+    for group in (*LAN_TYPE_GROUPS, GROUP_HOME, *LAN_GROUPS):
         if group not in used:
             candidates.append(group_identifier(router_mac, group))
     for ident in candidates:

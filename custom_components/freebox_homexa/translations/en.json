@@ -57,6 +57,7 @@
         "menu_options": {
           "general": "General settings",
           "groups": "Device groups",
+          "types": "Network client types",
           "repeaters": "Merge a duplicate repeater",
           "tnt": "TNT guide",
           "profiles": "Reminder profiles"
@@ -111,6 +112,10 @@
       "groups": {
         "title": "Device groups",
         "description": "{count} Homexa devices. “Automatic” keeps the computed group (shown in brackets); pick a group to force it. Applied on reload (automatic after saving)."
+      },
+      "types": {
+        "title": "Network client types",
+        "description": "{count} network clients. In “Wired network clients” and “Wi-Fi clients” (box Wi-Fi), each client is placed in a type sub-group: Servers, VMs and containers, Network equipment, Computers… “Automatic” keeps the computed type (shown in brackets); pick a type to force it. Wi-Fi clients of a repeater stay directly under the repeater. Applied on reload (automatic after saving)."
       },
       "repeaters": {
         "title": "Merge a duplicate repeater",
@@ -237,6 +242,23 @@
         "tnt": "TNT",
         "lan_wired": "Wired network clients",
         "lan_wifi": "Wi-Fi clients"
+      }
+    },
+    "device_type": {
+      "options": {
+        "auto": "Automatic",
+        "net_servers": "Servers",
+        "net_virtual": "VMs and containers",
+        "net_network": "Network equipment",
+        "net_computers": "Computers",
+        "net_phones": "Phones and tablets",
+        "net_media": "TV and media",
+        "net_iot": "Smart devices",
+        "net_consoles": "Consoles",
+        "net_printers": "Printers",
+        "net_cameras": "Cameras",
+        "net_amazon": "Amazon / Alexa",
+        "net_other": "Other"
       }
     }
   }

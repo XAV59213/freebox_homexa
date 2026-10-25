@@ -57,6 +57,7 @@
         "menu_options": {
           "general": "Paramètres généraux",
           "groups": "Groupes des appareils",
+          "types": "Types des clients réseau",
           "repeaters": "Fusionner un répéteur en double",
           "tnt": "Guide TNT",
           "profiles": "Profils de rappel"
@@ -111,6 +112,10 @@
       "groups": {
         "title": "Groupes des appareils",
         "description": "{count} appareils Homexa. « Automatique » garde le classement calculé (indiqué entre parenthèses) ; choisissez un groupe pour le forcer. Appliqué au rechargement (automatique après validation)."
+      },
+      "types": {
+        "title": "Types des clients réseau",
+        "description": "{count} clients réseau. Dans « Clients réseau filaires » et « Clients Wi-Fi » (Wi-Fi de la box), chaque client est rangé dans un sous-groupe de type : Serveurs, VM et conteneurs, Équipements réseau, Ordinateurs… « Automatique » garde le type calculé (indiqué entre parenthèses) ; choisissez un type pour le forcer. Les clients Wi-Fi d'un répéteur restent directement sous le répéteur. Appliqué au rechargement (automatique après validation)."
       },
       "repeaters": {
         "title": "Fusionner un répéteur en double",
@@ -237,6 +242,23 @@
         "tnt": "TNT",
         "lan_wired": "Clients réseau filaires",
         "lan_wifi": "Clients Wi-Fi"
+      }
+    },
+    "device_type": {
+      "options": {
+        "auto": "Automatique",
+        "net_servers": "Serveurs",
+        "net_virtual": "VM et conteneurs",
+        "net_network": "Équipements réseau",
+        "net_computers": "Ordinateurs",
+        "net_phones": "Téléphones et tablettes",
+        "net_media": "TV et multimédia",
+        "net_iot": "Objets connectés",
+        "net_consoles": "Consoles",
+        "net_printers": "Imprimantes",
+        "net_cameras": "Caméras",
+        "net_amazon": "Amazon / Alexa",
+        "net_other": "Autres"
       }
     }
   }

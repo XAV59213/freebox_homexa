@@ -92,6 +92,11 @@ async def async_get_config_entry_diagnostics(
             },
             # Classement des clients : nombre par lien (filaire, Wi-Fi box, répéteur).
             "lan_client_links": _count_links(getattr(router, "lan_links", {}) or {}),
+            # Type automatique des clients (sous-groupes Serveurs, VM et conteneurs…).
+            "lan_client_types": _count_links(
+                {k: v[1] for k, v in (getattr(router, "lan_client_types", {}) or {}).items()}
+            ),
+            "lan_type_overrides": len(getattr(router, "type_overrides", {}) or {}),
         }
     )
     return async_redact_data(data, TO_REDACT)

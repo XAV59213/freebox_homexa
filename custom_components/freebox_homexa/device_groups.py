@@ -374,6 +374,38 @@ def is_virtual_client(device: dict[str, Any]) -> bool:
     return any(t.startswith(_VIRTUAL_PREFIXES) for t in tokens)
 
 
+def _is_vendor_default_name(name: str, vendor: str) -> bool:
+    """Nom par défaut de la Freebox : « <fabricant> (<MAC>) » ou le fabricant seul."""
+    lower = name.strip().lower()
+    if not lower:
+        return True
+    if vendor and (lower == vendor or lower.startswith(vendor)):
+        return True
+    return bool(re.search(r"\(([0-9a-f]{2}[:\-]){5}[0-9a-f]{2}\)\s*$", lower))
+
+
+def user_names(device: dict[str, Any]) -> str:
+    """Noms choisis par l'utilisateur / l'appareil (hors nom par défaut « fabricant (MAC) »).
+
+    Ex. « Proxmox Server Solutions GmbH (BC:24:11:…) » est ignoré : ses mots « proxmox » /
+    « server » viennent du fabricant, pas d'un nom d'hôte.
+    """
+    vendor = (device.get("vendor_name") or "").strip().lower()
+    names = [device.get("primary_name") or "", device.get("default_name") or ""]
+    names += [
+        (n.get("name") or "") for n in device.get("names") or [] if isinstance(n, dict)
+    ]
+    return " ".join(n for n in names if not _is_vendor_default_name(str(n), vendor)).lower()
+
+
+def is_server_name(device: dict[str, Any]) -> bool:
+    """Nom d'hôte de serveur / hyperviseur (pve, proxmox, serveur, truenas…), hors nom fabricant."""
+    tokens = _name_tokens(user_names(device))
+    if any(t in _SERVER_TOKENS or _SERVER_NUMBERED.match(t) for t in tokens):
+        return True
+    return any(t.startswith(_SERVER_PREFIXES) for t in tokens)
+
+
 def is_server_client(device: dict[str, Any]) -> bool:
     """Serveur, NAS ou hyperviseur (Proxmox, Synology, TrueNAS, ESXi…)."""
     if device.get("host_type") == "nas":
@@ -381,10 +413,7 @@ def is_server_client(device: dict[str, Any]) -> bool:
     vendor = (device.get("vendor_name") or "").lower()
     if "synology" in vendor or "qnap" in vendor:
         return True
-    tokens = _name_tokens(_client_names(device))
-    if any(t in _SERVER_TOKENS or _SERVER_NUMBERED.match(t) for t in tokens):
-        return True
-    return any(t.startswith(_SERVER_PREFIXES) for t in tokens)
+    return is_server_name(device)
 
 
 def is_network_client(device: dict[str, Any]) -> bool:
@@ -401,10 +430,19 @@ def is_network_client(device: dict[str, Any]) -> bool:
 def lan_client_type(device: dict[str, Any]) -> str:
     """Type d'un client réseau (sous-groupe sous « filaires » / « Wi-Fi »), un de LAN_TYPES.
 
-    Ordre : VM et conteneurs (OUI virtuel ou nom lxc / ct / vm / docker / site…),
-    Serveurs (NAS, Proxmox, hyperviseurs), Équipements réseau (switch, routeur), puis
-    le classement existant (host_type Freebox, fabricant, nom d'hôte).
+    Ordre :
+    1. Serveurs par le NOM choisi (pve, proxmox, serveur…), avant l'OUI virtuel : depuis
+       Proxmox VE 8, le pont vmbr0 de l'HÔTE a aussi une MAC BC:24:11. Le nom par défaut
+       de la Freebox « Proxmox Server Solutions GmbH (MAC) » ne compte pas ;
+    2. VM et conteneurs (OUI virtuel ou nom lxc / ct / vm / docker / site…) ;
+    3. Serveurs (type NAS, Synology / QNAP) ;
+    4. Équipements réseau (switch, routeur) ;
+    5. TV et multimédia si le nom contient le mot « tv » (avant le fabricant, ex.
+       « Tv chambre papa » avec une puce Realtek / Intel), sauf Amazon (Fire TV) ;
+    6. le classement existant (host_type Freebox, fabricant, nom d'hôte).
     """
+    if is_server_name(device):
+        return NET_SERVERS
     if is_virtual_client(device):
         return NET_VIRTUAL
     if is_server_client(device):
@@ -412,6 +450,8 @@ def lan_client_type(device: dict[str, Any]) -> str:
     if is_network_client(device):
         return NET_NETWORK
     group = classify_lan_client(device)
+    if group != NET_AMAZON and "tv" in _name_tokens(user_names(device)):
+        return NET_MEDIA
     if group == GROUP_CAMERAS:
         return NET_CAMERAS
     if group == GROUP_PLAYER:

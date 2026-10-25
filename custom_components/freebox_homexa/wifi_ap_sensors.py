@@ -15,6 +15,7 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from .const import REPEATER_MODEL
 from .router import FreeboxRouter
+from .availability import FreeboxReachableMixin
 
 
 def _ap_device_info(router: FreeboxRouter, access_point: dict[str, Any]) -> DeviceInfo:
@@ -50,7 +51,7 @@ def _client_label(access_point: dict[str, Any], max_length: int = MAX_STATE_LENG
     return f"{len(names)} appareils"[:max_length]
 
 
-class FreeboxRepeaterCountSensor(SensorEntity):
+class FreeboxRepeaterCountSensor(FreeboxReachableMixin, SensorEntity):
     _attr_should_poll = False
     _attr_has_entity_name = True
     _attr_translation_key = "wifi_repeaters"
@@ -91,7 +92,7 @@ class FreeboxRepeaterCountSensor(SensorEntity):
         )
 
 
-class FreeboxWifiClientCountSensor(SensorEntity):
+class FreeboxWifiClientCountSensor(FreeboxReachableMixin, SensorEntity):
     _attr_should_poll = False
     _attr_has_entity_name = True
     _attr_translation_key = "wifi_clients"
@@ -138,7 +139,7 @@ class FreeboxWifiClientCountSensor(SensorEntity):
         )
 
 
-class FreeboxWifiClientListSensor(SensorEntity):
+class FreeboxWifiClientListSensor(FreeboxReachableMixin, SensorEntity):
     """Liste nominative des clients d'un AP, visible dans l'état du capteur."""
 
     _attr_should_poll = False
@@ -186,7 +187,7 @@ class FreeboxWifiClientListSensor(SensorEntity):
         )
 
 
-class FreeboxWifiTotalClientSensor(SensorEntity):
+class FreeboxWifiTotalClientSensor(FreeboxReachableMixin, SensorEntity):
     _attr_should_poll = False
     _attr_has_entity_name = True
     _attr_translation_key = "wifi_clients_total"

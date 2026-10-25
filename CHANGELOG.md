@@ -1,5 +1,12 @@
 # Changelog
 
+## Non publié
+- Qualité (Integration Quality Scale) — **entity-unavailable** :
+  - quand la Freebox est **injoignable** (journal « Freebox injoignable »), les entités Homexa passent **indisponibles** au lieu de garder une valeur figée ou de passer « inconnu » : capteurs (débits, températures, appels, disques, Wi-Fi, répéteurs, groupes de clients), capteurs binaires, interrupteur Wi-Fi, boutons, télécommande et lecteurs Player, calendrier Guide TV, et toutes les entités Freebox Home (volets, alarme, caméras, détecteurs, batteries). Elles redeviennent disponibles dès le retour de la Freebox (« Freebox de nouveau joignable ») ; les entités pilotées par signal sont réécrites tout de suite, les autres au relevé suivant
+  - nœud Freebox Home signalé **« unreachable »** par la Freebox (ex. détecteur hors de portée, caméra débranchée) : ses entités passent indisponibles. Les volets **RTS** (Somfy, radio sans retour d'état) ne sont jamais rendus indisponibles pour ce motif
+  - **inchangé** : les suivis d'appareils (`device_tracker`) gardent leur dernier état pendant une coupure, pour ne pas perturber la présence et les automatisations `to: home` / `to: not_home` ; l'interrupteur « inversion » des volets (réglage local) et les capteurs TNT (source Internet) restent disponibles
+  - attention aux automatisations sur l'**alarme** (ou un volet) déclenchées par `to:` : au retour, l'état passe de `unavailable` à la vraie valeur (ex. `disarmed`) et peut redéclencher l'automatisation. Ajouter `not_from: [unavailable, unknown]` au déclencheur pour l'éviter
+
 ## 28.8.60
 - Qualité (Integration Quality Scale) :
   - **runtime-data** : le routeur Freebox est rangé dans `entry.runtime_data` (entrée typée `FreeboxConfigEntry`) au lieu de `hass.data[freebox_homexa][unique_id]`. Plateformes, actions, diagnostics, options et déchargement lisent `entry.runtime_data`. `hass.data` ne garde que l'état global (cache de configuration, carte Lovelace, coordinateurs TNT). Aucun changement visible

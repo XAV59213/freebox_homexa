@@ -17,6 +17,7 @@ from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from .const import DOMAIN, option_remote_code
+from .availability import FreeboxReachableMixin
 from .router import FreeboxConfigEntry, FreeboxRouter
 
 _LOGGER = logging.getLogger(__name__)
@@ -121,7 +122,7 @@ async def async_setup_entry(
         _LOGGER.warning("Aucun Freebox Player détecté")
 
 
-class FreeboxPlayerMediaPlayer(MediaPlayerEntity):
+class FreeboxPlayerMediaPlayer(FreeboxReachableMixin, MediaPlayerEntity):
     """Contrôle du Freebox Player via l'API Player Freebox OS."""
 
     _attr_device_class = MediaPlayerDeviceClass.TV

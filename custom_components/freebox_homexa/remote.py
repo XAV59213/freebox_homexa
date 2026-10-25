@@ -12,6 +12,7 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from .const import option_remote_code
 from .media_player import player_device_info
+from .availability import FreeboxReachableMixin
 from .router import FreeboxConfigEntry, FreeboxRouter
 
 _LOGGER = logging.getLogger(__name__)
@@ -43,7 +44,7 @@ async def async_setup_entry(
         async_add_entities(entities, True)
 
 
-class FreeboxRemote(RemoteEntity):
+class FreeboxRemote(FreeboxReachableMixin, RemoteEntity):
     """Télécommande du Freebox Player."""
 
     _attr_supported_features = RemoteEntityFeature(0)

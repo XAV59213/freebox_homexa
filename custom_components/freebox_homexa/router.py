@@ -519,12 +519,24 @@ class FreeboxRouter:
             if self.reachable:
                 self.reachable = False
                 _LOGGER.info("Freebox injoignable (%s) : %s", self._host, err)
+                self._signal_reachability_changed()
             else:
                 _LOGGER.debug("Freebox toujours injoignable : %s", err)
             return
         if not self.reachable:
             self.reachable = True
             _LOGGER.info("Freebox de nouveau joignable (%s)", self._host)
+            self._signal_reachability_changed()
+
+    def _signal_reachability_changed(self) -> None:
+        """Réécrit l'état des entités à l'écoute (disponible / indisponible).
+
+        Les entités interrogées par Home Assistant (volets, alarme, Player…) suivent
+        au relevé suivant ; celles pilotées par signal sont réécrites tout de suite.
+        """
+        async_dispatcher_send(self.hass, self.signal_device_update)
+        async_dispatcher_send(self.hass, self.signal_sensor_update)
+        async_dispatcher_send(self.hass, self.signal_home_device_update)
 
     async def update_device_trackers(self) -> None:
         new_device = False

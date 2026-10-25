@@ -53,8 +53,13 @@ rules:
   docs-configuration-parameters: done
   docs-installation-parameters: done
   entity-unavailable:
-    status: todo
-    comment: Seuls Player et signal Wi-Fi passent indisponibles ; autres plateformes à revoir.
+    status: done
+    comment: >-
+      Entités indisponibles quand la Freebox est injoignable (router.reachable) ; nœuds
+      Freebox Home aussi quand l'API les signale « unreachable » (sauf RTS, sans retour
+      d'état). Choix assumé : les device_tracker gardent leur dernier état (présence),
+      l'inversion des volets (réglage local) et les capteurs TNT (source Internet) restent
+      disponibles.
   integration-owner: done
   log-when-unavailable:
     status: done

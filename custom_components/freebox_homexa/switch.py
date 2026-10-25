@@ -18,6 +18,7 @@ from homeassistant.util import slugify
 from .errors import is_shutdown_error, poll_log_level
 from .router import FreeboxConfigEntry, FreeboxRouter
 from .entity import FreeboxHomeEntity
+from .availability import FreeboxReachableMixin
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -59,7 +60,7 @@ async def async_setup_entry(
     _LOGGER.debug("%s entités interrupteurs ajoutées pour %s", len(entities), router.name)
 
 
-class FreeboxSwitch(SwitchEntity):
+class FreeboxSwitch(FreeboxReachableMixin, SwitchEntity):
     """Interrupteur WiFi de la Freebox."""
 
     def __init__(

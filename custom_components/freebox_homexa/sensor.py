@@ -41,6 +41,7 @@ from .tnt_sensor import HomexaTntSensor
 from .lan_group_sensors import async_setup_lan_group_sensors
 from .wifi_ap_sensors import async_setup_wifi_ap_sensors
 from .registry_compat import as_version
+from .availability import FreeboxReachableMixin
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -203,7 +204,7 @@ async def async_setup_entry(
     async_setup_lan_group_sensors(router, entry, async_add_entities)
 
 
-class FreeboxSensor(SensorEntity):
+class FreeboxSensor(FreeboxReachableMixin, SensorEntity):
     _attr_should_poll = False
 
     def __init__(self, router: FreeboxRouter, description: SensorEntityDescription) -> None:
@@ -310,7 +311,7 @@ class FreeboxBatterySensor(FreeboxHomeEntity, SensorEntity):
         return self.get_value("signal", "battery")
 
 
-class FreeboxWifiSignalSensor(SensorEntity):
+class FreeboxWifiSignalSensor(FreeboxReachableMixin, SensorEntity):
     """Force du signal Wi-Fi (RSSI) d'un client vu par la Freebox."""
 
     _attr_should_poll = False

@@ -790,6 +790,10 @@ def async_remove_lan_client_devices(
         macs = {c[1] for c in device.connections if c[0] == dr.CONNECTION_NETWORK_MAC}
         if not macs or router_mac in macs:
             continue
+        if set(device.config_entries) - {entry.entry_id}:
+            # Appareil partagé avec une autre intégration (ex. Shelly, ou relié par
+            # Home Assistant au tracker) : jamais supprimé.
+            continue
         remove_device(registry, device.id)
         removed += 1
     return removed

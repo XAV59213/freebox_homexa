@@ -78,6 +78,13 @@ rules:
     comment: Simulations hors HA uniquement.
 
   # --- Gold (partiel) ---
+  devices:
+    status: done
+    comment: >-
+      Appareils pour le matériel Free (Server, Player, répéteurs, nœuds Home, disques).
+      Clients réseau : appareil seulement si l'option « Créer des appareils pour les
+      clients réseau » est cochée (décochée par défaut depuis la migration 1.2) ; sinon
+      les device_tracker suivent le comportement ScannerEntity de Home Assistant.
   diagnostics: done
   discovery: done
   entity-translations:

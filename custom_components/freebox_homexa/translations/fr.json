@@ -26,7 +26,7 @@
       },
       "lan_options": {
         "title": "Clients LAN",
-        "description": "Faites ces choix **avant** que Home Assistant n'affiche la liste des appareils. Le Server, les répéteurs et le pack Home (alarme, PIR, caméras, volets) sont toujours créés.\n\nDécochez « Créer un device Homexa pour chaque client LAN » pour éviter les doublons depuis HA 2026.8.\nDécochez « Suivre les clients LAN » si la présence est déjà gérée ailleurs.\n\nPlayers détectés : {players}",
+        "description": "Faites ces choix **avant** que Home Assistant n'affiche la liste des appareils. Le Server, les répéteurs et le pack Home (alarme, PIR, caméras, volets) sont toujours créés.\n\n« Créer des appareils pour les clients réseau » est décoché par défaut (règle Home Assistant : un suivi d'appareil ne crée pas d'appareil) ; cochez-le pour ranger chaque client sous Clients réseau filaires / Clients Wi-Fi.\nDécochez « Suivre les clients LAN » si la présence est déjà gérée ailleurs.\n\nPlayers détectés : {players}",
         "data": {
           "track_lan_clients": "Suivre les clients LAN (device trackers)",
           "create_wifi_sensors": "Créer les capteurs RSSI Wi-Fi",
@@ -37,7 +37,7 @@
         "data_description": {
           "track_lan_clients": "Téléphones, PC et objets vus par la Freebox.",
           "create_wifi_sensors": "Force du signal en dBm quand le client est en Wi-Fi.",
-          "create_lan_devices": "Si décoché, tracker et RSSI restent des entités seules (pas de device en plus).",
+          "create_lan_devices": "Décoché (défaut) : tracker et RSSI restent des entités seules, reliées à l'appareil d'une autre intégration s'il existe. Coché : un appareil par client, rangé par groupe.",
           "home_poll_interval": "Fréquence PIR, contacts, alarme et volets. 5 s se rapproche de l'officielle si celle-ci est désactivée.",
           "remote_code": "8 chiffres : sur le Player, Réglages → Système → Informations. Un champ par Player peut s'ajouter. Laissez vide sans Player, ou pour Mini 4K / Pop."
         }

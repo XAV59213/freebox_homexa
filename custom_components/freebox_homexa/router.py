@@ -987,6 +987,11 @@ class FreeboxRouter:
         )
         self.lan_device_ids.pop(norm, None)
         self.lan_client_placements.pop(norm, None)
+        if not self.create_lan_devices:
+            # Option désactivée : comportement Home Assistant (ScannerEntity). Aucun
+            # appareil créé, aucun appareil existant (même d'une autre intégration)
+            # déplacé ; pas de groupes de clients ni de « Clients connectés ».
+            return None
         if device is None or not self._is_lan_client(device):
             return None
         registry = dr.async_get(self.hass)

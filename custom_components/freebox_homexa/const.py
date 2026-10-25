@@ -31,7 +31,10 @@ CONF_REMOTE_CODES = "remote_codes"
 
 DEFAULT_TRACK_LAN_CLIENTS = True
 DEFAULT_CREATE_WIFI_SENSORS = True
-DEFAULT_CREATE_LAN_DEVICES = True
+# Désactivé par défaut (nouvelles installations) : Home Assistant demande qu'un
+# device_tracker ne crée pas d'appareil ; les entrées existantes gardent True
+# (migration 1.2 dans __init__.async_migrate_entry).
+DEFAULT_CREATE_LAN_DEVICES = False
 DEFAULT_HOME_POLL_INTERVAL = 15
 HOME_POLL_INTERVAL_OPTIONS = [5, 10, 15, 20, 25, 30]
 

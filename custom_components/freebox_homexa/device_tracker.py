@@ -106,8 +106,18 @@ class FreeboxDevice(ScannerEntity):
 
     @callback
     def _async_link_device(self) -> None:
-        """Rattache l'entité à l'appareil de son client (créé / rangé par Homexa)."""
-        if not self._lan_client or self.registry_entry is None or self.hass is None:
+        """Rattache l'entité à l'appareil de son client (créé / rangé par Homexa).
+
+        Option « Créer des appareils pour les clients réseau » désactivée : rien ici,
+        Home Assistant relie lui-même le tracker à l'appareil d'une autre intégration
+        portant la même MAC (comportement standard des ScannerEntity).
+        """
+        if (
+            not self._create_lan_devices
+            or not self._lan_client
+            or self.registry_entry is None
+            or self.hass is None
+        ):
             return
         device_id = self._router.lan_device_ids.get(self._norm_mac)
         if device_id is None:

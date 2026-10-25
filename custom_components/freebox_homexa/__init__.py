@@ -61,6 +61,28 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
     return True
 
 
+async def async_migrate_entry(hass: HomeAssistant, entry: FreeboxConfigEntry) -> bool:
+    """Migration des entrées de configuration.
+
+    1.1 -> 1.2 : « Créer des appareils pour les clients réseau » passe à désactivé par
+    défaut pour les nouvelles installations. Une entrée qui n'a jamais réglé l'option
+    reçoit explicitement True : elle garde ses appareils clients, rien ne change.
+    """
+    if entry.version > 1:
+        # Version plus récente (retour arrière d'Homexa) : non prise en charge.
+        return False
+    if entry.version == 1 and entry.minor_version < 2:
+        options = dict(entry.options)
+        if CONF_CREATE_LAN_DEVICES not in options:
+            options[CONF_CREATE_LAN_DEVICES] = True
+            _LOGGER.info(
+                "Migration 1.2 : option « Créer des appareils pour les clients réseau » "
+                "conservée (activée) pour cette installation"
+            )
+        hass.config_entries.async_update_entry(entry, options=options, minor_version=2)
+    return True
+
+
 async def async_setup_entry(hass: HomeAssistant, entry: FreeboxConfigEntry) -> bool:
     hass.data.setdefault(DOMAIN, {})
 
@@ -134,6 +156,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: FreeboxConfigEntry) -> b
     create_lan_devices = option_enabled(
         entry, CONF_CREATE_LAN_DEVICES, DEFAULT_CREATE_LAN_DEVICES
     )
+    # Avant le premier relevé : le rangement des clients (ensure_lan_client_device)
+    # lit cette valeur dès update_all.
+    router.create_lan_devices = create_lan_devices
     if not create_lan_devices:
         removed = async_remove_lan_client_devices(hass, entry, freebox_config["mac"])
         if removed:

@@ -1,9 +1,8 @@
-"""Guide TV Homexa : EPG Freebox + pont optionnel vers Programme TNT FR.
+"""Guide TV Homexa : EPG Freebox + guide TNT embarqué de Homexa.
 
-Ne recrée ni le domaine programme_tnt_fr, ni ses capteurs, ni sa carte.
-Si l'intégration cyclope205/programme-tnt-fr est déjà installée, on lit ses
-entités existantes (current / prime_time / second_part). Sinon on reste sur
-l'EPG Freebox. Crédit source TNT : xmltvfr.fr / programme-tnt-fr.
+Lit les données du coordinateur TNT propre à Homexa
+(hass.data["freebox_homexa"]["tnt_coordinators"]) ; sinon on reste sur
+l'EPG Freebox. Crédit source TNT : xmltvfr.fr / programme-tnt-fr (MIT).
 """
 
 from __future__ import annotations
@@ -18,7 +17,7 @@ from homeassistant.util import slugify
 
 _LOGGER = logging.getLogger(__name__)
 
-TNT_DOMAIN = "programme_tnt_fr"
+TNT_SOURCE = "tnt"
 PRIME_TIME_START = time(21, 15)
 LATE_NIGHT_START = time(22, 40)
 
@@ -68,25 +67,34 @@ def channel_number(name: str | None) -> int | None:
 
 @callback
 def tnt_programs(hass: HomeAssistant) -> list[dict[str, Any]]:
-    """Read already-created Programme TNT FR sensors, if any."""
+    """Read the programmes of Homexa's own bundled TNT coordinators, if any."""
     programs: list[dict[str, Any]] = []
-    for state in hass.states.async_all("sensor"):
-        if not state.entity_id.startswith("sensor.programme_tnt_fr_"):
+    seen: set[str] = set()
+    coordinators = (
+        hass.data.get("freebox_homexa", {}).get("tnt_coordinators", {}).values()
+    )
+    for coordinator in coordinators:
+        data = getattr(coordinator, "data", None)
+        if not isinstance(data, dict):
             continue
-        current = state.attributes.get("current")
-        if not isinstance(current, dict):
-            continue
-        programs.append(
-            {
-                "source": TNT_DOMAIN,
-                "entity_id": state.entity_id,
-                "channel_name": state.attributes.get("channel_name") or state.name,
-                "channel_icon": state.attributes.get("channel_icon"),
-                "current": current,
-                "prime_time": state.attributes.get("prime_time"),
-                "second_part": state.attributes.get("second_part"),
-            }
-        )
+        for channel_id, item in data.items():
+            if channel_id in seen or not isinstance(item, dict):
+                continue
+            current = item.get("current")
+            if not isinstance(current, dict):
+                continue
+            seen.add(channel_id)
+            programs.append(
+                {
+                    "source": TNT_SOURCE,
+                    "channel_id": channel_id,
+                    "channel_name": item.get("channel_name") or channel_id,
+                    "channel_icon": item.get("channel_icon"),
+                    "current": current,
+                    "prime_time": item.get("prime_time"),
+                    "second_part": item.get("second_part"),
+                }
+            )
     return programs
 
 
@@ -135,7 +143,7 @@ def summarize_guide(
                     "stop": prog.get("stop"),
                     "poster": prog.get("poster"),
                     "tmdb_rating": prog.get("tmdb_rating"),
-                    "source": TNT_DOMAIN,
+                    "source": TNT_SOURCE,
                     "channel_number": channel_number(channel),
                 }
             )
@@ -160,7 +168,7 @@ def summarize_guide(
                 current.append(payload)
 
     return {
-        "source": TNT_DOMAIN if tnt else "freebox",
+        "source": TNT_SOURCE if tnt else "freebox",
         "tnt_available": bool(tnt),
         "current": current[:20],
         "prime_time": prime[:20],

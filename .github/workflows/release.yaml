@@ -48,6 +48,41 @@ jobs:
             exit 1
           fi
 
+          # Version de const.py : doit aussi correspondre au tag
+          CONST_VERSION=$(sed -n 's/^VERSION = "\(.*\)"$/\1/p' custom_components/freebox_homexa/const.py)
+          if [ "$CONST_VERSION" != "$TAG" ]; then
+            echo "::error::const.py (VERSION = $CONST_VERSION) ne correspond pas au tag ($TAG)"
+            exit 1
+          fi
+
+          # Archive HACS (zip_release) : CONTENU de custom_components/freebox_homexa à la racine du zip,
+          # HACS l'extrait dans custom_components/freebox_homexa/. Sans __pycache__ ni .pyc.
+          ZIP="$GITHUB_WORKSPACE/freebox_homexa.zip"
+          rm -f "$ZIP"
+          python3 - "$ZIP" <<'PY'
+          import pathlib, sys, zipfile
+          src = pathlib.Path("custom_components/freebox_homexa")
+          with zipfile.ZipFile(sys.argv[1], "w", zipfile.ZIP_DEFLATED) as zf:
+              for path in sorted(src.rglob("*")):
+                  rel = path.relative_to(src)
+                  if not path.is_file() or "__pycache__" in rel.parts or path.suffix in (".pyc", ".pyo"):
+                      continue
+                  zf.write(path, rel.as_posix())
+          PY
+          ZIP_VERSION=$(unzip -p "$ZIP" manifest.json | jq -r '.version')
+          if [ "$ZIP_VERSION" != "$TAG" ]; then
+            echo "::error::manifest.json du zip ($ZIP_VERSION) ne correspond pas au tag ($TAG)"
+            exit 1
+          fi
+          for f in manifest.json __init__.py; do
+            unzip -l "$ZIP" "$f" >/dev/null || { echo "::error::$f absent de la racine du zip"; exit 1; }
+          done
+          if unzip -Z1 "$ZIP" | grep -Eq '(^|/)__pycache__/|\.py[co]$'; then
+            echo "::error::Le zip contient des fichiers compilés (__pycache__ / .pyc)"
+            exit 1
+          fi
+          echo "Archive : $(unzip -Z1 "$ZIP" | wc -l) fichiers, $(du -h "$ZIP" | cut -f1)"
+
           # Notes : section correspondante de CHANGELOG.md, sinon notes générées par GitHub
           NOTES_FILE=$(mktemp)
           if [ -f CHANGELOG.md ]; then
@@ -59,8 +94,14 @@ jobs:
           if [ -s "$NOTES_FILE" ] && grep -q '[^[:space:]]' "$NOTES_FILE"; then
             echo "Notes issues de CHANGELOG.md (## $TAG)"
             gh release create "$TAG" --target "$TARGET" --title "$TAG" \
-              --notes-file "$NOTES_FILE" --generate-notes
+              --notes-file "$NOTES_FILE" --generate-notes "$ZIP"
           else
             echo "Pas de section $TAG dans CHANGELOG.md : notes générées automatiquement"
-            gh release create "$TAG" --target "$TARGET" --title "$TAG" --generate-notes
+            gh release create "$TAG" --target "$TARGET" --title "$TAG" --generate-notes "$ZIP"
           fi
+
+          # Vérifie que l'archive est bien jointe (HACS compte ses téléchargements)
+          gh release view "$TAG" --json assets -q '.assets[].name' | grep -qx 'freebox_homexa.zip' || {
+            echo "::error::freebox_homexa.zip n'est pas joint à la release $TAG"
+            exit 1
+          }

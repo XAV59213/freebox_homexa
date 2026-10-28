@@ -1,6 +1,6 @@
 # Changelog
 
-## Non publié
+## 28.8.65
 - Publication / HACS :
   - chaque release GitHub joint désormais l'archive **`freebox_homexa.zip`** (contenu de `custom_components/freebox_homexa`, sans `__pycache__` ni `.pyc`). `hacs.json` passe en `"zip_release": true` / `"filename": "freebox_homexa.zip"` : HACS installe depuis ce zip et peut afficher un **compteur de téléchargements**
   - le workflow `release.yaml` vérifie que `manifest.json`, `const.py` et le `manifest.json` du zip portent la même version que le tag, puis que l'archive est bien jointe à la release

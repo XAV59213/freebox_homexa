@@ -1,5 +1,11 @@
 # Changelog
 
+## Non publié
+- Publication / HACS :
+  - chaque release GitHub joint désormais l'archive **`freebox_homexa.zip`** (contenu de `custom_components/freebox_homexa`, sans `__pycache__` ni `.pyc`). `hacs.json` passe en `"zip_release": true` / `"filename": "freebox_homexa.zip"` : HACS installe depuis ce zip et peut afficher un **compteur de téléchargements**
+  - le workflow `release.yaml` vérifie que `manifest.json`, `const.py` et le `manifest.json` du zip portent la même version que le tag, puis que l'archive est bien jointe à la release
+  - aucun changement pour l'intégration elle-même (aucun code modifié)
+
 ## 28.8.64
 - Documentation :
   - README : nouvelles sections « Actions » (les 6 actions ; `freebox_homexa.remote` avec `code`, `player_id`, `device_id`, liste des touches, exemples YAML, erreurs), « Disponibilité et journal » (entités indisponibles quand la Freebox est injoignable, nœuds Home « unreachable » hors RTS, journal unique, astuce `not_from` pour les automatisations d'alarme) et « Suppression ». L'option « Créer des appareils pour les clients réseau » est mise à jour (décochée par défaut sur une nouvelle installation, conservée sur une existante, retrait automatique des appareils clients 100 % Homexa). Dépannage complété

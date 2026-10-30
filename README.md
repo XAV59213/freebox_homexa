@@ -1,4 +1,5 @@
 [![GitHub Release](https://img.shields.io/github/v/release/XAV59213/freebox_homexa?style=flat-square)](https://github.com/XAV59213/freebox_homexa/releases) [![hacs](https://img.shields.io/badge/HACS-Custom-orange.svg?style=flat-square)](https://hacs.xyz/) [![GitHub Activity](https://img.shields.io/github/commit-activity/m/XAV59213/freebox_homexa?style=flat-square)](https://github.com/XAV59213/freebox_homexa/commits/main)
+[![Downloads](https://img.shields.io/github/downloads/XAV59213/freebox_homexa/total.svg?label=Downloads)](https://github.com/XAV59213/freebox_homexa/releases)
 
 # Freebox Homexa
 

@@ -1,5 +1,8 @@
 # Changelog
 
+## 28.8.69 (2026-10-31)
+- **TNT / guide XMLTV** : la mise à jour horaire du guide (~78 Mo) ne bloque plus Home Assistant (#91). Le parsing se fait désormais par morceaux (`XMLPullParser`) au lieu d'un `ET.fromstring()` qui gardait le GIL ~13 s sur HA Green et faisait planter ZHA. Mémoire réduite, résultats identiques
+
 ## 28.8.68 (2026-10-31)
 - Carte **`homexa-tnt-card`**, éditeur visuel : les **libellés des interrupteurs** avaient disparu (Home Assistant récent n'affiche plus l'attribut `label` de `<ha-formfield>`). Chaque interrupteur (vues, carrousel, Favoris, Guide TV, Top films, chaînes favorites) a de nouveau son texte, à gauche ; toucher le texte bascule l'interrupteur. Accents rétablis (« À suivre », « soirée »)
 - Carte **`freebox-homexa-card`** :

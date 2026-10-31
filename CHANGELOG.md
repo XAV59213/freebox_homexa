@@ -1,5 +1,11 @@
 # Changelog
 
+## Non publié
+- Carte **`freebox-homexa-card`** :
+  - **interrupteurs « Sections affichées »** : ils apparaissaient désactivés alors que les sections étaient affichées (clé absente), si bien que les désactiver semblait sans effet. Ils sont maintenant activés par défaut (`default: true`) et reflètent l’état réel ; les désactiver masque bien la section. Clé absente = section affichée, comme avant
+  - **plusieurs volets / PIR / Player / RSSI / alarmes** : le sélecteur était déjà multiple, mais ne le montrait pas. L’aide indique maintenant qu’après un choix, un nouveau champ apparaît dessous pour ajouter une autre entité
+  - listes saisies en YAML sous forme de texte (`covers: cover.a, cover.b`) acceptées en plus des listes
+
 ## 28.8.67 (2026-10-31)
 - Carte **`freebox-homexa-card`** réglable :
   - nouvel éditeur visuel natif de Home Assistant (`getConfigForm`) : vrais sélecteurs d’entités et bouton **Enregistrer** actif dès qu’on change un réglage (l’ancien éditeur à champs texte ne l’activait qu’en quittant le champ)

@@ -194,7 +194,7 @@ type: custom:homexa-calls-card
 Journal des appels de la Freebox (manqués, reçus, émis) avec icônes, heure et durée, à partir du capteur « Derniers appels Freebox ».
 
 <p align="center">
-  <img src="docs/images/homexa-calls-card.jpg" alt="Carte Homexa Appels (historique Freebox)" width="420"><br>
+  <img src="https://raw.githubusercontent.com/XAV59213/freebox_homexa/main/docs/images/homexa-calls-card.jpg" alt="Carte Homexa Appels (historique Freebox)" width="420"><br>
   <em>Carte Homexa Appels (historique Freebox)</em>
 </p>
  Détails : [examples/lovelace/README.md](examples/lovelace/README.md)
@@ -208,7 +208,7 @@ type: custom:freebox-homexa-card
 Entièrement réglable dans l’éditeur visuel : titre, sections affichées ou masquées, et choix de **plusieurs** alarmes, volets, PIR, Player et capteurs RSSI (sélecteurs d’entités natifs). Liste vide = détection automatique. Détails : [examples/lovelace/README.md](examples/lovelace/README.md)
 
 <p align="center">
-  <img src="docs/images/freebox-homexa-card.jpg" alt="Carte Freebox Homexa" width="420"><br>
+  <img src="https://raw.githubusercontent.com/XAV59213/freebox_homexa/main/docs/images/freebox-homexa-card.jpg" alt="Carte Freebox Homexa" width="420"><br>
   <em>Carte Freebox Homexa</em>
 </p>
 
@@ -226,7 +226,7 @@ type: custom:homexa-tnt-card
 - Exemple complet : [examples/lovelace/homexa-tnt-card.yaml](examples/lovelace/homexa-tnt-card.yaml)
 
 <p align="center">
-  <img src="docs/images/homexa-tnt-card.jpg" alt="Carte Homexa TNT" width="420"><br>
+  <img src="https://raw.githubusercontent.com/XAV59213/freebox_homexa/main/docs/images/homexa-tnt-card.jpg" alt="Carte Homexa TNT" width="420"><br>
   <em>Carte Homexa TNT</em>
 </p>
 

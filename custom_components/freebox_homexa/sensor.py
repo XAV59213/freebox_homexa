@@ -78,6 +78,12 @@ CALL_SENSORS: tuple[SensorEntityDescription, ...] = (
     SensorEntityDescription(key="missed", name="Appels manqués Freebox", icon="mdi:phone-missed"),
 )
 
+# Journal complet (entrants, sortants, manqués) pour la carte « Homexa Appels ».
+CALL_LOG_SENSOR = SensorEntityDescription(
+    key="calls_log", name="Derniers appels Freebox", icon="mdi:phone-log"
+)
+CALL_LOG_MAX = 30
+
 DISK_PARTITION_SENSORS: tuple[SensorEntityDescription, ...] = (
     SensorEntityDescription(
         key="partition_free_space",
@@ -147,6 +153,7 @@ async def async_setup_entry(
     )
     entities.extend(FreeboxSensor(router, description) for description in CONNECTION_SENSORS)
     entities.extend(FreeboxCallSensor(router, description) for description in CALL_SENSORS)
+    entities.append(FreeboxCallLogSensor(router, CALL_LOG_SENSOR))
     entities.extend(
         FreeboxDiskSensor(router, disk, partition, description)
         for disk in router.disks.values()
@@ -262,6 +269,46 @@ class FreeboxCallSensor(FreeboxSensor):
             dt_util.utc_from_timestamp(call["datetime"]).isoformat(): call["name"]
             for call in self._call_list_for_type
         }
+
+
+class FreeboxCallLogSensor(FreeboxSensor):
+    """Derniers appels (tous types). État = nombre d'appels non lus.
+
+    L'attribut ``calls`` (liste, du plus récent au plus ancien) n'est pas
+    enregistré dans l'historique pour ne pas alourdir la base.
+    """
+
+    _unrecorded_attributes = frozenset({"calls"})
+
+    def __init__(self, router: FreeboxRouter, description: SensorEntityDescription) -> None:
+        super().__init__(router, description)
+        self._calls: list[dict[str, Any]] = []
+
+    @callback
+    def async_update_state(self) -> None:
+        calls = sorted(
+            (c for c in self._router.call_list or [] if isinstance(c, dict)),
+            key=lambda c: c.get("datetime") or 0,
+            reverse=True,
+        )[:CALL_LOG_MAX]
+        self._calls = [
+            {
+                "name": c.get("name") or c.get("number") or "Inconnu",
+                "number": c.get("number") or "",
+                "type": c.get("type") or "",
+                "datetime": dt_util.utc_from_timestamp(c["datetime"]).isoformat()
+                if c.get("datetime")
+                else None,
+                "duration": c.get("duration") or 0,
+                "new": bool(c.get("new", False)),
+            }
+            for c in calls
+        ]
+        self._attr_native_value = sum(1 for c in self._calls if c["new"])
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        return {"calls": self._calls}
 
 
 class FreeboxDiskSensor(FreeboxSensor):

@@ -14,7 +14,7 @@ from homeassistant.const import EVENT_HOMEASSISTANT_STARTED
 from homeassistant.core import Event, HomeAssistant, callback
 from homeassistant.helpers.event import async_call_later
 
-from ..const import CARD_FILENAME, STATIC_CARD_PATH, URL_BASE, VERSION
+from ..const import CALLS_CARD_FILENAME, CARD_FILENAME, STATIC_CARD_PATH, URL_BASE, VERSION
 from ..tnt_const import TNT_CARD_FILENAME
 
 _LOGGER = logging.getLogger(__name__)
@@ -77,6 +77,8 @@ class JSModuleRegistration:
         # avec add_extra_js_url uniquement : aucune ressource Lovelace créée,
         # et celles des autres intégrations ne sont jamais lues ni modifiées.
         add_extra_js_url(self.hass, f"{URL_BASE}/{TNT_CARD_FILENAME}?v={VERSION}")
+        # Carte « Homexa Appels » (journal téléphonique), même mécanisme.
+        add_extra_js_url(self.hass, f"{URL_BASE}/{CALLS_CARD_FILENAME}?v={VERSION}")
 
         if self.hass.is_running:
             await self._async_register_lovelace_resources()

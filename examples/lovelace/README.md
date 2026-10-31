@@ -58,3 +58,19 @@ type: custom:homexa-tnt-card
 ```
 
 Tableau de bord → Ajouter une carte → cherche **Homexa TNT**. Options : voir [homexa-tnt-card.yaml](homexa-tnt-card.yaml).
+
+# Carte « Homexa Appels » (journal téléphonique)
+
+```yaml
+type: custom:homexa-calls-card
+entity: sensor.derniers_appels_freebox
+title: Téléphone
+max_calls: 5
+```
+
+Remplace une carte Markdown : nom en gras, icône colorée selon le type (manqué en rouge, reçu en vert, émis en bleu), heure à droite avec « Aujourd'hui », « Hier » ou la date, durée des appels reçus/émis, point rouge sur les appels non lus et badge « N manqués » dans l’en-tête.
+
+Tout se règle dans l’éditeur visuel : capteur, titre, nombre d’appels (1 à 30), types affichés (`show_missed`, `show_accepted`, `show_outgoing`), `show_number`, `show_duration`.
+
+Source : nouveau capteur **« Derniers appels Freebox »** (état = appels non lus, attribut `calls` avec les 30 derniers appels, non enregistré dans l’historique). L’ancien capteur « Appels manqués Freebox » fonctionne aussi (appels manqués non lus uniquement).
+

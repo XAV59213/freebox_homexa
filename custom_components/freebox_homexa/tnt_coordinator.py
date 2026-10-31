@@ -33,46 +33,71 @@ def _parse_xmltv_datetime(value: str | None):
         return None
 
 
-def _parse_xmltv(xml_text: str, channels: list[str]) -> tuple[dict, dict]:
-    """Parse XMLTV off the event loop."""
-    root = ET.fromstring(xml_text)
+def _parse_xmltv(xml_data: bytes, channels: list[str]) -> tuple[dict, dict]:
+    """Parse XMLTV off the event loop, incrementally.
+
+    ET.fromstring() on the ~78 MB xmltv_fr.xml holds the GIL for the whole
+    parse (10+ s on HA Green), freezing the event loop even from an executor
+    thread (issue #91). Feeding small chunks to XMLPullParser releases the
+    GIL between chunks, and clearing nodes keeps memory low.
+    """
     wanted = set(channels)
     meta: dict[str, dict] = {}
-    for channel in root.findall("channel"):
-        cid = channel.get("id")
-        if cid not in wanted:
-            continue
-        display = channel.findtext("display-name") or cid
-        icon_el = channel.find("icon")
-        meta[cid] = {"name": display, "icon": icon_el.get("src") if icon_el is not None else None}
     programmes: dict[str, list[Programme]] = {cid: [] for cid in wanted}
-    for node in root.findall("programme"):
-        cid = node.get("channel")
-        if cid not in wanted:
-            continue
-        start = _parse_xmltv_datetime(node.get("start"))
-        stop = _parse_xmltv_datetime(node.get("stop"))
-        title = node.findtext("title")
-        if not start or not stop or not title:
-            continue
-        icon_el = node.find("icon")
-        rating_el = node.find("rating/value")
-        programmes[cid].append(
-            Programme(
-                start=start,
-                stop=stop,
-                title=title,
-                subtitle=node.findtext("sub-title"),
-                desc=node.findtext("desc"),
-                category=node.findtext("category"),
-                icon=icon_el.get("src") if icon_el is not None else None,
-                rating=rating_el.text if rating_el is not None else None,
-                date=(node.findtext("date") or "").strip() or None,
-            )
-        )
+    parser = ET.XMLPullParser(events=("start", "end"))
+    root = None
+    chunk = 64 * 1024
+    for offset in range(0, len(xml_data), chunk):
+        parser.feed(xml_data[offset : offset + chunk])
+        for event, node in parser.read_events():
+            if event == "start":
+                if root is None:
+                    root = node
+                continue
+            if node.tag == "channel":
+                cid = node.get("id")
+                if cid in wanted:
+                    icon_el = node.find("icon")
+                    meta[cid] = {
+                        "name": node.findtext("display-name") or cid,
+                        "icon": icon_el.get("src") if icon_el is not None else None,
+                    }
+            elif node.tag == "programme":
+                cid = node.get("channel")
+                if cid in wanted:
+                    _append_programme(programmes[cid], node)
+            else:
+                continue
+            node.clear()
+            if root is not None:
+                root.clear()  # drop processed children
+    parser.close()
     for cid in programmes:
         programmes[cid].sort(key=lambda item: item.start)
     return programmes, meta
+
+
+def _append_programme(target: list, node) -> None:
+    start = _parse_xmltv_datetime(node.get("start"))
+    stop = _parse_xmltv_datetime(node.get("stop"))
+    title = node.findtext("title")
+    if not start or not stop or not title:
+        return
+    icon_el = node.find("icon")
+    rating_el = node.find("rating/value")
+    target.append(
+        Programme(
+            start=start,
+            stop=stop,
+            title=title,
+            subtitle=node.findtext("sub-title"),
+            desc=node.findtext("desc"),
+            category=node.findtext("category"),
+            icon=icon_el.get("src") if icon_el is not None else None,
+            rating=rating_el.text if rating_el is not None else None,
+            date=(node.findtext("date") or "").strip() or None,
+        )
+    )
 
 
 class Programme:
@@ -178,9 +203,10 @@ class ProgrammeTntFrCoordinator(DataUpdateCoordinator):
     async def _fetch_and_parse(self) -> None:
         async with self._session.get(XMLTV_URL, timeout=60) as resp:
             resp.raise_for_status()
-            xml_text = await resp.text()
+            # bytes, pas de decode/charset-detection de 78 Mo sur le loop
+            xml_data = await resp.read()
         programmes, meta = await self.hass.async_add_executor_job(
-            _parse_xmltv, xml_text, self._channels
+            _parse_xmltv, xml_data, self._channels
         )
         self._programmes_by_channel = programmes
         self._channels_meta = meta

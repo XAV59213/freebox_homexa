@@ -54,7 +54,6 @@ Installation manuelle : copie le dossier `custom_components/freebox_homexa` dans
 
 ## Configuration
 
-[![Ouvrir le flux de config](https://my.home-assistant.io/badges/config_flow_start.svg)](https://my.home-assistant.io/redirect/config_flow_start/?domain=freebox_homexa)
 
 1. **Paramètres → Appareils et services → Ajouter une intégration**
 2. Cherche **Freebox Homexa**

@@ -1,5 +1,14 @@
 # Changelog
 
+## Non publié
+- Carte **`freebox-homexa-card`** réglable :
+  - nouvel éditeur visuel natif de Home Assistant (`getConfigForm`) : vrais sélecteurs d’entités et bouton **Enregistrer** actif dès qu’on change un réglage (l’ancien éditeur à champs texte ne l’activait qu’en quittant le champ)
+  - **plusieurs entités par section** : `alarms`, `covers`, `pirs`, `players`, `rssi_entities` ; une tuile par entité, chacune avec ses propres boutons
+  - **sections masquables** : `show_alarm`, `show_covers`, `show_pir`, `show_player`, `show_rssi`, et `title` facultatif
+  - détection auto limitée aux entités Freebox Homexa quand il y en a ; « salon » est bien préféré à « volet » pour le volet par défaut
+  - à l’ajout de la carte, elle est pré-remplie avec les entités détectées
+  - compatibilité : `alarm_entity`, `cover_entity`, `pir_entity`, `player_entity`, `rssi_entity` restent lues ; une carte existante s’affiche comme avant
+
 ## 28.8.66
 
 - docs: badge Downloads cumulés

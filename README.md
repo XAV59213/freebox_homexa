@@ -176,6 +176,14 @@ Vue Lovelace **Alarme / Volet / PIR / Player / RSSI** :
 - [examples/lovelace/homexa-tuiles-natives.yaml](examples/lovelace/homexa-tuiles-natives.yaml) — tuiles natives, sans carte custom
 - Mode d’emploi : [examples/lovelace/README.md](examples/lovelace/README.md)
 
+### Carte « Freebox Homexa »
+
+```yaml
+type: custom:freebox-homexa-card
+```
+
+Entièrement réglable dans l’éditeur visuel : titre, sections affichées ou masquées, et choix de **plusieurs** alarmes, volets, PIR, Player et capteurs RSSI (sélecteurs d’entités natifs). Liste vide = détection automatique. Détails : [examples/lovelace/README.md](examples/lovelace/README.md)
+
 ### Carte « Homexa TNT » (guide TV)
 
 Carte guide TV livrée avec l'intégration, adaptée de [Programme TNT FR](https://github.com/cyclope205/programme-tnt-fr) (MIT) : carrousels « En ce moment / À suivre / 1re et 2e partie de soirée », Guide TV par jour, chaînes favorites, affiches et notes TMDB (si une clé personnelle est configurée) et rappels (profils de rappel Homexa).

@@ -2,9 +2,14 @@
 # Après mise à jour de l’intégration : redémarre HA, puis
 # Tableau de bord → Modifier → Ajouter une carte → Freebox Homexa
 #
-# Détection auto des entités. Pour forcer :
-#   alarm_entity / cover_entity / pir_entity / player_entity / rssi_entity
+# Tout se règle dans l'éditeur visuel. Listes vides = détection auto.
+# Listes : alarms / covers / pirs / players / rssi_entities
+# Sections : show_alarm / show_covers / show_pir / show_player / show_rssi
+# (anciennes clés alarm_entity, cover_entity… toujours acceptées)
 
 type: custom:freebox-homexa-card
-cover_entity: cover.volet_salon
-player_entity: media_player.freebox_player
+title: Maison
+covers:
+  - cover.volet_salon
+players:
+  - media_player.freebox_player

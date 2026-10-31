@@ -1,5 +1,4 @@
 const CARD_TAG = "freebox-homexa-card";
-const EDITOR_TAG = "freebox-homexa-card-editor";
 
 const ALARM_MODES = [
   { state: "armed_home", service: "alarm_arm_home", label: "Présent", icon: "⌂" },
@@ -17,7 +16,12 @@ function _ids(hass, prefix) {
 
 function _prefer(ids, needles) {
   const lower = needles.map((n) => n.toLowerCase());
-  return ids.find((id) => lower.some((n) => id.toLowerCase().includes(n))) || ids[0] || "";
+  // Les mots-clés sont essayés dans l'ordre : « salon » passe avant « volet ».
+  for (const n of lower) {
+    const hit = ids.find((id) => id.toLowerCase().includes(n));
+    if (hit) return hit;
+  }
+  return ids[0] || "";
 }
 
 // Échappe toute valeur insérée dans un gabarit innerHTML (noms, états,
@@ -71,12 +75,12 @@ const STYLES = `
   }
   .grid {
     display: grid;
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
     gap: 12px;
   }
   .row3 {
     display: grid;
-    grid-template-columns: 1fr 1.15fr 1fr;
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
     gap: 12px;
   }
   .card {
@@ -90,6 +94,7 @@ const STYLES = `
   }
   .head { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
   .title { font-weight: 600; font-size: 15px; }
+  .card-title { font-size: 18px; font-weight: 600; margin: 0 0 10px 2px; }
   .sub { font-size: 12px; opacity: 0.7; margin-left: auto; }
   .modes { display: flex; gap: 8px; margin-top: 10px; }
   .mode {
@@ -130,10 +135,63 @@ const STYLES = `
   .empty { opacity: 0.5; font-size: 12px; padding: 8px 0; }
   @media (max-width: 700px) {
     .grid { grid-template-columns: 1fr; }
-    .row3 { grid-template-columns: 1fr 1fr; }
-    .row3 .card:nth-child(2) { grid-column: 1 / -1; }
+    .row3 { grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); }
   }
 `;
+
+// Clés d'une config : listes (nouveau) + anciennes clés à une entité (compat).
+const LIST_KEYS = {
+  alarm: ["alarms", "alarm_entity"],
+  cover: ["covers", "cover_entity"],
+  pir: ["pirs", "pir_entity"],
+  player: ["players", "player_entity"],
+  rssi: ["rssi_entities", "rssi_entity"],
+};
+const SHOW_KEYS = { alarm: "show_alarm", cover: "show_covers", pir: "show_pir", player: "show_player", rssi: "show_rssi" };
+
+function _asList(value) {
+  if (Array.isArray(value)) return value.filter((v) => typeof v === "string" && v);
+  if (typeof value === "string" && value.trim()) return [value.trim()];
+  return [];
+}
+
+function _uniq(ids) {
+  return [...new Set(ids)];
+}
+
+function _hasDeviceClass(hass, id, cls) {
+  const st = hass.states[id];
+  return !!(st && st.attributes && st.attributes.device_class === cls);
+}
+
+// Détection des entités : celles de Freebox Homexa d'abord, les autres en secours.
+function _detect(hass) {
+  const homexa = (ids) => ids.filter((id) => _platform(hass, id) === "freebox_homexa");
+  const pick = (ids) => {
+    const own = homexa(ids);
+    return own.length ? own : ids;
+  };
+  const motions = _ids(hass, "binary_sensor.").filter((id) => _hasDeviceClass(hass, id, "motion"));
+  const rssis = _ids(hass, "sensor.").filter((id) => _hasDeviceClass(hass, id, "signal_strength"));
+  const allPlayers = _ids(hass, "media_player.");
+  const ownPlayers = homexa(allPlayers);
+  return {
+    alarm: pick(_ids(hass, "alarm_control_panel.")),
+    cover: pick(_ids(hass, "cover.")),
+    pir: pick(motions),
+    player: ownPlayers.length ? ownPlayers : allPlayers.filter((id) => id.includes("freebox") || id.includes("player")),
+    rssi: pick(rssis),
+  };
+}
+
+// Choix automatique (aucune entité configurée) : une entité par section, comme avant.
+function _autoOne(kind, ids) {
+  if (!ids.length) return [];
+  if (kind === "cover") return [_prefer(ids, ["salon", "volet"])];
+  if (kind === "pir") return [_prefer(ids, ["entree", "entrée", "pir"])];
+  if (kind === "player") return [_prefer(ids, ["freebox_player", "player"])];
+  return [ids[0]];
+}
 
 class FreeboxHomexaCard extends HTMLElement {
   constructor() {
@@ -145,16 +203,103 @@ class FreeboxHomexaCard extends HTMLElement {
     this.attachShadow({ mode: "open" });
   }
 
-  static getStubConfig() {
-    return {};
+  // Formulaire natif de Home Assistant : sélecteurs d'entités, interrupteurs, bouton Enregistrer.
+  static getConfigForm() {
+    const ent = (domain, extra = {}) => ({ entity: { multiple: true, filter: { domain, ...extra } } });
+    const one = (domain) => ({ entity: { filter: { domain } } });
+    return {
+      schema: [
+        { name: "title", selector: { text: {} } },
+        {
+          type: "expandable",
+          name: "",
+          title: "Sections affichées",
+          flatten: true,
+          schema: [
+            {
+              type: "grid",
+              name: "",
+              flatten: true,
+              schema: [
+                { name: "show_alarm", selector: { boolean: {} } },
+                { name: "show_covers", selector: { boolean: {} } },
+                { name: "show_pir", selector: { boolean: {} } },
+                { name: "show_player", selector: { boolean: {} } },
+                { name: "show_rssi", selector: { boolean: {} } },
+              ],
+            },
+          ],
+        },
+        { name: "alarms", selector: ent("alarm_control_panel") },
+        { name: "covers", selector: ent("cover") },
+        { name: "pirs", selector: ent("binary_sensor", { device_class: "motion" }) },
+        { name: "players", selector: ent("media_player") },
+        { name: "rssi_entities", selector: ent("sensor", { device_class: "signal_strength" }) },
+        {
+          // Anciennes clés (une seule entité) : toujours lues, affichées ici pour pouvoir les vider.
+          type: "expandable",
+          name: "",
+          title: "Ancien réglage (une entité par section)",
+          flatten: true,
+          schema: [
+            { name: "alarm_entity", selector: one("alarm_control_panel") },
+            { name: "cover_entity", selector: one("cover") },
+            { name: "pir_entity", selector: one("binary_sensor") },
+            { name: "player_entity", selector: one("media_player") },
+            { name: "rssi_entity", selector: one("sensor") },
+          ],
+        },
+      ],
+      computeLabel: (s) =>
+        ({
+          title: "Titre (facultatif)",
+          show_alarm: "Alarme",
+          show_covers: "Volets",
+          show_pir: "Détecteurs PIR",
+          show_player: "Freebox Player",
+          show_rssi: "WiFi RSSI",
+          alarms: "Alarme(s)",
+          covers: "Volets",
+          pirs: "Détecteurs de mouvement (PIR)",
+          players: "Freebox Player",
+          rssi_entities: "Capteurs RSSI",
+          alarm_entity: "Alarme (ancien)",
+          cover_entity: "Volet (ancien)",
+          pir_entity: "PIR (ancien)",
+          player_entity: "Player (ancien)",
+          rssi_entity: "RSSI (ancien)",
+        })[s.name],
+      computeHelper: (s) =>
+        ["alarms", "covers", "pirs", "players", "rssi_entities"].includes(s.name)
+          ? "Vide = détection automatique"
+          : undefined,
+    };
   }
 
-  static getConfigElement() {
-    return document.createElement(EDITOR_TAG);
+  static getStubConfig(hass) {
+    const stub = {};
+    if (!hass) return stub;
+    const found = _detect(hass);
+    const keys = { alarm: "alarms", cover: "covers", pir: "pirs", player: "players", rssi: "rssi_entities" };
+    Object.entries(keys).forEach(([kind, key]) => {
+      const ids = _uniq(found[kind]);
+      const one = _autoOne(kind, ids);
+      const list = kind === "cover" || kind === "pir" ? ids.slice(0, 4) : one;
+      if (list.length) stub[key] = list;
+    });
+    return stub;
   }
 
   setConfig(config) {
-    this._config = config || {};
+    const cfg = { ...(config || {}) };
+    // Compatibilité : alarm_entity, cover_entity… sont fusionnées dans les listes.
+    Object.values(LIST_KEYS).forEach(([listKey, oneKey]) => {
+      if (cfg[oneKey]) {
+        cfg[listKey] = _uniq(_asList(cfg[listKey]).concat(_asList(cfg[oneKey])));
+        delete cfg[oneKey];
+      }
+    });
+    this._config = cfg;
     if (this._built) this._render(true);
   }
 
@@ -178,32 +323,25 @@ class FreeboxHomexaCard extends HTMLElement {
     return { columns: 12, min_columns: 6, min_rows: 6 };
   }
 
+  _shown(kind) {
+    return this._config[SHOW_KEYS[kind]] !== false;
+  }
+
+  // Renvoie, pour chaque section, la liste des entités à afficher.
   _entities() {
-    const cfg = this._config;
+    const out = { alarm: [], cover: [], pir: [], player: [], rssi: [] };
     const hass = this._hass;
-    if (!hass) return { alarm: "", cover: "", pir: "", player: "", rssi: "" };
-    const homexa = (prefix) =>
-      _ids(hass, prefix).filter((id) => _platform(hass, id) === "freebox_homexa");
-    const alarms = homexa("alarm_control_panel.").concat(_ids(hass, "alarm_control_panel."));
-    const covers = homexa("cover.").concat(_ids(hass, "cover."));
-    const motions = _ids(hass, "binary_sensor.").filter((id) => {
-      const st = hass.states[id];
-      return st && st.attributes && st.attributes.device_class === "motion";
+    if (!hass) return out;
+    let found = null;
+    Object.entries(LIST_KEYS).forEach(([kind, [listKey]]) => {
+      const chosen = _asList(this._config[listKey]);
+      if (chosen.length) out[kind] = _uniq(chosen);
+      else {
+        found = found || _detect(hass);
+        out[kind] = _autoOne(kind, _uniq(found[kind]));
+      }
     });
-    const players = homexa("media_player.").concat(
-      _ids(hass, "media_player.").filter((id) => id.includes("freebox") || id.includes("player"))
-    );
-    const rssis = _ids(hass, "sensor.").filter((id) => {
-      const st = hass.states[id];
-      return st && st.attributes && st.attributes.device_class === "signal_strength";
-    });
-    return {
-      alarm: cfg.alarm_entity || [...new Set(alarms)][0] || "",
-      cover: cfg.cover_entity || _prefer([...new Set(covers)], ["salon", "volet"]) || "",
-      pir: cfg.pir_entity || _prefer(motions, ["entree", "entrée", "pir"]) || motions[0] || "",
-      player: cfg.player_entity || _prefer([...new Set(players)], ["freebox_player", "player"]) || "",
-      rssi: cfg.rssi_entity || rssis[0] || "",
-    };
+    return out;
   }
 
   _call(domain, service, entity_id, data = {}) {
@@ -219,77 +357,123 @@ class FreeboxHomexaCard extends HTMLElement {
       if (!target) return;
       ev.preventDefault();
       ev.stopPropagation();
-      const e = this._entities();
-      if (target.dataset.alarm) this._call("alarm_control_panel", target.dataset.alarm, e.alarm);
-      else if (target.dataset.cover) this._call("cover", target.dataset.cover, e.cover);
-      else if (target.dataset.src) this._call("media_player", "select_source", e.player, { source: target.dataset.src });
+      const id = target.dataset.entity;
+      if (!id) return;
+      if (target.dataset.alarm) this._call("alarm_control_panel", target.dataset.alarm, id);
+      else if (target.dataset.cover) this._call("cover", target.dataset.cover, id);
+      else if (target.dataset.src) this._call("media_player", "select_source", id, { source: target.dataset.src });
       else if (target.dataset.prime) {
-        this._call("media_player", "play_media", e.player, {
+        this._call("media_player", "play_media", id, {
           media_content_type: "url",
           media_content_id: "https://www.primevideo.com",
         });
-      } else if (target.dataset.media) this._call("media_player", target.dataset.media, e.player);
+      } else if (target.dataset.media) this._call("media_player", target.dataset.media, id);
     });
   }
 
-  _render(force) {
+  _alarmCard(id) {
     const hass = this._hass;
+    const alarm = id ? hass.states[id] : null;
+    const st = alarm ? alarm.state : "";
+    const label = st === "armed_home" ? "Présent" : st === "armed_away" ? "Absent" : st === "disarmed" ? "Désarmé" : alarm ? st : "—";
+    const title = alarm && this._entitiesCount.alarm > 1 ? _name(hass, id) : "Alarme";
+    return {
+      key: `${id}:${st}`,
+      html: `<div class="card">
+        <div class="head"><span class="title">${_esc(title)}</span><span class="sub">${_esc(label)}</span></div>
+        ${alarm ? `<div class="modes">${ALARM_MODES.map((m) => `<button type="button" class="mode ${st === m.state ? "active" : ""}" data-alarm="${_esc(m.service)}" data-entity="${_esc(id)}"><div>${_esc(m.icon)}</div><span>${_esc(m.label)}</span></button>`).join("")}</div><div class="hint">Code requis</div>` : `<div class="empty">Aucune alarme Homexa</div>`}
+      </div>`,
+    };
+  }
+
+  _coverCard(id) {
+    const hass = this._hass;
+    const cover = id ? hass.states[id] : null;
+    const label = !cover ? "—" : cover.state === "closed" ? "Fermé" : cover.state === "open" ? "Ouvert" : cover.state;
+    return {
+      key: `${id}:${label}`,
+      html: `<div class="card">
+        <div class="head"><span class="title">${_esc(cover ? _name(hass, id) : "Volet")}</span><span class="sub">${_esc(label)}</span></div>
+        ${cover ? `<div class="cover-art">${`<div class='slat'></div>`.repeat(6)}</div><div class="btns"><button type="button" class="btn" data-cover="open_cover" data-entity="${_esc(id)}">Ouvrir</button><button type="button" class="btn" data-cover="close_cover" data-entity="${_esc(id)}">Fermer</button></div>` : `<div class="empty">Aucun volet Homexa</div>`}
+      </div>`,
+    };
+  }
+
+  _pirCard(id) {
+    const hass = this._hass;
+    const pir = id ? hass.states[id] : null;
+    const on = pir && pir.state === "on";
+    const time = pir ? _fmtTime(pir.last_changed) : "";
+    return {
+      key: `${id}:${on}:${time}`,
+      html: `<div class="card center">
+        <div class="head"><span class="title">${_esc(pir ? _name(hass, id) : "PIR")}</span></div>
+        <div class="sub" style="margin:0;display:block;">${pir ? (on ? "Actif" : "Inactif") : "—"}</div>
+        <div class="walk ${on ? "on" : ""}">PIR</div>
+        <div class="hint">Dernier déclencheur : ${_esc(time || "—")}</div>
+      </div>`,
+    };
+  }
+
+  _playerCard(id) {
+    const hass = this._hass;
+    const player = id ? hass.states[id] : null;
+    const st = player ? player.state : "";
+    const label = st === "playing" ? "Lecture" : st === "paused" ? "En pause" : st === "on" ? "Allumé" : st === "off" ? "Éteint" : player ? st : "—";
+    const e = _esc(id);
+    return {
+      key: `${id}:${label}`,
+      html: `<div class="card center">
+        <div class="head"><span class="title">${_esc(player ? _name(hass, id) : "Freebox Player")}</span><span class="sub">${_esc(label)}</span></div>
+        ${player ? `<div class="apps"><button type="button" class="app yt" data-src="YouTube" data-entity="${e}">YT</button><button type="button" class="app nf" data-src="Netflix" data-entity="${e}">N</button><button type="button" class="app pr" data-prime="1" data-entity="${e}">prime</button></div><div class="transport"><button type="button" data-media="media_previous_track" data-entity="${e}">|◀</button><button type="button" data-media="media_play_pause" data-entity="${e}">▮▶</button><button type="button" data-media="media_next_track" data-entity="${e}">▶|</button></div>` : `<div class="empty">Aucun Player Homexa</div>`}
+      </div>`,
+    };
+  }
+
+  _rssiCard(id) {
+    const hass = this._hass;
+    const st = id ? hass.states[id] : null;
+    const rssi = st ? Number.parseFloat(st.state) : NaN;
+    const ok = Number.isFinite(rssi);
+    const bars = ok ? _rssiBars(rssi) : 0;
+    const title = st && this._entitiesCount.rssi > 1 ? _name(hass, id) : "WiFi RSSI";
+    return {
+      key: `${id}:${ok ? Math.round(rssi) : ""}`,
+      html: `<div class="card center">
+        <div class="head"><span class="title">${_esc(title)}</span></div>
+        ${ok ? `<div class="rssi-val">${_esc(Math.round(rssi))} dBm</div><div class="bars">${[1, 2, 3, 4].map((i) => `<div class="bar ${i <= bars ? "on" : ""}" style="height:${8 + i * 4}px"></div>`).join("")}</div><div class="ok">${_esc(_rssiLabel(rssi))}</div>` : `<div class="empty">Aucun capteur RSSI</div>`}
+      </div>`,
+    };
+  }
+
+  _section(kind, ids, builder) {
+    if (!this._shown(kind)) return [];
+    // Section affichée sans entité : une carte « Aucun… » comme avant.
+    return (ids.length ? ids : [""]).map((id) => builder.call(this, id));
+  }
+
+  _render(force) {
+    if (!this._hass) return;
     const e = this._entities();
-    const alarm = hass && e.alarm ? hass.states[e.alarm] : null;
-    const cover = hass && e.cover ? hass.states[e.cover] : null;
-    const pir = hass && e.pir ? hass.states[e.pir] : null;
-    const player = hass && e.player ? hass.states[e.player] : null;
-    const rssiSt = hass && e.rssi ? hass.states[e.rssi] : null;
-    const alarmState = alarm ? alarm.state : "";
-    const alarmLabel =
-      alarmState === "armed_home" ? "Présent" :
-      alarmState === "armed_away" ? "Absent" :
-      alarmState === "disarmed" ? "Désarmé" : alarm ? alarm.state : "—";
-    const coverLabel = !cover ? "—" : cover.state === "closed" ? "Fermé" : cover.state === "open" ? "Ouvert" : cover.state;
-    const pirOn = pir && pir.state === "on";
-    const pirTime = pir ? _fmtTime(pir.last_changed) : "";
-    const playerState = player ? player.state : "";
-    const playerLabel =
-      playerState === "playing" ? "Lecture" :
-      playerState === "paused" ? "En pause" :
-      playerState === "on" ? "Allumé" :
-      playerState === "off" ? "Éteint" : player ? playerState : "—";
-    const rssi = rssiSt ? Number.parseFloat(rssiSt.state) : NaN;
-    const rssiOk = Number.isFinite(rssi);
-    const bars = rssiOk ? _rssiBars(rssi) : 0;
-    const key = [e.alarm, e.cover, e.pir, e.player, e.rssi, alarmState, coverLabel, pirOn, playerLabel, rssiOk ? Math.round(rssi) : ""].join("|");
+    this._entitiesCount = { alarm: e.alarm.length, rssi: e.rssi.length };
+    const top = [...this._section("alarm", e.alarm, this._alarmCard), ...this._section("cover", e.cover, this._coverCard)];
+    const bottom = [
+      ...this._section("pir", e.pir, this._pirCard),
+      ...this._section("player", e.player, this._playerCard),
+      ...this._section("rssi", e.rssi, this._rssiCard),
+    ];
+    const title = this._config.title || "";
+    const key = [title, ...top.map((c) => c.key), "/", ...bottom.map((c) => c.key)].join("|");
     if (!force && this._lastKey === key && this.shadowRoot.querySelector(".wrap")) return;
     this._lastKey = key;
 
     this.shadowRoot.innerHTML = `
       <style>${STYLES}</style>
       <div class="wrap">
-        <div class="grid">
-          <div class="card">
-            <div class="head"><span class="title">Alarme</span><span class="sub">${_esc(alarmLabel)}</span></div>
-            ${e.alarm ? `<div class="modes">${ALARM_MODES.map((m) => `<button type="button" class="mode ${alarmState === m.state ? "active" : ""}" data-alarm="${_esc(m.service)}"><div>${_esc(m.icon)}</div><span>${_esc(m.label)}</span></button>`).join("")}</div><div class="hint">Code requis</div>` : `<div class="empty">Aucune alarme Homexa</div>`}
-          </div>
-          <div class="card">
-            <div class="head"><span class="title">${_esc(cover ? _name(hass, e.cover) : "Volet")}</span><span class="sub">${_esc(coverLabel)}</span></div>
-            ${e.cover ? `<div class="cover-art">${`<div class='slat'></div>`.repeat(6)}</div><div class="btns"><button type="button" class="btn" data-cover="open_cover">Ouvrir</button><button type="button" class="btn" data-cover="close_cover">Fermer</button></div>` : `<div class="empty">Aucun volet Homexa</div>`}
-          </div>
-        </div>
-        <div class="row3">
-          <div class="card center">
-            <div class="head"><span class="title">${_esc(pir ? _name(hass, e.pir) : "PIR")}</span></div>
-            <div class="sub" style="margin:0;display:block;">${pirOn ? "Actif" : "Inactif"}</div>
-            <div class="walk ${pirOn ? "on" : ""}">PIR</div>
-            <div class="hint">Dernier déclencheur : ${_esc(pirTime || "—")}</div>
-          </div>
-          <div class="card center">
-            <div class="head"><span class="title">${_esc(player ? _name(hass, e.player) : "Freebox Player")}</span><span class="sub">${_esc(playerLabel)}</span></div>
-            ${e.player ? `<div class="apps"><button type="button" class="app yt" data-src="YouTube">YT</button><button type="button" class="app nf" data-src="Netflix">N</button><button type="button" class="app pr" data-prime="1">prime</button></div><div class="transport"><button type="button" data-media="media_previous_track">|◀</button><button type="button" data-media="media_play_pause">▮▶</button><button type="button" data-media="media_next_track">▶|</button></div>` : `<div class="empty">Aucun Player Homexa</div>`}
-          </div>
-          <div class="card center">
-            <div class="head"><span class="title">WiFi RSSI</span></div>
-            ${rssiOk ? `<div class="rssi-val">${_esc(Math.round(rssi))} dBm</div><div class="bars">${[1, 2, 3, 4].map((i) => `<div class="bar ${i <= bars ? "on" : ""}" style="height:${8 + i * 4}px"></div>`).join("")}</div><div class="ok">${_esc(_rssiLabel(rssi))}</div>` : `<div class="empty">Aucun capteur RSSI</div>`}
-          </div>
-        </div>
+        ${title ? `<div class="card-title">${_esc(title)}</div>` : ""}
+        ${top.length ? `<div class="grid">${top.map((c) => c.html).join("")}</div>` : ""}
+        ${bottom.length ? `<div class="row3">${bottom.map((c) => c.html).join("")}</div>` : ""}
+        ${!top.length && !bottom.length ? `<div class="empty">Toutes les sections sont masquées</div>` : ""}
       </div>
     `;
     this._bound = false;
@@ -297,41 +481,13 @@ class FreeboxHomexaCard extends HTMLElement {
   }
 }
 
-class FreeboxHomexaCardEditor extends HTMLElement {
-  constructor() {
-    super();
-    this._config = {};
-    this.attachShadow({ mode: "open" });
-  }
-  setConfig(config) {
-    this._config = { ...(config || {}) };
-    this._draw();
-  }
-  set hass(_hass) {}
-  _draw() {
-    const fields = [["alarm_entity", "Alarme"], ["cover_entity", "Volet"], ["pir_entity", "PIR"], ["player_entity", "Player"], ["rssi_entity", "RSSI"]];
-    this.shadowRoot.innerHTML = `<div style="display:flex;flex-direction:column;gap:8px;padding:8px 0;">${fields.map(([key, label]) => `<label>${_esc(label)}</label><input data-key="${_esc(key)}" value="${_esc(this._config[key] || "")}" placeholder="auto" />`).join("")}</div>`;
-    this.shadowRoot.querySelectorAll("input").forEach((input) => {
-      input.addEventListener("change", (ev) => {
-        const next = { ...this._config };
-        const value = ev.target.value.trim();
-        if (value) next[ev.target.dataset.key] = value;
-        else delete next[ev.target.dataset.key];
-        this._config = next;
-        this.dispatchEvent(new CustomEvent("config-changed", { detail: { config: next } }));
-      });
-    });
-  }
-}
-
 if (!customElements.get(CARD_TAG)) customElements.define(CARD_TAG, FreeboxHomexaCard);
-if (!customElements.get(EDITOR_TAG)) customElements.define(EDITOR_TAG, FreeboxHomexaCardEditor);
 window.customCards = window.customCards || [];
 if (!window.customCards.some((card) => card.type === CARD_TAG)) {
   window.customCards.push({
     type: CARD_TAG,
     name: "Freebox Homexa",
-    description: "Alarme, volet, PIR, Player et RSSI Freebox Homexa",
+    description: "Alarme, volets, PIR, Player et RSSI Freebox Homexa",
     preview: true,
     documentationURL: "https://github.com/XAV59213/freebox_homexa",
   });

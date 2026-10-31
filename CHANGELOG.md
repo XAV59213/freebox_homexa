@@ -1,5 +1,8 @@
 # Changelog
 
+## Non publié
+- Carte **`homexa-tnt-card`**, éditeur visuel : les **libellés des interrupteurs** avaient disparu (Home Assistant récent n'affiche plus l'attribut `label` de `<ha-formfield>`). Chaque interrupteur (vues, carrousel, Favoris, Guide TV, Top films, chaînes favorites) a de nouveau son texte, à gauche ; toucher le texte bascule l'interrupteur. Accents rétablis (« À suivre », « soirée »)
+
 ## 28.8.67 (2026-10-31)
 - Carte **`freebox-homexa-card`** réglable :
   - nouvel éditeur visuel natif de Home Assistant (`getConfigForm`) : vrais sélecteurs d’entités et bouton **Enregistrer** actif dès qu’on change un réglage (l’ancien éditeur à champs texte ne l’activait qu’en quittant le champ)

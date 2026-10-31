@@ -1,5 +1,8 @@
 # Changelog
 
+## Non publié
+- Documentation : capture de la carte **Homexa Appels** ajoutée au README (`docs/images/homexa-calls-card.jpg`)
+
 ## 28.8.70 (2026-10-31)
 - Nouvelle carte **`homexa-calls-card`** (« Homexa Appels ») : journal des appels de la Freebox, livrée avec l’intégration (chargée automatiquement comme la carte TNT)
   - une ligne par appel : icône colorée (manqué / reçu / émis), nom en gras, heure, « Aujourd'hui » / « Hier » / date, durée, numéro en option ; point rouge sur les non lus et badge « N manqués »

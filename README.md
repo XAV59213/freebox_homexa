@@ -182,7 +182,13 @@ Vue Lovelace **Alarme / Volet / PIR / Player / RSSI** :
 type: custom:homexa-calls-card
 ```
 
-Journal des appels de la Freebox (manqués, reçus, émis) avec icônes, heure et durée, à partir du capteur « Derniers appels Freebox ». Détails : [examples/lovelace/README.md](examples/lovelace/README.md)
+Journal des appels de la Freebox (manqués, reçus, émis) avec icônes, heure et durée, à partir du capteur « Derniers appels Freebox ».
+
+<p align="center">
+  <img src="docs/images/homexa-calls-card.jpg" alt="Carte Homexa Appels (historique Freebox)" width="420"><br>
+  <em>Carte Homexa Appels (historique Freebox)</em>
+</p>
+ Détails : [examples/lovelace/README.md](examples/lovelace/README.md)
 
 ### Carte « Freebox Homexa »
 

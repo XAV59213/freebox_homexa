@@ -151,7 +151,7 @@ const SHOW_KEYS = { alarm: "show_alarm", cover: "show_covers", pir: "show_pir", 
 
 function _asList(value) {
   if (Array.isArray(value)) return value.filter((v) => typeof v === "string" && v);
-  if (typeof value === "string" && value.trim()) return [value.trim()];
+  if (typeof value === "string" && value.trim()) return value.split(",").map((v) => v.trim()).filter(Boolean);
   return [];
 }
 
@@ -221,11 +221,11 @@ class FreeboxHomexaCard extends HTMLElement {
               name: "",
               flatten: true,
               schema: [
-                { name: "show_alarm", selector: { boolean: {} } },
-                { name: "show_covers", selector: { boolean: {} } },
-                { name: "show_pir", selector: { boolean: {} } },
-                { name: "show_player", selector: { boolean: {} } },
-                { name: "show_rssi", selector: { boolean: {} } },
+                { name: "show_alarm", default: true, selector: { boolean: {} } },
+                { name: "show_covers", default: true, selector: { boolean: {} } },
+                { name: "show_pir", default: true, selector: { boolean: {} } },
+                { name: "show_player", default: true, selector: { boolean: {} } },
+                { name: "show_rssi", default: true, selector: { boolean: {} } },
               ],
             },
           ],
@@ -271,13 +271,13 @@ class FreeboxHomexaCard extends HTMLElement {
         })[s.name],
       computeHelper: (s) =>
         ["alarms", "covers", "pirs", "players", "rssi_entities"].includes(s.name)
-          ? "Vide = détection automatique"
+          ? "Plusieurs possibles : après un choix, un nouveau champ « Sélectionner une entité » apparaît dessous pour en ajouter un autre. Vide = détection automatique"
           : undefined,
     };
   }
 
   static getStubConfig(hass) {
-    const stub = {};
+    const stub = { show_alarm: true, show_covers: true, show_pir: true, show_player: true, show_rssi: true };
     if (!hass) return stub;
     const found = _detect(hass);
     const keys = { alarm: "alarms", cover: "covers", pir: "pirs", player: "players", rssi: "rssi_entities" };
@@ -323,8 +323,11 @@ class FreeboxHomexaCard extends HTMLElement {
     return { columns: 12, min_columns: 6, min_rows: 6 };
   }
 
+  // Section visible sauf si explicitement désactivée (false, "false", "off", 0).
+  // Clé absente = visible : les cartes existantes gardent toutes leurs sections.
   _shown(kind) {
-    return this._config[SHOW_KEYS[kind]] !== false;
+    const v = this._config[SHOW_KEYS[kind]];
+    return !(v === false || v === 0 || v === "false" || v === "off");
   }
 
   // Renvoie, pour chaque section, la liste des entités à afficher.

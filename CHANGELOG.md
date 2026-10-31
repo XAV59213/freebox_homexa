@@ -2,6 +2,10 @@
 
 ## Non publié
 - Carte **`homexa-tnt-card`**, éditeur visuel : les **libellés des interrupteurs** avaient disparu (Home Assistant récent n'affiche plus l'attribut `label` de `<ha-formfield>`). Chaque interrupteur (vues, carrousel, Favoris, Guide TV, Top films, chaînes favorites) a de nouveau son texte, à gauche ; toucher le texte bascule l'interrupteur. Accents rétablis (« À suivre », « soirée »)
+- Carte **`freebox-homexa-card`** :
+  - **interrupteurs « Sections affichées »** : ils apparaissaient désactivés alors que les sections étaient affichées (clé absente), si bien que les désactiver semblait sans effet. Ils sont maintenant activés par défaut (`default: true`) et reflètent l’état réel ; les désactiver masque bien la section. Clé absente = section affichée, comme avant
+  - **plusieurs volets / PIR / Player / RSSI / alarmes** : le sélecteur était déjà multiple, mais ne le montrait pas. L’aide indique maintenant qu’après un choix, un nouveau champ apparaît dessous pour ajouter une autre entité
+  - listes saisies en YAML sous forme de texte (`covers: cover.a, cover.b`) acceptées en plus des listes
 
 ## 28.8.67 (2026-10-31)
 - Carte **`freebox-homexa-card`** réglable :

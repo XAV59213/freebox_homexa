@@ -1,6 +1,6 @@
 # Changelog
 
-## Non publié
+## 28.8.67 (2026-10-31)
 - Carte **`freebox-homexa-card`** réglable :
   - nouvel éditeur visuel natif de Home Assistant (`getConfigForm`) : vrais sélecteurs d’entités et bouton **Enregistrer** actif dès qu’on change un réglage (l’ancien éditeur à champs texte ne l’activait qu’en quittant le champ)
   - **plusieurs entités par section** : `alarms`, `covers`, `pirs`, `players`, `rssi_entities` ; une tuile par entité, chacune avec ses propres boutons

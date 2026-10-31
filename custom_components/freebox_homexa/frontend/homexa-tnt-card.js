@@ -31,6 +31,28 @@
  * SOFTWARE.
  */
 
+// Ligne « libellé + interrupteur ». Home Assistant 2026 n'affiche plus l'attribut
+// `label` de <ha-formfield> : le texte est donc écrit nous-mêmes, à gauche du switch.
+function _tntSwitchRow(label, sw, padding) {
+  var row = document.createElement("div");
+  row.style.display = "flex";
+  row.style.alignItems = "center";
+  row.style.justifyContent = "space-between";
+  row.style.gap = "12px";
+  row.style.padding = padding;
+  var text = document.createElement("span");
+  text.textContent = label;
+  text.style.flex = "1";
+  text.style.cursor = "pointer";
+  text.addEventListener("click", function () {
+    sw.checked = !sw.checked;
+    sw.dispatchEvent(new Event("change", { bubbles: true }));
+  });
+  row.appendChild(text);
+  return row;
+}
+
+
 
 const CARD_VERSION = "3.0.8-homexa.1";
 (function () {
@@ -1915,12 +1937,8 @@ if (progDate) metaParts.push(progDate);
       wrap.style.padding = "12px 16px";
 
       function addToggle(key, label) {
-        var row = document.createElement("ha-formfield");
-        row.setAttribute("label", label);
-        row.style.display = "flex";
-        row.style.alignItems = "center";
-        row.style.padding = "6px 0";
         var sw = document.createElement("ha-switch");
+        var row = _tntSwitchRow(label, sw, "6px 0");
         sw.checked = self._config[key] !== false;
         sw.addEventListener("change", function (ev) {
           var newConfig = Object.assign({}, self._config);
@@ -1936,11 +1954,11 @@ if (progDate) metaParts.push(progDate);
         wrap.appendChild(row);
       }
 
-      addToggle("show_current", "Afficher l''En ce moment''");
-      addToggle("show_next", "Afficher \"A suivre\"");
-      addToggle("hide_next_poster", "Masquer les jaquettes de \"A suivre\" (texte seul)");
-      addToggle("show_prime_time", "Afficher la 1re partie de soiree");
-      addToggle("show_second_part", "Afficher la 2e partie de soiree");
+      addToggle("show_current", "Afficher « En ce moment »");
+      addToggle("show_next", "Afficher « À suivre »");
+      addToggle("hide_next_poster", "Masquer les jaquettes de « À suivre » (texte seul)");
+      addToggle("show_prime_time", "Afficher la 1re partie de soirée");
+      addToggle("show_second_part", "Afficher la 2e partie de soirée");
 
       var carouselTitle = document.createElement("div");
       carouselTitle.textContent = "Carrousel";
@@ -2073,12 +2091,8 @@ if (progDate) metaParts.push(progDate);
               wrap.appendChild(groupHeader);
             }
 
-            var row = document.createElement("ha-formfield");
-            row.setAttribute("label", attrs.channel_name || id);
-            row.style.display = "flex";
-            row.style.alignItems = "center";
-            row.style.padding = "4px 0";
             var sw = document.createElement("ha-switch");
+            var row = _tntSwitchRow(attrs.channel_name || id, sw, "4px 0");
             sw.checked = !!favSet[cid];
             sw.addEventListener("change", function (ev) {
               var current = (self._config.favorite_channels || []).slice();

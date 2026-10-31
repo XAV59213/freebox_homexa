@@ -1,6 +1,6 @@
 # Changelog
 
-## Non publié
+## 28.8.71 (2026-10-31)
 - Documentation : capture de la carte **Homexa Appels** ajoutée au README (`docs/images/homexa-calls-card.jpg`)
 - Documentation : captures des cartes **Freebox Homexa** et **Homexa TNT** ajoutées au README (`docs/images/freebox-homexa-card.jpg`, `docs/images/homexa-tnt-card.jpg`)
 

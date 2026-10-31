@@ -1,5 +1,12 @@
 # Changelog
 
+## Non publié
+- Nouvelle carte **`homexa-calls-card`** (« Homexa Appels ») : journal des appels de la Freebox, livrée avec l’intégration (chargée automatiquement comme la carte TNT)
+  - une ligne par appel : icône colorée (manqué / reçu / émis), nom en gras, heure, « Aujourd'hui » / « Hier » / date, durée, numéro en option ; point rouge sur les non lus et badge « N manqués »
+  - éditeur visuel : capteur, titre, nombre d’appels (1 à 30), types affichés, numéro, durée
+  - fonctionne aussi avec l’ancien capteur « Appels manqués Freebox »
+- Nouveau capteur **« Derniers appels Freebox »** (`calls_log`) : état = appels non lus, attribut `calls` (30 derniers appels : nom, numéro, type, date, durée, non lu), exclu de l’historique. Les capteurs existants ne changent pas
+
 ## 28.8.69 (2026-10-31)
 - **TNT / guide XMLTV** : la mise à jour horaire du guide (~78 Mo) ne bloque plus Home Assistant (#91). Le parsing se fait désormais par morceaux (`XMLPullParser`) au lieu d'un `ET.fromstring()` qui gardait le GIL ~13 s sur HA Green et faisait planter ZHA. Mémoire réduite, résultats identiques
 

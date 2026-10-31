@@ -20,6 +20,7 @@ VERSION = "28.8.69"
 URL_BASE = "/freebox_homexa"
 CARD_FILENAME = "freebox-homexa-card.js"
 STATIC_CARD_PATH = f"{URL_BASE}/{CARD_FILENAME}"
+CALLS_CARD_FILENAME = "homexa-calls-card.js"
 
 # Options (Paramètres → Intégration → Configurer)
 CONF_TRACK_LAN_CLIENTS = "track_lan_clients"

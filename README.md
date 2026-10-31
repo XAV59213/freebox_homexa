@@ -176,6 +176,14 @@ Vue Lovelace **Alarme / Volet / PIR / Player / RSSI** :
 - [examples/lovelace/homexa-tuiles-natives.yaml](examples/lovelace/homexa-tuiles-natives.yaml) — tuiles natives, sans carte custom
 - Mode d’emploi : [examples/lovelace/README.md](examples/lovelace/README.md)
 
+### Carte « Homexa Appels »
+
+```yaml
+type: custom:homexa-calls-card
+```
+
+Journal des appels de la Freebox (manqués, reçus, émis) avec icônes, heure et durée, à partir du capteur « Derniers appels Freebox ». Détails : [examples/lovelace/README.md](examples/lovelace/README.md)
+
 ### Carte « Freebox Homexa »
 
 ```yaml

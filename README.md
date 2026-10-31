@@ -181,9 +181,9 @@ triggers:
 
 Vue Lovelace **Alarme / Volet / PIR / Player / RSSI** :
 
-- [examples/lovelace/homexa-dashboard.yaml](examples/lovelace/homexa-dashboard.yaml) — Mushroom (rendu de la capture)
-- [examples/lovelace/homexa-tuiles-natives.yaml](examples/lovelace/homexa-tuiles-natives.yaml) — tuiles natives, sans carte custom
-- Mode d’emploi : [examples/lovelace/README.md](examples/lovelace/README.md)
+- [examples/lovelace/homexa-dashboard.yaml](https://github.com/XAV59213/freebox_homexa/blob/main/examples/lovelace/homexa-dashboard.yaml) — Mushroom (rendu de la capture)
+- [examples/lovelace/homexa-tuiles-natives.yaml](https://github.com/XAV59213/freebox_homexa/blob/main/examples/lovelace/homexa-tuiles-natives.yaml) — tuiles natives, sans carte custom
+- Mode d’emploi : [examples/lovelace/README.md](https://github.com/XAV59213/freebox_homexa/blob/main/examples/lovelace/README.md)
 
 ### Carte « Homexa Appels »
 
@@ -194,10 +194,10 @@ type: custom:homexa-calls-card
 Journal des appels de la Freebox (manqués, reçus, émis) avec icônes, heure et durée, à partir du capteur « Derniers appels Freebox ».
 
 <p align="center">
-  <img src="docs/images/homexa-calls-card.jpg" alt="Carte Homexa Appels (historique Freebox)" width="420"><br>
+  <img src="https://raw.githubusercontent.com/XAV59213/freebox_homexa/main/docs/images/homexa-calls-card.jpg" alt="Carte Homexa Appels (historique Freebox)" width="420"><br>
   <em>Carte Homexa Appels (historique Freebox)</em>
 </p>
- Détails : [examples/lovelace/README.md](examples/lovelace/README.md)
+ Détails : [examples/lovelace/README.md](https://github.com/XAV59213/freebox_homexa/blob/main/examples/lovelace/README.md)
 
 ### Carte « Freebox Homexa »
 
@@ -205,10 +205,10 @@ Journal des appels de la Freebox (manqués, reçus, émis) avec icônes, heure e
 type: custom:freebox-homexa-card
 ```
 
-Entièrement réglable dans l’éditeur visuel : titre, sections affichées ou masquées, et choix de **plusieurs** alarmes, volets, PIR, Player et capteurs RSSI (sélecteurs d’entités natifs). Liste vide = détection automatique. Détails : [examples/lovelace/README.md](examples/lovelace/README.md)
+Entièrement réglable dans l’éditeur visuel : titre, sections affichées ou masquées, et choix de **plusieurs** alarmes, volets, PIR, Player et capteurs RSSI (sélecteurs d’entités natifs). Liste vide = détection automatique. Détails : [examples/lovelace/README.md](https://github.com/XAV59213/freebox_homexa/blob/main/examples/lovelace/README.md)
 
 <p align="center">
-  <img src="docs/images/freebox-homexa-card.jpg" alt="Carte Freebox Homexa" width="420"><br>
+  <img src="https://raw.githubusercontent.com/XAV59213/freebox_homexa/main/docs/images/freebox-homexa-card.jpg" alt="Carte Freebox Homexa" width="420"><br>
   <em>Carte Freebox Homexa</em>
 </p>
 
@@ -223,10 +223,10 @@ type: custom:homexa-tnt-card
 - Chargée automatiquement depuis l'intégration (`/freebox_homexa/homexa-tnt-card.js`), sans ressource Lovelace à ajouter, sans CDN.
 - Nom distinct (`homexa-tnt-card`, « Homexa TNT » dans le sélecteur de cartes) : aucune collision avec la carte `programme-tnt-fr-card` si l'intégration séparée est aussi installée.
 - N'affiche que les capteurs TNT de Freebox Homexa ; chaînes à choisir dans Configurer → Guide TNT.
-- Exemple complet : [examples/lovelace/homexa-tnt-card.yaml](examples/lovelace/homexa-tnt-card.yaml)
+- Exemple complet : [examples/lovelace/homexa-tnt-card.yaml](https://github.com/XAV59213/freebox_homexa/blob/main/examples/lovelace/homexa-tnt-card.yaml)
 
 <p align="center">
-  <img src="docs/images/homexa-tnt-card.jpg" alt="Carte Homexa TNT" width="420"><br>
+  <img src="https://raw.githubusercontent.com/XAV59213/freebox_homexa/main/docs/images/homexa-tnt-card.jpg" alt="Carte Homexa TNT" width="420"><br>
   <em>Carte Homexa TNT</em>
 </p>
 

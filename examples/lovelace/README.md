@@ -16,22 +16,39 @@ Si elle n’apparaît pas :
 - URL : `/freebox_homexa/freebox-homexa-card.js`
 - Type : Module JavaScript
 
-## Options (facultatif)
+## Réglages (éditeur visuel)
+
+Dans l’éditeur de la carte (crayon → **Configuration**) :
+- **Titre** facultatif
+- **Sections affichées** : Alarme, Volets, Détecteurs PIR, Freebox Player, WiFi RSSI (décocher = masquer)
+- **Alarme(s), Volets, PIR, Freebox Player, Capteurs RSSI** : sélecteurs d’entités natifs de Home Assistant, **plusieurs entités possibles** (une tuile par entité, dans l’ordre choisi)
+- liste vide = détection automatique (une entité par section, celles de Freebox Homexa en priorité)
+
+## Options YAML
 
 ```yaml
 type: custom:freebox-homexa-card
-alarm_entity: alarm_control_panel.alarme
-cover_entity: cover.volet_salon
-pir_entity: binary_sensor.pir_entree
-player_entity: media_player.freebox_player
-rssi_entity: sensor.signal_wi_fi
+title: Maison
+covers:
+  - cover.volet_salon
+  - cover.volet_cuisine
+pirs:
+  - binary_sensor.pir_entree
+players:
+  - media_player.freebox_player
+rssi_entities:
+  - sensor.signal_wi_fi
+show_alarm: true
+show_rssi: false
 ```
 
-Sans ces clés, la carte prend toute seule :
+Les anciennes clés `alarm_entity`, `cover_entity`, `pir_entity`, `player_entity`, `rssi_entity` restent lues (ajoutées à la liste correspondante) : une carte déjà configurée continue de fonctionner. Elles sont visibles dans l’éditeur sous « Ancien réglage » pour pouvoir les vider.
+
+Sans entité choisie, la carte prend toute seule :
 - l’alarme Homexa
-- le volet dont le nom contient `salon`
-- un PIR / motion
-- `media_player.freebox_player`
+- le volet dont le nom contient `salon`, sinon `volet`
+- un PIR / motion (`entree` en priorité)
+- le Player Homexa (`media_player.freebox_player`)
 - le premier capteur RSSI
 
 # Carte « Homexa TNT »

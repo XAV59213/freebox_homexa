@@ -198,6 +198,11 @@ type: custom:freebox-homexa-card
 
 Entièrement réglable dans l’éditeur visuel : titre, sections affichées ou masquées, et choix de **plusieurs** alarmes, volets, PIR, Player et capteurs RSSI (sélecteurs d’entités natifs). Liste vide = détection automatique. Détails : [examples/lovelace/README.md](examples/lovelace/README.md)
 
+<p align="center">
+  <img src="docs/images/freebox-homexa-card.jpg" alt="Carte Freebox Homexa" width="420"><br>
+  <em>Carte Freebox Homexa</em>
+</p>
+
 ### Carte « Homexa TNT » (guide TV)
 
 Carte guide TV livrée avec l'intégration, adaptée de [Programme TNT FR](https://github.com/cyclope205/programme-tnt-fr) (MIT) : carrousels « En ce moment / À suivre / 1re et 2e partie de soirée », Guide TV par jour, chaînes favorites, affiches et notes TMDB (si une clé personnelle est configurée) et rappels (profils de rappel Homexa).
@@ -210,6 +215,11 @@ type: custom:homexa-tnt-card
 - Nom distinct (`homexa-tnt-card`, « Homexa TNT » dans le sélecteur de cartes) : aucune collision avec la carte `programme-tnt-fr-card` si l'intégration séparée est aussi installée.
 - N'affiche que les capteurs TNT de Freebox Homexa ; chaînes à choisir dans Configurer → Guide TNT.
 - Exemple complet : [examples/lovelace/homexa-tnt-card.yaml](examples/lovelace/homexa-tnt-card.yaml)
+
+<p align="center">
+  <img src="docs/images/homexa-tnt-card.jpg" alt="Carte Homexa TNT" width="420"><br>
+  <em>Carte Homexa TNT</em>
+</p>
 
 HACS → Frontend → [Mushroom](https://github.com/piitaya/lovelace-mushroom), puis colle le YAML dans l’éditeur brut du tableau de bord. Remplace les `entity_id` par tes entités Homexa.
 

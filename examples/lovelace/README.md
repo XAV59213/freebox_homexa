@@ -72,5 +72,5 @@ Remplace une carte Markdown : nom en gras, icône colorée selon le type (manqu�
 
 Tout se règle dans l’éditeur visuel : capteur, titre, nombre d’appels (1 à 30), types affichés (`show_missed`, `show_accepted`, `show_outgoing`), `show_number`, `show_duration`.
 
-Source : nouveau capteur **« Derniers appels Freebox »** (état = appels non lus, attribut `calls` avec les 30 derniers appels, non enregistré dans l’historique). L’ancien capteur « Appels manqués Freebox » fonctionne aussi (appels manqués non lus uniquement).
+Source : capteur **« Derniers appels Freebox »** (état = nombre d’appels non lus). Pour protéger la vie privée, les noms et numéros ne sont **jamais** dans les attributs d’état : la carte lit les 30 derniers appels avec la commande WebSocket `freebox_homexa/calls`, réservée aux utilisateurs qui ont le droit de voir ce capteur. Elle se met à jour à chaque changement du capteur et toutes les 60 s. Avec le capteur « Appels manqués Freebox », la carte affiche les appels manqués non lus.
 

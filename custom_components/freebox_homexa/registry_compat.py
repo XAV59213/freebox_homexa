@@ -25,6 +25,36 @@ def device_owned_by(device: Any, entry_id: str) -> bool:
     return device is not None and device_entry_id(device) == entry_id
 
 
+def device_entries(device: Any) -> set[str]:
+    """Toutes les entrées de configuration liées à l'appareil."""
+    entries = set(getattr(device, "config_entries", None) or ())
+    entry_id = getattr(device, "config_entry_id", None)
+    if entry_id:
+        entries.add(entry_id)
+    return entries
+
+
+def shared_with_other_entries(device: Any, entry_id: str) -> bool:
+    """True si l'appareil appartient (aussi) à une autre entrée / intégration.
+
+    Même garde que async_remove_lan_client_devices : un tel appareil n'est
+    jamais renommé, déplacé, re-parenté, modifié ni supprimé par Homexa.
+    """
+    return device is not None and bool(device_entries(device) - {entry_id})
+
+
+def foreign_device_with_connection(
+    registry: Any, connection: tuple[str, str], entry_id: str
+) -> Any:
+    """Appareil d'une AUTRE intégration portant cette connexion (MAC), dans tout le registre.
+
+    Couvre aussi l'appareil auquel Home Assistant a relié notre tracker
+    (ScannerEntity) : il appartient à l'autre intégration.
+    """
+    device = registry.async_get_device(connections={connection})
+    return device if shared_with_other_entries(device, entry_id) else None
+
+
 def get_device_by_identifier(registry: Any, identifier: tuple[str, str], entry_id: str) -> Any:
     """Appareil de cette entrée portant cet identifiant (None sinon)."""
     getter = getattr(registry, "async_get_device_by_identifier", None)

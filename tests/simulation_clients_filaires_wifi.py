@@ -55,6 +55,10 @@ class Reg:
     def async_get_device_by_connection(s, c, e):
         return next((d for d in DEV.values() if c in d.connections and d.config_entry_id == e), None)
 
+    def async_get_device(s, identifiers=None, connections=None):
+        return next((d for d in DEV.values() if d.identifiers & set(identifiers or ())
+                     or d.connections & set(connections or ())), None)
+
     def async_get_or_create(s, config_entry_id, identifiers=(), name=None, connections=(), **kw):
         d = next((d for d in DEV.values() if d.identifiers & set(identifiers)
                   or d.connections & set(connections)), None)
@@ -634,7 +638,7 @@ assert names("lan_wifi_net_phones") == ["iPhone-Xav"]
 sub_id = r16.group_device_ids["lan_wired_net_network"]
 ENT[f"{RM}_lan_group_clients_lan_wired_net_network"] = sub_id
 class _E:  # entrée de registre d'entité (unique_id)
-    def __init__(s, uid): s.unique_id = uid
+    def __init__(s, uid): s.unique_id = uid; s.entity_id = uid; s.config_entry_id = "E"
 er.async_entries_for_device = lambda r, did, include_disabled_entities=True: [
     _E(e) for e, d in ENT.items() if d == did]
 assert not dg._has_entities(None, sub_id)
@@ -665,7 +669,7 @@ class _ER:
 _entries_for_device = er.async_entries_for_device
 er.async_get = lambda h: _ER()
 er.async_entries_for_device = lambda r, did, include_disabled_entities=True: [
-    types.SimpleNamespace(entity_id=e, unique_id=e) for e, d in ENT.items() if d == did]
+    types.SimpleNamespace(entity_id=e, unique_id=e, config_entry_id="E") for e, d in ENT.items() if d == did]
 r18 = make_router()
 hosts18 = lan()
 # Jumeau « locally administered » du Garage, listé par la Freebox comme hôte répéteur.

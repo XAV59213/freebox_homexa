@@ -1,6 +1,6 @@
 # Changelog
 
-## Non publié
+## 28.8.74 — 2026-11-02
 - Revue HACS (frenck) — **appareils des autres intégrations jamais modifiés** :
   - `ensure_lan_client_device` : avant de créer l’appareil d’un client réseau, la MAC est cherchée dans **tout** le registre. Si un appareil d’une autre intégration la porte (Shelly, ESPHome…), ou si Home Assistant y a relié le tracker, il n’est plus jamais renommé, modifié (fabricant), rattaché à l’entrée Homexa, re-parenté ni rangé dans « Clients réseau »
   - `async_clean_repeater_connections` : un appareil partagé avec une autre entrée n’est plus modifié ni supprimé ; un appareil portant une entité d’une autre intégration n’est plus vidé ; seules nos propres entités sont déplacées

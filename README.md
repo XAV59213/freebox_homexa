@@ -1,8 +1,16 @@
-[![HACS Custom](https://img.shields.io/badge/HACS-Custom-orange.svg)](https://hacs.xyz) [![Release](https://img.shields.io/github/v/release/XAV59213/freebox_homexa?label=release)](https://github.com/XAV59213/freebox_homexa/releases/latest) [![Hassfest](https://img.shields.io/github/actions/workflow/status/XAV59213/freebox_homexa/hassfest.yaml?branch=main&label=Hassfest&logo=github)](https://github.com/XAV59213/freebox_homexa/actions/workflows/hassfest.yaml) [![HACS validation](https://img.shields.io/github/actions/workflow/status/XAV59213/freebox_homexa/validate.yaml?branch=main&label=HACS%20validation&logo=github)](https://github.com/XAV59213/freebox_homexa/actions/workflows/validate.yaml) [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE) [![Downloads](https://img.shields.io/github/downloads/XAV59213/freebox_homexa/total.svg?label=Downloads)](https://github.com/XAV59213/freebox_homexa/releases) [![Version](https://img.shields.io/github/v/release/XAV59213/freebox_homexa?label=VERSION&color=blue)](https://github.com/XAV59213/freebox_homexa/releases/latest) [![Home Assistant](https://img.shields.io/badge/HOME%20ASSISTANT-%3E%3D2026.8.0-41BDF5.svg)](https://www.home-assistant.io)
+<p align="center">
+  <a href="https://hacs.xyz"><img src="https://img.shields.io/badge/HACS-Default-41BDF5?style=for-the-badge&logo=homeassistantcommunitystore&logoColor=white" alt="HACS Default"></a>
+</p>
+
+[![HACS Default](https://img.shields.io/badge/HACS-Default-41BDF5.svg)](https://hacs.xyz) [![Release](https://img.shields.io/github/v/release/XAV59213/freebox_homexa?label=release)](https://github.com/XAV59213/freebox_homexa/releases/latest) [![Hassfest](https://img.shields.io/github/actions/workflow/status/XAV59213/freebox_homexa/hassfest.yaml?branch=main&label=Hassfest&logo=github)](https://github.com/XAV59213/freebox_homexa/actions/workflows/hassfest.yaml) [![HACS validation](https://img.shields.io/github/actions/workflow/status/XAV59213/freebox_homexa/validate.yaml?branch=main&label=HACS%20validation&logo=github)](https://github.com/XAV59213/freebox_homexa/actions/workflows/validate.yaml) [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE) [![Downloads](https://img.shields.io/github/downloads/XAV59213/freebox_homexa/total.svg?label=Downloads)](https://github.com/XAV59213/freebox_homexa/releases) [![Version](https://img.shields.io/github/v/release/XAV59213/freebox_homexa?label=VERSION&color=blue)](https://github.com/XAV59213/freebox_homexa/releases/latest) [![Home Assistant](https://img.shields.io/badge/HOME%20ASSISTANT-%3E%3D2026.8.0-41BDF5.svg)](https://www.home-assistant.io)
 
 [![Buy Me A Coffee](https://img.buymeacoffee.com/button-api/?text=xav59213&emoji=&slug=xav59213&button_colour=5F7FFF&font_colour=ffffff&font_family=Cookie&outline_colour=000000&coffee_colour=FFDD00)](https://www.buymeacoffee.com/xav59213)
 
 ## Via HACS (recommandé)
+
+> [!TIP]
+> 🎉 **Freebox Homexa est maintenant disponible directement dans la bibliothèque HACS / Marketplace.**
+> Plus besoin d’ajouter le dépôt personnalisé : cherche simplement « Freebox Homexa » dans HACS.
 
 [![Open your Home Assistant instance and open a repository inside the Home Assistant Community Store.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=XAV59213&repository=freebox_homexa&category=integration)
 
@@ -41,12 +49,17 @@ HDMI sur le Player = **sortie vers le téléviseur** (CEC One Touch Play), pas u
 
 ## Installation (HACS)
 
-L’intégration n’est pas encore dans le store HACS par défaut. Ajoute le dépôt custom :
+> [!TIP]
+> 🎉 **Freebox Homexa est maintenant disponible directement dans la bibliothèque HACS / Marketplace.**
+> Plus besoin d’ajouter le dépôt personnalisé : cherche simplement « Freebox Homexa » dans HACS.
 
-1. HACS → menu → **Dépôts personnalisés**
-2. URL : `https://github.com/XAV59213/freebox_homexa`
-3. Catégorie : **Integration**
-4. Installe **Freebox Homexa**, puis redémarre Home Assistant
+[![Ouvrir Freebox Homexa dans HACS](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=XAV59213&repository=freebox_homexa&category=integration)
+
+1. HACS → recherche **Freebox Homexa**
+2. Clique sur **Télécharger**, puis redémarre Home Assistant
+3. Ajoute l’intégration : **Paramètres → Appareils et services → Ajouter une intégration → Freebox Homexa**
+
+> Le dépôt personnalisé (`https://github.com/XAV59213/freebox_homexa`) n’est plus nécessaire. Si tu l’avais ajouté, tu peux le retirer de **HACS → Dépôts personnalisés** sans perdre l’intégration.
 
 Installation manuelle : copie le dossier `custom_components/freebox_homexa` dans `/config/custom_components/` puis redémarre.
 

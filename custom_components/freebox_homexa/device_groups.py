@@ -1049,8 +1049,12 @@ def async_merge_repeater_devices(
             d.id: len(er.async_entries_for_device(entities, d.id, include_disabled_entities=True))
             for d in group
         }
-        keeper = next((d for d in group if canon_ident in d.identifiers), None) or max(
-            group, key=lambda d: counts[d.id]
+        # L'appareil conservé n'est jamais un appareil partagé avec une autre intégration.
+        own = [d for d in group if not shared_with_other_entries(d, entry.entry_id)]
+        if not own:
+            continue
+        keeper = next((d for d in own if canon_ident in d.identifiers), None) or max(
+            own, key=lambda d: counts[d.id]
         )
         _LOGGER.debug("Répéteur %s : appareil conservé %s (%s)", canon, keeper.id, keeper.name)
         area_id = keeper.area_id
@@ -1058,8 +1062,23 @@ def async_merge_repeater_devices(
         for dup in group:
             if dup.id == keeper.id:
                 continue
-            for ent in er.async_entries_for_device(entities, dup.id, include_disabled_entities=True):
-                entities.async_update_entity(ent.entity_id, device_id=keeper.id)
+            if shared_with_other_entries(dup, entry.entry_id):
+                # Doublon partagé avec une autre intégration : ni entités déplacées,
+                # ni suppression (async_remove_device le retirerait partout).
+                _LOGGER.debug("Répéteur %s : doublon partagé %s ignoré", canon, dup.id)
+                continue
+            dup_entities = er.async_entries_for_device(
+                entities, dup.id, include_disabled_entities=True
+            )
+            foreign = [e for e in dup_entities if e.config_entry_id != entry.entry_id]
+            # Seules nos propres entités sont déplacées vers l'appareil conservé.
+            for ent in dup_entities:
+                if ent.config_entry_id == entry.entry_id:
+                    entities.async_update_entity(ent.entity_id, device_id=keeper.id)
+            if foreign:
+                # Entité d'une autre intégration : l'appareil n'est jamais supprimé.
+                _LOGGER.debug("Répéteur %s : doublon %s conservé (entités tierces)", canon, dup.id)
+                continue
             for child in entry_devices(registry, entry.entry_id):
                 if child.via_device_id == dup.id:
                     registry.async_update_device(child.id, via_device_id=keeper.id)

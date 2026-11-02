@@ -4,6 +4,8 @@
   (ou partagé avec Homexa) n'est jamais renommée, modifiée, rattachée ni re-parentée ;
 - async_clean_repeater_connections : un doublon de répéteur partagé n'est ni vidé
   ni supprimé ; les entités des autres intégrations ne sont jamais déplacées ;
+- async_merge_repeater_devices : mêmes gardes (doublon partagé ignoré, seules nos
+  entités déplacées, jamais de suppression s'il reste une entité tierce) ;
 - nos propres appareils restent gérés comme avant.
 Lancer depuis la racine du dépôt : python3 tests/simulation_registre_partage.py
 """
@@ -77,6 +79,8 @@ class Dev:
         self.via_device_id = via
         self.name = name
         self.name_by_user = None
+        self.area_id = None
+        self.model = None
 
 
 class Registry:
@@ -212,4 +216,36 @@ print("OK : appareil portant une entité d'une autre intégration -> intact")
 reg = run({"E"}, [Ent("sensor.homexa", "E")])
 assert "dup" not in reg.devs and moved == [("sensor.homexa", "rep")], (reg.log, moved)
 print("OK : doublon 100 % Homexa -> entités vers le répéteur puis suppression (comme avant)")
+
+# --- async_merge_repeater_devices --------------------------------------------
+ROUTER = "AA:00:00:00:00:01"
+ALIAS = "00:24:D4:00:00:02"
+merge_reps = {REP: {"macs": [REP, ALIAS], "name": "Repeteur"}}
+entry = types.SimpleNamespace(entry_id="E")
+
+
+def run_merge(dup_entries, dup_ents):
+    rep = Dev("rep", {"E"}, {("mac", REP.lower())}, {("freebox_homexa", f"repeater_{REP}")})
+    dup = Dev("dup", dup_entries, {("mac", ALIAS.lower())}, {("freebox_homexa", f"repeater_{ALIAS}")})
+    reg = Registry([rep, dup])
+    device_groups.dr.async_get = lambda hass: reg
+    ents.clear()
+    ents["dup"] = dup_ents
+    moved.clear()
+    n = device_groups.async_merge_repeater_devices(None, entry, ROUTER, merge_reps)
+    return reg, n
+
+
+reg, n = run_merge({"E", "ESPHOME"}, [Ent("sensor.esp", "ESPHOME"), Ent("sensor.homexa", "E")])
+assert "dup" in reg.devs and moved == [] and n == 0, (reg.log, moved)
+assert not [x for x in reg.log if x[0] == "remove"], reg.log
+print("OK : fusion — doublon partagé (ESPHome) -> ignoré, ni entités déplacées ni suppression")
+
+reg, n = run_merge({"E"}, [Ent("sensor.esp", "ESPHOME"), Ent("sensor.homexa", "E")])
+assert "dup" in reg.devs and moved == [("sensor.homexa", "rep")] and n == 0, (reg.log, moved)
+print("OK : fusion — entité tierce -> seule notre entité déplacée, doublon conservé")
+
+reg, n = run_merge({"E"}, [Ent("sensor.homexa", "E")])
+assert "dup" not in reg.devs and moved == [("sensor.homexa", "rep")] and n == 1, (reg.log, moved)
+print("OK : fusion — doublon 100 % Homexa -> fusionné puis supprimé (comme avant)")
 print("SIMULATION_REGISTRE_PARTAGE_OK")

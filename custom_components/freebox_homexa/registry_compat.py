@@ -27,11 +27,12 @@ def device_owned_by(device: Any, entry_id: str) -> bool:
 
 def device_entries(device: Any) -> set[str]:
     """Toutes les entrées de configuration liées à l'appareil."""
-    entries = set(getattr(device, "config_entries", None) or ())
     entry_id = getattr(device, "config_entry_id", None)
-    if entry_id:
-        entries.add(entry_id)
-    return entries
+    if entry_id is not None or hasattr(type(device), "config_entry_id"):
+        # HA 2026.8+ : un appareil = une entrée (config_entries, déprécié, vaut
+        # {config_entry_id}) ; on évite de lire la propriété dépréciée.
+        return {entry_id} if entry_id else set()
+    return set(getattr(device, "config_entries", None) or ())
 
 
 def shared_with_other_entries(device: Any, entry_id: str) -> bool:

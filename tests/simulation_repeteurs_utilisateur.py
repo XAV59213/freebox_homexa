@@ -41,7 +41,7 @@ class ER:
     def async_update_entity(s,e,device_id): ENT[e][0]=device_id
 er=sys.modules["homeassistant.helpers.entity_registry"]; sys.modules["homeassistant.helpers"].entity_registry=er
 E_=ER(); er.async_get=lambda h:E_
-er.async_entries_for_device=lambda r,did,include_disabled_entities: [types.SimpleNamespace(entity_id=e) for e,(d,k) in ENT.items() if d==did]
+er.async_entries_for_device=lambda r,did,include_disabled_entities: [types.SimpleNamespace(entity_id=e,config_entry_id="E") for e,(d,k) in ENT.items() if d==did]
 pkg=types.ModuleType("fh"); pkg.__path__=[]; sys.modules["fh"]=pkg
 c=types.ModuleType("fh.const"); c.DOMAIN="d"; c.REPEATER_MODEL="F-RP01A"; c.FreeboxHomeCategory=type("C",(),{}); sys.modules["fh.const"]=c
 def load(name):

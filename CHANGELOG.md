@@ -1,5 +1,8 @@
 # Changelog
 
+## Non publié
+- Suite revue HACS (frenck) : `async_merge_repeater_devices` applique les mêmes gardes que `async_clean_repeater_connections` — un doublon de répéteur partagé avec une autre intégration n’est ni vidé ni supprimé (ni choisi comme appareil conservé), seules nos propres entités sont déplacées, et un doublon portant encore une entité d’une autre intégration n’est jamais supprimé (tests : `tests/simulation_registre_partage.py`)
+
 ## 28.8.74 — 2026-11-02
 - Revue HACS (frenck) — **appareils des autres intégrations jamais modifiés** :
   - `ensure_lan_client_device` : avant de créer l’appareil d’un client réseau, la MAC est cherchée dans **tout** le registre. Si un appareil d’une autre intégration la porte (Shelly, ESPHome…), ou si Home Assistant y a relié le tracker, il n’est plus jamais renommé, modifié (fabricant), rattaché à l’entrée Homexa, re-parenté ni rangé dans « Clients réseau »

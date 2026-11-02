@@ -8,7 +8,10 @@ Doc complète : [Wiki](https://github.com/XAV59213/freebox_homexa/wiki)
 
 ## Installation
 
-1. HACS → dépôt personnalisé `https://github.com/XAV59213/freebox_homexa` (Integration)
+> **Freebox Homexa est maintenant disponible directement dans la bibliothèque HACS / Marketplace.**
+> Plus besoin d’ajouter le dépôt personnalisé : cherche simplement « Freebox Homexa » dans HACS.
+
+1. HACS → recherche **Freebox Homexa** → **Télécharger**
 2. Redémarre Home Assistant
 3. Ajoute l’intégration via l’UI (appairage sur l’écran Freebox)
 

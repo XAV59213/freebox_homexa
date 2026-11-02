@@ -34,7 +34,13 @@ from .const import (
     HOME_COMPATIBLE_CATEGORIES,
     REPEATER_MODEL,
 )
-from .registry_compat import as_version, get_device_by_connection, get_device_by_identifier
+from .registry_compat import (
+    as_version,
+    foreign_device_with_connection,
+    get_device_by_connection,
+    get_device_by_identifier,
+    shared_with_other_entries,
+)
 from .errors import is_shutdown_error
 from .wifi_ap import build_wifi_aps
 
@@ -995,7 +1001,15 @@ class FreeboxRouter:
         if device is None or not self._is_lan_client(device):
             return None
         registry = dr.async_get(self.hass)
+        connection = (CONNECTION_NETWORK_MAC, str(mac).lower())
+        if foreign_device_with_connection(registry, connection, self.entry_id) is not None:
+            # MAC déjà portée par un appareil d'une autre intégration (Shelly, ESPHome…)
+            # ou auquel Home Assistant a relié le tracker : jamais renommé, modifié,
+            # rattaché à cette entrée, re-parenté ni déplacé dans un groupe Homexa.
+            return None
         entry = self._lan_client_device(registry, mac)
+        if entry is not None and shared_with_other_entries(entry, self.entry_id):
+            return None
         if entry is None:
             if not self.create_lan_devices or norm not in self.tracked_lan_macs:
                 return None

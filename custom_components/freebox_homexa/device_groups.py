@@ -16,6 +16,7 @@ from .registry_compat import (
     entry_devices,
     get_device_by_identifier,
     remove_device,
+    shared_with_other_entries,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -790,7 +791,7 @@ def async_remove_lan_client_devices(
         macs = {c[1] for c in device.connections if c[0] == dr.CONNECTION_NETWORK_MAC}
         if not macs or router_mac in macs:
             continue
-        if set(device.config_entries) - {entry.entry_id}:
+        if shared_with_other_entries(device, entry.entry_id):
             # Appareil partagé avec une autre intégration (ex. Shelly, ou relié par
             # Home Assistant au tracker) : jamais supprimé.
             continue
@@ -1155,6 +1156,8 @@ def async_clean_repeater_connections(
         device = get_device_by_identifier(registry, (DOMAIN, f"repeater_{canon}"), entry_id)
         if device is None:
             continue
+        if shared_with_other_entries(device, entry_id):
+            continue  # appareil partagé avec une autre intégration : jamais modifié
         repeater_ids[canon] = device
         own = {_norm_mac(m) for m in payload.get("macs") or [canon]}
         current = set(device.connections)
@@ -1184,6 +1187,10 @@ def async_clean_repeater_connections(
             continue
         if any(isinstance(i, tuple) and len(i) > 0 and i[0] == DOMAIN for i in device.identifiers):
             continue
+        if shared_with_other_entries(device, entry_id):
+            # Appareil partagé (Shelly, Freebox native, relié par HA…) : ni entités
+            # déplacées, ni suppression (async_remove_device le retirerait partout).
+            continue
         macs = {_norm_mac(c[1]) for c in device.connections if c[0] == dr.CONNECTION_NETWORK_MAC}
         if not macs or len(macs) != len(device.connections):
             continue
@@ -1194,10 +1201,16 @@ def async_clean_repeater_connections(
         if keeper is None:
             continue
         entities = er.async_get(hass)
-        for ent in er.async_entries_for_device(entities, device.id, include_disabled_entities=True):
+        device_entities = er.async_entries_for_device(
+            entities, device.id, include_disabled_entities=True
+        )
+        if any(ent.config_entry_id != entry_id for ent in device_entities):
+            # Entité d'une autre intégration sur cet appareil : on ne touche à rien.
+            continue
+        for ent in device_entities:
             entities.async_update_entity(ent.entity_id, device_id=keeper.id)
         for child in entry_devices(registry, entry_id):
-            if child.via_device_id == device.id:
+            if child.via_device_id == device.id and not shared_with_other_entries(child, entry_id):
                 registry.async_update_device(child.id, via_device_id=keeper.id)
         _LOGGER.warning(
             "Appareil %s (MAC du répéteur %s) supprimé : doublon du répéteur",

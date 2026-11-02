@@ -12,6 +12,7 @@ from homeassistant.helpers.typing import ConfigType
 from freebox_api.exceptions import AuthorizationError, HttpRequestError
 import homeassistant.helpers.device_registry as dr
 
+from .calls_ws import async_register_calls_websocket_api
 from .const import (
     CONF_CREATE_LAN_DEVICES,
     DEFAULT_CREATE_LAN_DEVICES,
@@ -54,6 +55,7 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
     """Services de l'intégration, enregistrés une seule fois (pas par entrée)."""
     hass.data.setdefault(DOMAIN, {})
     async_setup_services(hass)
+    async_register_calls_websocket_api(hass)
     try:
         await async_setup_reminders(hass)
     except Exception:  # noqa: BLE001

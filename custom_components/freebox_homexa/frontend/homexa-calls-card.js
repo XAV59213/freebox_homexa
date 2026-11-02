@@ -1,7 +1,8 @@
 /* Carte Lovelace « Homexa Appels » : journal téléphonique de la Freebox.
  *
- * Source : capteur « Derniers appels Freebox » (attribut `calls`, tous types)
- * ou, en secours, capteur « Appels manqués Freebox » (attributs date → nom).
+ * Source : commande WebSocket `freebox_homexa/calls` pour le capteur choisi
+ * (« Derniers appels Freebox » = tous les appels, « Appels manqués Freebox » =
+ * manqués non lus). Les noms et numéros ne sont jamais dans les attributs d'état.
  */
 const CALLS_TAG = "homexa-calls-card";
 
@@ -46,25 +47,20 @@ function _duration(sec) {
   return m ? `${m} min ${String(s % 60).padStart(2, "0")}` : `${s} s`;
 }
 
-// Liste normalisée des appels d'une entité, du plus récent au plus ancien.
-function _calls(st) {
-  if (!st || !st.attributes) return [];
-  const a = st.attributes;
-  if (Array.isArray(a.calls)) return a.calls.filter((c) => c && typeof c === "object");
-  // Ancien capteur « Appels manqués » : { "2026-10-31T13:32:00+00:00": "Naomie" }
-  return Object.keys(a)
-    .filter((k) => /^\d{4}-\d{2}-\d{2}T/.test(k))
-    .map((k) => ({ datetime: k, name: a[k], type: "missed", new: true }))
-    .sort((x, y) => (x.datetime < y.datetime ? 1 : -1));
-}
-
 function _detect(hass) {
   const ids = Object.keys((hass && hass.states) || {}).filter((id) => id.startsWith("sensor."));
   const isHomexa = (id) => ((hass.entities || {})[id] || {}).platform === "freebox_homexa";
-  const log = ids.find((id) => Array.isArray(hass.states[id].attributes.calls) && (isHomexa(id) || id.includes("appels")));
-  if (log) return log;
-  return ids.find((id) => id.includes("appels_manques")) || "";
+  const own = ids.filter(isHomexa);
+  const pool = own.length ? own : ids;
+  return (
+    pool.find((id) => (hass.states[id].attributes || {}).icon === "mdi:phone-log") ||
+    pool.find((id) => id.includes("derniers_appels")) ||
+    pool.find((id) => id.includes("appels_manques")) ||
+    ""
+  );
 }
+
+const REFRESH_MS = 60000;
 
 const STYLES = `
   ha-card { padding: 12px 16px 8px; }
@@ -92,7 +88,57 @@ class HomexaCallsCard extends HTMLElement {
     this._config = {};
     this._hass = null;
     this._key = "";
+    this._calls = null; // null = pas encore chargé
+    this._error = "";
+    this._fetchKey = "";
+    this._loading = false;
     this.attachShadow({ mode: "open" });
+  }
+
+  connectedCallback() {
+    if (!this._timer) this._timer = setInterval(() => this._fetch(true), REFRESH_MS);
+  }
+
+  disconnectedCallback() {
+    clearInterval(this._timer);
+    this._timer = null;
+  }
+
+  _entity() {
+    return this._config.entity || _detect(this._hass);
+  }
+
+  // Recharge la liste quand l'état du capteur change (nouvel appel, appels lus) ou toutes les 60 s.
+  async _fetch(force) {
+    const hass = this._hass;
+    if (!hass || this._loading) return;
+    const entity = this._entity();
+    const st = entity ? hass.states[entity] : null;
+    const key = `${entity}|${st ? st.last_updated : ""}`;
+    if (!force && key === this._fetchKey) return;
+    this._fetchKey = key;
+    if (!entity || !st) {
+      this._calls = [];
+      this._render();
+      return;
+    }
+    this._loading = true;
+    try {
+      const res = await hass.callWS({ type: "freebox_homexa/calls", entity_id: entity, limit: 30 });
+      this._calls = Array.isArray(res && res.calls) ? res.calls : [];
+      this._error = "";
+    } catch (err) {
+      this._calls = [];
+      this._error = (err && (err.code === "unknown_command" || err.code === "not_found"))
+        ? "Journal d'appels indisponible : mets à jour Freebox Homexa et redémarre Home Assistant"
+        : err && err.code === "unauthorized"
+          ? "Accès au journal d'appels refusé pour cet utilisateur"
+          : "Journal d'appels indisponible";
+    } finally {
+      this._loading = false;
+    }
+    this._key = "";
+    this._render();
   }
 
   static getConfigForm() {
@@ -142,12 +188,15 @@ class HomexaCallsCard extends HTMLElement {
   setConfig(config) {
     this._config = { ...(config || {}) };
     this._key = "";
+    this._fetchKey = "";
     this._render();
+    this._fetch(false);
   }
 
   set hass(hass) {
     this._hass = hass;
     this._render();
+    this._fetch(false);
   }
 
   getCardSize() {
@@ -167,16 +216,17 @@ class HomexaCallsCard extends HTMLElement {
   _render() {
     if (!this._hass) return;
     const cfg = this._config;
-    const entity = cfg.entity || _detect(this._hass);
+    const entity = this._entity();
     const st = entity ? this._hass.states[entity] : null;
+    const all = this._calls || [];
     const max = Math.max(1, Math.min(30, Number(cfg.max_calls) || 5));
     const allowed = { missed: this._on("show_missed", true), accepted: this._on("show_accepted", true), outgoing: this._on("show_outgoing", true) };
-    const calls = _calls(st).filter((c) => allowed[c.type] !== false).slice(0, max);
-    const unread = _calls(st).filter((c) => c.new && c.type === "missed").length;
+    const calls = all.filter((c) => allowed[c.type] !== false).slice(0, max);
+    const unread = all.filter((c) => c.new && c.type === "missed").length;
     const title = cfg.title === undefined ? "Téléphone" : cfg.title;
     const showNum = this._on("show_number", false);
     const showDur = this._on("show_duration", true);
-    const key = JSON.stringify([entity, st && st.last_updated, cfg, new Date().toDateString()]);
+    const key = JSON.stringify([entity, this._calls, this._error, cfg, new Date().toDateString()]);
     if (key === this._key) return;
     this._key = key;
 
@@ -195,7 +245,11 @@ class HomexaCallsCard extends HTMLElement {
       })
       .join("");
 
-    const empty = !entity ? "Aucun capteur d'appels Freebox Homexa" : !st ? `Entité introuvable : ${entity}` : "Aucun appel";
+    const empty = !entity
+      ? "Aucun capteur d'appels Freebox Homexa"
+      : !st
+        ? `Entité introuvable : ${entity}`
+        : this._error || (this._calls === null ? "Chargement…" : "Aucun appel");
     this.shadowRoot.innerHTML = `<style>${STYLES}</style>
       <ha-card>
         ${title ? `<div class="head"><ha-icon icon="mdi:phone"></ha-icon><span class="title">${_esc(title)}</span>${unread ? `<span class="badge">${_esc(unread)} manqué${unread > 1 ? "s" : ""}</span>` : ""}</div>` : ""}

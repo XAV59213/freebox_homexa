@@ -1,5 +1,17 @@
 # Changelog
 
+## Non publié
+- Revue HACS (frenck) — **appareils des autres intégrations jamais modifiés** :
+  - `ensure_lan_client_device` : avant de créer l’appareil d’un client réseau, la MAC est cherchée dans **tout** le registre. Si un appareil d’une autre intégration la porte (Shelly, ESPHome…), ou si Home Assistant y a relié le tracker, il n’est plus jamais renommé, modifié (fabricant), rattaché à l’entrée Homexa, re-parenté ni rangé dans « Clients réseau »
+  - `async_clean_repeater_connections` : un appareil partagé avec une autre entrée n’est plus modifié ni supprimé ; un appareil portant une entité d’une autre intégration n’est plus vidé ; seules nos propres entités sont déplacées
+  - même garde que `async_remove_lan_client_devices`, factorisée dans `registry_compat.shared_with_other_entries`
+  - tests : `tests/simulation_registre_partage.py` (Shelly / ESPHome intacts, nos appareils toujours gérés)
+- Revue HACS (frenck) — **vie privée du journal d’appels** :
+  - capteur « Derniers appels Freebox » : l’état reste le nombre d’appels non lus ; l’attribut `calls` (noms, numéros) est **supprimé**
+  - capteur « Appels manqués Freebox » : même problème, les attributs « date → nom » (le nom vaut le numéro pour un appelant inconnu) sont **supprimés** ; l’état (nombre de manqués non lus) ne change pas. Une carte Markdown ou une automatisation qui lisait ces attributs doit passer à la carte « Homexa Appels »
+  - nouvelle commande WebSocket `freebox_homexa/calls` (entité capteur Homexa obligatoire pour un non-administrateur, droit de lecture sur l’entité vérifié) ; la carte `homexa-calls-card` l’utilise, se rafraîchit à chaque changement du capteur et toutes les 60 s, et affiche un message clair si la commande est indisponible ou refusée
+  - tests : `tests/simulation_journal_appels.py`
+
 ## 28.8.71 (2026-10-31)
 - Documentation : capture de la carte **Homexa Appels** ajoutée au README (`docs/images/homexa-calls-card.jpg`)
 - Documentation : captures des cartes **Freebox Homexa** et **Homexa TNT** ajoutées au README (`docs/images/freebox-homexa-card.jpg`, `docs/images/homexa-tnt-card.jpg`)

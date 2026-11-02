@@ -22,7 +22,6 @@ from homeassistant.helpers.device_registry import CONNECTION_NETWORK_MAC, Device
 from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.dispatcher import async_dispatcher_connect
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
-from homeassistant.util import dt as dt_util
 
 from .const import (
     CONF_CREATE_LAN_DEVICES,
@@ -82,8 +81,6 @@ CALL_SENSORS: tuple[SensorEntityDescription, ...] = (
 CALL_LOG_SENSOR = SensorEntityDescription(
     key="calls_log", name="Derniers appels Freebox", icon="mdi:phone-log"
 )
-CALL_LOG_MAX = 30
-
 DISK_PARTITION_SENSORS: tuple[SensorEntityDescription, ...] = (
     SensorEntityDescription(
         key="partition_free_space",
@@ -263,52 +260,20 @@ class FreeboxCallSensor(FreeboxSensor):
         ]
         self._attr_native_value = len(self._call_list_for_type)
 
-    @property
-    def extra_state_attributes(self) -> dict[str, Any]:
-        return {
-            dt_util.utc_from_timestamp(call["datetime"]).isoformat(): call["name"]
-            for call in self._call_list_for_type
-        }
 
 
 class FreeboxCallLogSensor(FreeboxSensor):
     """Derniers appels (tous types). État = nombre d'appels non lus.
 
-    L'attribut ``calls`` (liste, du plus récent au plus ancien) n'est pas
-    enregistré dans l'historique pour ne pas alourdir la base.
+    Aucun nom ni numéro dans les attributs d'état : la carte homexa-calls-card
+    lit la liste via la commande WebSocket ``freebox_homexa/calls``.
     """
-
-    _unrecorded_attributes = frozenset({"calls"})
-
-    def __init__(self, router: FreeboxRouter, description: SensorEntityDescription) -> None:
-        super().__init__(router, description)
-        self._calls: list[dict[str, Any]] = []
 
     @callback
     def async_update_state(self) -> None:
-        calls = sorted(
-            (c for c in self._router.call_list or [] if isinstance(c, dict)),
-            key=lambda c: c.get("datetime") or 0,
-            reverse=True,
-        )[:CALL_LOG_MAX]
-        self._calls = [
-            {
-                "name": c.get("name") or c.get("number") or "Inconnu",
-                "number": c.get("number") or "",
-                "type": c.get("type") or "",
-                "datetime": dt_util.utc_from_timestamp(c["datetime"]).isoformat()
-                if c.get("datetime")
-                else None,
-                "duration": c.get("duration") or 0,
-                "new": bool(c.get("new", False)),
-            }
-            for c in calls
-        ]
-        self._attr_native_value = sum(1 for c in self._calls if c["new"])
-
-    @property
-    def extra_state_attributes(self) -> dict[str, Any]:
-        return {"calls": self._calls}
+        self._attr_native_value = sum(
+            1 for c in self._router.call_list or [] if isinstance(c, dict) and c.get("new", False)
+        )
 
 
 class FreeboxDiskSensor(FreeboxSensor):

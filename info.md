@@ -8,8 +8,15 @@ Doc complète : [Wiki](https://github.com/XAV59213/freebox_homexa/wiki)
 
 ## Installation
 
-> **Freebox Homexa est maintenant disponible directement dans la bibliothèque HACS / Marketplace.**
+<p align="center">
+  <a href="https://hacs.xyz"><img src="https://img.shields.io/badge/HACS-Default-41BDF5?style=for-the-badge&logo=homeassistantcommunitystore&logoColor=white" alt="HACS Default"></a>
+</p>
+
+> [!TIP]
+> 🎉 **Freebox Homexa est maintenant disponible directement dans la bibliothèque HACS / Marketplace.**
 > Plus besoin d’ajouter le dépôt personnalisé : cherche simplement « Freebox Homexa » dans HACS.
+
+[![Ouvrir Freebox Homexa dans HACS](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=XAV59213&repository=freebox_homexa&category=integration)
 
 1. HACS → recherche **Freebox Homexa** → **Télécharger**
 2. Redémarre Home Assistant

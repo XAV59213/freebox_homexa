@@ -41,6 +41,17 @@
           "home_poll_interval": "How often to query PIR, contacts, alarm and shutters. 5 s is closer to the official integration if that one is disabled.",
           "remote_code": "8 digits from the Player: Settings → System → Information. Extra fields appear per detected Player. Leave empty without a Player, or for Mini 4K / Pop."
         }
+      },
+      "reconfigure": {
+        "title": "Reconfigure Freebox",
+        "description": "Change the host or port of this Freebox entry (for example switch from the public *.fbxos.fr URL to mafreebox.freebox.fr or a local IP when remote access is disabled).",
+        "data": {
+          "host": "[%key:common::config_flow::data::host%]",
+          "port": "[%key:common::config_flow::data::port%]"
+        },
+        "data_description": {
+          "host": "Hostname or IP address of your Freebox (e.g. mafreebox.freebox.fr)."
+        }
       }
     },
     "error": {
@@ -51,7 +62,9 @@
     },
     "abort": {
       "already_configured": "[%key:common::config_flow::abort::already_configured_device%]",
-      "reauth_successful": "Re-authorization successful"
+      "reauth_successful": "Re-authorization successful",
+      "reconfigure_successful": "Reconfiguration successful",
+      "wrong_account": "This host does not match the Freebox being reconfigured"
     }
   },
   "options": {

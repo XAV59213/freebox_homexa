@@ -1,5 +1,8 @@
 # Changelog
 
+## 28.8.76 — 2026-11-04
+- Découverte zeroconf : le menu ⋮ de la carte de découverte affiche maintenant **Ignorer** (unique_id posé dès la découverte). Permet de masquer la carte sans créer d’entrée.
+
 ## 28.8.75 — 2026-11-04
 - Configuration : le formulaire de saisie de l’hôte est **toujours affiché**, même après une découverte zeroconf. L’utilisateur peut ainsi modifier manuellement l’adresse (`mafreebox.freebox.fr` ou IP locale) quand l’accès à distance est désactivé et que l’URL publique `*.fbxos.fr` est injoignable (#101, PR #102)
 - Suite revue HACS (frenck) : `async_merge_repeater_devices` applique les mêmes gardes que `async_clean_repeater_connections` — un doublon de répéteur partagé avec une autre intégration n’est ni vidé ni supprimé (ni choisi comme appareil conservé), seules nos propres entités sont déplacées, et un doublon portant encore une entité d’une autre intégration n’est jamais supprimé (tests : `tests/simulation_registre_partage.py`)

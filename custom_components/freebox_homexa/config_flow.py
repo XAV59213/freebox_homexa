@@ -332,6 +332,9 @@ class FreeboxFlowHandler(ConfigFlow, domain=DOMAIN):
         self._suggested_port = int(
             discovery_info.properties.get("https_port") or discovery_info.port or 80
         )
+        # Unique ID posé ici pour que HA affiche « Ignorer » sur la carte de découverte
+        await self.async_set_unique_id(self._suggested_host)
+        self._abort_if_unique_id_configured()
         return await self.async_step_user()
 
 

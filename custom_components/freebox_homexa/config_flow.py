@@ -8,6 +8,7 @@ import voluptuous as vol
 
 from homeassistant.config_entries import (
     SOURCE_REAUTH,
+    SOURCE_RECONFIGURE,
     ConfigEntry,
     ConfigFlow,
     ConfigFlowResult,
@@ -318,6 +319,45 @@ class FreeboxFlowHandler(ConfigFlow, domain=DOMAIN):
             title=self._data[CONF_HOST],
             data=self._data,
             options=self._options,
+        )
+
+    async def async_step_reconfigure(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """Permet de changer l'hôte/port d'une entrée existante (ex. URL publique → locale)."""
+        entry = self._get_reconfigure_entry()
+        errors: dict[str, str] = {}
+
+        if user_input is not None:
+            new_host = user_input[CONF_HOST].strip()
+            new_port = int(user_input.get(CONF_PORT, 80))
+            # Vérifie que le nouvel hôte n'est pas déjà utilisé par une autre entrée
+            await self.async_set_unique_id(new_host)
+            self._abort_if_unique_id_mismatch(reason="wrong_account")
+            for existing in self._async_current_entries():
+                if (
+                    existing.unique_id == new_host
+                    and existing.entry_id != entry.entry_id
+                ):
+                    return self.async_abort(reason="already_configured")
+
+            new_data = {**entry.data, CONF_HOST: new_host, CONF_PORT: new_port}
+            return self.async_update_reload_and_abort(
+                entry,
+                data_updates=new_data,
+                unique_id=new_host,
+            )
+
+        return self.async_show_form(
+            step_id="reconfigure",
+            data_schema=vol.Schema(
+                {
+                    vol.Required(CONF_HOST, default=entry.data.get(CONF_HOST, "")): str,
+                    vol.Required(CONF_PORT, default=entry.data.get(CONF_PORT, 80)): int,
+                }
+            ),
+            errors=errors,
+            description_placeholders=_PLACEHOLDERS,
         )
 
     async def async_step_zeroconf(

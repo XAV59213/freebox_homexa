@@ -41,11 +41,24 @@
           "home_poll_interval": "Fréquence PIR, contacts, alarme et volets. 5 s se rapproche de l'officielle si celle-ci est désactivée.",
           "remote_code": "8 chiffres : sur le Player, Réglages → Système → Informations. Un champ par Player peut s'ajouter. Laissez vide sans Player, ou pour Mini 4K / Pop."
         }
+      },
+      "reconfigure": {
+        "title": "Reconfigurer la Freebox",
+        "description": "Changez l'hôte ou le port de cette entrée (par exemple passer de l'URL publique *.fbxos.fr à mafreebox.freebox.fr ou une IP locale quand l'accès distant est désactivé).",
+        "data": {
+          "host": "Nom d'hôte ou adresse IP",
+          "port": "Port"
+        },
+        "data_description": {
+          "host": "Nom d'hôte ou adresse IP de votre Freebox (ex. mafreebox.freebox.fr)."
+        }
       }
     },
     "abort": {
       "already_configured": "Hôte déjà configuré",
-      "reauth_successful": "Réautorisation réussie"
+      "reauth_successful": "Réautorisation réussie",
+      "reconfigure_successful": "Reconfiguration réussie",
+      "wrong_account": "Cet hôte ne correspond pas à la Freebox en cours de reconfiguration"
     },
     "error": {
       "cannot_connect": "Impossible de se connecter, veuillez réessayer",

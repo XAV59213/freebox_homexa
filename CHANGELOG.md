@@ -1,5 +1,8 @@
 # Changelog
 
+## 28.8.77 — 2026-11-04
+- Reconfiguration : on peut maintenant changer l’hôte/port d’une entrée existante (menu ⋮ → Reconfigurer) sans la supprimer. Utile pour passer de l’URL publique `*.fbxos.fr` à `mafreebox.freebox.fr` ou une IP locale quand l’accès distant est désactivé.
+
 ## 28.8.76 — 2026-11-04
 - Découverte zeroconf : le menu ⋮ de la carte de découverte affiche maintenant **Ignorer** (unique_id posé dès la découverte). Permet de masquer la carte sans créer d’entrée.
 

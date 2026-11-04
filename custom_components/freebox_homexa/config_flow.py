@@ -180,6 +180,8 @@ class FreeboxFlowHandler(ConfigFlow, domain=DOMAIN):
         self._data: dict[str, Any] = {}
         self._options: dict[str, Any] = {}
         self._players: list[dict[str, Any]] = []
+        self._suggested_host: str | None = None
+        self._suggested_port: int | None = None
 
     @staticmethod
     @callback
@@ -191,24 +193,23 @@ class FreeboxFlowHandler(ConfigFlow, domain=DOMAIN):
     ) -> ConfigFlowResult:
         if user_input is None:
             store = Store(self.hass, STORAGE_VERSION, STORAGE_KEY_CONFIG)
-            stored_data = await store.async_load()
-            if stored_data:
-                user_input = stored_data
-            else:
-                return self.async_show_form(
-                    step_id="user",
-                    data_schema=vol.Schema(
-                        {
-                            vol.Required(CONF_HOST): str,
-                            vol.Required(CONF_PORT, default=80): int,
-                        }
-                    ),
-                    description_placeholders=_PLACEHOLDERS,
-                )
+            stored_data = await store.async_load() or {}
+            suggested_host = self._suggested_host or stored_data.get(CONF_HOST, "")
+            suggested_port = self._suggested_port if self._suggested_port is not None else stored_data.get(CONF_PORT, 80)
+            return self.async_show_form(
+                step_id="user",
+                data_schema=vol.Schema(
+                    {
+                        vol.Required(CONF_HOST, default=suggested_host): str,
+                        vol.Required(CONF_PORT, default=suggested_port): int,
+                    }
+                ),
+                description_placeholders=_PLACEHOLDERS,
+            )
 
         self._data = {
-            CONF_HOST: (user_input or {}).get(CONF_HOST),
-            CONF_PORT: (user_input or {}).get(CONF_PORT, 80),
+            CONF_HOST: user_input.get(CONF_HOST),
+            CONF_PORT: user_input.get(CONF_PORT, 80),
         }
         await self.async_set_unique_id(self._data[CONF_HOST])
         if self.source != SOURCE_REAUTH:
@@ -322,9 +323,16 @@ class FreeboxFlowHandler(ConfigFlow, domain=DOMAIN):
     async def async_step_zeroconf(
         self, discovery_info: ZeroconfServiceInfo
     ) -> ConfigFlowResult:
-        host = discovery_info.properties.get("api_domain") or discovery_info.host
-        port = discovery_info.properties.get("https_port") or 80
-        return await self.async_step_user({CONF_HOST: host, CONF_PORT: int(port)})
+        """Découverte zeroconf : pré-remplit l'hôte mais laisse toujours l'utilisateur le modifier.
+
+        Utile quand l'accès distant est désactivé (URL *.fbxos.fr injoignable)
+        et que l'on veut utiliser mafreebox.freebox.fr ou une IP locale.
+        """
+        self._suggested_host = discovery_info.properties.get("api_domain") or discovery_info.host
+        self._suggested_port = int(
+            discovery_info.properties.get("https_port") or discovery_info.port or 80
+        )
+        return await self.async_step_user()
 
 
 def _tnt_schema(channels_default: list[str], tmdb_api_key_default: str | None) -> vol.Schema:

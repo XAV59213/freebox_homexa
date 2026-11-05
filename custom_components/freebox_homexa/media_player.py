@@ -160,6 +160,7 @@ class FreeboxPlayerMediaPlayer(FreeboxReachableMixin, MediaPlayerEntity):
         self._attr_device_info = player_device_info(router, player)
         self._attr_available = bool(player.get("reachable", True))
         self._attr_source = None
+        self._channel_number = None
         if self._kind == "mini4k":
             self._attr_source_list = list(MINI_4K_SOURCES)
         else:
@@ -182,6 +183,7 @@ class FreeboxPlayerMediaPlayer(FreeboxReachableMixin, MediaPlayerEntity):
             "player_id": self._player_id,
             "api_version": self._api_version,
             "player_model": _player_model(self._player),
+            "channel_number": self._channel_number,
             "hdmi_note": "HDMI (CEC) réveille la TV sur la sortie du Player, ce n'est pas une entrée HDMI de la TV.",
         }
 
@@ -236,11 +238,21 @@ class FreeboxPlayerMediaPlayer(FreeboxReachableMixin, MediaPlayerEntity):
             return
 
         self._attr_available = True
+        # Devialet : champs observés dans /player/{id}/api/{version}/status/.
+        # Les formats plats restent prioritaires pour les autres firmwares.
+        def as_dict(value: Any) -> dict[str, Any]:
+            return value if isinstance(value, dict) else {}
+
+        foreground = as_dict(status.get("foreground_app"))
+        context = as_dict(foreground.get("context"))
+        channel = as_dict(context.get("channel"))
+        nested_state = as_dict(as_dict(status.get("player")).get("state"))
         power = str(status.get("power_state") or status.get("power") or "").lower()
         playback = str(
             status.get("playback_state")
             or status.get("state")
             or status.get("playback")
+            or nested_state.get("playback_state")
             or ""
         ).lower()
 
@@ -274,11 +286,29 @@ class FreeboxPlayerMediaPlayer(FreeboxReachableMixin, MediaPlayerEntity):
         title = (
             status.get("title")
             or status.get("program_name")
-            or (status.get("cur_info") or {}).get("title")
+            or as_dict(status.get("cur_info")).get("title")
         )
-        self._attr_media_title = title
-        current = status.get("app") or status.get("source") or status.get("uri")
-        if isinstance(current, str) and current.startswith("tv:"):
+        channel_name = channel.get("channelName")
+        self._attr_media_channel = channel_name if isinstance(channel_name, str) else None
+        number = channel.get("channelNumber")
+        self._channel_number = (
+            number if isinstance(number, (int, str)) and not isinstance(number, bool) else None
+        )
+        # Une chaîne n'est pas un titre d'émission : simple repli d'affichage.
+        self._attr_media_title = title or self._attr_media_channel
+        current = (
+            status.get("app") or status.get("source") or status.get("uri")
+            or foreground.get("cur_url") or foreground.get("package")
+        )
+        self._attr_source = None
+        if self._attr_state == MediaPlayerState.OFF:
+            self._attr_media_title = None
+            self._attr_media_channel = None
+            self._channel_number = None
+            return
+        if isinstance(current, str) and (
+            current.startswith("tv:") or current == "fr.freebox.tv"
+        ):
             self._attr_source = "TV"
         elif isinstance(current, str) and "youtube" in current.lower():
             self._attr_source = "YouTube"

@@ -1,6 +1,6 @@
 # Changelog
 
-## Non publié
+## 28.8.79 — 2026-11-05
 - Issue #106 — messages et robustesse :
   - **Freebox Home (`home/nodes`)** : on ne confond plus une erreur HTTP quelconque avec un refus de droit. Un vrai `insufficient_rights` affiche le message d'autorisation (droits de l'application dans Freebox OS, sans imposer une case « maison connectée » qui n'existe pas sur tous les modèles). Toute autre erreur (endpoint absent sur Freebox v8, indisponibilité temporaire…) a un message neutre et actionnable
   - **Player POP / `api_available=False`** : message clair (nom, `api_available`, modèle, pistes : Player allumé, Android TV Remote). Pas de contrôle inventé sans `id` — Free n'expose alors pas d'API locale. Si l'API devient disponible plus tard, Homexa recharge automatiquement l'entrée (retries espacés). Les chemins Homexa passent toujours un `player_id` explicite et ne s'appuient pas sur `freebox-api` `players[0]["id"]` non gardé

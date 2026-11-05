@@ -133,8 +133,8 @@ async def run():
 
     access.get.side_effect = RuntimeError('offline')
     await entity.async_update()  # API failure must not raise.
-    assert router.player_diagnostic_schemas[17] == {
-        'outcome': 'unavailable', 'status_schema': {'type': 'null'}}
+    assert router.player_diagnostic_schemas[17]['outcome'] == 'unavailable'
+    assert router.player_diagnostic_schemas[17]['timing_samples'] == []
     print('OK : Devialet TV, pause, plat, Révolution imbriquée, champs absents/malformés, arrêt, transitions, erreur API')
 
 

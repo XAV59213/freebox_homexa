@@ -1,6 +1,6 @@
 # Changelog
 
-## Non publié
+## 28.8.82 — 2026-11-05
 - Diagnostic Player : dernier schéma de statut reçu lors du polling normal (aucune requête supplémentaire ni commande). Types et présence des champs média uniquement, sans titres, auteurs, images/URL, valeurs numériques ou identifiants ; noms de champs inconnus remplacés. Les anciens diagnostics réseau sont aussi limités à leur structure pour ne plus exporter MAC/noms/identités. Aucun JSON brut conservé ni journalisé ; collecte bornée en mémoire, réinitialisée au rechargement. Ce mode privilégie la confidentialité et réduit les informations disponibles pour le dépannage réseau.
 
 ## 28.8.81 — 2026-11-05

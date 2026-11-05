@@ -1,6 +1,6 @@
 # Changelog
 
-## Non publié
+## 28.8.80 — 2026-11-05
 - Correction thread-safety (#106) : le retry Player (`async_schedule_player_api_retry`) passait `hass.async_create_task` via un lambda à `async_call_later`, ce qui plantait avec `RuntimeError` hors de la boucle d'événements. On passe maintenant la coroutine directement (comme le frontend Lovelace) — HassJob la planifie correctement
 
 ## 28.8.79 — 2026-11-05

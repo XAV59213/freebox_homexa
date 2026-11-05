@@ -1,6 +1,6 @@
 # Changelog
 
-## Non publié
+## 28.8.83 — 2026-11-05
 - Diagnostic Player : deux observations récentes du polling normal pour vérifier l'avancement YouTube, sans commande ni requête supplémentaire. Seules les durées/positions numériques finies de 0 à 7 jours, un état de lecture validé, une catégorie d'application connue et les dates de collecte sont exportés. Confidentialité volontairement moins stricte que le schéma seul pour ces valeurs précises ; aucun titre, auteur, URL, package brut ou identifiant. Échantillons effacés sur erreur/changement de catégorie et retirés après 120 secondes ; dernière collecte marquée périmée si nécessaire. Aucun changement du media_player ni support du titre vidéo.
 
 ## 28.8.82 — 2026-11-05

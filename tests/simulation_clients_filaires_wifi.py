@@ -35,6 +35,8 @@ except ImportError:  # bouchon minimal (HA fournit aiohttp)
 ha["freebox_api"].Freepybox = object
 ha["freebox_api.api.call"].Call = object; ha["freebox_api.api.home"].Home = object; ha["freebox_api.api.wifi"].Wifi = object
 ha["freebox_api.exceptions"].HttpRequestError = type("HttpRequestError", (Exception,), {})
+ha["freebox_api.exceptions"].InsufficientPermissionsError = type("IPE", (Exception,), {})
+ha["freebox_api.exceptions"].InvalidTokenError = type("InvalidTokenError", (Exception,), {})
 ha["freebox_api.exceptions"].NotOpenError = type("NotOpenError", (Exception,), {})
 
 

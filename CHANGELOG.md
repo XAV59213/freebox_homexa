@@ -1,5 +1,13 @@
 # Changelog
 
+## Non publié
+- Issue #106 — messages et robustesse :
+  - **Freebox Home (`home/nodes`)** : on ne confond plus une erreur HTTP quelconque avec un refus de droit. Un vrai `insufficient_rights` affiche le message d'autorisation (droits de l'application dans Freebox OS, sans imposer une case « maison connectée » qui n'existe pas sur tous les modèles). Toute autre erreur (endpoint absent sur Freebox v8, indisponibilité temporaire…) a un message neutre et actionnable
+  - **Player POP / `api_available=False`** : message clair (nom, `api_available`, modèle, pistes : Player allumé, Android TV Remote). Pas de contrôle inventé sans `id` — Free n'expose alors pas d'API locale. Si l'API devient disponible plus tard, Homexa recharge automatiquement l'entrée (retries espacés). Les chemins Homexa passent toujours un `player_id` explicite et ne s'appuient pas sur `freebox-api` `players[0]["id"]` non gardé
+  - **Appairage (`async_step_link`)** : journalise le type d'exception ; gère `InvalidTokenError`, timeouts et erreurs réseau aiohttp à part de l'« Erreur inconnue » ; ferme toujours la session
+  - **HA 2026.12** : suppression de l'`update listener` au profit de `OptionsFlowWithReload` (reauth/reconfigure gardent `async_update_reload_and_abort`) — finit l'avertissement « has an update listener and should use it for scheduling a reload »
+  - tests : `tests/simulation_issue106_home_player.py`
+
 ## 28.8.78 — 2026-11-05
 - Correction : certains Freebox Player renvoyés par l’API n’ont pas de clé `id`. Les plateformes media_player, remote et button les ignorent maintenant au lieu de planter avec `KeyError: 'id'` (#106).
 

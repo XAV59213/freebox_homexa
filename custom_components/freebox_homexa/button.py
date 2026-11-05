@@ -20,6 +20,7 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from .const import option_remote_code
 from .media_player import player_device_info
 from .router import FreeboxConfigEntry, FreeboxRouter
+from .player_remote import async_schedule_player_api_retry, filter_ready_players
 from .availability import FreeboxReachableMixin
 
 _LOGGER = logging.getLogger(__name__)
@@ -121,12 +122,12 @@ async def async_setup_entry(
         _LOGGER.debug("Players indisponibles pour les boutons remote : %s", err)
         players = []
 
-    valid_players = []
-    for player in players:
-        if not isinstance(player, dict) or "id" not in player:
-            _LOGGER.debug("Player Freebox ignoré pour les boutons (pas de clé 'id') : %s", player)
-            continue
-        valid_players.append(player)
+    valid_players, skipped = filter_ready_players(
+        players, logger=_LOGGER, context="boutons",
+        log_skipped=False,
+    )
+    if skipped:
+        await async_schedule_player_api_retry(hass, entry, router)
 
     for player in valid_players:
         for key, name, icon, enabled in PLAYER_REMOTE_BUTTONS:

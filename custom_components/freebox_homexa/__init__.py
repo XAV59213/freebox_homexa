@@ -212,7 +212,10 @@ async def async_setup_entry(hass: HomeAssistant, entry: FreeboxConfigEntry) -> b
     entry.async_on_unload(
         async_track_time_interval(hass, _poll_home, timedelta(seconds=home_interval))
     )
-    entry.async_on_unload(entry.add_update_listener(async_reload_entry))
+    # Pas d'update listener : OptionsFlowWithReload recharge après les options,
+    # et reauth/reconfigure utilisent async_update_reload_and_abort. Combiner les
+    # deux provoquait l'avertissement HA 2026.12 (« has an update listener and
+    # should use it for scheduling a reload »).
 
     entry.runtime_data = router
     try:
@@ -285,6 +288,3 @@ async def async_unload_entry(hass: HomeAssistant, entry: FreeboxConfigEntry) -> 
     # erreur traduite tant qu'aucune entrée n'est chargée). Rappels TNT conservés.
     return True
 
-
-async def async_reload_entry(hass: HomeAssistant, entry: FreeboxConfigEntry) -> None:
-    await hass.config_entries.async_reload(entry.entry_id)

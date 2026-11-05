@@ -82,3 +82,137 @@ async def async_send_player_keys(
         if accepted is False:
             _LOGGER.debug("Touche %s : réponse du Player non confirmée", key)
     return failures
+
+
+# Délais (s) avant rechargement si un Player sans API devient contrôlable plus tard.
+PLAYER_API_RETRY_DELAYS = (120, 300, 600)
+
+
+def player_display_name(player: dict[str, Any]) -> str:
+    """Nom affiché d'un Player (device_name / name / id / générique)."""
+    name = player.get("device_name") or player.get("name")
+    if name:
+        return str(name)
+    if player.get("id") is not None:
+        return f"Freebox Player {player['id']}"
+    return "Freebox Player"
+
+
+def player_api_ready(player: Any) -> bool:
+    """True si l'API Player Freebox OS peut contrôler cet appareil.
+
+    L'API `/player/` omet souvent `id` quand `api_available` vaut False (cas
+    documenté pour le Player POP / stb_v8 / fbx8am). Sans `id`, freebox-api ne
+    peut pas appeler status/volume/open (`players[0]["id"]` planterait). On
+    n'invente pas de contrôle alternatif : Free ne publie pas d'API locale pour
+    ces modèles ; Android TV Remote reste hors périmètre Homexa.
+    """
+    if not isinstance(player, dict):
+        return False
+    if player.get("id") is None:
+        return False
+    # Clé absente = anciens firmwares qui exposaient déjà l'id : on accepte.
+    if player.get("api_available") is False:
+        return False
+    return True
+
+
+def player_skip_message(player: dict[str, Any], context: str = "") -> str:
+    """Message actionnable quand un Player n'est pas contrôlable via Freebox OS."""
+    name = player_display_name(player)
+    suffix = f" ({context})" if context else ""
+    api_available = player.get("api_available")
+    has_id = player.get("id") is not None
+    model = player.get("device_model") or player.get("stb_type") or "?"
+    if api_available is False or not has_id:
+        return (
+            f"Player « {name} » ignoré{suffix} : son API Freebox OS est indisponible "
+            f"(api_available={api_available!r}, "
+            f"id={'présent' if has_id else 'absent'}, "
+            f"modèle={model}). Vérifier que le Player est allumé et joignable sur le "
+            f"réseau. Sur Player POP / Mini 4K (Android TV), Free n'expose souvent "
+            f"aucune API locale : utiliser Android TV Remote, ou patienter — Homexa "
+            f"réessaiera automatiquement si l'API devient disponible."
+        )
+    return f"Player « {name} » ignoré{suffix} : charge utile inattendue : {player}"
+
+
+def filter_ready_players(
+    players: list[Any],
+    *,
+    logger: logging.Logger | None = None,
+    context: str = "",
+    log_skipped: bool = True,
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+    """Sépare les Players contrôlables des autres."""
+    log = logger or _LOGGER
+    ready: list[dict[str, Any]] = []
+    skipped: list[dict[str, Any]] = []
+    for player in players or []:
+        if player_api_ready(player):
+            ready.append(player)
+            continue
+        if isinstance(player, dict):
+            skipped.append(player)
+            if log_skipped:
+                log.warning("%s", player_skip_message(player, context))
+        elif log_skipped:
+            log.warning(
+                "Player Freebox ignoré%s : charge utile non dict : %r",
+                f" ({context})" if context else "",
+                player,
+            )
+    return ready, skipped
+
+
+async def async_schedule_player_api_retry(hass: Any, entry: Any, router: Any) -> None:
+    """Recharge l'entrée si un Player sans API devient contrôlable plus tard.
+
+    Utile quand le Player était éteint / injoignable au démarrage (`api_available=
+    False`, pas d'`id`) puis se met à exposer l'API. On ne crée pas d'entité sans
+    `id` : Freebox OS ne fournit alors aucun endpoint de contrôle.
+    """
+    from homeassistant.helpers.event import async_call_later
+
+    if getattr(router, "_player_api_retry_scheduled", False):
+        return
+    router._player_api_retry_scheduled = True
+    attempt = {"n": 0}
+
+    async def _attempt(_now: Any = None) -> None:
+        if getattr(router, "closing", False):
+            return
+        try:
+            players = list(await router._api.player.get_players() or [])
+        except Exception as err:  # noqa: BLE001
+            _LOGGER.debug("Nouvelle tentative Player impossible : %s", err)
+            return
+        ready = [p for p in players if player_api_ready(p)]
+        known = set(getattr(router, "player_identifiers", ()) or ())
+        new_ready = [p for p in ready if f"player_{p['id']}" not in known]
+        if new_ready:
+            _LOGGER.info(
+                "API Player devenue disponible pour %s — rechargement de l'intégration",
+                ", ".join(player_display_name(p) for p in new_ready),
+            )
+            await hass.config_entries.async_reload(entry.entry_id)
+            return
+        attempt["n"] += 1
+        if attempt["n"] >= len(PLAYER_API_RETRY_DELAYS):
+            _LOGGER.debug(
+                "Aucune API Player contrôlable après %s tentatives — stop",
+                attempt["n"],
+            )
+            return
+        delay = PLAYER_API_RETRY_DELAYS[attempt["n"]]
+        entry.async_on_unload(
+            async_call_later(hass, delay, lambda n: hass.async_create_task(_attempt(n)))
+        )
+
+    entry.async_on_unload(
+        async_call_later(
+            hass,
+            PLAYER_API_RETRY_DELAYS[0],
+            lambda n: hass.async_create_task(_attempt(n)),
+        )
+    )

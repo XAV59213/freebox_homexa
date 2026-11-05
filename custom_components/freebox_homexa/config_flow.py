@@ -1,11 +1,17 @@
 """Flux de configuration pour l'intégration Freebox Homexa."""
 
 import logging
+from contextlib import suppress
 from typing import Any
 
-from freebox_api.exceptions import AuthorizationError, HttpRequestError
+import aiohttp
 import voluptuous as vol
-
+from freebox_api.exceptions import (
+    AuthorizationError,
+    HttpRequestError,
+    InsufficientPermissionsError,
+    InvalidTokenError,
+)
 from homeassistant.config_entries import (
     SOURCE_REAUTH,
     SOURCE_RECONFIGURE,
@@ -13,6 +19,7 @@ from homeassistant.config_entries import (
     ConfigFlow,
     ConfigFlowResult,
     OptionsFlow,
+    OptionsFlowWithReload,
 )
 from homeassistant.const import CONF_HOST, CONF_PORT
 from homeassistant.core import HomeAssistant, callback
@@ -21,20 +28,6 @@ from homeassistant.helpers import selector
 from homeassistant.helpers.service_info.zeroconf import ZeroconfServiceInfo
 from homeassistant.helpers.storage import Store
 
-from .device_groups import (
-    CONF_DEVICE_GROUP_OVERRIDES,
-    CONF_DEVICE_TYPE_OVERRIDES,
-    CONF_REPEATER_MERGES,
-    GROUP_AUTO,
-    LAN_TYPE_NAMES,
-    group_choices,
-    group_label,
-    migrate_overrides,
-    migrate_type_overrides,
-    type_choices,
-    migrate_repeater_merges,
-    repeater_registry_devices,
-)
 from .const import (
     CONF_CREATE_LAN_DEVICES,
     CONF_CREATE_WIFI_SENSORS,
@@ -51,21 +44,35 @@ from .const import (
     STORAGE_VERSION,
     remote_code_field,
 )
+from .device_groups import (
+    CONF_DEVICE_GROUP_OVERRIDES,
+    CONF_DEVICE_TYPE_OVERRIDES,
+    CONF_REPEATER_MERGES,
+    GROUP_AUTO,
+    LAN_TYPE_NAMES,
+    group_choices,
+    group_label,
+    migrate_overrides,
+    migrate_repeater_merges,
+    migrate_type_overrides,
+    repeater_registry_devices,
+    type_choices,
+)
+from .router import get_api, get_hosts_list_if_supported, resolve_token_file
 from .tnt_const import (
     CONF_ANNOUNCE_VOLUME,
     CONF_MEDIA_PLAYER_TARGETS,
     CONF_NOTIFY_TARGET,
     CONF_REMINDER_PROFILES,
-    CONF_TTS_ENGINE,
     CONF_TMDB_API_KEY,
     CONF_TNT_CHANNELS,
     CONF_TNT_CHANNELS_BELGIQUE,
     CONF_TNT_CHANNELS_FRANCE,
+    CONF_TTS_ENGINE,
     FRANCE_CHANNELS,
     RTBF_CHANNELS,
     selected_channels,
 )
-from .router import get_api, get_hosts_list_if_supported, resolve_token_file
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -252,29 +259,35 @@ class FreeboxFlowHandler(ConfigFlow, domain=DOMAIN):
         errors = {}
         fbx = await get_api(self.hass, self._data[CONF_HOST])
         try:
-            await fbx.open(
-                self._data[CONF_HOST],
-                self._data.get(CONF_PORT, 80),
-            )
-
-            await fbx.system.get_config()
-            await get_hosts_list_if_supported(fbx)
             try:
-                self._players = await fbx.player.get_players() or []
-            except Exception:
-                self._players = []
-            await fbx.close()
-
-            store = Store(self.hass, STORAGE_VERSION, STORAGE_KEY_CONFIG)
-            await store.async_save(self._data)
-
-            if self.source == SOURCE_REAUTH:
-                return self.async_update_reload_and_abort(
-                    self._get_reauth_entry(),
-                    data=self._data,
+                await fbx.open(
+                    self._data[CONF_HOST],
+                    self._data.get(CONF_PORT, 80),
                 )
 
-            return await self.async_step_lan_options()
+                await fbx.system.get_config()
+                await get_hosts_list_if_supported(fbx)
+                try:
+                    self._players = await fbx.player.get_players() or []
+                except Exception as err:  # noqa: BLE001 — listing optionnel
+                    _LOGGER.debug("Liste Player indisponible pendant l'appairage : %s", err)
+                    self._players = []
+
+                store = Store(self.hass, STORAGE_VERSION, STORAGE_KEY_CONFIG)
+                await store.async_save(self._data)
+
+                if self.source == SOURCE_REAUTH:
+                    return self.async_update_reload_and_abort(
+                        self._get_reauth_entry(),
+                        data=self._data,
+                    )
+
+                return await self.async_step_lan_options()
+
+            finally:
+                # Toujours fermer la session, y compris en cas d'erreur après open().
+                with suppress(Exception):
+                    await fbx.close()
 
         except AuthorizationError as err:
             message = str(err).lower()
@@ -286,11 +299,25 @@ class FreeboxFlowHandler(ConfigFlow, domain=DOMAIN):
                 _LOGGER.warning("Autorisation Freebox en attente / timeout, token conservé : %s", err)
                 errors["base"] = "register_failed"
 
-        except HttpRequestError:
+        except InvalidTokenError as err:
+            _LOGGER.warning("Descripteur / token Freebox invalide : %s", err)
+            await self._cleanup_invalid_token()
+            errors["base"] = "invalid_token"
+
+        except InsufficientPermissionsError as err:
+            _LOGGER.warning("Droits Freebox insuffisants pendant l'appairage : %s", err)
             errors["base"] = "cannot_connect"
 
-        except Exception:
-            _LOGGER.exception("Erreur inconnue")
+        except (HttpRequestError, TimeoutError, aiohttp.ClientError, OSError) as err:
+            _LOGGER.warning(
+                "Connexion Freebox impossible pendant l'appairage (%s): %s",
+                type(err).__name__,
+                err,
+            )
+            errors["base"] = "cannot_connect"
+
+        except Exception as err:
+            _LOGGER.exception("Erreur inconnue pendant l'appairage (%s)", type(err).__name__)
             errors["base"] = "unknown"
 
         return self.async_show_form(
@@ -526,7 +553,7 @@ def _profile_schema(
     return vol.Schema(fields)
 
 
-class FreeboxOptionsFlowHandler(OptionsFlow):
+class FreeboxOptionsFlowHandler(OptionsFlowWithReload):
     """Options : LAN, intervalle Home et télécommandes Player sur le même écran."""
 
     def __init__(self) -> None:

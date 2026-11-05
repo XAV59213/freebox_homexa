@@ -1,8 +1,7 @@
 """Diagnostics Freebox Homexa (« Télécharger les diagnostics »).
 
-Contient de quoi analyser le regroupement des répéteurs Wi-Fi. Les MAC sont
-conservées (indispensables à l'analyse) ; numéros de série, jetons et mots de
-passe sont masqués.
+Contient de quoi analyser le regroupement des répéteurs Wi-Fi. Les valeurs et noms de champs inconnus sont
+remplacés par leur structure typée ; aucun historique de lecture exporté.
 """
 
 from __future__ import annotations
@@ -13,6 +12,7 @@ from homeassistant.components.diagnostics import async_redact_data
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 
+from .player_diagnostics import status_schema
 from .device_groups import repeater_registry_devices
 from .wifi_ap import is_freebox_repeater
 
@@ -61,7 +61,8 @@ async def async_get_config_entry_diagnostics(
     }
     if router is None:
         data["router"] = "non chargé"
-        return async_redact_data(data, TO_REDACT)
+        return {"legacy_schema": status_schema(async_redact_data(data, TO_REDACT)),
+                "players": []}
     hosts = {
         mac: device
         for mac, device in (router.devices or {}).items()
@@ -108,4 +109,10 @@ async def async_get_config_entry_diagnostics(
             "lan_client_devices": len(getattr(router, "lan_device_ids", {}) or {}),
         }
     )
-    return async_redact_data(data, TO_REDACT)
+    # Les anciens diagnostics contenaient notamment des MAC et noms d'appareils.
+    # Leur structure seule est exportée : pas de promesse d'anonymisation partielle.
+    return {
+        "privacy_mode": "schema_only_no_personal_values",
+        "legacy_schema": status_schema(async_redact_data(data, TO_REDACT)),
+        "players": list(getattr(router, "player_diagnostic_schemas", {}).values()),
+    }

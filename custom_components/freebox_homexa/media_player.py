@@ -18,6 +18,7 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from .const import DOMAIN, option_remote_code
 from .availability import FreeboxReachableMixin
+from .player_diagnostics import cache_player_schema
 from .player_remote import async_schedule_player_api_retry, filter_ready_players
 from .router import FreeboxConfigEntry, FreeboxRouter
 
@@ -228,6 +229,7 @@ class FreeboxPlayerMediaPlayer(FreeboxReachableMixin, MediaPlayerEntity):
                 status = None
 
         if status is None:
+            cache_player_schema(self._router, self._player_id, None, "unavailable")
             _LOGGER.debug(
                 "Statut Player %s (%s) indisponible : %s",
                 self._player_id,
@@ -237,6 +239,7 @@ class FreeboxPlayerMediaPlayer(FreeboxReachableMixin, MediaPlayerEntity):
             self._attr_available = bool(self._player.get("reachable"))
             return
 
+        cache_player_schema(self._router, self._player_id, status, "received")
         self._attr_available = True
         # Devialet : champs observés dans /player/{id}/api/{version}/status/.
         # Les formats plats restent prioritaires pour les autres firmwares.

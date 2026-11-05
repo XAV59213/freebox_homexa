@@ -89,6 +89,7 @@ async def run():
     assert entity._attr_media_title == entity._attr_media_channel == 'M6'
     assert entity.extra_state_attributes['channel_number'] == 6
     assert entity._attr_source == 'TV'
+    assert router.player_diagnostic_schemas[17]['outcome'] == 'received'
     assert entity._attr_volume_level == .3
     access.get.assert_any_await('player/17/api/v11/status/')
 
@@ -132,6 +133,8 @@ async def run():
 
     access.get.side_effect = RuntimeError('offline')
     await entity.async_update()  # API failure must not raise.
+    assert router.player_diagnostic_schemas[17] == {
+        'outcome': 'unavailable', 'status_schema': {'type': 'null'}}
     print('OK : Devialet TV, pause, plat, Révolution imbriquée, champs absents/malformés, arrêt, transitions, erreur API')
 
 

@@ -36,7 +36,17 @@ async def async_setup_entry(
         _LOGGER.warning("Impossible de lister les Freebox Player : %s", err)
         return
 
-    entities = [FreeboxRemote(router, player, entry) for player in players]
+    valid_players = []
+    for player in players:
+        if not isinstance(player, dict) or "id" not in player:
+            _LOGGER.warning(
+                "Player Freebox ignoré pour la télécommande (pas de clé 'id') : %s",
+                player,
+            )
+            continue
+        valid_players.append(player)
+
+    entities = [FreeboxRemote(router, player, entry) for player in valid_players]
     if entities:
         async_add_entities(entities, True)
 

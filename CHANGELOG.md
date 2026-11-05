@@ -1,5 +1,8 @@
 # Changelog
 
+## 28.8.78 — 2026-11-05
+- Correction : certains Freebox Player renvoyés par l’API n’ont pas de clé `id`. Les plateformes media_player, remote et button les ignorent maintenant au lieu de planter avec `KeyError: 'id'` (#106).
+
 ## 28.8.77 — 2026-11-04
 - Reconfiguration : on peut maintenant changer l’hôte/port d’une entrée existante (menu ⋮ → Reconfigurer) sans la supprimer. Utile pour passer de l’URL publique `*.fbxos.fr` à `mafreebox.freebox.fr` ou une IP locale quand l’accès distant est désactivé.
 

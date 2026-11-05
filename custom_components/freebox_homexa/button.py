@@ -121,7 +121,14 @@ async def async_setup_entry(
         _LOGGER.debug("Players indisponibles pour les boutons remote : %s", err)
         players = []
 
+    valid_players = []
     for player in players:
+        if not isinstance(player, dict) or "id" not in player:
+            _LOGGER.debug("Player Freebox ignoré pour les boutons (pas de clé 'id') : %s", player)
+            continue
+        valid_players.append(player)
+
+    for player in valid_players:
         for key, name, icon, enabled in PLAYER_REMOTE_BUTTONS:
             entities.append(
                 FreeboxPlayerRemoteButton(

@@ -11,7 +11,12 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from .const import option_remote_code
-from .player_remote import VALID_COMMANDS as PLAYER_VALID_COMMANDS, async_send_player_keys
+from .player_remote import (
+    VALID_COMMANDS as PLAYER_VALID_COMMANDS,
+    async_schedule_player_api_retry,
+    async_send_player_keys,
+    filter_ready_players,
+)
 from .media_player import player_device_info
 from .availability import FreeboxReachableMixin
 from .router import FreeboxConfigEntry, FreeboxRouter
@@ -36,15 +41,12 @@ async def async_setup_entry(
         _LOGGER.warning("Impossible de lister les Freebox Player : %s", err)
         return
 
-    valid_players = []
-    for player in players:
-        if not isinstance(player, dict) or "id" not in player:
-            _LOGGER.warning(
-                "Player Freebox ignoré pour la télécommande (pas de clé 'id') : %s",
-                player,
-            )
-            continue
-        valid_players.append(player)
+    valid_players, skipped = filter_ready_players(
+        players, logger=_LOGGER, context="télécommande",
+        log_skipped=False,
+    )
+    if skipped:
+        await async_schedule_player_api_retry(hass, entry, router)
 
     entities = [FreeboxRemote(router, player, entry) for player in valid_players]
     if entities:

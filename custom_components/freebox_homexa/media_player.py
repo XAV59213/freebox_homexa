@@ -18,6 +18,7 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from .const import DOMAIN, option_remote_code
 from .availability import FreeboxReachableMixin
+from .player_remote import async_schedule_player_api_retry, filter_ready_players
 from .router import FreeboxConfigEntry, FreeboxRouter
 
 _LOGGER = logging.getLogger(__name__)
@@ -114,22 +115,24 @@ async def async_setup_entry(
         _LOGGER.warning("Impossible de lister les Freebox Player : %s", err)
         return
 
-    valid_players = []
-    for player in players:
-        if not isinstance(player, dict) or "id" not in player:
-            _LOGGER.warning(
-                "Player Freebox ignoré (pas de clé 'id') : %s",
-                player,
-            )
-            continue
-        valid_players.append(player)
+    valid_players, skipped = filter_ready_players(
+        players, logger=_LOGGER, context="media_player"
+    )
+    if skipped:
+        await async_schedule_player_api_retry(hass, entry, router)
 
     entities = [FreeboxPlayerMediaPlayer(router, player, entry) for player in valid_players]
     if entities:
         async_add_entities(entities, True)
         _LOGGER.info("%s Freebox Player(s) ajouté(s)", len(entities))
-    else:
+    elif not players:
         _LOGGER.warning("Aucun Freebox Player détecté")
+    else:
+        _LOGGER.warning(
+            "Aucun Freebox Player contrôlable via l'API Freebox OS "
+            "(%s détecté(s), tous sans API locale)",
+            len(players),
+        )
 
 
 class FreeboxPlayerMediaPlayer(FreeboxReachableMixin, MediaPlayerEntity):

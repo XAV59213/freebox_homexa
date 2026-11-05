@@ -41,7 +41,7 @@ from .registry_compat import (
     get_device_by_identifier,
     shared_with_other_entries,
 )
-from .errors import is_shutdown_error
+from .errors import is_permission_denied, is_shutdown_error
 from .wifi_ap import build_wifi_aps
 
 _LOGGER = logging.getLogger(__name__)
@@ -666,8 +666,28 @@ class FreeboxRouter:
                 if is_shutdown_error(err, self):
                     _LOGGER.debug("Poll Home interrompu (rechargement) : %s", err)
                     return
+                # Ne pas confondre un endpoint absent / une erreur réseau avec un refus
+                # de droit : sur Freebox v8 (api 16.x) il n'y a souvent aucune case
+                # « maison connectée » à cocher.
+                if is_permission_denied(err):
+                    self.home_granted = False
+                    _LOGGER.warning(
+                        "L'accès aux appareils domestiques n'est pas autorisé (%s). "
+                        "Dans Freebox OS → Paramètres → Gestion des accès → Applications, "
+                        "vérifiez les droits de l'application Homexa (alarme / maison "
+                        "connectée s'ils existent sur votre modèle).",
+                        err,
+                    )
+                    return
                 self.home_granted = False
-                _LOGGER.warning("L'accès aux appareils domestiques n'est pas autorisé")
+                _LOGGER.warning(
+                    "Impossible de lire les appareils Freebox Home (home/nodes) : %s. "
+                    "Ce n'est pas forcément un refus de droit — l'API peut être absente "
+                    "sur certains modèles (ex. Freebox v8 sans objets Home) ou temporairement "
+                    "indisponible. Si vous n'avez pas d'alarme / PIR / volets Freebox Home, "
+                    "ignorez ce message.",
+                    err,
+                )
 
     async def reboot(self) -> None:
         try:

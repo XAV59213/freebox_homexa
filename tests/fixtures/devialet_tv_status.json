@@ -1,0 +1,25 @@
+{
+  "power_state": "running",
+  "foreground_app": {
+    "package_id": 34,
+    "cur_url": "",
+    "context": {
+      "player": {
+        "metadata": {}
+      },
+      "channel": {
+        "channelName": "M6",
+        "channelNumber": 6
+      }
+    },
+    "package": "fr.freebox.tv"
+  },
+  "player": {
+    "state": {
+      "duration_ms": 0,
+      "playback_state": "playing",
+      "position_ms": 0
+    },
+    "name": "Freebox TV"
+  }
+}

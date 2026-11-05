@@ -1,5 +1,8 @@
 # Changelog
 
+## Non publié
+- Correction thread-safety (#106) : le retry Player (`async_schedule_player_api_retry`) passait `hass.async_create_task` via un lambda à `async_call_later`, ce qui plantait avec `RuntimeError` hors de la boucle d'événements. On passe maintenant la coroutine directement (comme le frontend Lovelace) — HassJob la planifie correctement
+
 ## 28.8.79 — 2026-11-05
 - Issue #106 — messages et robustesse :
   - **Freebox Home (`home/nodes`)** : on ne confond plus une erreur HTTP quelconque avec un refus de droit. Un vrai `insufficient_rights` affiche le message d'autorisation (droits de l'application dans Freebox OS, sans imposer une case « maison connectée » qui n'existe pas sur tous les modèles). Toute autre erreur (endpoint absent sur Freebox v8, indisponibilité temporaire…) a un message neutre et actionnable

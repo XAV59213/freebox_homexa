@@ -205,14 +205,11 @@ async def async_schedule_player_api_retry(hass: Any, entry: Any, router: Any) ->
             )
             return
         delay = PLAYER_API_RETRY_DELAYS[attempt["n"]]
-        entry.async_on_unload(
-            async_call_later(hass, delay, lambda n: hass.async_create_task(_attempt(n)))
-        )
+        # Passer la coroutine directement : HassJob la planifie sur la boucle
+        # d'événements. Un lambda + hass.async_create_task depuis un SyncWorker
+        # déclenche RuntimeError (thread-safety HA).
+        entry.async_on_unload(async_call_later(hass, delay, _attempt))
 
     entry.async_on_unload(
-        async_call_later(
-            hass,
-            PLAYER_API_RETRY_DELAYS[0],
-            lambda n: hass.async_create_task(_attempt(n)),
-        )
+        async_call_later(hass, PLAYER_API_RETRY_DELAYS[0], _attempt)
     )

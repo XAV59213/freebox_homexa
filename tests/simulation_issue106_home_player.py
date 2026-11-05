@@ -216,4 +216,13 @@ assert "OptionsFlowWithReload" in open(
 ).read()
 print("OK : OptionsFlowWithReload sans update listener (HA 2026.12)")
 
+
+# --- retry Player sans async_create_task hors boucle -------------------------
+src = open("custom_components/freebox_homexa/player_remote.py", encoding="utf-8").read()
+assert "async_schedule_player_api_retry" in src
+assert "async_call_later" in src
+assert "lambda n: hass.async_create_task" not in src
+assert "async_call_later(hass, PLAYER_API_RETRY_DELAYS[0], _attempt)" in src
+print("OK : retry Player passe la coroutine à async_call_later (thread-safe)")
+
 print("Tous les tests issue #106 sont verts.")

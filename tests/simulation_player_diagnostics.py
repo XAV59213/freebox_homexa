@@ -70,3 +70,40 @@ for secret in secrets:
     assert secret not in json.dumps(result)
 assert not hasattr(router, '_api')  # Aucune API nécessaire au téléchargement.
 print('OK : cache borné, aucun secret/URL/titre/identifiant/valeur personnelle, export complet, entrée non chargée')
+
+# Les seules valeurs additionnelles sont strictement validées.
+from datetime import datetime, timedelta, timezone
+from unittest.mock import patch
+from freebox_homexa import player_diagnostics as pd
+router = types.SimpleNamespace()
+base = datetime(2026, 11, 5, 12, tzinfo=timezone.utc)
+def poll(seconds, position=1000, duration=5000, playback="playing", package="com.youtube", outcome="received"):
+    with patch.object(pd, "datetime") as clock:
+        clock.now.return_value = base + timedelta(seconds=seconds)
+        clock.fromisoformat.side_effect = datetime.fromisoformat
+        pd.cache_player_schema(router, 17, {
+            "foreground_app":{"package":package}, "player":{"state":{
+            "position_ms":position, "duration_ms":duration, "playback_state":playback}}}, outcome)
+poll(0)
+poll(30, 31000)
+assert len(router.player_diagnostic_schemas[17]["timing_samples"]) == 2
+assert [s["position_ms"] for s in router.player_diagnostic_schemas[17]["timing_samples"]] == [1000,31000]
+for bad in (None, -1, float("inf"), float("nan"), True, "SECRET", 10**1000, [], {}):
+    poll(40, bad, bad, playback="SECRET_TOKEN", package="SECRET_ACCOUNT")
+    sample = router.player_diagnostic_schemas[17]["timing_samples"][-1]
+    assert sample["position_ms"] is None and sample["duration_ms"] is None
+    assert sample["playback_state"] == "unknown" and sample["application_category"] == "other"
+    assert "SECRET" not in json.dumps(router.player_diagnostic_schemas)
+poll(50, outcome="unavailable")
+assert router.player_diagnostic_schemas[17]["timing_samples"] == []
+poll(60)
+poll(200)
+assert len(router.player_diagnostic_schemas[17]["timing_samples"]) == 1
+with patch.object(pd, "datetime") as clock:
+    clock.now.return_value = base + timedelta(seconds=400)
+    clock.fromisoformat.side_effect = datetime.fromisoformat
+    exported = pd.player_diagnostics(router)[0]
+    assert exported["stale"] is True and exported["timing_samples"] == []
+poll(210, 0, 0, "paused")
+assert router.player_diagnostic_schemas[17]["timing_samples"][-1]["position_ms"] == 0
+print("OK : valeurs numériques bornées, états/catégories filtrés, deux relevés, expiration et erreur")

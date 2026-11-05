@@ -1,7 +1,8 @@
 """Diagnostics Freebox Homexa (« Télécharger les diagnostics »).
 
 Contient de quoi analyser le regroupement des répéteurs Wi-Fi. Les valeurs et noms de champs inconnus sont
-remplacés par leur structure typée ; aucun historique de lecture exporté.
+remplacés par leur structure typée ; deux observations récentes de durée/position
+sont explicitement autorisées, sans titre ni identité.
 """
 
 from __future__ import annotations
@@ -12,7 +13,7 @@ from homeassistant.components.diagnostics import async_redact_data
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 
-from .player_diagnostics import status_schema
+from .player_diagnostics import player_diagnostics, status_schema
 from .device_groups import repeater_registry_devices
 from .wifi_ap import is_freebox_repeater
 
@@ -112,7 +113,7 @@ async def async_get_config_entry_diagnostics(
     # Les anciens diagnostics contenaient notamment des MAC et noms d'appareils.
     # Leur structure seule est exportée : pas de promesse d'anonymisation partielle.
     return {
-        "privacy_mode": "schema_only_no_personal_values",
+        "privacy_mode": "schema_plus_allowlisted_playback_timings",
         "legacy_schema": status_schema(async_redact_data(data, TO_REDACT)),
-        "players": list(getattr(router, "player_diagnostic_schemas", {}).values()),
+        "players": player_diagnostics(router),
     }

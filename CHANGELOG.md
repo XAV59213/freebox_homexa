@@ -1,5 +1,8 @@
 # Changelog
 
+## Non publié
+- Diagnostic Player : deux observations récentes du polling normal pour vérifier l'avancement YouTube, sans commande ni requête supplémentaire. Seules les durées/positions numériques finies de 0 à 7 jours, un état de lecture validé, une catégorie d'application connue et les dates de collecte sont exportés. Confidentialité volontairement moins stricte que le schéma seul pour ces valeurs précises ; aucun titre, auteur, URL, package brut ou identifiant. Échantillons effacés sur erreur/changement de catégorie et retirés après 120 secondes ; dernière collecte marquée périmée si nécessaire. Aucun changement du media_player ni support du titre vidéo.
+
 ## 28.8.82 — 2026-11-05
 - Diagnostic Player : dernier schéma de statut reçu lors du polling normal (aucune requête supplémentaire ni commande). Types et présence des champs média uniquement, sans titres, auteurs, images/URL, valeurs numériques ou identifiants ; noms de champs inconnus remplacés. Les anciens diagnostics réseau sont aussi limités à leur structure pour ne plus exporter MAC/noms/identités. Aucun JSON brut conservé ni journalisé ; collecte bornée en mémoire, réinitialisée au rechargement. Ce mode privilégie la confidentialité et réduit les informations disponibles pour le dépannage réseau.
 

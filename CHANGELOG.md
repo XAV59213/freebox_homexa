@@ -1,6 +1,6 @@
 # Changelog
 
-## Non publié
+## 28.8.81 — 2026-11-05
 - Player Devialet : lecture du statut imbriqué (`player.state.playback_state`) et de la chaîne (`foreground_app.context.channel.channelName` / `channelNumber`). Le media_player expose la chaîne et utilise son nom en repli du titre, sans inventer de titre d'émission. Formats plats conservés, informations effacées à l'arrêt ou lorsqu'elles disparaissent. Tests sur extrait public Devialet anonymisé ; validation sur appareil réel encore à faire.
 
 ## 28.8.80 — 2026-11-05

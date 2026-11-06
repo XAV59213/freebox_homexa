@@ -21,6 +21,7 @@ from .availability import FreeboxReachableMixin
 from .player_diagnostics import cache_player_schema
 from .player_remote import async_schedule_player_api_retry, filter_ready_players
 from .router import FreeboxConfigEntry, FreeboxRouter
+from .tv_guide import tnt_artwork_url
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -304,6 +305,7 @@ class FreeboxPlayerMediaPlayer(FreeboxReachableMixin, MediaPlayerEntity):
             or foreground.get("cur_url") or foreground.get("package")
         )
         self._attr_source = None
+        self._attr_media_image_url = None
         if self._attr_state == MediaPlayerState.OFF:
             self._attr_media_title = None
             self._attr_media_channel = None
@@ -323,6 +325,16 @@ class FreeboxPlayerMediaPlayer(FreeboxReachableMixin, MediaPlayerEntity):
         # titre de vidéo inventé. La chaîne TV (ex. BFM TV) reste prioritaire.
         if not self._attr_media_title and self._attr_source in {"YouTube", "Netflix"}:
             self._attr_media_title = self._attr_source
+        # Artwork TNT uniquement en contexte TV (poster/icone programme, sinon logo).
+        # YouTube/Netflix : aucune miniature inventée.
+        if self._attr_source == "TV":
+            hass = getattr(self, "hass", None)
+            if hass is not None:
+                self._attr_media_image_url = tnt_artwork_url(
+                    hass,
+                    channel_name=self._attr_media_channel,
+                    channel_number=self._channel_number,
+                )
 
     async def async_set_volume_level(self, volume: float) -> None:
         await self._put("control/volume", {"volume": int(round(volume * 100))})

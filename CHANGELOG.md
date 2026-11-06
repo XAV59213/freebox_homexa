@@ -1,6 +1,7 @@
 # Changelog
 
 ## Non publié
+- Player : artwork TNT sur le media_player en live TV — poster/icone du programme en cours, sinon logo de chaîne (même préférence que la carte Homexa TNT ; le capteur TNT préfère encore le logo). Matching par nom/numéro (`BFM TV` / `BFMTV` / numéro). Effacé hors TV (veille, YouTube, Netflix, sans match). Réutilise les URL HTTP déjà en mémoire dans le coordinateur TNT, sans requête réseau supplémentaire.
 - Player : si YouTube ou Netflix est déjà reconnu comme source et qu'aucun titre/chaîne n'est fourni, le media_player affiche « YouTube » / « Netflix » au lieu d'une carte vide. Aucun titre de vidéo inventé ; la chaîne TV (ex. BFM TV) reste prioritaire. Le diagnostic aligne la catégorie d'application sur la même détection large (youtube/netflix dans package/cur_url), toujours sans exporter le package brut.
 
 

@@ -65,6 +65,81 @@ def channel_number(name: str | None) -> int | None:
     return None
 
 
+def _wanted_channel_number(value: Any) -> int | None:
+    if isinstance(value, bool) or value is None:
+        return None
+    if isinstance(value, int):
+        return value
+    if isinstance(value, str) and value.strip().isdigit():
+        return int(value.strip())
+    return None
+
+
+def _http_url(value: Any) -> str | None:
+    if isinstance(value, str) and value.startswith(("http://", "https://")):
+        return value
+    return None
+
+
+def artwork_from_tnt_programs(
+    programs: list[dict[str, Any]],
+    *,
+    channel_name: str | None = None,
+    channel_number: int | str | None = None,
+) -> str | None:
+    """Poster/icone du programme en cours, sinon logo de chaîne (comme la carte TNT).
+
+    Le capteur TNT préfère channel_icon ; la carte utilise poster || icon.
+    Pour le media_player on suit la carte : artwork du programme d'abord.
+    """
+    resolve_number = globals()["channel_number"]
+    wanted_num = _wanted_channel_number(channel_number)
+    wanted_key = _norm(channel_name)
+    wanted_compact = wanted_key.replace(" ", "")
+    if wanted_num is None and channel_name:
+        wanted_num = resolve_number(channel_name)
+
+    for prog in programs:
+        if not isinstance(prog, dict):
+            continue
+        name = prog.get("channel_name")
+        name_s = name if isinstance(name, str) else None
+        key = _norm(name_s)
+        compact = key.replace(" ", "")
+        prog_num = resolve_number(name_s)
+        matched = False
+        if wanted_key and (key == wanted_key or (wanted_compact and compact == wanted_compact)):
+            matched = True
+        elif wanted_num is not None and prog_num == wanted_num:
+            matched = True
+        if not matched:
+            continue
+        current = prog.get("current")
+        if isinstance(current, dict):
+            for field in ("poster", "icon"):
+                url = _http_url(current.get(field))
+                if url:
+                    return url
+        url = _http_url(prog.get("channel_icon"))
+        if url:
+            return url
+    return None
+
+
+def tnt_artwork_url(
+    hass: HomeAssistant,
+    *,
+    channel_name: str | None = None,
+    channel_number: int | str | None = None,
+) -> str | None:
+    """Recherche dans les coordinateurs TNT Homexa déjà chargés (pas de réseau)."""
+    return artwork_from_tnt_programs(
+        tnt_programs(hass),
+        channel_name=channel_name,
+        channel_number=channel_number,
+    )
+
+
 @callback
 def tnt_programs(hass: HomeAssistant) -> list[dict[str, Any]]:
     """Read the programmes of Homexa's own bundled TNT coordinators, if any."""

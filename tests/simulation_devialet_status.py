@@ -123,7 +123,27 @@ async def run():
         assert entity._attr_source is None and entity.extra_state_attributes['channel_number'] is None
 
     await update({'power_state':'running', 'foreground_app':{'package':'com.netflix.mediaplayer'}})
-    assert entity._attr_source == 'Netflix' and entity._attr_media_title is None
+    assert entity._attr_source == 'Netflix' and entity._attr_media_title == 'Netflix'
+    # YouTube sans métadonnées : repli UX, pas un titre de vidéo inventé.
+    await update({'power_state':'running', 'foreground_app':{'package':'com.google.android.youtube.tv'}})
+    assert entity._attr_source == 'YouTube' and entity._attr_media_title == 'YouTube'
+    await update({'power_state':'running', 'foreground_app':{'cur_url':'https://www.youtube.com/watch?v=abc'}})
+    assert entity._attr_source == 'YouTube' and entity._attr_media_title == 'YouTube'
+    # Un vrai titre reste prioritaire sur le repli d'application.
+    await update({'power_state':'running', 'title':'Vidéo réelle',
+                 'foreground_app':{'package':'com.google.android.youtube.tv'}})
+    assert entity._attr_source == 'YouTube' and entity._attr_media_title == 'Vidéo réelle'
+    # Chaîne TV non écrasée par un package YouTube fantôme.
+    await update({**FIXTURE, 'foreground_app':{
+        'package':'fr.freebox.tv',
+        'context':{'channel':{'channelName':'BFM TV', 'channelNumber':15}}}})
+    assert entity._attr_source == 'TV' and entity._attr_media_title == 'BFM TV'
+    assert entity._attr_media_channel == 'BFM TV'
+    # Après YouTube, l'arrêt efface le repli.
+    await update({'power_state':'running', 'foreground_app':{'package':'fr.freebox.youtube'}})
+    assert entity._attr_media_title == 'YouTube'
+    await update({'power_state':'standby', 'foreground_app':{'package':'fr.freebox.youtube'}})
+    assert entity._attr_state == State.OFF and entity._attr_media_title is None
     await update({'title':'Titre existant', 'playback_state':'playing'})
     assert entity._attr_media_title == 'Titre existant' and entity._attr_state == State.PLAYING
     await update({'cur_info':{'title':'Autre titre'}, 'power_state':'running'})
@@ -135,7 +155,7 @@ async def run():
     await entity.async_update()  # API failure must not raise.
     assert router.player_diagnostic_schemas[17]['outcome'] == 'unavailable'
     assert router.player_diagnostic_schemas[17]['timing_samples'] == []
-    print('OK : Devialet TV, pause, plat, Révolution imbriquée, champs absents/malformés, arrêt, transitions, erreur API')
+    print('OK : Devialet TV, pause, plat, YouTube/Netflix repli UX, BFM prioritaire, arrêt, erreur API')
 
 
 asyncio.run(run())

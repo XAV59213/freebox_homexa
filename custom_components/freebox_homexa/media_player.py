@@ -319,6 +319,10 @@ class FreeboxPlayerMediaPlayer(FreeboxReachableMixin, MediaPlayerEntity):
             self._attr_source = "Netflix"
         elif current:
             self._attr_source = str(current)
+        # Repli UX uniquement : nom de l'application déjà reconnue, jamais un
+        # titre de vidéo inventé. La chaîne TV (ex. BFM TV) reste prioritaire.
+        if not self._attr_media_title and self._attr_source in {"YouTube", "Netflix"}:
+            self._attr_media_title = self._attr_source
 
     async def async_set_volume_level(self, volume: float) -> None:
         await self._put("control/volume", {"volume": int(round(volume * 100))})

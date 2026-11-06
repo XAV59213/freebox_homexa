@@ -107,3 +107,23 @@ with patch.object(pd, "datetime") as clock:
 poll(210, 0, 0, "paused")
 assert router.player_diagnostic_schemas[17]["timing_samples"][-1]["position_ms"] == 0
 print("OK : valeurs numériques bornées, états/catégories filtrés, deux relevés, expiration et erreur")
+
+# Alignement catégorie diagnostic / media_player (sous-chaîne youtube/netflix).
+router = types.SimpleNamespace()
+for package, expected in (
+    ("com.google.android.youtube.tv", "YouTube"),
+    ("fr.freebox.youtube", "YouTube"),
+    ("youtube-private", "YouTube"),
+    ("com.netflix.mediaplayer", "Netflix"),
+    ("fr.freebox.tv", "TV"),
+    ("com.primevideo", "other"),
+):
+    cache_player_schema(router, 1, {"foreground_app": {"package": package},
+        "player": {"state": {"playback_state": "unknown", "duration_ms": 0, "position_ms": 0}}}, "received")
+    sample = router.player_diagnostic_schemas[1]["timing_samples"][-1]
+    assert sample["application_category"] == expected, (package, sample)
+    assert package not in json.dumps(router.player_diagnostic_schemas)
+cache_player_schema(router, 1, {"foreground_app": {"cur_url": "https://www.youtube.com/", "package": "com.unknown"},
+    "player": {"state": {"playback_state": "playing", "duration_ms": 0, "position_ms": 0}}}, "received")
+assert router.player_diagnostic_schemas[1]["timing_samples"][-1]["application_category"] == "YouTube"
+print("OK : catégories YouTube/Netflix/TV alignées sans fuite de package")

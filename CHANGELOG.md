@@ -1,6 +1,9 @@
 # Changelog
 
 ## Non publié
+
+
+## 28.8.86 — 2026-11-06
 - Player : artwork YouTube/Netflix via PNG carrés embarqués (`frontend/youtube.png`, `frontend/netflix.png`) servis en local (`/freebox_homexa/youtube.png`, `/freebox_homexa/netflix.png`) — plus de hotlink externe pour `media_image_url`. TNT reste prioritaire.
 
 ## 28.8.85 — 2026-11-06

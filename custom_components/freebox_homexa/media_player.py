@@ -55,13 +55,13 @@ MINI_4K_MODELS = {"fbx6lc", "freebox_mini", "mini4k", "mini_4k", "stb_mini"}
 DEVIALET_MODELS = {"fbx7hd-delta", "stb_v7", "fbx7hd-one"}
 API_VERSION_FALLBACKS = ("v6", "v8", "v7", "v5")
 
-# Logos publics officiels (hotlink) pour le grand carré media_image_url.
-# YouTube : brands.home-assistant.io. Netflix : Wikimedia Commons Logomark
-# (extrait de brand.netflix.com, domaine public sur Commons — marque Netflix inchangée).
-# Pas de logos MDI ni d'assets privés. L'artwork TNT reste prioritaire en live TV.
+# Logos publics carrés (hotlink) pour le grand carré media_image_url.
+# YouTube : brands.home-assistant.io/icon.png (256x256). Netflix : Wikimedia
+# Commons Netflix-new-icon.png (1024x1024). Évite le recadrage des wordmarks larges.
+# L'artwork TNT reste prioritaire en live TV.
 APP_ARTWORK_URLS = {
-    "YouTube": "https://brands.home-assistant.io/youtube/logo.png",
-    "Netflix": "https://upload.wikimedia.org/wikipedia/commons/e/ea/Netflix_Logomark.png",
+    "YouTube": "https://brands.home-assistant.io/youtube/icon.png",
+    "Netflix": "https://upload.wikimedia.org/wikipedia/commons/f/ff/Netflix-new-icon.png",
 }
 APP_ICONS = {
     "YouTube": "mdi:youtube",

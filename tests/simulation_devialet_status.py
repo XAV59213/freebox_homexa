@@ -62,7 +62,7 @@ module('homeassistant.helpers.device_registry', DeviceInfo=dict)
 module('homeassistant.helpers.entity_platform', AddEntitiesCallback=object)
 pkg = module('freebox_homexa')
 pkg.__path__ = [str(ROOT / 'custom_components/freebox_homexa')]
-module('freebox_homexa.const', DOMAIN='freebox_homexa', option_remote_code=lambda *a: None)
+module('freebox_homexa.const', DOMAIN='freebox_homexa', URL_BASE='/freebox_homexa', option_remote_code=lambda *a: None)
 module('freebox_homexa.availability', FreeboxReachableMixin=type('Mixin', (), {}))
 module('freebox_homexa.player_remote', async_schedule_player_api_retry=AsyncMock(), filter_ready_players=lambda *a: [])
 module('freebox_homexa.router', FreeboxConfigEntry=object, FreeboxRouter=object)
@@ -132,12 +132,12 @@ async def run():
 
     await update({'power_state':'running', 'foreground_app':{'package':'com.netflix.mediaplayer'}})
     assert entity._attr_source == 'Netflix' and entity._attr_media_title == 'Netflix'
-    assert entity._attr_media_image_url == 'https://upload.wikimedia.org/wikipedia/commons/f/ff/Netflix-new-icon.png'
+    assert entity._attr_media_image_url == '/freebox_homexa/netflix.png'
     assert entity._attr_icon == 'mdi:netflix'
     # YouTube sans métadonnées : repli UX, pas un titre de vidéo inventé.
     await update({'power_state':'running', 'foreground_app':{'package':'com.google.android.youtube.tv'}})
     assert entity._attr_source == 'YouTube' and entity._attr_media_title == 'YouTube'
-    assert entity._attr_media_image_url == 'https://brands.home-assistant.io/youtube/icon.png'
+    assert entity._attr_media_image_url == '/freebox_homexa/youtube.png'
     await update({'power_state':'running', 'foreground_app':{'cur_url':'https://www.youtube.com/watch?v=abc'}})
     assert entity._attr_source == 'YouTube' and entity._attr_media_title == 'YouTube'
     # Un vrai titre reste prioritaire sur le repli d'application.
@@ -160,11 +160,11 @@ async def run():
     # YouTube/Netflix : logos publics officiels (pas de miniature vidéo inventée).
     await update({'power_state':'running', 'foreground_app':{'package':'com.google.android.youtube.tv'}})
     assert entity._attr_source == 'YouTube'
-    assert entity._attr_media_image_url == 'https://brands.home-assistant.io/youtube/icon.png'
+    assert entity._attr_media_image_url == '/freebox_homexa/youtube.png'
     assert entity._attr_icon == 'mdi:youtube'
     await update({'power_state':'running', 'foreground_app':{'package':'com.netflix.mediaplayer'}})
     assert entity._attr_source == 'Netflix'
-    assert entity._attr_media_image_url == 'https://upload.wikimedia.org/wikipedia/commons/f/ff/Netflix-new-icon.png'
+    assert entity._attr_media_image_url == '/freebox_homexa/netflix.png'
     assert entity._attr_icon == 'mdi:netflix'
     # BFM + TNT reste prioritaire sur les icônes app.
     await update({**FIXTURE, 'foreground_app':{
@@ -183,8 +183,10 @@ async def run():
     assert entity._attr_icon is None
     _artwork['url'] = None
     # URLs artwork app alignées sur les constantes du module.
-    assert mp.APP_ARTWORK_URLS['YouTube'] == 'https://brands.home-assistant.io/youtube/icon.png'
-    assert mp.APP_ARTWORK_URLS['Netflix'] == 'https://upload.wikimedia.org/wikipedia/commons/f/ff/Netflix-new-icon.png'
+    assert mp.APP_ARTWORK_URLS['YouTube'] == '/freebox_homexa/youtube.png'
+    assert mp.APP_ARTWORK_URLS['Netflix'] == '/freebox_homexa/netflix.png'
+    assert (ROOT / 'custom_components/freebox_homexa/frontend/youtube.png').is_file()
+    assert (ROOT / 'custom_components/freebox_homexa/frontend/netflix.png').is_file()
     # Après YouTube, l'arrêt efface le repli.
     await update({'power_state':'running', 'foreground_app':{'package':'fr.freebox.youtube'}})
     assert entity._attr_media_title == 'YouTube'

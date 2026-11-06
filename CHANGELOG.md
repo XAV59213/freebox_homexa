@@ -1,7 +1,7 @@
 # Changelog
 
 ## Non publié
-- Player : artwork YouTube/Netflix aligné sur des icônes carrées (`https://brands.home-assistant.io/youtube/icon.png`, `https://upload.wikimedia.org/wikipedia/commons/f/ff/Netflix-new-icon.png`) pour éviter le recadrage des wordmarks larges dans le grand carré media_player. TNT reste prioritaire.
+- Player : artwork YouTube/Netflix via PNG carrés embarqués (`frontend/youtube.png`, `frontend/netflix.png`) servis en local (`/freebox_homexa/youtube.png`, `/freebox_homexa/netflix.png`) — plus de hotlink externe pour `media_image_url`. TNT reste prioritaire.
 
 ## 28.8.85 — 2026-11-06
 - Player : en YouTube/Netflix sans miniature API, `media_image_url` utilise les logos publics `https://brands.home-assistant.io/youtube/logo.png` et `https://upload.wikimedia.org/wikipedia/commons/e/ea/Netflix_Logomark.png` (Logomark Netflix issu de brand.netflix.com, domaine public sur Wikimedia Commons). Icône entité `mdi:youtube` / `mdi:netflix`. L’artwork TNT en live TV reste prioritaire ; image et icône effacées à l’arrêt.

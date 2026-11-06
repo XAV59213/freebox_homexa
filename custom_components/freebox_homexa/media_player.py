@@ -16,7 +16,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
-from .const import DOMAIN, option_remote_code
+from .const import DOMAIN, URL_BASE, option_remote_code
 from .availability import FreeboxReachableMixin
 from .player_diagnostics import cache_player_schema
 from .player_remote import async_schedule_player_api_retry, filter_ready_players
@@ -55,13 +55,13 @@ MINI_4K_MODELS = {"fbx6lc", "freebox_mini", "mini4k", "mini_4k", "stb_mini"}
 DEVIALET_MODELS = {"fbx7hd-delta", "stb_v7", "fbx7hd-one"}
 API_VERSION_FALLBACKS = ("v6", "v8", "v7", "v5")
 
-# Logos publics carrés (hotlink) pour le grand carré media_image_url.
-# YouTube : brands.home-assistant.io/icon.png (256x256). Netflix : Wikimedia
-# Commons Netflix-new-icon.png (1024x1024). Évite le recadrage des wordmarks larges.
+# Icônes carrées embarquées dans frontend/ (servies via URL_BASE, sans hotlink).
+# youtube.png 256x256 (source brands.home-assistant.io/youtube/icon.png).
+# netflix.png 1024x1024 (source Wikimedia Commons Netflix-new-icon.png).
 # L'artwork TNT reste prioritaire en live TV.
 APP_ARTWORK_URLS = {
-    "YouTube": "https://brands.home-assistant.io/youtube/icon.png",
-    "Netflix": "https://upload.wikimedia.org/wikipedia/commons/f/ff/Netflix-new-icon.png",
+    "YouTube": f"{URL_BASE}/youtube.png",
+    "Netflix": f"{URL_BASE}/netflix.png",
 }
 APP_ICONS = {
     "YouTube": "mdi:youtube",

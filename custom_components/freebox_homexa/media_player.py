@@ -16,7 +16,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
-from .const import DOMAIN, option_remote_code
+from .const import DOMAIN, URL_BASE, option_remote_code
 from .availability import FreeboxReachableMixin
 from .player_diagnostics import cache_player_schema
 from .player_remote import async_schedule_player_api_retry, filter_ready_players
@@ -54,6 +54,16 @@ DEVIALET_SOURCES = ["TV", "HDMI (CEC)", "YouTube", "Netflix", "Navigateur"]
 MINI_4K_MODELS = {"fbx6lc", "freebox_mini", "mini4k", "mini_4k", "stb_mini"}
 DEVIALET_MODELS = {"fbx7hd-delta", "stb_v7", "fbx7hd-one"}
 API_VERSION_FALLBACKS = ("v6", "v8", "v7", "v5")
+
+# Artwork local (MDI Pictogrammers) servi via frontend URL_BASE — pas de logos marketing officiels.
+APP_ARTWORK_URLS = {
+    "YouTube": f"{URL_BASE}/youtube.svg",
+    "Netflix": f"{URL_BASE}/netflix.svg",
+}
+APP_ICONS = {
+    "YouTube": "mdi:youtube",
+    "Netflix": "mdi:netflix",
+}
 
 
 def _normalize_api_version(raw: Any) -> str:
@@ -306,6 +316,7 @@ class FreeboxPlayerMediaPlayer(FreeboxReachableMixin, MediaPlayerEntity):
         )
         self._attr_source = None
         self._attr_media_image_url = None
+        self._attr_icon = None
         if self._attr_state == MediaPlayerState.OFF:
             self._attr_media_title = None
             self._attr_media_channel = None
@@ -325,8 +336,8 @@ class FreeboxPlayerMediaPlayer(FreeboxReachableMixin, MediaPlayerEntity):
         # titre de vidéo inventé. La chaîne TV (ex. BFM TV) reste prioritaire.
         if not self._attr_media_title and self._attr_source in {"YouTube", "Netflix"}:
             self._attr_media_title = self._attr_source
-        # Artwork TNT uniquement en contexte TV (poster/icone programme, sinon logo).
-        # YouTube/Netflix : aucune miniature inventée.
+        # Artwork : TNT prioritaire en TV ; sinon icônes MDI locales YouTube/Netflix
+        # (pas de miniature vidéo inventée, pas de logo marketing officiel).
         if self._attr_source == "TV":
             hass = getattr(self, "hass", None)
             if hass is not None:
@@ -335,6 +346,9 @@ class FreeboxPlayerMediaPlayer(FreeboxReachableMixin, MediaPlayerEntity):
                     channel_name=self._attr_media_channel,
                     channel_number=self._channel_number,
                 )
+        elif self._attr_source in APP_ARTWORK_URLS:
+            self._attr_media_image_url = APP_ARTWORK_URLS[self._attr_source]
+            self._attr_icon = APP_ICONS[self._attr_source]
 
     async def async_set_volume_level(self, volume: float) -> None:
         await self._put("control/volume", {"volume": int(round(volume * 100))})

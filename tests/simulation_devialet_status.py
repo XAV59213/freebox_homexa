@@ -62,7 +62,7 @@ module('homeassistant.helpers.device_registry', DeviceInfo=dict)
 module('homeassistant.helpers.entity_platform', AddEntitiesCallback=object)
 pkg = module('freebox_homexa')
 pkg.__path__ = [str(ROOT / 'custom_components/freebox_homexa')]
-module('freebox_homexa.const', DOMAIN='freebox_homexa', option_remote_code=lambda *a: None)
+module('freebox_homexa.const', DOMAIN='freebox_homexa', URL_BASE='/freebox_homexa', option_remote_code=lambda *a: None)
 module('freebox_homexa.availability', FreeboxReachableMixin=type('Mixin', (), {}))
 module('freebox_homexa.player_remote', async_schedule_player_api_retry=AsyncMock(), filter_ready_players=lambda *a: [])
 module('freebox_homexa.router', FreeboxConfigEntry=object, FreeboxRouter=object)
@@ -132,9 +132,12 @@ async def run():
 
     await update({'power_state':'running', 'foreground_app':{'package':'com.netflix.mediaplayer'}})
     assert entity._attr_source == 'Netflix' and entity._attr_media_title == 'Netflix'
+    assert entity._attr_media_image_url == '/freebox_homexa/netflix.svg'
+    assert entity._attr_icon == 'mdi:netflix'
     # YouTube sans métadonnées : repli UX, pas un titre de vidéo inventé.
     await update({'power_state':'running', 'foreground_app':{'package':'com.google.android.youtube.tv'}})
     assert entity._attr_source == 'YouTube' and entity._attr_media_title == 'YouTube'
+    assert entity._attr_media_image_url == '/freebox_homexa/youtube.svg'
     await update({'power_state':'running', 'foreground_app':{'cur_url':'https://www.youtube.com/watch?v=abc'}})
     assert entity._attr_source == 'YouTube' and entity._attr_media_title == 'YouTube'
     # Un vrai titre reste prioritaire sur le repli d'application.
@@ -154,9 +157,21 @@ async def run():
         'package':'fr.freebox.tv',
         'context':{'channel':{'channelName':'BFM TV', 'channelNumber':15}}}})
     assert entity._attr_media_image_url == 'https://image.tmdb.org/t/p/w500/bfm-poster.jpg'
-    # YouTube sans métadonnées : aucune miniature inventée.
+    # YouTube/Netflix : SVG MDI local (pas de miniature vidéo inventée).
     await update({'power_state':'running', 'foreground_app':{'package':'com.google.android.youtube.tv'}})
-    assert entity._attr_source == 'YouTube' and entity._attr_media_image_url is None
+    assert entity._attr_source == 'YouTube'
+    assert entity._attr_media_image_url == '/freebox_homexa/youtube.svg'
+    assert entity._attr_icon == 'mdi:youtube'
+    await update({'power_state':'running', 'foreground_app':{'package':'com.netflix.mediaplayer'}})
+    assert entity._attr_source == 'Netflix'
+    assert entity._attr_media_image_url == '/freebox_homexa/netflix.svg'
+    assert entity._attr_icon == 'mdi:netflix'
+    # BFM + TNT reste prioritaire sur les icônes app.
+    await update({**FIXTURE, 'foreground_app':{
+        'package':'fr.freebox.tv',
+        'context':{'channel':{'channelName':'BFM TV', 'channelNumber':15}}}})
+    assert entity._attr_media_image_url == 'https://image.tmdb.org/t/p/w500/bfm-poster.jpg'
+    assert entity._attr_icon is None
     # Veille : image effacée.
     _artwork['url'] = 'https://image.tmdb.org/t/p/w500/bfm-poster.jpg'
     await update({**FIXTURE, 'foreground_app':{
@@ -165,7 +180,11 @@ async def run():
     assert entity._attr_media_image_url
     await update({'power_state':'standby'})
     assert entity._attr_state == State.OFF and entity._attr_media_image_url is None
+    assert entity._attr_icon is None
     _artwork['url'] = None
+    # Assets MDI présents dans frontend/
+    assert (ROOT / 'custom_components/freebox_homexa/frontend/youtube.svg').is_file()
+    assert (ROOT / 'custom_components/freebox_homexa/frontend/netflix.svg').is_file()
     # Après YouTube, l'arrêt efface le repli.
     await update({'power_state':'running', 'foreground_app':{'package':'fr.freebox.youtube'}})
     assert entity._attr_media_title == 'YouTube'

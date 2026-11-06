@@ -1,9 +1,11 @@
 # Changelog
 
 ## Non publié
+
+
+## 28.8.84 — 2026-11-06
 - Player : artwork TNT sur le media_player en live TV — poster/icone du programme en cours, sinon logo de chaîne (même préférence que la carte Homexa TNT ; le capteur TNT préfère encore le logo). Matching par nom/numéro (`BFM TV` / `BFMTV` / numéro). Effacé hors TV (veille, YouTube, Netflix, sans match). Réutilise les URL HTTP déjà en mémoire dans le coordinateur TNT, sans requête réseau supplémentaire.
 - Player : si YouTube ou Netflix est déjà reconnu comme source et qu'aucun titre/chaîne n'est fourni, le media_player affiche « YouTube » / « Netflix » au lieu d'une carte vide. Aucun titre de vidéo inventé ; la chaîne TV (ex. BFM TV) reste prioritaire. Le diagnostic aligne la catégorie d'application sur la même détection large (youtube/netflix dans package/cur_url), toujours sans exporter le package brut.
-
 
 ## 28.8.83 — 2026-11-05
 - Diagnostic Player : deux observations récentes du polling normal pour vérifier l'avancement YouTube, sans commande ni requête supplémentaire. Seules les durées/positions numériques finies de 0 à 7 jours, un état de lecture validé, une catégorie d'application connue et les dates de collecte sont exportés. Confidentialité volontairement moins stricte que le schéma seul pour ces valeurs précises ; aucun titre, auteur, URL, package brut ou identifiant. Échantillons effacés sur erreur/changement de catégorie et retirés après 120 secondes ; dernière collecte marquée périmée si nécessaire. Aucun changement du media_player ni support du titre vidéo.

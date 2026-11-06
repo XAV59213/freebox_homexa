@@ -8,7 +8,7 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from typing import Any
 
 from .const import DOMAIN
-from .tnt_const import ALL_CHANNELS
+from .tnt_const import ALL_CHANNELS, freebox_channel_number
 from .tnt_coordinator import ProgrammeTntFrCoordinator
 
 TNT_DEVICE_INFO = DeviceInfo(
@@ -56,7 +56,7 @@ class HomexaTntSensor(CoordinatorEntity[ProgrammeTntFrCoordinator], SensorEntity
     @property
     def extra_state_attributes(self) -> dict:
         data = self._data
-        return {
+        attrs = {
             "channel_id": self._channel_id,
             "channel_name": data.get("channel_name") or self._attr_name,
             "channel_icon": data.get("channel_icon"),
@@ -66,3 +66,7 @@ class HomexaTntSensor(CoordinatorEntity[ProgrammeTntFrCoordinator], SensorEntity
             "prime_time": data.get("prime_time"),
             "second_part": data.get("second_part"),
         }
+        number = freebox_channel_number(self._channel_id)
+        if number is not None:
+            attrs["channel_number"] = number
+        return attrs

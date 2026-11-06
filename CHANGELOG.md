@@ -3,6 +3,9 @@
 ## Non publié
 
 
+## 28.8.87 — 2026-11-06
+- Carte Homexa TNT : bouton **« Regarder sur {chaîne} »** dans le détail d’un programme (carrousel « En ce moment », guide, top films) pour zapper sur le Freebox Player configuré (`media_player` / `play_media` avec `tv:?channel=N`, ou script `zap_channel_scripts` s’il existe). Bouton masqué si aucun Player ni script. Numéro Freebox exposé sur les capteurs TNT (`channel_number`). Carte `3.0.8-homexa.2`.
+
 ## 28.8.86 — 2026-11-06
 - Player : artwork YouTube/Netflix via PNG carrés embarqués (`frontend/youtube.png`, `frontend/netflix.png`) servis en local (`/freebox_homexa/youtube.png`, `/freebox_homexa/netflix.png`) — plus de hotlink externe pour `media_image_url`. TNT reste prioritaire.
 

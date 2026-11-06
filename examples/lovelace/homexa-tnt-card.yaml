@@ -12,5 +12,6 @@ show_second_part: true
 #   - France2.fr
 # entities:            # facultatif : par défaut tous les capteurs TNT Homexa
 #   - sensor.tf1
-# zap_channel_scripts: # facultatif : channel_id -> script qui change de chaîne sur le Player
+# media_player: media_player.salon_freebox_player  # facultatif : Player Homexa pour « Regarder sur … »
+# zap_channel_scripts: # facultatif : channel_id -> script (prioritaire sur media_player)
 #   TF1.fr: script.player_tf1

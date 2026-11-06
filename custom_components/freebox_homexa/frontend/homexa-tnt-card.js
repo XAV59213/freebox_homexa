@@ -54,7 +54,18 @@ function _tntSwitchRow(label, sw, padding) {
 
 
 
-const CARD_VERSION = "3.0.8-homexa.1";
+const CARD_VERSION = "3.0.8-homexa.2";
+
+// Numéros Freebox (LCN) — alignés sur FREEBOX_CHANNEL_NUMBERS Python.
+const FREEBOX_CHANNEL_NUMBERS = {
+  "TF1.fr": 1, "France2.fr": 2, "France3.fr": 3, "CanalPlus.fr": 4,
+  "France5.fr": 5, "M6.fr": 6, "Arte.fr": 7, "W9.fr": 9, "TMC.fr": 10,
+  "NT1.fr": 11, "LaChaineParlementaire.fr": 13, "France4.fr": 14,
+  "BFMTV.fr": 15, "CNews.fr": 16, "CStar.fr": 17, "Gulli.fr": 18,
+  "T18.fr": 19, "TF1SeriesFilms.fr": 20, "LEquipe21.fr": 21, "6ter.fr": 22,
+  "Numero23.fr": 23, "RMCDecouverte.fr": 24, "Cherie25.fr": 25,
+  "LCI.fr": 26, "FranceInfo.fr": 27
+};
 (function () {
   "use strict";
 
@@ -112,6 +123,10 @@ const CARD_VERSION = "3.0.8-homexa.1";
     ".modal-notify-cancel-btn { border: 1px solid var(--divider-color, #555); background: transparent; color: var(--primary-text-color); font-size: 0.8em; font-weight: 600; padding: 6px 12px; border-radius: 999px; cursor: pointer; font-family: inherit; }",
     ".modal-notify-cancel-btn:active { transform: scale(0.95); }",
     ".modal-notify-status { font-size: 0.8em; opacity: 0.85; margin-left: 2px; }",
+    ".modal-zap-btn { display: block; width: 100%; margin-top: 14px; border: none; background: var(--primary-color, #3f6fe0); color: #fff; font-size: 0.95em; font-weight: 700; padding: 12px 16px; border-radius: 10px; cursor: pointer; font-family: inherit; }",
+    ".modal-zap-btn[hidden] { display: none; }",
+    ".modal-zap-btn:active { transform: scale(0.98); }",
+    ".modal-zap-btn:disabled { opacity: 0.55; cursor: not-allowed; }",
     ".poster-live-badge { position: absolute; top: 10px; right: 10px; display: flex; align-items: center; gap: 5px; background: rgba(224,38,63,0.94); color: #fff; font-size: 0.66em; font-weight: 800; letter-spacing: 0.04em; text-transform: uppercase; padding: 5px 10px 5px 8px; border-radius: 20px; box-shadow: 0 2px 10px rgba(224,38,63,0.5); z-index: 1; }",
     ".poster-live-dot { width: 6px; height: 6px; border-radius: 50%; background: #fff; animation: tntfr-pulse 1.6s infinite; }",
     "@keyframes tntfr-pulse { 0% { box-shadow: 0 0 0 0 rgba(255,255,255,0.7); } 70% { box-shadow: 0 0 0 6px rgba(255,255,255,0); } 100% { box-shadow: 0 0 0 0 rgba(255,255,255,0); } }",
@@ -192,8 +207,9 @@ const CARD_VERSION = "3.0.8-homexa.1";
     ".film-meta { font-size: 0.75em; opacity: 0.75; margin-top: 3px; }"
   ].join("\n");
 
-    // Voir option de carte "zap_channel_scripts" (documentee dans le README) :
-  // dictionnaire channel_id -> entity_id de script HA fourni par l'utilisateur.
+    // Options de carte : "media_player" (entité Freebox Player) et/ou
+  // "zap_channel_scripts" (channel_id -> script HA). Le bouton du détail
+  // utilise le script s'il existe, sinon play_media tv:?channel=N.
 
 
 
@@ -584,6 +600,7 @@ var SLOT_DEFS = [
         "<div class=\"modal-rating\" hidden></div>" +
         "<div class=\"modal-desc\"></div>" +
         "<a class=\"modal-tmdb-link\" hidden target=\"_blank\" rel=\"noopener noreferrer\">Voir la fiche TMDB</a>" +
+        "<button type=\"button\" class=\"modal-zap-btn\" hidden>Regarder sur cette chaîne</button>" +
         "<div class=\"modal-notify-row\" hidden>" +
         "<span class=\"modal-notify-label\">Me notifier avant :</span>" +
         "<select class=\"modal-notify-profile\" hidden></select>" +
@@ -617,6 +634,7 @@ var SLOT_DEFS = [
         modalRating: overlay.querySelector(".modal-rating"),
         modalDesc: overlay.querySelector(".modal-desc"),
         modalTmdbLink: overlay.querySelector(".modal-tmdb-link"),
+        modalZapBtn: overlay.querySelector(".modal-zap-btn"),
         modalNotifyRow: overlay.querySelector(".modal-notify-row"),
         modalNotifyBtns: overlay.querySelectorAll(".modal-notify-btn"),
         modalNotifyCancelBtn: overlay.querySelector(".modal-notify-cancel-btn"),
@@ -625,6 +643,9 @@ var SLOT_DEFS = [
       };
       this._built = true;
       this._activeReminders = {};
+      this._els.modalZapBtn.addEventListener("click", function () {
+        self._zapFromModal();
+      });
       this._els.modalNotifyRow.addEventListener("click", function (e) {
         var scheduleBtn = e.target.closest(".modal-notify-btn");
         if (scheduleBtn && self._modalProg) {
@@ -958,7 +979,7 @@ if (progDate) metaParts.push(progDate);
       }
 
       btn.addEventListener("click", function () {
-        self._openModal(channelLabel, prog);
+        self._openModal(channelLabel, prog, channelId);
       });
 
       return btn;
@@ -1298,7 +1319,7 @@ if (progDate) metaParts.push(progDate);
         var isFavorite = !!(favSet && favSet[channelId]);
         progs.forEach(function (prog) {
           if (prog.category) categories[prog.category] = true;
-          ref.list.appendChild(self._buildGuideItem(prog, ref.label, ref.icon, isFavorite));
+          ref.list.appendChild(self._buildGuideItem(prog, ref.label, ref.icon, isFavorite, channelId));
         });
       });
       this._updateGenreOptions(Object.keys(categories).sort(function (a, b) {
@@ -1329,7 +1350,7 @@ if (progDate) metaParts.push(progDate);
       }
     }
 
-    _buildGuideItem(prog, channelLabel, channelIcon, isFavorite) {
+    _buildGuideItem(prog, channelLabel, channelIcon, isFavorite, channelId) {
       var self = this;
       var item = document.createElement("button");
       item.type = "button";
@@ -1403,7 +1424,7 @@ if (progDate) metaParts.push(progDate);
 
       item.appendChild(body);
       item.addEventListener("click", function () {
-        self._openModal(channelLabel, prog);
+        self._openModal(channelLabel, prog, channelId);
       });
       return item;
     }
@@ -1556,6 +1577,8 @@ if (progDate) metaParts.push(progDate);
           films.push({
             title: pick.title,
             channel: attrs.channel_name || cid,
+            channelId: cid,
+            channelNumber: attrs.channel_number || null,
             start: pick.start,
             rating: rating,
             votes: pick.tmdb_votes || 0,
@@ -1591,12 +1614,12 @@ if (progDate) metaParts.push(progDate);
         row.setAttribute("role", "button");
         row.tabIndex = 0;
         row.addEventListener("click", function () {
-          self._openModal(film.channel, film.prog || {});
+          self._openModal(film.channel, film.prog || {}, film.channelId, film.channelNumber);
         });
         row.addEventListener("keydown", function (e) {
           if (e.key === "Enter" || e.key === " ") {
             e.preventDefault();
-            self._openModal(film.channel, film.prog || {});
+            self._openModal(film.channel, film.prog || {}, film.channelId, film.channelNumber);
           }
         });
 
@@ -1645,7 +1668,71 @@ if (progDate) metaParts.push(progDate);
       els.modalNotifyCancelBtn.hidden = !activeMinutes;
     }
 
-    _openModal(channelLabel, prog) {
+    _playerEntity() {
+      var cfg = this._config || {};
+      var player = cfg.media_player || cfg.player_entity || null;
+      return (typeof player === "string" && player.indexOf("media_player.") === 0) ? player : null;
+    }
+
+    _zapScriptFor(channelId) {
+      if (!channelId) return null;
+      var scripts = (this._config && this._config.zap_channel_scripts) || {};
+      return scripts[channelId] || null;
+    }
+
+    _channelNumberFor(channelId, explicitNumber) {
+      if (typeof explicitNumber === "number" && isFinite(explicitNumber)) return explicitNumber;
+      if (explicitNumber != null && String(explicitNumber).trim() !== "" && !isNaN(Number(explicitNumber))) {
+        return Number(explicitNumber);
+      }
+      if (channelId && this._hass) {
+        var entities = this._resolveEntities ? this._resolveEntities() : [];
+        for (var i = 0; i < entities.length; i++) {
+          var st = this._hass.states[entities[i]];
+          var attrs = (st && st.attributes) || {};
+          if (attrs.channel_id === channelId && attrs.channel_number != null) {
+            var n = Number(attrs.channel_number);
+            if (isFinite(n)) return n;
+          }
+        }
+      }
+      if (channelId && Object.prototype.hasOwnProperty.call(FREEBOX_CHANNEL_NUMBERS, channelId)) {
+        return FREEBOX_CHANNEL_NUMBERS[channelId];
+      }
+      return null;
+    }
+
+    _canZapChannel(channelId, channelNumber) {
+      if (this._zapScriptFor(channelId)) return true;
+      return !!(this._playerEntity() && this._channelNumberFor(channelId, channelNumber) != null);
+    }
+
+    _zapToChannel(channelId, channelLabel, channelNumber) {
+      if (!this._hass) return false;
+      var scriptId = this._zapScriptFor(channelId);
+      if (scriptId) {
+        this._hass.callService("script", "turn_on", { entity_id: scriptId });
+        return true;
+      }
+      var player = this._playerEntity();
+      var number = this._channelNumberFor(channelId, channelNumber);
+      if (!player || number == null) return false;
+      this._hass.callService("media_player", "play_media", {
+        entity_id: player,
+        media_content_id: "tv:?channel=" + String(number),
+        media_content_type: "url"
+      });
+      return true;
+    }
+
+    _zapFromModal() {
+      var ctx = this._modalZap;
+      if (!ctx) return;
+      var ok = this._zapToChannel(ctx.channelId, ctx.channelLabel, ctx.channelNumber);
+      if (ok) this._closeModal();
+    }
+
+    _openModal(channelLabel, prog, channelId, channelNumber) {
       var els = this._els;
       if (prog.icon) {
         els.modalIcon.src = prog.icon;
@@ -1690,7 +1777,22 @@ if (progDate) metaParts.push(progDate);
         els.modalTmdbLink.removeAttribute("href");
       }
 
-      
+      var resolvedNumber = this._channelNumberFor(channelId, channelNumber);
+      this._modalZap = {
+        channelId: channelId || null,
+        channelLabel: channelLabel || "",
+        channelNumber: resolvedNumber
+      };
+      if (this._canZapChannel(channelId, resolvedNumber)) {
+        var label = channelLabel ? ("Regarder sur " + channelLabel) : "Aller sur cette chaîne";
+        els.modalZapBtn.textContent = label;
+        els.modalZapBtn.hidden = false;
+        els.modalZapBtn.disabled = false;
+      } else {
+        els.modalZapBtn.hidden = true;
+        this._modalZap = null;
+      }
+
       // Un programme deja commence (encore en cours ou totalement termine) ne
       // peut plus recevoir de rappel : isProgLive() ne couvre que le cas "en
       // cours" (0 < frac < 1) et laisse donc passer les programmes deja finis
@@ -1707,7 +1809,7 @@ if (progDate) metaParts.push(progDate);
         this._renderReminderProfileSelect();
         els.modalNotifyRow.hidden = false;
         this._refreshReminderStatus();
-              } else {
+      } else {
         this._modalProg = null;
         els.modalNotifyRow.hidden = true;
       }
@@ -2013,6 +2115,53 @@ if (progDate) metaParts.push(progDate);
       colsHint.style.opacity = "0.7";
       colsHint.style.margin = "-4px 0 10px";
       wrap.appendChild(colsHint);
+
+      var playerRow = document.createElement("div");
+      playerRow.style.display = "flex";
+      playerRow.style.alignItems = "center";
+      playerRow.style.gap = "10px";
+      playerRow.style.padding = "6px 0";
+      var playerLabel = document.createElement("div");
+      playerLabel.textContent = "Freebox Player (zapper depuis le détail)";
+      playerLabel.style.flex = "1";
+      var playerInput = document.createElement("input");
+      playerInput.type = "text";
+      playerInput.placeholder = "media_player.salon_freebox_player";
+      playerInput.style.flex = "1.2";
+      playerInput.style.padding = "6px 8px";
+      playerInput.style.borderRadius = "4px";
+      playerInput.style.border = "1px solid var(--divider-color, #767676)";
+      playerInput.style.background = "var(--card-background-color, #fff)";
+      playerInput.style.color = "var(--primary-text-color)";
+      playerInput.style.fontFamily = "inherit";
+      playerInput.style.fontSize = "14px";
+      playerInput.value = self._config.media_player || self._config.player_entity || "";
+      playerInput.addEventListener("change", function (ev) {
+        var v = String(ev.target.value || "").trim();
+        var newConfig = Object.assign({}, self._config);
+        if (!v) {
+          delete newConfig.media_player;
+          delete newConfig.player_entity;
+        } else {
+          newConfig.media_player = v;
+          delete newConfig.player_entity;
+        }
+        self._config = newConfig;
+        self.dispatchEvent(new CustomEvent("config-changed", {
+          detail: { config: newConfig },
+          bubbles: true,
+          composed: true
+        }));
+      });
+      playerRow.appendChild(playerLabel);
+      playerRow.appendChild(playerInput);
+      wrap.appendChild(playerRow);
+      var playerHint = document.createElement("div");
+      playerHint.textContent = "Entité media_player Homexa utilisée pour « Regarder sur … » (tv:?channel=N). Sans Player ni script zap, le bouton est masqué.";
+      playerHint.style.fontSize = "12px";
+      playerHint.style.opacity = "0.7";
+      playerHint.style.margin = "-4px 0 10px";
+      wrap.appendChild(playerHint);
       
       var viewsTitle = document.createElement("div");
       viewsTitle.textContent = "Vues disponibles";

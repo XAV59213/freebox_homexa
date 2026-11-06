@@ -23,7 +23,7 @@
 
 Intégration **Home Assistant** pour la Freebox Server, Freebox Home, les répéteurs Wi-Fi Free et le Freebox Player.
 
-**Version actuelle :** [28.8.86](https://github.com/XAV59213/freebox_homexa/releases/tag/28.8.86) · Home Assistant **2026.8.0+**
+**Version actuelle :** [28.8.87](https://github.com/XAV59213/freebox_homexa/releases/tag/28.8.87) · Home Assistant **2026.8.0+**
 
 Wiki : [Documentation](https://github.com/XAV59213/freebox_homexa/wiki)
 
@@ -236,6 +236,7 @@ type: custom:homexa-tnt-card
 - Chargée automatiquement depuis l'intégration (`/freebox_homexa/homexa-tnt-card.js`), sans ressource Lovelace à ajouter, sans CDN.
 - Nom distinct (`homexa-tnt-card`, « Homexa TNT » dans le sélecteur de cartes) : aucune collision avec la carte `programme-tnt-fr-card` si l'intégration séparée est aussi installée.
 - N'affiche que les capteurs TNT de Freebox Homexa ; chaînes à choisir dans Configurer → Guide TNT.
+- Bouton **Regarder sur {chaîne}** dans le détail d’un programme : configurez `media_player: media_player.…` (zap via `play_media` / `tv:?channel=N`) et/ou `zap_channel_scripts`.
 - Exemple complet : [examples/lovelace/homexa-tnt-card.yaml](https://github.com/XAV59213/freebox_homexa/blob/main/examples/lovelace/homexa-tnt-card.yaml)
 
 <p align="center">

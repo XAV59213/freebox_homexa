@@ -149,6 +149,46 @@ def selected_channels(options) -> list[str]:
         return list(DEFAULT_CHANNELS)
     return [c for c in channels if c in ALL_CHANNELS]
 
+
+# Numéros Freebox OS (LCN) pour zap Player via tv:?channel=N.
+# Distinct de CHANNEL_ORDER (ordre d'affichage carte).
+FREEBOX_CHANNEL_NUMBERS = {
+    "TF1.fr": 1,
+    "France2.fr": 2,
+    "France3.fr": 3,
+    "CanalPlus.fr": 4,
+    "France5.fr": 5,
+    "M6.fr": 6,
+    "Arte.fr": 7,
+    "W9.fr": 9,
+    "TMC.fr": 10,
+    "NT1.fr": 11,
+    "LaChaineParlementaire.fr": 13,
+    "France4.fr": 14,
+    "BFMTV.fr": 15,
+    "CNews.fr": 16,
+    "CStar.fr": 17,
+    "Gulli.fr": 18,
+    "T18.fr": 19,
+    "TF1SeriesFilms.fr": 20,
+    "LEquipe21.fr": 21,
+    "6ter.fr": 22,
+    "Numero23.fr": 23,
+    "RMCDecouverte.fr": 24,
+    "Cherie25.fr": 25,
+    "LCI.fr": 26,
+    "FranceInfo.fr": 27,
+}
+
+
+def freebox_channel_number(channel_id: str | None) -> int | None:
+    """Numéro de chaîne Freebox pour un channel_id TNT Homexa, si connu."""
+    if not channel_id:
+        return None
+    value = FREEBOX_CHANNEL_NUMBERS.get(channel_id)
+    return value if isinstance(value, int) else None
+
+
 # Ordre d'affichage des chaînes dans la carte (adapted from cyclope205/programme-tnt-fr, MIT)
 CHANNEL_ORDER = {
     "TF1.fr": 1, "France2.fr": 2, "France3.fr": 3,
@@ -164,5 +204,5 @@ CHANNEL_ORDER = {
 }
 
 # Version de la carte homexa-tnt-card.js (doit correspondre à CARD_VERSION du JS)
-TNT_CARD_VERSION = "3.0.8-homexa.1"
+TNT_CARD_VERSION = "3.0.8-homexa.2"
 TNT_CARD_FILENAME = "homexa-tnt-card.js"

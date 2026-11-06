@@ -82,12 +82,20 @@ def cache_player_schema(router: Any, player_id: Any, status: Any, outcome: str) 
         samples = []
     else:
         state = _dict(_dict(status.get("player")).get("state"))
-        package = _dict(status.get("foreground_app")).get("package")
-        # Correspondances exactes uniquement : jamais de package arbitraire exporté.
-        category = {
-            "com.youtube": "YouTube", "fr.freebox.youtube": "YouTube",
-            "com.google.android.youtube.tv": "YouTube", "fr.freebox.tv": "TV",
-        }.get(package, "other") if isinstance(package, str) else "other"
+        foreground = _dict(status.get("foreground_app"))
+        package = foreground.get("package")
+        cur_url = foreground.get("cur_url")
+        # Même logique large que media_player (sous-chaîne youtube/netflix),
+        # sans jamais exporter le package brut.
+        category = "other"
+        candidates = [v for v in (package, cur_url) if isinstance(v, str)]
+        blob = " ".join(candidates).lower()
+        if any(v.startswith("tv:") or v == "fr.freebox.tv" for v in candidates):
+            category = "TV"
+        elif "youtube" in blob:
+            category = "YouTube"
+        elif "netflix" in blob:
+            category = "Netflix"
         playback = state.get("playback_state")
         sample = {
             "observed_at": now.isoformat(),

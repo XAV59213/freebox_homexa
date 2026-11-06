@@ -1,7 +1,7 @@
 # Changelog
 
 ## Non publié
-- Player : en YouTube/Netflix sans miniature API, `media_image_url` pointe vers les SVG MDI locaux `/freebox_homexa/youtube.svg` et `/freebox_homexa/netflix.svg` (Pictogrammers Free License ; pas de logos marketing officiels). Icône entité `mdi:youtube` / `mdi:netflix`. L’artwork TNT en live TV reste prioritaire ; image et icône effacées à l’arrêt.
+- Player : en YouTube/Netflix sans miniature API, `media_image_url` utilise les logos publics `https://brands.home-assistant.io/youtube/logo.png` et `https://upload.wikimedia.org/wikipedia/commons/e/ea/Netflix_Logomark.png` (Logomark Netflix issu de brand.netflix.com, domaine public sur Wikimedia Commons). Icône entité `mdi:youtube` / `mdi:netflix`. L’artwork TNT en live TV reste prioritaire ; image et icône effacées à l’arrêt.
 
 ## 28.8.84 — 2026-11-06
 - Player : artwork TNT sur le media_player en live TV — poster/icone du programme en cours, sinon logo de chaîne (même préférence que la carte Homexa TNT ; le capteur TNT préfère encore le logo). Matching par nom/numéro (`BFM TV` / `BFMTV` / numéro). Effacé hors TV (veille, YouTube, Netflix, sans match). Réutilise les URL HTTP déjà en mémoire dans le coordinateur TNT, sans requête réseau supplémentaire.

@@ -16,7 +16,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
-from .const import DOMAIN, URL_BASE, option_remote_code
+from .const import DOMAIN, option_remote_code
 from .availability import FreeboxReachableMixin
 from .player_diagnostics import cache_player_schema
 from .player_remote import async_schedule_player_api_retry, filter_ready_players
@@ -55,10 +55,13 @@ MINI_4K_MODELS = {"fbx6lc", "freebox_mini", "mini4k", "mini_4k", "stb_mini"}
 DEVIALET_MODELS = {"fbx7hd-delta", "stb_v7", "fbx7hd-one"}
 API_VERSION_FALLBACKS = ("v6", "v8", "v7", "v5")
 
-# Artwork local (MDI Pictogrammers) servi via frontend URL_BASE — pas de logos marketing officiels.
+# Logos publics officiels (hotlink) pour le grand carré media_image_url.
+# YouTube : brands.home-assistant.io. Netflix : Wikimedia Commons Logomark
+# (extrait de brand.netflix.com, domaine public sur Commons — marque Netflix inchangée).
+# Pas de logos MDI ni d'assets privés. L'artwork TNT reste prioritaire en live TV.
 APP_ARTWORK_URLS = {
-    "YouTube": f"{URL_BASE}/youtube.svg",
-    "Netflix": f"{URL_BASE}/netflix.svg",
+    "YouTube": "https://brands.home-assistant.io/youtube/logo.png",
+    "Netflix": "https://upload.wikimedia.org/wikipedia/commons/e/ea/Netflix_Logomark.png",
 }
 APP_ICONS = {
     "YouTube": "mdi:youtube",
@@ -336,8 +339,8 @@ class FreeboxPlayerMediaPlayer(FreeboxReachableMixin, MediaPlayerEntity):
         # titre de vidéo inventé. La chaîne TV (ex. BFM TV) reste prioritaire.
         if not self._attr_media_title and self._attr_source in {"YouTube", "Netflix"}:
             self._attr_media_title = self._attr_source
-        # Artwork : TNT prioritaire en TV ; sinon icônes MDI locales YouTube/Netflix
-        # (pas de miniature vidéo inventée, pas de logo marketing officiel).
+        # Artwork : TNT prioritaire en TV ; sinon logos publics YouTube/Netflix
+        # (pas de miniature de vidéo inventée).
         if self._attr_source == "TV":
             hass = getattr(self, "hass", None)
             if hass is not None:

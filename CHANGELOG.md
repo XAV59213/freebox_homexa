@@ -1,6 +1,9 @@
 # Changelog
 
 ## Non publié
+
+
+## 28.8.85 — 2026-11-06
 - Player : en YouTube/Netflix sans miniature API, `media_image_url` utilise les logos publics `https://brands.home-assistant.io/youtube/logo.png` et `https://upload.wikimedia.org/wikipedia/commons/e/ea/Netflix_Logomark.png` (Logomark Netflix issu de brand.netflix.com, domaine public sur Wikimedia Commons). Icône entité `mdi:youtube` / `mdi:netflix`. L’artwork TNT en live TV reste prioritaire ; image et icône effacées à l’arrêt.
 
 ## 28.8.84 — 2026-11-06

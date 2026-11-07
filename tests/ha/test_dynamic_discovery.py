@@ -318,10 +318,13 @@ async def test_two_real_entries_late_player_isolation_and_unload(hass, forwarded
         await FreeboxRouter.update_home_devices(router)
         await hass.async_block_till_done()
         assert owned(hass, second_entry) == initial_second
-        from custom_components.freebox_homexa.repairs import async_home_permission_denied, home_permission_issue_id
+        from custom_components.freebox_homexa.repairs import async_home_permission_denied, home_permission_issue_id, async_source_permission_result, permission_issue_id
+        from freebox_api.exceptions import InsufficientPermissionsError
         from homeassistant.helpers import issue_registry as ir
         async_home_permission_denied(hass, entry.entry_id)
         async_home_permission_denied(hass, second_entry.entry_id)
+        async_source_permission_result(hass, entry.entry_id, 'disks', InsufficientPermissionsError('synthetic'))
+        async_source_permission_result(hass, second_entry.entry_id, 'disks', InsufficientPermissionsError('synthetic'))
         issues = ir.async_get(hass)
         issues.async_ignore(DOMAIN, home_permission_issue_id(second_entry.entry_id), True)
         ignored = issues.async_get_issue(DOMAIN, home_permission_issue_id(second_entry.entry_id))
@@ -332,6 +335,8 @@ async def test_two_real_entries_late_player_isolation_and_unload(hass, forwarded
         assert issues.async_get_issue(DOMAIN, home_permission_issue_id(second_entry.entry_id)) == ignored
         await hass.config_entries.async_remove(second_entry.entry_id)
         assert issues.async_get_issue(DOMAIN, home_permission_issue_id(second_entry.entry_id)) is None
+        assert issues.async_get_issue(DOMAIN, permission_issue_id(second_entry.entry_id, "disks")) is None
+        assert issues.async_get_issue(DOMAIN, permission_issue_id(entry.entry_id, "disks")) is not None
         assert issues.async_get_issue(DOMAIN, home_permission_issue_id(entry.entry_id)) is not None
         await second.async_update_players()
         assert api.player.get_players.await_count == 2

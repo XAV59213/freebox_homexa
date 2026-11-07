@@ -346,6 +346,6 @@ async def async_unload_entry(hass: HomeAssistant, entry: FreeboxConfigEntry) -> 
 
 async def async_remove_entry(hass: HomeAssistant, entry: FreeboxConfigEntry) -> None:
     """Delete only this entry's issue on permanent removal, not on unload."""
-    from .repairs import async_clear_home_permission_issue
+    from .repairs import async_clear_entry_permission_issues
 
-    async_clear_home_permission_issue(hass, entry.entry_id)
+    async_clear_entry_permission_issues(hass, entry.entry_id)

@@ -1,4 +1,4 @@
-# Inventaire fini des travaux restants — jalon 14
+# Inventaire fini des travaux restants — jalon15
 
 **21 done / 31 todo / 2 exempt, préparation 28.8.90 ; aucune certification HA.**
 Une ligne par todo, pas une liste infinie de tests. La règle A est du
@@ -11,7 +11,7 @@ la qualité transversale. Le mandat continue, ce document n’en annonce pas la 
 
 | Règle | Minimum fini avant validation entière |
 |---|---|
-| repair-issues | Home insufficient_rights est couvert par Repair FR/EN natif entry-scoped, ignore conservé et suppression sur récupération ou retrait définitif. Restent autres sources de droits et liaison moderne config_entry_id absente de HA2026.10.4 ; aucune alerte sur panne transitoire, auth racine reste reauth. |
+| repair-issues | Home +12scopes lectures couverts par Repairs SDK structurés FREN natifs, ignore et ownership conservés. Restent lectures d’état par appareil et droits écriture/résolution sans commande-probe, disparition volontaire de capacités et liaison moderne config_entry_id absente de HA2026.10.4. Inventaire détaillé quality-scale-repair-inventory.md. |
 
 ## B — quatre règles mixtes : travail indépendant possible, réserve précise
 
@@ -71,7 +71,7 @@ modifier artificiellement le sens du YAML. Aucune soumission amont ici.
 | Règle | Minimum restant |
 |---|---|
 | test-coverage | Seuil officiel intégration entière encore non atteint (75,74 % lignes / 54,34 % branches / 70,38 % combiné). Cibler erreurs/récupération et comportements manquants via A/B, pas tests sans assertions ni exclusion opportuniste. Deux passages locaux et CI doivent donner mêmes 39 modules/totaux. |
-| strict-typing | 122 erreurs réelles/16 fichiers/41 modules ; résoudre contrats/narrowing/structures et appels SDK non annotés, sans Any/cast/ignore pour score. Conflit héritage FFmpeg et typage SDK doivent être distingués des défauts locaux corrigeables. |
+| strict-typing | 120 erreurs réelles/14 fichiers/41 modules ; résoudre contrats/narrowing/structures et appels SDK non annotés, sans Any/cast/ignore pour score. Conflit héritage FFmpeg et typage SDK doivent être distingués des défauts locaux corrigeables. |
 
 ## Exemptions inchangées : deux, pas une façon de masquer des défauts
 

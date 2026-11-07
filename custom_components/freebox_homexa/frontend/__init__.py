@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from collections.abc import Iterable, Mapping
+
 import logging
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
@@ -40,7 +42,7 @@ def _resources(lovelace: Any) -> Any:
     return getattr(lovelace, "resources", None)
 
 
-def _path_only(url: str) -> str:
+def _path_only(url: object) -> str:
     return str(url).split("?", 1)[0]
 
 
@@ -146,7 +148,7 @@ class JSModuleRegistration:
     async def _retry_resources(self, _now: Any) -> None:
         await self._async_register_lovelace_resources()
 
-    async def _async_sync_modules(self, resources: Any, items: list[dict]) -> None:
+    async def _async_sync_modules(self, resources: Any, items: Iterable[Mapping[str, object]]) -> None:
         wanted = {STATIC_CARD_PATH}
         versioned_static = f"{STATIC_CARD_PATH}?v={VERSION}"
         matching = [item for item in items if _path_only(item.get("url", "")) in wanted]

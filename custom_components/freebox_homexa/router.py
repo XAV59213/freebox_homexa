@@ -338,12 +338,14 @@ class FreeboxRouter:
             self.api_repeaters_error = None
         except Exception as err:  # noqa: BLE001 — API absente / droit manquant
             self.api_repeaters_raw = None
-            self.api_repeaters_error = f"{type(err).__name__}: {err}"
+            self.api_repeaters_error = type(err).__name__
+            self.note_permission("repeaters", err)
             if not getattr(self, "_repeater_api_logged", False):
-                _LOGGER.info("API /repeater/ indisponible (regroupement via lan/browser) : %s", err)
+                _LOGGER.info("API /repeater/ indisponible (regroupement via lan/browser) : %s", type(err).__name__)
                 self._repeater_api_logged = True
             return
         if isinstance(data, list):
+            self.note_permission("repeaters")
             self.api_repeaters = [r for r in data if isinstance(r, dict)]
 
     def is_repeater_host(self, device: dict[str, Any]) -> bool:
@@ -432,8 +434,16 @@ class FreeboxRouter:
                     canon, name, model, macs, grouping or "aucun (MAC seule)",
                 )
 
+    def note_permission(self, source: str, error: Exception | None = None) -> None:
+        """Report rights only; transient outages never create or clear an issue."""
+        from .repairs import async_source_permission_result
+
+        if not self.closing:
+            async_source_permission_result(self.hass, self.entry_id, source, error)
+
     def _wifi_api_error(self, key: str, path: str, err: Exception) -> None:
         """Mémorise l'erreur d'une API Wi-Fi ; journal (info) une seule fois par API."""
+        self.note_permission("wifi_" + key, err)
         self.wifi_api_errors[key] = type(err).__name__
         self.note_source(("wifi", key), False, "API Freebox Wi-Fi " + key)
 
@@ -446,6 +456,7 @@ class FreeboxRouter:
             enabled = config.get("enabled") if isinstance(config, dict) else None
             self.wifi_global_enabled = enabled if isinstance(enabled, bool) else None
             self.wifi_api_errors.pop("config", None)
+            self.note_permission("wifi_config")
             self.note_source(("wifi", "config"), True, "API Freebox Wi-Fi config")
         except Exception as err:  # noqa: BLE001
             self.wifi_global_enabled = None
@@ -455,6 +466,7 @@ class FreeboxRouter:
             if not isinstance(bss_list, list):
                 raise ValueError("Invalid Wi-Fi BSS collection")
             self.wifi_api_errors.pop("bss", None)
+            self.note_permission("wifi_bss")
             self.note_source(("wifi", "bss"), True, "API Freebox Wi-Fi bss")
         except Exception as err:  # noqa: BLE001 — API absente selon firmware
             self._wifi_api_error("bss", "wifi/bss/", err)
@@ -484,6 +496,7 @@ class FreeboxRouter:
             if not isinstance(access_points, list):
                 raise ValueError("Invalid Wi-Fi AP collection")
             self.wifi_api_errors.pop("ap", None)
+            self.note_permission("wifi_ap")
             self.note_source(("wifi", "ap"), True, "API Freebox Wi-Fi ap")
         except Exception as err:  # noqa: BLE001 — API wifi absente selon firmware
             self.wifi_stations_available = False
@@ -494,6 +507,7 @@ class FreeboxRouter:
 
         self.wifi_radio_status = []
         stations_by_mac: dict[str, dict[str, Any]] = {}
+        stations_observed = False
         for access_point in access_points:
             if not isinstance(access_point, dict):
                 continue
@@ -514,7 +528,9 @@ class FreeboxRouter:
                 stations = await self._api.wifi.get_station_list(ap_id)
                 if not isinstance(stations, list):
                     raise ValueError("Invalid Wi-Fi stations collection")
+                stations_observed = True
             except HttpRequestError as err:
+                self.note_permission("wifi_stations", err)
                 self.wifi_stations_available = False
                 _LOGGER.debug("Stations Wi-Fi indisponibles (%s)", type(err).__name__)
                 continue
@@ -534,6 +550,8 @@ class FreeboxRouter:
                 merged["_ap_name"] = access_point.get("name")
                 stations_by_mac[mac] = merged
 
+        if stations_observed and self.wifi_stations_available:
+            self.note_permission("wifi_stations")
         self.note_source("wifi_stations", self.wifi_stations_available, "Stations Wi-Fi")
         for mac, device in self.devices.items():
             station = stations_by_mac.get(str(mac).upper())
@@ -611,11 +629,13 @@ class FreeboxRouter:
                             raise ValueError("Invalid Player metadata key")
                         player[key] = value
                     players.append(player)
+                self.note_permission("players")
                 self.players = players
                 self.players_initialized = True
                 self.note_source(("player_inventory", self.entry_id), True, "Inventaire Player")
                 async_dispatcher_send(self.hass, self.signal_players_update)
-            except Exception:
+            except Exception as err:
+                self.note_permission("players", err)
                 if not self.closing:
                     self.note_source(("player_inventory", self.entry_id), False, "Inventaire Player")
 
@@ -674,12 +694,15 @@ class FreeboxRouter:
         # Bridge mode can change at runtime; retry at the existing poll interval.
         try:
             self.supports_hosts, fbx_devices = await get_hosts_list_if_supported(self._api)
-        except Exception:
+        except Exception as err:
+            self.note_permission("lan", err)
             self.lan_available = False
             self.note_source("lan", False, "Source LAN")
             raise
         self.note_source("lan", self.supports_hosts, "Source LAN")
 
+        if self.supports_hosts:
+            self.note_permission("lan")
         self.lan_available = self.supports_hosts
         seen_macs = {device["l2ident"]["id"] for device in fbx_devices}
         if self.lan_available:
@@ -718,17 +741,22 @@ class FreeboxRouter:
         _LOGGER.debug("Mise à jour des appareils connectés terminée")
 
     async def update_sensors(self) -> None:
+        permission_source = "system"
         try:
             syst_datas: dict[str, Any] = await self._api.system.get_config()
             self.sensors_temperature = {
                 sensor["name"]: sensor.get("value") for sensor in syst_datas["sensors"]
             }
 
+            serial = syst_datas["serial"]
+            self.note_permission("system")
+            permission_source = "connection"
             connection_datas: dict[str, Any] = await self._api.connection.get_status()
             for sensor_key in CONNECTION_SENSORS_KEYS:
                 value = connection_datas.get(sensor_key)
                 self.sensors_connection[sensor_key] = value if isinstance(value, (int, float)) and not isinstance(value, bool) else None
 
+            self.note_permission("connection")
             raw_uptime = syst_datas.get("uptime_val")
             uptime_seconds = (raw_uptime if isinstance(raw_uptime, (int, float))
                               and not isinstance(raw_uptime, bool) and raw_uptime >= 0 else None)
@@ -742,10 +770,15 @@ class FreeboxRouter:
                     round(datetime.now().timestamp()) - uptime_seconds
                 ) if uptime_seconds is not None else None,
                 "firmware_version": self._sw_v,
-                "serial": syst_datas["serial"],
+                "serial": serial,
             }
 
-            self.call_list = await self._api.call.get_calls_log() or []
+            permission_source = "calls"
+            calls = await self._api.call.get_calls_log()
+            if not isinstance(calls, list):
+                raise ValueError("Invalid call log collection")
+            self.call_list = calls
+            self.note_permission("calls")
             await self._update_disks_sensors()
             await self._update_raids_sensors()
 
@@ -754,7 +787,8 @@ class FreeboxRouter:
             self.sensors_available = True
             async_dispatcher_send(self.hass, self.signal_sensor_update)
             _LOGGER.debug("Mise à jour des capteurs terminée")
-        except Exception:
+        except Exception as err:
+            self.note_permission(permission_source, err)
             # The global router may still answer LAN requests. Do not leave
             # sensor snapshots looking fresh after a separate sensor API error.
             if self.sensors_available:
@@ -772,11 +806,13 @@ class FreeboxRouter:
                 disk = {**fbx_disk}
                 disk["partitions"] = {part["id"]: part for part in fbx_disk.get("partitions", [])}
                 disks[fbx_disk["id"]] = disk
+            self.note_permission("disks")
             self.disks = disks
             if not self.disks_available:
                 _LOGGER.info("Source disques Freebox de nouveau disponible")
             self.disks_available = True
-        except Exception:  # An unsuccessful read is never a successful empty snapshot.
+        except Exception as err:  # An unsuccessful read
+            self.note_permission("disks", err)
             if self.disks_available:
                 _LOGGER.info("Source disques Freebox indisponible")
             self.disks_available = False
@@ -789,18 +825,20 @@ class FreeboxRouter:
             if not isinstance(fbx_raids, list):
                 raise ValueError("Invalid RAID collection")
             raids = {raid["id"]: raid for raid in fbx_raids}
+            self.note_permission("raids")
             self.raids = raids
             if not self.raids_available:
                 _LOGGER.info("Source RAID Freebox de nouveau disponible")
             self.raids_available = True
-        except Exception:  # An unsuccessful read is never a successful empty snapshot.
+        except Exception as err:  # An unsuccessful read
+            self.note_permission("raids", err)
             # An API error is not proof of permanent hardware incapability.
             if self.raids_available:
                 _LOGGER.info("Source RAID Freebox indisponible")
             self.raids_available = False
 
     async def update_home_devices(self, now: datetime | None = None) -> None:
-        from .repairs import async_clear_home_permission_issue, async_home_permission_denied
+        from .repairs import async_clear_home_permission_issue, async_home_permission_denied, is_structured_permission_denial
 
         if not self.home_granted or self.closing:
             return
@@ -810,6 +848,8 @@ class FreeboxRouter:
         async with self._home_update_lock:
             try:
                 home_nodes = await self.home.get_home_nodes()
+                if self.closing:
+                    return
                 if not isinstance(home_nodes, list):
                     raise ValueError("Invalid Home collection")
                 devices: dict[str, Any] = {}
@@ -847,7 +887,8 @@ class FreeboxRouter:
                     # Reload after granting rights rechecks the explicit gate.
                     # Transient failures must not permanently disable polling.
                     self.home_granted = False
-                    async_home_permission_denied(self.hass, self.entry_id)
+                    if is_structured_permission_denial(err):
+                        async_home_permission_denied(self.hass, self.entry_id)
                     _LOGGER.warning("L'accès aux appareils domestiques n'est pas autorisé ; "
                         "dans Freebox OS → Gestion des accès → Applications, vérifiez les droits Homexa")
 

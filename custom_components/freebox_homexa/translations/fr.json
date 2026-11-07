@@ -603,6 +603,10 @@
     "home_permissions": {
       "title": "Accès Home à rétablir",
       "description": "Freebox OS refuse l’accès de cette intégration aux appareils Home. Dans Freebox OS, ouvrez Paramètres > Gestion des accès > Applications, sélectionnez Homexa et accordez l’accès Home. Rechargez ensuite cette entrée d’intégration dans Home Assistant. Les identifiants et réglages existants sont conservés. Cette alerte disparaît après une lecture Home réussie."
+    },
+    "source_permissions": {
+      "title": "Droit d’accès Freebox à rétablir",
+      "description": "Freebox OS refuse explicitement l’accès à la source {source}. Dans Gestion des accès > Applications > Homexa, vérifiez les droits accordés à l’application puis rechargez cette entrée. Cette alerte disparaît seulement après une lecture réussie de cette source ; les réglages et identifiants sont conservés."
     }
   }
 }

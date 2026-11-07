@@ -202,7 +202,7 @@ rules:
   test-coverage:
     status: todo
     comment: >-
-      Jalon 14 : 567 tests HA 2026.10.4, 41 modules sans omit : 4978/6326 lignes (78,69 %), 1271/2122 branches (59,90 %), combiné 73,97 %. 32 lignes automatiquement exclues, aucune exclusion personnalisée. Deux passages locaux comparés intégralement ; livraison exige CI verte et égalité exacte totals ET files de son artefact. Liens des runs et comparaison publiés dans la description PR119. Deux suites JS et douze simulations séparées. Seuil officiel non atteint ; aucune validation matérielle.
+      Jalon15 : 592 tests HA2026.10.4, 41modules sans omit : 5052/6389 lignes (79,07 %), 1299/2144 branches (60,59 %), combiné74,43 %. 32lignes automatiquement exclues, aucune exclusion personnalisée. Deux passages locaux et artefact CI comparés intégralement pour livraison ; liens exacts dans PR119. Deux suites JS et douze simulations séparées. Seuil officiel non atteint ; aucune validation matérielle.
   devices:
     status: todo
     comment: media_player.py:90-103 et tnt_sensor.py:14-29 DeviceInfo ; cohérence des associations/subdevices
@@ -331,7 +331,7 @@ rules:
   repair-issues:
     status: todo
     comment: >-
-      Jalon 14 : Repair natif Home insufficient_rights, persistant et entry-scoped, texte réellement chargé en FR/EN. Aucun Repair sur timeout/JSON invalide ; choix ignorer conservé à unload et nouvelles erreurs, suppression sur lecture Home réussie ou suppression définitive de cette seule entrée via async_remove_entry. HA testé 2026.10.4 ne possède pas encore config_entry_id dans async_create_issue : pas de paramètre inventé ni masquage automatique lors de désactivation revendiqué. Restent inventaire des refus de droits WiFi/stockage/autres sources et liaison native moderne à vérifier ; cette règle globale ne devient pas done. Auth racine reste reauth HA, pas doublon Repair.
+      Jalon15 : refus structurés SDK observés sur Home plus12scopes de lecture existants (WiFi config/BSS/AP/stations, repeater, disques/RAID, system/connection/calls, LAN, Player). SDK public avec transport mocké et registre HA natif : ignorer conservé sur répétition/timeout/collection invalide, suppression seulement sur observation valide du même scope ou retrait définitif ciblé. Stations multi-AP ne déclarent pas reprise sur un autre AP sain ou zéro AP. FREN réellement chargé, aucune donnée privée ; repeater/ inchangé et payload erreur brut supprimé. Docs quality-scale-repair-inventory.md. Règle globale reste todo : lectures d’état par appareil et droits écriture/résolution sans commande-probe à inventorier, disparition volontaire de capacités à distinguer, API native config_entry_id absente dans HA2026.10.4 ; aucun masquage automatique sur désactivation revendiqué.
   stale-devices:
     status: todo
     comment: router.py:941-994,1112-1123 nettoie certains registres ; stale sensor/client/disque/Home et garanties
@@ -353,4 +353,4 @@ rules:
   strict-typing:
     status: todo
     comment: >-
-      Jalon 14 : mypy 2.4.1 strict, 122 erreurs /16 fichiers/41 modules, contre130/18/39 au lot12. Alarm/BinarySensor/discovery/repairs sans diagnostic ; cache Player typé list[dict[str, object]], validation JSON réelle et callback public typed. Aucun Any/cast/ignore artificiel ajouté. Restent SDK non annoté, schémas voluptuous/probatio, callbacks et conflit FFmpeg ; identifiant disque historique entier non converti pour satisfaire un type. Pas de conformité globale revendiquée.
+      Jalon15 : mypy strict120 erreurs/14fichiers/41modules, contre122/16/41 au jalon14. DeviceGroups : propriétaire canonique optionnel réellement borné, sans modifier le nettoyage ni les IDs ; frontend : Iterable[Mapping[str, object]] et conversion URL object fidèles aux valeurs consommées. Ces deux modules sans diagnostic, mais leurs frontières dynamiques historiques ne deviennent pas sans Any par magie. Aucun Any/cast/ignore artificiel ajouté. Restent contrats SDK, schémas voluptuous/probatio, callbacks et FFmpeg ; identité disque historique entière préservée.

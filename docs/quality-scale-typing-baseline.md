@@ -153,3 +153,13 @@ Nouveau module repairs strict sans diagnostic, helper discovery inchangé. Cache
 Player list[dict[str, object]] validé sur les vraies observations JSON ; pas Any,
 cast ou ignore ajouté. 122 erreurs non masquées, aucune conversion de l'identité
 historique disque entière en string pour un score. Périmètre41 modules explicite.
+
+## Jalon15 —120 erreurs/14fichiers/41modules
+
+DeviceGroups/frontend n'ont plus de diagnostic : canonical owner séparé puis
+None vérifié après contrôle de cardinalité, même comportement de nettoyage ;
+items Lovelace Iterable[Mapping[str, object]], _path_only(object) reflète la
+conversion str déjà présente. Aucun nouvel Any/cast/ignore ni faux schéma sous
+TYPE_CHECKING. Les Any dynamiques historiques de compat frontend ne sont pas
+présentés comme typés intégralement. 120 diagnostics réels restent, dont SDK et
+schemas incompatibles, sans conversion des identifiants disque historiques.

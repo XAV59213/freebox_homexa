@@ -603,6 +603,10 @@
     "home_permissions": {
       "title": "Home access needs attention",
       "description": "Freebox OS denied this integration access to Home devices. In Freebox OS, open Settings > Access management > Applications, select Homexa and grant the Home access permission. Then reload this integration entry in Home Assistant. Existing entity IDs and settings are preserved. This issue clears after a successful Home read."
+    },
+    "source_permissions": {
+      "title": "Freebox access permission needs attention",
+      "description": "Freebox OS explicitly denied access to source {source}. In Access management > Applications > Homexa, check the application's granted permissions, then reload this entry. This issue clears only after a successful read of this source; existing settings and identifiers are preserved."
     }
   }
 }

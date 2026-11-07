@@ -364,3 +364,14 @@ réussit ou quand cette entrée est définitivement supprimée. Les simples time
 ne créent pas d'alerte. Sur HA2026.10.4 testé, pas de liaison native config_entry_id
 pour masquer automatiquement l'alerte pendant la désactivation ; cette limite est
 conservée dans l'audit, pas une conformité Repairs globale revendiquée.
+
+### Autres refus de droits explicites
+
+Les lectures WiFi, répéteurs, stockage/RAID, système/connexion/appels, LAN et
+inventaire Player disposent également d'alertes de droits. Un nom technique fixe
+indique la source concernée, sans nom/SSID/numéro/jeton. Seul un refus SDK explicite
+crée l'alerte ; une panne passagère ou réponse invalide ne l'efface pas. Une lecture
+valide de cette même source la supprime. Une liste AP vide ou un autre AP sain ne
+prouve pas la reprise des stations précédemment refusées. Aucun test de droit en
+écriture ni commande automatique ajouté ; la conformité Repairs globale n'est pas
+revendiquée. Voir l'inventaire et ses limites dans l'audit.

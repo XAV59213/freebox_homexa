@@ -1214,9 +1214,12 @@ def async_clean_repeater_connections(
         if not macs or len(macs) != len(device.connections):
             continue
         canons = {owner.get(m) for m in macs}
-        if None in canons or len(canons) != 1:
+        if len(canons) != 1:
             continue
-        keeper = repeater_ids.get(next(iter(canons)))
+        candidate_owner = next(iter(canons))
+        if candidate_owner is None:
+            continue
+        keeper = repeater_ids.get(candidate_owner)
         if keeper is None:
             continue
         entities = er.async_get(hass)

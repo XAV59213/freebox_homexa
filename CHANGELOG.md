@@ -1,6 +1,7 @@
 # Changelog
 
 ## Non publié
+- Carte Player : curseur volume 0–100 % et bouton muet selon les capacités et valeurs disponibles. Envoi seulement à validation du curseur ; aucun appel automatique. Masqués à l’arrêt/indisponibilité ou si valeur inconnue.
 - 2026-11-07 — Carte Freebox Homexa : image de lecture du Player (`entity_picture`, sinon `media_image_url`) au-dessus des commandes. Affichage sans recadrage ni étirement ; masqué sans image, en veille ou sur erreur. Carte TNT inchangée.
 
 

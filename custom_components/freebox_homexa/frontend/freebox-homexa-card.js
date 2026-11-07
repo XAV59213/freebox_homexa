@@ -120,6 +120,9 @@ const STYLES = `
   .center { text-align: center; }
   .walk { width: 64px; height: 64px; margin: 10px auto 6px; border-radius: 50%; display: flex; align-items: center; justify-content: center; background: var(--secondary-background-color); font-size: 28px; }
   .walk.on { background: color-mix(in srgb, var(--error-color, #f44336) 20%, transparent); }
+  .player-volume { display: flex; align-items: center; gap: 10px; margin-top: 14px; }
+  .player-volume input { flex: 1; min-width: 0; touch-action: pan-y; }
+  .player-volume button { padding: 8px; border-radius: 8px; cursor: pointer; }
   .player-artwork { display: block; width: 100%; height: 180px; max-height: 40vh; object-fit: contain; border-radius: 10px; margin: 10px auto; }
   .player-artwork[hidden] { display: none; }
   .apps { display: flex; justify-content: center; gap: 10px; margin: 8px 0; }
@@ -354,7 +357,36 @@ class FreeboxHomexaCard extends HTMLElement {
     this._hass.callService(domain, service, { entity_id, ...data });
   }
 
+  _volumeAction(target, mute = false) {
+    const id = target.dataset.entity;
+    const player = this._hass && this._hass.states[id];
+    if (!player || ["off", "standby", "unavailable", "unknown"].includes(player.state)) return;
+    const attrs = player.attributes || {};
+    const features = Number(attrs.supported_features) || 0;
+    if (mute) {
+      if ((features & 8) && typeof attrs.is_volume_muted === "boolean") {
+        this._call("media_player", "volume_mute", id, {is_volume_muted: !attrs.is_volume_muted});
+      }
+    } else if ((features & 4) && typeof attrs.volume_level === "number" && Number.isFinite(attrs.volume_level)) {
+      const value = Number(target.value);
+      if (Number.isFinite(value) && value >= 0 && value <= 100) {
+        this._call("media_player", "volume_set", id, {volume: value / 100});
+      }
+    }
+  }
+
   _bindOnce() {
+    // Delegation bound once to the persistent shadow root, even across renders.
+    if (!this._volumeBound) {
+      this._volumeBound = true;
+      this.shadowRoot.addEventListener("change", (ev) => {
+        if (ev.target.matches("[data-volume]")) this._volumeAction(ev.target);
+      });
+      this.shadowRoot.addEventListener("click", (ev) => {
+        const button = ev.target.closest("[data-volume-mute]");
+        if (button) this._volumeAction(button, true);
+      });
+    }
     if (this._bound) return;
     this._bound = true;
     this.shadowRoot.addEventListener("click", (ev) => {
@@ -432,10 +464,22 @@ class FreeboxHomexaCard extends HTMLElement {
     const image = !["off", "standby", "unavailable", "unknown", ""].includes(st)
       && typeof rawImage === "string"
       && (/^https?:\/\//i.test(rawImage) || /^\/(?!\/)/.test(rawImage)) ? rawImage : "";
+    const features = Number(attrs.supported_features) || 0;
+    const active = player && !["off", "standby", "unavailable", "unknown"].includes(st);
+    const knownVolume = typeof attrs.volume_level === "number" && Number.isFinite(attrs.volume_level)
+      && attrs.volume_level >= 0 && attrs.volume_level <= 1;
+    const canVolume = active && (features & 4) && knownVolume;
+    const canMute = active && (features & 8) && typeof attrs.is_volume_muted === "boolean";
+    const percent = knownVolume ? Math.round(attrs.volume_level * 100) : null;
+    const volumeHtml = canVolume || canMute ? `<div class="player-volume">
+      ${canVolume ? `<input type="range" min="0" max="100" step="1" value="${percent}" aria-label="Volume" aria-valuetext="${percent} %" data-volume data-entity="${e}"><span>${percent} %</span>` : ""}
+      ${canMute ? `<button type="button" data-volume-mute data-entity="${e}" aria-pressed="${attrs.is_volume_muted}" aria-label="${attrs.is_volume_muted ? "Rétablir le son" : "Couper le son"}">${attrs.is_volume_muted ? "Son coupé" : "Muet"}</button>` : ""}
+    </div>` : "";
     return {
-      key: JSON.stringify([id, label, image]),
+      key: JSON.stringify([id, label, image, percent, attrs.is_volume_muted, features]),
       html: `<div class="card center">
         <div class="head"><span class="title">${_esc(player ? _name(hass, id) : "Freebox Player")}</span><span class="sub">${_esc(label)}</span></div>
+        ${volumeHtml}
         ${image ? `<img class="player-artwork" src="${_esc(image)}" alt="Illustration de la lecture en cours">` : ""}
         ${player ? `<div class="apps"><button type="button" class="app yt" data-src="YouTube" data-entity="${e}">YT</button><button type="button" class="app nf" data-src="Netflix" data-entity="${e}">N</button><button type="button" class="app pr" data-prime="1" data-entity="${e}">prime</button></div><div class="transport"><button type="button" data-media="media_previous_track" data-entity="${e}">|◀</button><button type="button" data-media="media_play_pause" data-entity="${e}">▮▶</button><button type="button" data-media="media_next_track" data-entity="${e}">▶|</button></div>` : `<div class="empty">Aucun Player Homexa</div>`}
       </div>`,

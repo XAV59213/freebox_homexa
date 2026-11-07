@@ -37,11 +37,21 @@ assert(!render('on', {volume_level: 0.4}).html.includes('type="range"'));
 assert(!render('on', {supported_features: 4}).html.includes('type="range"'));
 const calls = [];
 render('on', caps);
-card._hass.callService = (...args) => calls.push(args);
+// Contract from HA media_player/services.yaml: volume_set takes volume_level,
+// not the Freebox payload key volume. Reject unknown/missing fields as HA does.
+card._hass.callService = (domain, service, data) => {
+  const field = service === 'volume_set' ? 'volume_level' : 'is_volume_muted';
+  assert.deepEqual(Object.keys(data).sort(), ['entity_id', field].sort());
+  if (service === 'volume_set') {
+    assert.equal(typeof data.volume_level, 'number');
+    assert(data.volume_level >= 0 && data.volume_level <= 1);
+  } else assert.equal(typeof data.is_volume_muted, 'boolean');
+  calls.push([domain, service, data]);
+};
 assert.equal(calls.length, 0); // rendering never changes volume
 card._volumeAction({dataset: {entity: id}, value: '75'});
 assert.equal(calls[0][1], 'volume_set');
-assert.equal(calls[0][2].volume, .75);
+assert.equal(calls[0][2].volume_level, .75);
 card._volumeAction({dataset: {entity: id}}, true);
 assert.equal(calls[1][1], 'volume_mute');
 assert.equal(calls[1][2].is_volume_muted, true);

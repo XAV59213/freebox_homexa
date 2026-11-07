@@ -370,7 +370,7 @@ class FreeboxHomexaCard extends HTMLElement {
     } else if ((features & 4) && typeof attrs.volume_level === "number" && Number.isFinite(attrs.volume_level)) {
       const value = Number(target.value);
       if (Number.isFinite(value) && value >= 0 && value <= 100) {
-        this._call("media_player", "volume_set", id, {volume: value / 100});
+        this._call("media_player", "volume_set", id, {volume_level: value / 100});
       }
     }
   }

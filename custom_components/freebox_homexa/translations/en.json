@@ -585,5 +585,11 @@
     "reminder_state_unconfirmed": {
       "message": "Reminder storage and timer state do not agree. Check Home Assistant storage, then explicitly schedule or cancel this reminder."
     }
+  },
+  "issues": {
+    "home_permissions": {
+      "title": "Home access needs attention",
+      "description": "Freebox OS denied this integration access to Home devices. In Freebox OS, open Settings > Access management > Applications, select Homexa and grant the Home access permission. Then reload this integration entry in Home Assistant. Existing entity IDs and settings are preserved. This issue clears after a successful Home read."
+    }
   }
 }

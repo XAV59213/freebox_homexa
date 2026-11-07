@@ -141,6 +141,7 @@ class _Lock:
 
 def _router():
     r = R.FreeboxRouter.__new__(R.FreeboxRouter)
+    r.entry_id = "synthetic-entry"
     r.home_granted = True
     r.home_available = True
     r.closing = False

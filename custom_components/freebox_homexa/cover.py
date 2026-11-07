@@ -2,6 +2,8 @@
 # DESCRIPTION: Gestion des volets (covers) Freebox, incluant les volets basiques et les volets avec position.
 # OBJECTIF: Permettre le contrôle des volets (ouverture, fermeture, arrêt) et la gestion de leur position.
 
+from collections.abc import Iterable
+from functools import partial
 import logging
 from typing import Any
 from datetime import timedelta
@@ -10,6 +12,7 @@ from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
 from homeassistant.components.cover import CoverEntity, CoverDeviceClass, CoverState
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.entity_registry import async_get
+from .discovery import DiscoveryCandidate, async_setup_discovery
 from .const import DOMAIN, FreeboxHomeCategory
 from .entity import FreeboxHomeEntity
 from .errors import is_shutdown_error, poll_log_level
@@ -40,17 +43,16 @@ async def async_setup_entry(
         async_add_entities: Fonction pour ajouter des entités à Home Assistant.
     """
     router: FreeboxRouter = entry.runtime_data
-    entities: list[CoverEntity] = []
+    def candidates() -> Iterable[DiscoveryCandidate]:
+        for nodeid, node in router.home_devices.items():
+            if node["category"] == FreeboxHomeCategory.BASIC_SHUTTER:
+                yield str(nodeid), partial(FreeboxBasicShutter, hass, router, node)
+            elif node["category"] in {FreeboxHomeCategory.SHUTTER, FreeboxHomeCategory.OPENER}:
+                yield str(nodeid), partial(FreeboxShutter, hass, router, node)
 
-    for nodeid, node in router.home_devices.items():
-        if node["category"] == FreeboxHomeCategory.BASIC_SHUTTER:
-            entities.append(FreeboxBasicShutter(hass, router, node))
-        elif node["category"] in {FreeboxHomeCategory.SHUTTER, FreeboxHomeCategory.OPENER}:
-            entities.append(FreeboxShutter(hass, router, node))
+    async_setup_discovery(hass, entry, router,
+        [router.signal_home_device_new, router.signal_home_device_update], candidates, async_add_entities)
 
-    if entities:
-        async_add_entities(entities, update_before_add=True)
-        _LOGGER.debug("%s entités de volets ajoutées pour %s", len(entities), router.name)
 
 # SECTION: Classe pour les volets basiques
 class FreeboxBasicShutter(FreeboxHomeEntity, CoverEntity):

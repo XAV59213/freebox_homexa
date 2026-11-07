@@ -296,6 +296,10 @@ class FreeboxRouter:
         self.lan_links: dict[str, str] = {}
         self._lan_link_pending: dict[str, tuple[str, int]] = {}
         self._home_update_lock = asyncio.Lock()
+        self._players_update_lock = asyncio.Lock()
+        self.players: list[dict[str, object]] = []
+        self.players_initialized = False
+        self.player_discovery_active = False
 
         self.supports_hosts = True
         self.devices: dict[str, dict[str, Any]] = {}
@@ -586,6 +590,40 @@ class FreeboxRouter:
         if self._player_button_readers:
             async_dispatcher_send(self.hass, self.signal_device_update)
 
+    async def async_update_players(self) -> None:
+        """Observe metadata once at the existing interval, never issue commands."""
+        if self.closing or self._players_update_lock.locked():
+            return
+        async with self._players_update_lock:
+            try:
+                payload: object = await self.async_read(self._api.player.get_players)
+                if self.closing:
+                    return
+                if not isinstance(payload, list):
+                    raise ValueError("Invalid Player collection")
+                players: list[dict[str, object]] = []
+                for item in payload:
+                    if not isinstance(item, dict):
+                        raise ValueError("Invalid Player metadata")
+                    player: dict[str, object] = {}
+                    for key, value in item.items():
+                        if not isinstance(key, str):
+                            raise ValueError("Invalid Player metadata key")
+                        player[key] = value
+                    players.append(player)
+                self.players = players
+                self.players_initialized = True
+                self.note_source(("player_inventory", self.entry_id), True, "Inventaire Player")
+                async_dispatcher_send(self.hass, self.signal_players_update)
+            except Exception:
+                if not self.closing:
+                    self.note_source(("player_inventory", self.entry_id), False, "Inventaire Player")
+
+    @property
+    def signal_players_update(self) -> str:
+        """Entry-owned discovery, unlike legacy host-scoped state signals."""
+        return f"{DOMAIN}-{self.entry_id}-players-update"
+
     async def update_all(self, now: datetime | None = None) -> None:
         """Relevé principal (appareils + capteurs).
 
@@ -599,6 +637,8 @@ class FreeboxRouter:
         try:
             await self.update_device_trackers()
             await self.update_sensors()
+            if self.player_discovery_active:
+                await self.async_update_players()
             await self.update_player_buttons()
         except Exception as err:
             if self.closing and is_shutdown_error(err, self):
@@ -760,6 +800,8 @@ class FreeboxRouter:
             self.raids_available = False
 
     async def update_home_devices(self, now: datetime | None = None) -> None:
+        from .repairs import async_clear_home_permission_issue, async_home_permission_denied
+
         if not self.home_granted or self.closing:
             return
         if self._home_update_lock.locked():
@@ -786,6 +828,7 @@ class FreeboxRouter:
                                      node is not None and home_node_reachable(node), "Appareil Home")
                 self.home_devices = devices
                 self.home_snapshot_known = True
+                async_clear_home_permission_issue(self.hass, self.entry_id)
                 if not self.home_available:
                     _LOGGER.info("Source Freebox Home de nouveau disponible")
                 self.home_available = True
@@ -804,6 +847,7 @@ class FreeboxRouter:
                     # Reload after granting rights rechecks the explicit gate.
                     # Transient failures must not permanently disable polling.
                     self.home_granted = False
+                    async_home_permission_denied(self.hass, self.entry_id)
                     _LOGGER.warning("L'accès aux appareils domestiques n'est pas autorisé ; "
                         "dans Freebox OS → Gestion des accès → Applications, vérifiez les droits Homexa")
 

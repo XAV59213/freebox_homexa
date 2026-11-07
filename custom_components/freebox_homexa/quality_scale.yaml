@@ -32,12 +32,9 @@ rules:
     comment: manifest.json:12 config_flow=true ; config_flow.py:180-225 ConfigFlow avec formulaire user. Constat
       structurel, pas preuve de couverture du flow.
   config-flow-test-coverage:
-    status: todo
-    comment: '407 tests HA au total ; config_flow.py : 437/438 lignes (99,77 %), 145/148 branches (97,97 %).
-      Les erreurs de link testées sont suivies de la correction de leur cause et de la finalisation du même
-      flow avec unique_id vérifié. Options répéteurs (registre uniquement), conflits Alexa, doublons de libellés,
-      defaults privés synthétiques et conservation des codes vérifiés. Reste ligne 369 et trois branches ;
-      guard reauth/user à justifier, sans forcer un chemin artificiel. 100 % non atteint, donc todo.'
+    status: done
+    comment: >-
+      Lots 13–14 : config_flow.py 437/437 lignes et 146/146 branches, 100 %. Vrai manager HA : reconfigure de deux entrées legacy partageant le même unique_id avorte sans mutation, reload ni API ; correction de conflit Alexa puis Echo distinct prouvés dans le même flow. La garde reauth dans user était inaccessible : reauth passe par reauth_confirm puis link, non user. Aucun pragma ni état artificiel forcé. Les réserves identité physique/reauth restent dans leurs règles distinctes.
   dependency-transparency:
     status: todo
     comment: 'Source GPL-3.0 tag v1.3.1 commit 96322885f37df37e6f491ab889b27cf912cc293a ; wheel PyPI SHA256
@@ -205,11 +202,7 @@ rules:
   test-coverage:
     status: todo
     comment: >-
-      536 tests HA 2026.10.4 (+25 au lot 12), 39 modules sans omit : 4701/6207 lignes (75,74 %),
-      1126/2072 branches (54,34 %), combiné 70,38 %. Deux suites JS et douze simulations historiques
-      séparées. 28 lignes typing automatiquement exclues par coverage.py (17 au lot 11), aucun omit
-      ni exclusion personnalisée ; imports TYPE_CHECKING canoniques et générique réel explicités.
-      Seuil officiel non atteint ; aucune validation matérielle.
+      Jalon 14 : 567 tests HA 2026.10.4, 41 modules sans omit : 4978/6326 lignes (78,69 %), 1271/2122 branches (59,90 %), combiné 73,97 %. 32 lignes automatiquement exclues, aucune exclusion personnalisée. Deux passages locaux comparés intégralement ; livraison exige CI verte et égalité exacte totals ET files de son artefact. Liens des runs et comparaison publiés dans la description PR119. Deux suites JS et douze simulations séparées. Seuil officiel non atteint ; aucune validation matérielle.
   devices:
     status: todo
     comment: media_player.py:90-103 et tnt_sensor.py:14-29 DeviceInfo ; cohérence des associations/subdevices
@@ -272,9 +265,9 @@ rules:
       renforcée ; reste todo au sens formel, la règle officielle visant une page/revue home-assistant.io non
       soumise. Aucune certification custom revendiquée.'
   dynamic-devices:
-    status: todo
-    comment: Code de découverte LAN/Home/répéteurs présent ; découverte runtime après setup et couverture de
-      tous périphériques sans reload non démontrées.
+    status: done
+    comment: >-
+      Jalon 14 : vrai forwarding HA puis ajouts Home, Player, LAN, points accès/répéteurs, disques/partitions/RAID/températures, batteries/tamper sur nœud connu. Player metadata partagé au timer central existant, un relevé par cycle pour trois plateformes, création paresseuse sans reload ni commande. Transports SDK Home/Player/LAN/Storage mockés, endpoint repeater/ inchangé. Deux entrées réelles avec même ID Player local restent isolées ; IDs/noms/icônes/options préservés, disparition/retour sans recréation. Listeners entry-owned, callbacks closing inertes, lecture annulée drainée et résultat tardif ignoré. tests/ha/test_dynamic_discovery.py. Pas de suppression historique (stale-devices distinct).
   entity-category:
     status: done
     comment: 'Revue sémantique globale des 30 familles et 81 variantes : docs/quality-scale-entity-inventory.md.
@@ -337,8 +330,8 @@ rules:
       physique/host/jeton ; aucune migration ni changement IDs imposé.'
   repair-issues:
     status: todo
-    comment: Pas de preuve de Repairs pour tous états actionnables nécessitant intervention ; logs et ConfigEntryAuthFailed
-      ne suffisent pas.
+    comment: >-
+      Jalon 14 : Repair natif Home insufficient_rights, persistant et entry-scoped, texte réellement chargé en FR/EN. Aucun Repair sur timeout/JSON invalide ; choix ignorer conservé à unload et nouvelles erreurs, suppression sur lecture Home réussie ou suppression définitive de cette seule entrée via async_remove_entry. HA testé 2026.10.4 ne possède pas encore config_entry_id dans async_create_issue : pas de paramètre inventé ni masquage automatique lors de désactivation revendiqué. Restent inventaire des refus de droits WiFi/stockage/autres sources et liaison native moderne à vérifier ; cette règle globale ne devient pas done. Auth racine reste reauth HA, pas doublon Repair.
   stale-devices:
     status: todo
     comment: router.py:941-994,1112-1123 nettoie certains registres ; stale sensor/client/disque/Home et garanties
@@ -360,11 +353,4 @@ rules:
   strict-typing:
     status: todo
     comment: >-
-      Mypy 2.4.1 strict : 130 erreurs /18 fichiers/39 modules (162 au lot 11). Cover, Remote,
-      MediaPlayer, TNT const/sensor/coordinator : zéro diagnostic strict. Contrat cover compatible
-      kwargs et appels positionnels historiques, positions invalides rejetées avant transport.
-      DeviceInfo typés, vrai SDK Access, Iterable remote, descriptions frozen, imports canoniques
-      avec runtime ancien HA conservé. Coordinator TNT générique réellement borné dict[str,
-      dict[str, object]], titres/images malformés deviennent None, pas Any implicite de data pour
-      masquer les consommateurs. Aucun Any/cast/ignore artificiel ajouté. Restent SDK non annoté,
-      voluptuous/probatio, rappels, autres modules et conflit nom FFmpeg.
+      Jalon 14 : mypy 2.4.1 strict, 122 erreurs /16 fichiers/41 modules, contre130/18/39 au lot12. Alarm/BinarySensor/discovery/repairs sans diagnostic ; cache Player typé list[dict[str, object]], validation JSON réelle et callback public typed. Aucun Any/cast/ignore artificiel ajouté. Restent SDK non annoté, schémas voluptuous/probatio, callbacks et conflit FFmpeg ; identifiant disque historique entier non converti pour satisfaire un type. Pas de conformité globale revendiquée.

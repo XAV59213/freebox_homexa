@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+from functools import partial
+from collections.abc import Iterable
+
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, replace
 import logging
@@ -22,10 +25,11 @@ from homeassistant.exceptions import ServiceValidationError
 from homeassistant.helpers.dispatcher import async_dispatcher_connect
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
+from .discovery import DiscoveryCandidate, async_setup_discovery
 from .const import DOMAIN, option_remote_code
 from .media_player import player_device_info
 from .router import FreeboxConfigEntry, FreeboxRouter
-from .player_remote import async_schedule_player_api_retry, async_send_player_keys, filter_ready_players
+from .player_remote import async_send_player_keys, filter_ready_players
 from .availability import FreeboxReachableMixin, FreeboxPlayerReachableMixin
 
 from .errors import async_action_errors
@@ -123,35 +127,23 @@ async def async_setup_entry(
         FreeboxButton(router, description) for description in BUTTON_DESCRIPTIONS
     ]
 
-    try:
-        players = await router._api.player.get_players() or []
-    except Exception as err:
-        _LOGGER.debug("Players indisponibles pour les boutons remote : %s", err)
-        players = []
-
-    valid_players, skipped = filter_ready_players(
-        players, logger=_LOGGER, context="boutons",
-        log_skipped=False,
-    )
-    if skipped:
-        await async_schedule_player_api_retry(hass, entry, router)
-
-    for player in valid_players:
-        for key, name, icon, enabled in PLAYER_REMOTE_BUTTONS:
-            entities.append(
-                FreeboxPlayerRemoteButton(
-                    router, player, entry, key, name, icon, enabled
-                )
-            )
-        for key, name, icon, url, enabled in PLAYER_APP_BUTTONS:
-            entities.append(
-                FreeboxPlayerAppButton(
-                    router, player, key, name, icon, url, enabled
-                )
-            )
-
     async_add_entities(entities, True)
-    _LOGGER.debug("%s boutons ajoutés pour %s", len(entities), router.mac)
+
+    router.player_discovery_active = True
+    if not router.players_initialized:
+        await router.async_update_players()
+
+    def candidates() -> Iterable[DiscoveryCandidate]:
+        valid_players, _ = filter_ready_players(router.players, log_skipped=False)
+        for player in valid_players:
+            for key, name, icon, enabled in PLAYER_REMOTE_BUTTONS:
+                yield f"remote:{player['id']}:{key}", partial(
+                    FreeboxPlayerRemoteButton, router, player, entry, key, name, icon, enabled)
+            for key, name, icon, url, enabled in PLAYER_APP_BUTTONS:
+                yield f"app:{player['id']}:{key}", partial(
+                    FreeboxPlayerAppButton, router, player, key, name, icon, url, enabled)
+
+    async_setup_discovery(hass, entry, router, [router.signal_players_update], candidates, async_add_entities)
 
 
 class FreeboxButton(FreeboxReachableMixin, ButtonEntity):

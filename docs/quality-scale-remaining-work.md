@@ -1,19 +1,17 @@
-# Inventaire fini des travaux restants — lot 12
+# Inventaire fini des travaux restants — jalon 14
 
-**19 done / 33 todo / 2 exempt, préparation 28.8.90 ; aucune certification HA.**
-Une ligne par todo, pas une liste infinie de tests. Les trois règles A sont du
+**21 done / 31 todo / 2 exempt, préparation 28.8.90 ; aucune certification HA.**
+Une ligne par todo, pas une liste infinie de tests. La règle A est du
 travail local indépendant ; B mêle travail local et réserve de compatibilité ou
 dépendance ; C exige proposition compatible ou action amont avant conformité.
 D contient du contenu local présent, pas treize documents manquants ; E mesure
 la qualité transversale. Le mandat continue, ce document n’en annonce pas la fin.
 
-## A — trois règles localement traitables, sans migration ni appareil réel
+## A — une règle localement traitable, sans migration ni appareil réel
 
 | Règle | Minimum fini avant validation entière |
 |---|---|
-| config-flow-test-coverage | Couvrir réellement ligne 369 et trois branches user/reauth restantes par le manager HA ; vérifier récupération après erreurs et ID à chaque création, pas appel direct artificiel d’un état inaccessible. |
-| dynamic-devices | Vérifier ajouts après setup (pas seulement premier forward) Home/Player/LAN/disques/répéteurs : ajout unique, ownership listener, retrait/unload. Préserver URLs repeater/, IDs et préférences. Corriger seulement les familles où le test démontre un défaut. |
-| repair-issues | Inventorier erreurs nécessitant intervention (droits/config), utiliser reauth existant pour auth quand approprié, Repairs traduits avec résolution/ownership pour autres cas réellement actionnables ; aucun Repair pour panne transitoire normale. |
+| repair-issues | Home insufficient_rights est couvert par Repair FR/EN natif entry-scoped, ignore conservé et suppression sur récupération ou retrait définitif. Restent autres sources de droits et liaison moderne config_entry_id absente de HA2026.10.4 ; aucune alerte sur panne transitoire, auth racine reste reauth. |
 
 ## B — quatre règles mixtes : travail indépendant possible, réserve précise
 
@@ -73,7 +71,7 @@ modifier artificiellement le sens du YAML. Aucune soumission amont ici.
 | Règle | Minimum restant |
 |---|---|
 | test-coverage | Seuil officiel intégration entière encore non atteint (75,74 % lignes / 54,34 % branches / 70,38 % combiné). Cibler erreurs/récupération et comportements manquants via A/B, pas tests sans assertions ni exclusion opportuniste. Deux passages locaux et CI doivent donner mêmes 39 modules/totaux. |
-| strict-typing | 130 erreurs réelles/18 fichiers/39 modules ; résoudre contrats/narrowing/structures et appels SDK non annotés, sans Any/cast/ignore pour score. Conflit héritage FFmpeg et typage SDK doivent être distingués des défauts locaux corrigeables. |
+| strict-typing | 122 erreurs réelles/16 fichiers/41 modules ; résoudre contrats/narrowing/structures et appels SDK non annotés, sans Any/cast/ignore pour score. Conflit héritage FFmpeg et typage SDK doivent être distingués des défauts locaux corrigeables. |
 
 ## Exemptions inchangées : deux, pas une façon de masquer des défauts
 

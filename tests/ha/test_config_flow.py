@@ -236,3 +236,25 @@ async def test_characterize_same_host_port_change_preserves_identity(hass):
     assert entry.data["port"] == 443
     assert entry.data["remote_code"] == "synthetic"
     reload.assert_awaited_once_with(entry.entry_id)
+
+
+async def test_reconfigure_rejects_existing_duplicate_identity_without_mutation(hass):
+    """Legacy/restored duplicate entries are a real manager input, not a mocked step."""
+    first = MockConfigEntry(domain=DOMAIN, unique_id='freebox.test',
+        data={'host': 'freebox.test', 'port': 80}, options={'home_poll_interval': 20})
+    duplicate = MockConfigEntry(domain=DOMAIN, unique_id='freebox.test',
+        data={'host': 'freebox.test', 'port': 81}, options={'home_poll_interval': 30})
+    first.add_to_hass(hass)
+    duplicate.add_to_hass(hass)
+    before = [(entry.entry_id, entry.unique_id, dict(entry.data), dict(entry.options)) for entry in (first, duplicate)]
+    with patch('custom_components.freebox_homexa.config_flow.get_api', new_callable=AsyncMock) as get_api, \
+         patch.object(hass.config_entries, 'async_reload', new_callable=AsyncMock) as reload:
+        result = await hass.config_entries.flow.async_init(DOMAIN,
+            context={'source': 'reconfigure', 'entry_id': first.entry_id})
+        result = await hass.config_entries.flow.async_configure(result['flow_id'],
+            {'host': 'freebox.test', 'port': 80})
+        assert result['type'] == FlowResultType.ABORT
+        assert result['reason'] == 'already_configured'
+        assert [(entry.entry_id, entry.unique_id, dict(entry.data), dict(entry.options)) for entry in (first, duplicate)] == before
+        get_api.assert_not_called()
+        reload.assert_not_called()

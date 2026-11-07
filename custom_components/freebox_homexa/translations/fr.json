@@ -598,5 +598,11 @@
     "reminder_state_unconfirmed": {
       "message": "L’état du rappel n’est pas confirmé entre le stockage et le minuteur. Vérifiez le stockage Home Assistant puis programmez ou annulez explicitement ce rappel."
     }
+  },
+  "issues": {
+    "home_permissions": {
+      "title": "Accès Home à rétablir",
+      "description": "Freebox OS refuse l’accès de cette intégration aux appareils Home. Dans Freebox OS, ouvrez Paramètres > Gestion des accès > Applications, sélectionnez Homexa et accordez l’accès Home. Rechargez ensuite cette entrée d’intégration dans Home Assistant. Les identifiants et réglages existants sont conservés. Cette alerte disparaît après une lecture Home réussie."
+    }
   }
 }

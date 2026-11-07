@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+from collections.abc import Iterable
+from functools import partial
+
 import logging
 from pathlib import Path
 from dataclasses import dataclass
@@ -13,6 +16,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.util import slugify
 
+from .discovery import DiscoveryCandidate, async_setup_discovery
 from .errors import is_shutdown_error, poll_log_level
 from .router import FreeboxConfigEntry, FreeboxRouter
 from .entity import FreeboxHomeEntity
@@ -47,17 +51,15 @@ async def async_setup_entry(
 ) -> None:
     """Configure les entités interrupteurs pour la Freebox."""
     router: FreeboxRouter = entry.runtime_data
-    entities: list[SwitchEntity] = []
+    async_add_entities([FreeboxSwitch(router, description) for description in SWITCH_DESCRIPTIONS], True)
 
-    for nodeid, node in router.home_devices.items():
-        if node["category"] in {"shutter", "opener"}:
-            entities.append(FreeboxShutterInvertSwitchEntity(hass, router, node))
+    def candidates() -> Iterable[DiscoveryCandidate]:
+        for nodeid, node in router.home_devices.items():
+            if node["category"] in {"shutter", "opener"}:
+                yield str(nodeid), partial(FreeboxShutterInvertSwitchEntity, hass, router, node)
 
-    for entity_description in SWITCH_DESCRIPTIONS:
-        entities.append(FreeboxSwitch(router, entity_description))
-
-    async_add_entities(entities, True)
-    _LOGGER.debug("%s entités interrupteurs ajoutées pour %s", len(entities), router.name)
+    async_setup_discovery(hass, entry, router,
+        [router.signal_home_device_new, router.signal_home_device_update], candidates, async_add_entities)
 
 
 class FreeboxSwitch(FreeboxReachableMixin, SwitchEntity):

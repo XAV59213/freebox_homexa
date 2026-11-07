@@ -220,8 +220,8 @@ class FreeboxFlowHandler(ConfigFlow, domain=DOMAIN):
             CONF_PORT: user_input.get(CONF_PORT, 80),
         }
         await self.async_set_unique_id(self._data[CONF_HOST])
-        if self.source != SOURCE_REAUTH:
-            self._abort_if_unique_id_configured()
+        # Reauth enters reauth_confirm -> link, never the user/discovery step.
+        self._abort_if_unique_id_configured()
         return await self.async_step_link()
 
     async def async_step_reauth(self, entry_data: dict[str, Any]) -> ConfigFlowResult:

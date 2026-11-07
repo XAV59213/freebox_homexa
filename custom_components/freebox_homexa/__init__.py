@@ -342,3 +342,10 @@ async def async_unload_entry(hass: HomeAssistant, entry: FreeboxConfigEntry) -> 
     # erreur traduite tant qu'aucune entrée n'est chargée). Rappels TNT conservés.
     return True
 
+
+
+async def async_remove_entry(hass: HomeAssistant, entry: FreeboxConfigEntry) -> None:
+    """Delete only this entry's issue on permanent removal, not on unload."""
+    from .repairs import async_clear_home_permission_issue
+
+    async_clear_home_permission_issue(hass, entry.entry_id)

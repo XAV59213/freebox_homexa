@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from functools import partial
+
 from collections.abc import Iterable
 import logging
 from typing import TYPE_CHECKING, Any
@@ -16,10 +18,10 @@ from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
+from .discovery import DiscoveryCandidate, async_setup_discovery
 from .const import DOMAIN, option_remote_code
 from .player_remote import (
     VALID_COMMANDS as PLAYER_VALID_COMMANDS,
-    async_schedule_player_api_retry,
     async_send_player_keys,
     filter_ready_players,
 )
@@ -43,22 +45,16 @@ async def async_setup_entry(
     hass: HomeAssistant, entry: FreeboxConfigEntry, async_add_entities: AddEntitiesCallback
 ) -> None:
     router: FreeboxRouter = entry.runtime_data
-    try:
-        players = await router._api.player.get_players() or []
-    except Exception as err:
-        _LOGGER.warning("Impossible de lister les Freebox Player : %s", err)
-        return
+    router.player_discovery_active = True
+    if not router.players_initialized:
+        await router.async_update_players()
 
-    valid_players, skipped = filter_ready_players(
-        players, logger=_LOGGER, context="télécommande",
-        log_skipped=False,
-    )
-    if skipped:
-        await async_schedule_player_api_retry(hass, entry, router)
+    def candidates() -> Iterable[DiscoveryCandidate]:
+        valid_players, _ = filter_ready_players(router.players, log_skipped=False)
+        for player in valid_players:
+            yield str(player["id"]), partial(FreeboxRemote, router, player, entry)
 
-    entities = [FreeboxRemote(router, player, entry) for player in valid_players]
-    if entities:
-        async_add_entities(entities, True)
+    async_setup_discovery(hass, entry, router, [router.signal_players_update], candidates, async_add_entities)
 
 
 class FreeboxRemote(FreeboxReachableMixin, RemoteEntity):

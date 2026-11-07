@@ -66,6 +66,8 @@ def add_entities(
     track_lan: bool,
     create_devices: bool,
 ) -> None:
+    if router.closing:
+        return
     new_tracked = []
 
     for mac, device in router.devices.items():

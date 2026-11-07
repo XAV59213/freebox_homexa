@@ -348,3 +348,19 @@ fonctionnent encore ; une panne de la source Home conserve son état unavailable
 Aucune relance FFmpeg périodique ni commande automatique n’est ajoutée.
 Les noms fixes suivent réellement la langue HA FR/EN, sans renommer les IDs ni
 les noms personnalisés ; l’icône Player selon source respecte l’icône choisie.
+
+## Ajouts après installation et droit Home
+
+Les nouveaux appareils pris en charge apparaissent après observation par le poll
+existant, sans redémarrage ni recharge manuelle : Home, Players, LAN/répéteurs,
+stockage et capteurs. Les identifiants et réglages des entités connues ne sont pas
+recréés à chaque observation ni supprimés à la disparition temporaire.
+
+Si Freebox OS refuse explicitement le droit Home, une alerte dans **Paramètres >
+Système > Réparations** explique d'accorder ce droit dans Freebox OS > Gestion des
+accès > Applications > Homexa, puis de recharger l'entrée d'intégration. Le choix
+d'ignorer l'alerte survit aux recharges ; l'alerte disparaît quand une lecture Home
+réussit ou quand cette entrée est définitivement supprimée. Les simples timeouts
+ne créent pas d'alerte. Sur HA2026.10.4 testé, pas de liaison native config_entry_id
+pour masquer automatiquement l'alerte pendant la désactivation ; cette limite est
+conservée dans l'audit, pas une conformité Repairs globale revendiquée.

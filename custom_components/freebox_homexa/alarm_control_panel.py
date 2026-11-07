@@ -2,19 +2,26 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable, Iterable, Mapping
+from functools import partial
+
 import asyncio
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from homeassistant.components.alarm_control_panel import (
     AlarmControlPanelEntity,
-    AlarmControlPanelEntityFeature,
-    AlarmControlPanelState,
 )
+if TYPE_CHECKING:
+    from homeassistant.components.alarm_control_panel.const import AlarmControlPanelEntityFeature, AlarmControlPanelState
+else:
+    from homeassistant.components.alarm_control_panel import AlarmControlPanelEntityFeature, AlarmControlPanelState
+
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.event import async_track_time_interval
 from datetime import datetime, timedelta
 
+from .discovery import DiscoveryCandidate, async_setup_discovery
 from .const import FreeboxHomeCategory
 from .entity import FreeboxHomeEntity
 from .errors import async_action_errors
@@ -45,14 +52,13 @@ async def async_setup_entry(
     """Set up alarm panel."""
     router: FreeboxRouter = entry.runtime_data
 
-    async_add_entities(
-        (
-            FreeboxAlarm(hass, router, node)
-            for node in router.home_devices.values()
-            if node["category"] == FreeboxHomeCategory.ALARM
-        ),
-        True,
-    )
+    def candidates() -> Iterable[DiscoveryCandidate]:
+        for nodeid, node in router.home_devices.items():
+            if node["category"] == FreeboxHomeCategory.ALARM:
+                yield str(nodeid), partial(FreeboxAlarm, hass, router, node)
+
+    async_setup_discovery(hass, entry, router,
+        [router.signal_home_device_new, router.signal_home_device_update], candidates, async_add_entities)
 
 
 class FreeboxAlarm(FreeboxHomeEntity, AlarmControlPanelEntity):
@@ -82,7 +88,7 @@ class FreeboxAlarm(FreeboxHomeEntity, AlarmControlPanelEntity):
             node["type"]["endpoints"], "signal", "state"
         )
 
-        self._unsub_watcher = None
+        self._unsub_watcher: Callable[[], None] | None = None
         self._freebox_alarm_state = "idle"
 
         # Absent always available. Présent if the alarm2 slot exists on the panel.
@@ -130,14 +136,15 @@ class FreeboxAlarm(FreeboxHomeEntity, AlarmControlPanelEntity):
 
     async def async_update_during_arming(self, now: datetime | None = None) -> None:
         """Poll state during arming/alert phases."""
-        self._freebox_alarm_state = await self.get_home_endpoint_value(self._command_state)
+        state: object = await self.get_home_endpoint_value(self._command_state)
+        self._freebox_alarm_state = state if isinstance(state, str) else ""
         self._attr_alarm_state = FREEBOX_TO_STATUS.get(self._freebox_alarm_state)
         self.async_write_ha_state()
 
     async def async_update(self) -> None:
         """Update state."""
-        state: str | None = await self.get_home_endpoint_value(self._command_state)
-        if state:
+        state: object = await self.get_home_endpoint_value(self._command_state)
+        if isinstance(state, str) and state:
             self._freebox_alarm_state = state
             self._attr_alarm_state = FREEBOX_TO_STATUS.get(state)
             if self._freebox_alarm_state == "idle" and self._unsub_watcher is not None:
@@ -146,16 +153,28 @@ class FreeboxAlarm(FreeboxHomeEntity, AlarmControlPanelEntity):
         else:
             self._attr_alarm_state = None
 
-    def update_parameters(self, node):
-        """Update name and extra attributes."""
-        self._source_name = node["label"].strip()
-
-        self._attr_extra_state_attributes = {}
-        for endpoint in filter(lambda x: x["ep_type"] == "signal", node["show_endpoints"]):
-            name = endpoint["name"]
-            if name in HIDDEN_SIGNAL_ATTRIBUTES:
+    def update_parameters(self, node: Mapping[str, object]) -> None:
+        """Update public metadata, never exposing the PIN signal."""
+        label = node["label"]
+        if not isinstance(label, str):
+            raise TypeError("Alarm label must be a string")
+        self._source_name = label.strip()
+        endpoints = node["show_endpoints"]
+        if not isinstance(endpoints, list):
+            raise TypeError("Alarm endpoints must be a list")
+        attributes: dict[str, object] = {}
+        for endpoint in endpoints:
+            if not isinstance(endpoint, Mapping):
+                raise TypeError("Alarm endpoint must be a mapping")
+            data: Mapping[object, object] = endpoint
+            if data["ep_type"] != "signal":
                 continue
-            self._attr_extra_state_attributes[name] = endpoint["value"]
+            name = data["name"]
+            if not isinstance(name, str):
+                raise TypeError("Alarm signal name must be a string")
+            if name not in HIDDEN_SIGNAL_ATTRIBUTES:
+                attributes[name] = data["value"]
+        self._attr_extra_state_attributes = attributes
 
     async def async_will_remove_from_hass(self) -> None:
         """Cleanup when entity is removed."""
@@ -165,6 +184,6 @@ class FreeboxAlarm(FreeboxHomeEntity, AlarmControlPanelEntity):
         await super().async_will_remove_from_hass()
 
     @property
-    def supported_features(self) -> int:
+    def supported_features(self) -> AlarmControlPanelEntityFeature:
         """Return the list of supported features."""
         return self._supported_features

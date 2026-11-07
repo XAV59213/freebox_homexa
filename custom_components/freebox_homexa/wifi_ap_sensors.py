@@ -245,6 +245,8 @@ def async_setup_wifi_ap_sensors(
 
     @callback
     def add_ap_client_sensors() -> None:
+        if router.closing:
+            return
         new_entities: list[Entity] = []
         for ap_id in router.wifi_aps:
             if ap_id in tracked:

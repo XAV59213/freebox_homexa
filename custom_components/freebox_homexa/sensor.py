@@ -1,4 +1,7 @@
 from __future__ import annotations
+
+from collections.abc import Iterable
+from functools import partial
 from dataclasses import replace
 
 import logging
@@ -24,6 +27,7 @@ from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.dispatcher import async_dispatcher_connect
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
+from .discovery import DiscoveryCandidate, async_setup_discovery
 from .const import (
     CONF_CREATE_LAN_DEVICES,
     CONF_CREATE_WIFI_SENSORS,
@@ -150,30 +154,28 @@ async def async_setup_entry(
         entry, CONF_CREATE_LAN_DEVICES, DEFAULT_CREATE_LAN_DEVICES
     )
 
-    entities.extend(
-        FreeboxSensor(
-            router,
-            temperature_sensor_description(sensor_name),
-        )
-        for sensor_name in router.sensors_temperature
-    )
+    def candidates() -> Iterable[DiscoveryCandidate]:
+        for sensor_name in router.sensors_temperature:
+            yield f"temperature:{sensor_name}", partial(FreeboxSensor, router, temperature_sensor_description(sensor_name))
+        for disk in router.disks.values():
+            for partition in disk["partitions"].values():
+                for description in DISK_PARTITION_SENSORS:
+                    yield f"disk:{disk['id']}:{partition['id']}:{description.key}", partial(
+                        FreeboxDiskSensor, router, disk, partition, description)
+        for node in router.home_devices.values():
+            if any(endpoint["name"] == "battery" and endpoint["ep_type"] == "signal"
+                   and endpoint.get("value") is not None for endpoint in node["show_endpoints"]):
+                endpoint = next(endpoint for endpoint in node["show_endpoints"]
+                    if endpoint["name"] == "battery" and endpoint["ep_type"] == "signal"
+                    and endpoint.get("value") is not None)
+                yield f"battery:{node['id']}", partial(FreeboxBatterySensor, hass, router, node, endpoint)
+
     entities.extend(FreeboxSensor(router, description) for description in CONNECTION_SENSORS)
     entities.extend(FreeboxCallSensor(router, description) for description in CALL_SENSORS)
     entities.append(FreeboxCallLogSensor(router, CALL_LOG_SENSOR))
-    entities.extend(
-        FreeboxDiskSensor(router, disk, partition, description)
-        for disk in router.disks.values()
-        for partition in disk["partitions"].values()
-        for description in DISK_PARTITION_SENSORS
-    )
-    for node in router.home_devices.values():
-        for endpoint in node["show_endpoints"]:
-            if (
-                endpoint["name"] == "battery"
-                and endpoint["ep_type"] == "signal"
-                and endpoint.get("value") is not None
-            ):
-                entities.append(FreeboxBatterySensor(hass, router, node, endpoint))
+    async_setup_discovery(hass, entry, router,
+        [router.signal_sensor_update, router.signal_home_device_new, router.signal_home_device_update],
+        candidates, async_add_entities)
 
     coordinator = hass.data[DOMAIN].get(TNT_COORDINATORS_KEY, {}).get(entry.entry_id)
     if coordinator is not None:
@@ -190,7 +192,7 @@ async def async_setup_entry(
 
     @callback
     def add_wifi_signal_sensors() -> None:
-        if not create_wifi:
+        if router.closing or not create_wifi:
             return
         new_sensors: list[FreeboxWifiSignalSensor] = []
         for mac, device in router.devices.items():

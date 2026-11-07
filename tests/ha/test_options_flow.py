@@ -187,13 +187,14 @@ async def test_repeater_page_clear_retains_other_settings(hass):
     assert entry.options == {"home_poll_interval": 20, "repeater_merges": {}}
 
 
-async def test_profile_conflict_then_distinct_targets_and_edit_defaults(hass):
+@pytest.mark.parametrize("other_platform", ["test", "alexa_media"])
+async def test_profile_conflict_then_distinct_targets_and_edit_defaults(hass, other_platform):
     from homeassistant.helpers import entity_registry as er
     entry = MockConfigEntry(domain=DOMAIN, data={"host": "freebox.test"}, options={"home_poll_interval": 20})
     entry.add_to_hass(hass)
     registry = er.async_get(hass)
     echo = registry.async_get_or_create("media_player", "alexa_media", "test-echo", suggested_object_id="test_echo")
-    other = registry.async_get_or_create("media_player", "test", "test-other", suggested_object_id="test_other")
+    other = registry.async_get_or_create("media_player", other_platform, "test-other", suggested_object_id="test_other")
     slug = "alexa_media_" + echo.entity_id.split(".", 1)[1]
     notify = AsyncMock()
     hass.services.async_register("notify", slug, notify)

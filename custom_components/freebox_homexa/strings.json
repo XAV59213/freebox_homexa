@@ -598,5 +598,11 @@
     "reminder_state_unconfirmed": {
       "message": "L’état du rappel n’est pas confirmé entre le stockage et le minuteur. Vérifiez le stockage Home Assistant puis programmez ou annulez explicitement ce rappel."
     }
+  },
+  "issues": {
+    "home_permissions": {
+      "title": "Home access needs attention",
+      "description": "Freebox OS denied this integration access to Home devices. In Freebox OS, open Settings > Access management > Applications, select Homexa and grant the Home access permission. Then reload this integration entry in Home Assistant. Existing entity IDs and settings are preserved. This issue clears after a successful Home read."
+    }
   }
 }

@@ -136,3 +136,20 @@ exclues par coverage (17 avant) ; aucun omit/exclude_lines ajouté.
 Restent SDK non annoté, schémas voluptuous/probatio, rappels/config/storage,
 dictionnaires historiques et conflit MRO nom principal None vs FFmpeg str.
 La règle globale reste todo, pas de gate strict artificiellement vert.
+
+## Lot 13 local — 122 erreurs /16 fichiers/40 modules
+
+130→122 diagnostics. Alarm, BinarySensor et discovery : aucun diagnostic strict.
+Enums HA canoniques (imports runtime historiques conservés), unsubscribe réellement
+nullable, état non-string inconnu plutôt qu'exception/un faux état armé, Mapping
+métadonnées validé sans ajout Any/cast/ignore. Suppression du cache RAID optionnel
+inutilisé, lookup réel à chaque observation. Nouveau module discovery typé ; le
+périmètre passe honnêtement de39 à40 modules. Aucun contrat SDK non typé masqué.
+Preuve : /tmp/homexa-mypy-lot13-alarm.txt ; CI lot13 non encore livrée.
+
+## Jalon 14 — 122 erreurs /16 fichiers/41 modules
+
+Nouveau module repairs strict sans diagnostic, helper discovery inchangé. Cache
+Player list[dict[str, object]] validé sur les vraies observations JSON ; pas Any,
+cast ou ignore ajouté. 122 erreurs non masquées, aucune conversion de l'identité
+historique disque entière en string pour un score. Périmètre41 modules explicite.

@@ -519,6 +519,12 @@
     },
     "cannot_fetch_tnt": {
       "message": "Could not retrieve the TNT guide: {error}"
+    },
+    "command_failed": {
+      "message": "The action could not be completed. Check the Freebox connection and permissions."
+    },
+    "inversion_unavailable": {
+      "message": "The inversion setting is unavailable. Check that switch before moving the cover."
     }
   }
 }

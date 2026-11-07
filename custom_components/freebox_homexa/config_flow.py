@@ -285,7 +285,7 @@ class FreeboxFlowHandler(ConfigFlow, domain=DOMAIN):
                 return await self.async_step_lan_options()
 
             finally:
-                # Toujours fermer la session, y compris en cas d'erreur après open().
+                # Toujours tenter close public ; sa réussite après open échoué dépend du SDK.
                 with suppress(Exception):
                     await fbx.close()
 

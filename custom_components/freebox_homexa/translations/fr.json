@@ -532,6 +532,12 @@
     },
     "cannot_fetch_tnt": {
       "message": "Impossible de récupérer le guide TNT : {error}"
+    },
+    "command_failed": {
+      "message": "L’action n’a pas pu être exécutée. Vérifiez la connexion et les autorisations de la Freebox."
+    },
+    "inversion_unavailable": {
+      "message": "Le réglage d’inversion est indisponible. Vérifiez cet interrupteur avant de déplacer le volet."
     }
   }
 }

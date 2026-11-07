@@ -1,6 +1,7 @@
 # Changelog
 
 ## Non publié
+- 2026-11-07 — Quality Scale, lot 4 : 234 tests (+47), vraies plateformes caméra/volets/interrupteurs/boutons, contrat Home du vrai SDK sur transport mocké, récupération après erreurs de configuration et matrice de preuves des 54 règles. Correction double inversion/position inconnue, état caméra périmé, disponibilité Wi-Fi et faux succès camera/cover. Aucun changement d’identité, endpoint repeater/ ou publication ; préparation 28.8.90, évaluation 12/40/2 inchangée.
 - 2026-11-07 — Quality Scale, lot 3 : 187 tests HA (+69), plateformes Player/télécommande/calendrier et inventaire des 41 boutons ; veille correctement reconnue, indisponibilité après échec du statut, volume/muet inconnus non réutilisés, dates TV débordantes ignorées. Évaluation prudente inchangée (12 done / 40 todo / 2 exempt), aucun niveau officiel revendiqué.
 - 2026-11-07 — Quality Scale, lot 2 : guide utilisateur détaillé, propriétaires CODEOWNERS cohérents avec le manifeste et métadonnées des six services FR/EN, vrais tests de plateformes HA/dispatcher/coordinateurs et multi-entrées, couverture mesurée renforcée. Aucun niveau officiel revendiqué.
 - 2026-11-07 — Options : conserve les codes télécommande des Players absents de la liste ou non listables ; un code visible reste effaçable explicitement. Autres options/IDs inchangés.

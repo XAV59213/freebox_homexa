@@ -87,13 +87,18 @@ class FreeboxSwitch(FreeboxReachableMixin, SwitchEntity):
     async def async_update(self) -> None:
         try:
             data = await self._router.wifi.get_global_config()
-            self._attr_is_on = bool(data["enabled"])
+            enabled = data.get("enabled")
+            if not isinstance(enabled, bool):
+                raise ValueError("Invalid Wi-Fi state")
+            self._attr_is_on = enabled
+            self._attr_available = True
         except Exception as err:  # noqa: BLE001
             if is_shutdown_error(err, self._router):
                 _LOGGER.debug("État du Wi-Fi non lu (rechargement) : %s", err)
                 return
             _LOGGER.log(poll_log_level(self._router), "Échec de la mise à jour du WiFi : %s", err)
             self._attr_is_on = None
+            self._attr_available = False
 
 
 class FreeboxShutterInvertSwitchEntity(FreeboxHomeEntity, SwitchEntity):
@@ -108,7 +113,7 @@ class FreeboxShutterInvertSwitchEntity(FreeboxHomeEntity, SwitchEntity):
         self._attr_unique_id = f"{self._attr_unique_id}_InvertSwitch"
         storage_dir = Path(hass.config.path(".storage", "freebox_homexa"))
         self._path = storage_dir / f"{slugify(self._attr_unique_id)}.conf"
-        self._state: bool = False
+        self._state: bool | None = False
 
     async def async_added_to_hass(self) -> None:
         await super().async_added_to_hass()
@@ -136,7 +141,8 @@ class FreeboxShutterInvertSwitchEntity(FreeboxHomeEntity, SwitchEntity):
 
     @property
     def available(self) -> bool:
-        return True
+        # This setting is local: router reachability is irrelevant, disk errors are not.
+        return self._state is not None
 
     async def async_update(self) -> None:
         await self.hass.async_add_executor_job(self._load_state)
@@ -153,4 +159,4 @@ class FreeboxShutterInvertSwitchEntity(FreeboxHomeEntity, SwitchEntity):
                 self._state = False
         except OSError as err:
             _LOGGER.error("Erreur lecture inversion %s: %s", self._attr_name, err)
-            self._state = False
+            self._state = None

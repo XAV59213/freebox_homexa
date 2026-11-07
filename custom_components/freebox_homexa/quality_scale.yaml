@@ -13,8 +13,10 @@ rules:
       fois après deux setups sans entrée. Les rappels sont idempotents et les services persistent après unload.
   appropriate-polling:
     status: todo
-    comment: __init__.py:211 relève central, tnt_const.py:12 intervalle TNT 5 min. Audit des fréquences, doublons
-      et charge toutes plateformes non achevé.
+    comment: 'Règle officielle relue le 2026-11-07 : intervalle choisi par le développeur, pas de champ config
+      flow. Le champ home_poll_interval existe encore ; ne pas le supprimer pour le score au risque de changer
+      les réglages existants. Documenter une dépréciation compatible et vérifier les fréquences/doublons de toutes
+      les plateformes avant done.'
   brands:
     status: todo
     comment: 'Règle officielle vérifiée : assets dans home-assistant/brands sous le domaine. Lecture GitHub
@@ -31,10 +33,11 @@ rules:
       structurel, pas preuve de couverture du flow.
   config-flow-test-coverage:
     status: todo
-    comment: '187 tests HA au total ; config_flow.py : 359/438 lignes (81,96 %), 97/148 branches (65,54 %).
-      Découverte et limite reconfigure, profils ajout/modification/suppression/erreurs, TNT, groupes/types
-      et codes Player présents/absents testés via flow manager. Encore loin de 100 % : options répéteurs, conflits
-      Alexa, chemins rares/auth/storage à couvrir.'
+    comment: '234 tests HA au total ; config_flow.py : 437/438 lignes (99,77 %), 145/148 branches (97,97 %).
+      Les erreurs de link testées sont suivies de la correction de leur cause et de la finalisation du même flow
+      avec unique_id vérifié. Options répéteurs (registre uniquement), conflits Alexa, doublons de libellés,
+      defaults privés synthétiques et conservation des codes vérifiés. Reste ligne 369 et trois branches ; guard
+      reauth/user à justifier, sans forcer un chemin artificiel. 100 % non atteint, donc todo.'
   dependency-transparency:
     status: todo
     comment: 'SDK 1.3.1 installé depuis PyPI ; source publique tag v1.3.1 et GPL-3.0 vérifiés via GitHub (commit
@@ -84,10 +87,10 @@ rules:
       sont rattachés à entry.async_on_unload.'
   entity-unique-id:
     status: todo
-    comment: 'Vraies plateformes multi-entrées : capteurs centraux ont IDs distincts et restent stables ; RAID
-      ne change pas de unique_id au retrait/retour ni renommage. ScannerEntity HA utilise sa propriété unique_id
-      MAC client, pas le _attr_unique_id préfixé défini dans FreeboxDevice ; aucun changement imposé. Inventaire
-      collisions/stabilité de tous modèles et partitions encore incomplet.'
+    comment: IDs historiques conservés ; plateformes multientrées, retour/disparition et variantes boutons testés.
+      La stabilité RAID au renommage n’est prouvée que dans la même instance, pas au rechargement (constructeur
+      utilise le nom). ScannerEntity fournit MAC client. Audit collisions/partitions et proposition de migration
+      réversible restent nécessaires ; aucune migration imposée.
   has-entity-name:
     status: todo
     comment: tnt_sensor.py:28 et sensor.py:371 mettent has_entity_name=False ; règle globale non satisfaite.
@@ -112,14 +115,16 @@ rules:
       Test de déduplication identité physique manquant.
   action-exceptions:
     status: todo
-    comment: media_player.py:217-221,389-390 journalise/absorbe certains échecs au lieu de lever une erreur
-      utilisateur ; tous services à auditer.
+    comment: 'Cover/camera utilisent async_execute_home_command : erreur HomeAssistantError command_failed traduite
+      si helper booléen échoue ; état optimiste inchangé, SDK mocké en échec et commande absente testés. Mais
+      media_player._command, remote, boutons, alarme et Wi-Fi absorbent encore certains échecs : règle globale
+      reste todo.'
   config-entry-unloading:
     status: todo
-    comment: Vraies plateformes HA sensor/binary_sensor/device_tracker/alarme et coordinateurs TNT testés ;
-      listeners/timers retirés, isolement deux entrées et shutdown owning-entry vérifiés. Succès/refus unload
-      intégration testés. Restent cycle complet simultané des 11 plateformes, caméra/volets et tâches/rappels
-      en vol, et échecs après probe ; cleanup SDK limité par contrat amont.
+    comment: 'Les 11 domaines ont maintenant au moins une vraie EntityPlatform ajoutée/retirée (incluant boutons/camera/cover/switch),
+      hooks coopératifs et listeners vérifiés ; isolement deux entrées et shutdown coordinator propriétaire testés.
+      Reste orchestration simultanée complète, setup échoué après probe et tâches en vol. SDK close peut échouer
+      avant fermeture session : limitation source démontrée, pas contournée.'
   docs-configuration-parameters:
     status: todo
     comment: 'docs/guide-utilisateur.md (lié README) : Table des options général/groupes/types/répéteurs/TNT/profils,
@@ -134,10 +139,10 @@ rules:
       custom revendiquée.'
   entity-unavailable:
     status: todo
-    comment: Vraies plateformes HA testent perte/retour sur capteurs centraux, disque, RAID, Wi-Fi/AP/groupes
-      ; Home/RTS mixin, trackers et TNT vérifiés séparément. RAID disparu plusieurs cycles récupère sans crash.
-      Disponibilité spécifique Player/caméra/volets et toutes variantes/métadonnées absentes non encore prouvée
-      globalement.
+    comment: Vraies plateformes couvrent perte/retour centraux, TNT, Player, télécommande, caméra, volets et
+      Wi-Fi. Caméra remplace son node au signal, disparaît/récupère sans nouvelle identité ; Wi-Fi invalide devient
+      indisponible ; inversion disque illisible inconnue, position incertaine sans commande ambiguë. Reste vérifier
+      toutes variantes, événements/autorisation et erreurs partielles avant règle globale done.
   integration-owner:
     status: done
     comment: 'manifest.json déclare @gvigroux, @XAV59213 et @Steph73HB ; .github/CODEOWNERS reprend exactement
@@ -162,9 +167,9 @@ rules:
       avant réauth. Lié au choix de migration unique ID host vers identité physique, non imposé ici.
   test-coverage:
     status: todo
-    comment: '187 tests HA 2026.10.4 ; 38 modules sans omit : lignes 2680/5732 (46,76 %), branches 401/1916
-      (20,93 %), combiné 40,29 %. Rapports JSON/XML CI, seuil officiel non atteint ; reste todo. Les tests
-      de caractérisation de limitations SDK/reconfigure ne sont pas des correctifs de ces limitations.'
+    comment: '234 tests HA 2026.10.4 ; 38 modules sans omit : lignes 3068/5724 (53,60 %), branches 500/1912 (26,15
+      %), combiné 46,73 %. Rapports JSON/XML CI ; seuil officiel non atteint. Certaines variantes sont des inventaires
+      explicitement distincts du runtime. Les tests ne valident pas le matériel.'
   devices:
     status: todo
     comment: media_player.py:90-103 et tnt_sensor.py:14-29 DeviceInfo ; cohérence des associations/subdevices
@@ -246,11 +251,12 @@ rules:
       incomplètes.
   exception-translations:
     status: done
-    comment: Toutes les 17 levées custom de HomeAssistantError/sous-classes (dont UpdateFailed TNT) ont domaine,
+    comment: Toutes les 19 levées custom de HomeAssistantError/sous-classes (dont UpdateFailed TNT) ont domaine,
       clé sans message dur, et placeholders cohérents. tests/ha/test_translations_services.py vérifie source
       AST et strings/FR/EN, puis charge la traduction française via le vrai moteur HA. Les erreurs absorbées
       restent un défaut distinct action-exceptions ; Unauthorized est une exception du framework, pas un message
-      custom.
+      custom. Nouveau command_failed sans placeholder privé ; échecs Home réellement levés, tests de clés/domaines/placeholders
+      FR/EN.
   icon-translations:
     status: todo
     comment: icons.json existe ; tnt_sensor.py:27 et autres plateformes gardent des icônes statiques ; inventaire

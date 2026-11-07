@@ -6,6 +6,7 @@ import logging
 from collections.abc import Callable
 from typing import Any
 from homeassistant.core import HomeAssistant
+from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.dispatcher import async_dispatcher_connect
 from homeassistant.helpers.entity import Entity
@@ -125,6 +126,19 @@ class FreeboxHomeEntity(Entity):
                 return False
             _LOGGER.error("Erreur lors de la commande sur l'appareil %s : %s", self._id, err)
             return False
+
+    async def async_execute_home_command(
+        self, command_id: int | None, value: Any | None = None
+    ) -> None:
+        """Require acknowledgement before updating camera/cover optimistic state.
+
+        Keep the historical boolean helper for its other existing callers.
+        No raw SDK error, URL or command payload is exposed in the UI message.
+        """
+        if not await self.set_home_endpoint_value(command_id, value):
+            raise HomeAssistantError(
+                translation_domain=DOMAIN, translation_key="command_failed"
+            )
 
     async def get_home_endpoint_value(self, command_id: int | None) -> Any | None:
         """Récupère la valeur d'un endpoint avec timeout et gestion d'erreur."""

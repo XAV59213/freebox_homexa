@@ -141,30 +141,16 @@ class FreeboxCamera(FreeboxHomeEntity, FFmpegCamera):
 
         Envoie la commande pour activer la détection via l'API Freebox.
         """
-        if self._command_motion_detection is None:
-            _LOGGER.error("Détection de mouvement non supportée pour %s", self._node_id)
-            return
-        try:
-            await self.set_home_endpoint_value(self._command_motion_detection, True)
-            self._attr_motion_detection_enabled = True
-            _LOGGER.info("Détection de mouvement activée pour %s", self._node_id)
-        except Exception as err:
-            _LOGGER.error("Échec de l'activation de la détection de mouvement pour %s: %s", self._node_id, err)
+        await self.async_execute_home_command(self._command_motion_detection, True)
+        self._attr_motion_detection_enabled = True
 
     async def async_disable_motion_detection(self) -> None:
         """Désactive la détection de mouvement sur la caméra.
 
         Envoie la commande pour désactiver la détection via l'API Freebox.
         """
-        if self._command_motion_detection is None:
-            _LOGGER.error("Détection de mouvement non supportée pour %s", self._node_id)
-            return
-        try:
-            await self.set_home_endpoint_value(self._command_motion_detection, False)
-            self._attr_motion_detection_enabled = False
-            _LOGGER.info("Détection de mouvement désactivée pour %s", self._node_id)
-        except Exception as err:
-            _LOGGER.error("Échec de la désactivation de la détection de mouvement pour %s: %s", self._node_id, err)
+        await self.async_execute_home_command(self._command_motion_detection, False)
+        self._attr_motion_detection_enabled = False
 
     async def async_update_signal(self) -> None:
         """Met à jour les données de la caméra à partir du routeur Freebox.
@@ -175,15 +161,19 @@ class FreeboxCamera(FreeboxHomeEntity, FFmpegCamera):
             node = self._router.home_devices.get(self._id)
             if node is None:
                 _LOGGER.warning("Caméra %s non trouvée dans les données du routeur", self._id)
+                self._attr_available = False
+                self.async_write_ha_state()
                 return
+            self._attr_available = True
+            self._node = node
             self.update_node(node)
             self.async_write_ha_state()
             _LOGGER.debug("Caméra %s mise à jour avec succès", self._name)
         except Exception as err:  # noqa: BLE001
             if is_shutdown_error(err, self._router):
-                _LOGGER.debug("Mise à jour de la caméra %s interrompue (rechargement) : %s", self._node_id, err)
+                _LOGGER.debug("Mise à jour de la caméra %s interrompue (rechargement) : %s", self._id, err)
                 return
-            _LOGGER.log(poll_log_level(self._router), "Échec de la mise à jour de la caméra %s : %s", self._node_id, err)
+            _LOGGER.log(poll_log_level(self._router), "Échec de la mise à jour de la caméra %s : %s", self._id, err)
 
     def update_node(self, node: dict[str, Any]) -> None:
         """Met à jour les paramètres de la caméra à partir des données du nœud.

@@ -38,7 +38,7 @@ noms de fonctions/tests pour éviter les décalages de lignes.
 | test-before-setup (nouveau) | open/probe avant forward, erreurs temporaires/auth converties ; nettoyage public tenté, limite SDK précisée ci-dessous |
 | diagnostics (lot 1) | export chargé/non chargé, valeurs privées synthétiques et clés inconnues absentes, cache borné, timings validés/périmés |
 | entity-event-setup (lot 2) | inventaire AST + vraies plateformes HA/dispatcher/CoordinatorEntity, retrait des listeners et timers, isolement deux entrées |
-| exception-translations (lot 2) | toutes les 17 levées custom HA/sous-classes traduites, placeholders vérifiés strings/FR/EN, moteur HA français réel |
+| exception-translations (lot 2) | toutes les 19 levées custom HA/sous-classes traduites, placeholders vérifiés strings/FR/EN, moteur HA français réel |
 | async-dependency (lot 2) | SDK asyncio/aiohttp ; SSL/fichiers dans asyncio.to_thread, signature coroutine publique testée et source v1.3.1 vérifiée |
 | integration-owner (lot 2) | propriétaires du manifest repris sans ajout de personne dans CODEOWNERS ; cohérence testée, mainteneur XAV59213 actif dans les cinq derniers commits main |
 
@@ -75,7 +75,7 @@ pas tester toute version HA ≥2026.8 ; un job minimum supporté reste à établ
 Le plugin HA bloque sockets externes et DNS ; toutes les réponses appareil sont
 synthétiques/mocks. Aucun secret/token de production, aucun appareil connecté.
 
-**187 tests passent** (68 au lot 1, +50 au lot 2, +69 au lot 3) : config initiale, réseau/auth, duplicate host, réauth avec
+**234 tests passent** (68 au lot 1, +50 au lot 2, +69 au lot 3, +47 au lot 4) : config initiale, réseau/auth, duplicate host, réauth avec
 reload de l'entrée existante, options général/groupes, conservation options,
 migration LAN, setup/unload succès/refus, erreurs close/annulation, confidentialité,
 bornes cache/timings, Entity HA et signaux dispatcher/perte-retour, logs centraux
@@ -88,15 +88,15 @@ Les tests SDK/reconfigure de caractérisation documentent une limite, ils ne la 
 
 | Périmètre (38 modules, aucun omit) | Lignes exécutées | Branches | Combiné |
 |---|---:|---:|---:|
-| Intégration entière | 2680/5732 = **46,76 %** | 401/1916 = **20,93 %** | **40,29 %** |
-| config_flow.py | 359/438 = **81,96 %** | 97/148 = **65,54 %** | **77,82 %** |
+| Intégration entière | 3068/5724 = **53,60 %** | 500/1912 = **26,15 %** | **46,73 %** |
+| config_flow.py | 437/438 = **99,77 %** | 145/148 = **97,97 %** | **99,32 %** |
 | diagnostics.py | **100 %** | **100 %** | **100 %** |
 | player_diagnostics.py | **100 %** | **100 %** | **100 %** |
 | availability.py | **100 %** | **100 %** | **100 %** |
 
 `test-coverage` et `config-flow-test-coverage` restent **todo**, loin des exigences.
 Imports exécutés comptés dans les lignes ; ces chiffres ne signifient donc pas
-47 % des fonctionnalités validées. Pas de seuil abaissé pour déclarer un niveau.
+54 % des fonctionnalités validées. Pas de seuil abaissé pour déclarer un niveau.
 CI ajoutée `.github/workflows/ha-tests.yaml` : vrais tests HA + inventaire YAML,
 rapports coverage JSON/XML en artefact. Syntax/HACS/hassfest ne prouvent pas la
 couverture runtime. Les simulations historiques restent des régressions séparées.
@@ -109,7 +109,67 @@ PYTHONDONTWRITEBYTECODE=1 /tmp/homexa-ha-quality/bin/python -m pytest -q tests/h
   --cov-report=term --cov-report=json:coverage.json --cov-report=xml:coverage.xml
 ```
 
-## Lot 3 — état Player et nouvelles plateformes réelles
+## Lot 4 — camera/cover/switch et minimum de validation par règle
+
+[Matrice complète des 54 règles](quality-scale-proof-matrix.md) : pour chaque règle,
+preuve acquise et minimum restant, en distinguant travail local compatible, réserve
+formelle documentaire, migration sensible et limite SDK. Les **40 todo** ne sont
+pas tous bloqués. **12 done / 40 todo / 2 exempt** reste le compte exact.
+
+### Changements vérifiés, pas seulement inventaires
+
+- Vraies EntityPlatform camera/cover/switch : ajout, état HA, perte/retour et retrait
+  des listeners Home ; inversion locale utilisable sans réseau, mais indisponible
+  sur erreur de lecture de son fichier. Ajout/retrait des trois familles de boutons
+  sans commande automatique. Au moins un représentant des **11 domaines** a donc
+  maintenant un vrai test de plateforme, sans prétendre un lifecycle complet simultané.
+- **Volet inversé** : position inconnue ne provoque plus `100 - None`, ni faux état
+  ouvert. La position optimiste est stockée dans le même repère brut que l’API,
+  évitant une deuxième inversion. Une valeur disparue ne réutilise pas l’ancienne.
+  Inversion configurée mais inconnue : pas d’envoi d’une position ambiguë.
+- **Erreurs d’action Home** : nouveaux appels cover/camera exigent succès du helper
+  booléen avant état optimiste ; échec/commande absente lève `command_failed` traduit
+  sans détail privé. Le contrat historique du helper pour les autres appelants est
+  conservé. Tests traversent aussi le **vrai adaptateur freebox-api Home 1.3.1**,
+  avec transport synthétique, mêmes endpoints et payloads `{value: ...}`.
+  Un retour SDK sans exception n’est pas une preuve de mouvement physique.
+- **Caméra** : son nouveau node remplace bien le cache pour disponibilité après
+  signal ; disparition répétée puis retour garde l’ID. Correction des chemins
+  d’erreur référant un attribut `_node_id` inexistant. Aucun flux, image ni réseau
+  de caméra de production utilisé ; manager FFmpeg synthétique pour ces tests.
+- **Wi-Fi** : réponse absente/invalide/échouée → indisponible/inconnu, pas faux ON
+  ni ancienne mesure ; retour booléen valide rétablit disponibilité.
+- **Configuration** : vrais flows options répéteurs sur registre synthétique
+  (aucune modification API repeater/), conflit Alexa et récupération, libellés
+  identiques/override absent, codes/clé TMDB synthétiques préservés. Les erreurs
+  initiales testées sont maintenant suivies de la correction de la cause et de la
+  finalisation du **même flow**, unique_id vérifié à chaque création concernée.
+  Port seul caractérisé sans changer l’identité ; absence de probe reste un défaut.
+- **Dépendances de test** : PyTurboJPEG 1.8.3, version exacte du manifest camera HA,
+  pour importer la vraie classe caméra sans stub. La présence de la bibliothèque
+  native améliore les snapshots ; ni transcodage/snapshot ni qualité vidéo validés.
+
+### Mesures et réserves précises
+
+| Module | Lignes | Branches | Combiné |
+|---|---:|---:|---:|
+| camera.py | 56/79 = 70,89 % | 4/12 = 33,33 % | 65,93 % |
+| cover.py | 117/162 = 72,22 % | 19/42 = 45,24 % | 66,67 % |
+| switch.py | 93/107 = 86,92 % | 5/12 = 41,67 % | 82,35 % |
+
+`config-flow-test-coverage` reste todo : ligne 369 et trois branches non couvertes
+(notamment garde user/reauth et collision reconfigure). Pas de pragma omit ni appel
+artificiel pour masquer ces chemins ; ils demandent une analyse du graphe HA et
+des anciennes entrées. Les tests de récupération ne sont pas remplacés par le score.
+La règle officielle `appropriate-polling` a été relue : elle exclut un intervalle
+choisi dans le flow ; `home_poll_interval` existe encore. Le supprimer silencieusement
+ne serait pas une amélioration compatible : dépréciation/proposition nécessaire.
+Les docs locales ne deviennent pas absentes du seul fait de l’absence de revue
+home-assistant.io. La matrice distingue exactement ces deux dimensions.
+Aucun niveau officiel, merge, release, commande appareil, migration d’ID ou nettoyage
+irréversible des appareils persistants. Version préparée conservée **28.8.90**.
+
+## Lot 3 — état Player et nouvelles plateformes réelles (jalon historique)
 
 - **Télécommande** : reproduit `standby → on` causé par la vérité d'un dictionnaire
   non vide. Les états running/on et standby/stopped/off sont maintenant distingués ;
@@ -133,8 +193,8 @@ PYTHONDONTWRITEBYTECODE=1 /tmp/homexa-ha-quality/bin/python -m pytest -q tests/h
 Les comptes restent **12 done / 40 todo / 2 exempt**. Les sous-cas supplémentaires
 ne suffisent pas à prouver une règle globale pour toutes les plateformes.
 `entity-unavailable` reste notamment à démontrer pour les autres familles.
-Camera, cover et switch n'ont pas encore de couverture runtime mesurée ; les
-chemins d'options rares restent à tester. Ce sont des travaux indépendants encore
+Au jalon 3, camera/cover/switch n'avaient pas encore de couverture runtime ;
+le lot 4 ci-dessus apporte ces preuves et les flows rares, sans achever les règles globales. Ce sont des travaux indépendants encore
 traitables, pas des blocages architecturaux ni une déclaration de fin d'audit.
 La réserve SDK, les migrations d'identité et les limites de validation matérielle
 restent inchangées ; aucune session privée, API repeater ou identité n'est modifiée.
@@ -233,25 +293,25 @@ listés dans le tableau suivant ; celui-ci reprend le YAML, il n'est pas un seco
 
 | Règle encore todo | Preuve manquante / prochain travail |
 |---|---|
-| appropriate-polling | __init__.py:211 relève central, tnt_const.py:12 intervalle TNT 5 min. Audit des fréquences, doublons et charge toutes plateformes non achevé. |
+| appropriate-polling | Règle officielle relue le 2026-11-07 : intervalle choisi par le développeur, pas de champ config flow. Le champ home_poll_interval existe encore ; ne pas le supprimer pour le score au risque de changer les réglages existants. Documenter une dépréciation compatible et vérifier les fréquences/doublons de toutes les plateformes avant done. |
 | brands | Règle officielle vérifiée : assets dans home-assistant/brands sous le domaine. Lecture GitHub de core_integrations/freebox_homexa le 2026-11-07 -> 404 ; logos locaux YouTube/Netflix ne sont pas le branding de cette intégration. Aucun ajout/PR amont ni création de logo effectué. Reste todo ; HACS accepté ne vaut pas branding validé. |
-| config-flow-test-coverage | 187 tests HA au total ; config_flow.py : 359/438 lignes (81,96 %), 97/148 branches (65,54 %). Découverte et limite reconfigure, profils ajout/modification/suppression/erreurs, TNT, groupes/types et codes Player présents/absents testés via flow manager. Encore loin de 100 % : options répéteurs, conflits Alexa, chemins rares/auth/storage à couvrir. |
+| config-flow-test-coverage | 234 tests HA au total ; config_flow.py : 437/438 lignes (99,77 %), 145/148 branches (97,97 %). Les erreurs de link testées sont suivies de la correction de leur cause et de la finalisation du même flow avec unique_id vérifié. Options répéteurs (registre uniquement), conflits Alexa, doublons de libellés, defaults privés synthétiques et conservation des codes vérifiés. Reste ligne 369 et trois branches ; guard reauth/user à justifier, sans forcer un chemin artificiel. 100 % non atteint, donc todo. |
 | dependency-transparency | SDK 1.3.1 installé depuis PyPI ; source publique tag v1.3.1 et GPL-3.0 vérifiés via GitHub (commit 96322885f37df37e6f491ab889b27cf912cc293a), fichier client installé identique au raw. Workflow public release.yml de ce tag prévoit build/attestation/publication PyPI, mais exécution effective de publication non établie : les runs verts trouvés sont Tests/CodeQL, pas preuve de publish. Manifest reste freebox-api>=1.3.1, pas pin exact. Aucune dépendance changée ; todo reste justifié. |
 | docs-actions | docs/guide-utilisateur.md (lié README) : Les six actions et tous leurs champs, ciblage multi-entrées et réponse scheduled_minutes sont documentés ; inventaire metadata/strings/FR/EN et YAML exemples testé. Preuve documentaire locale renforcée ; reste todo au sens formel, la règle officielle visant une page/revue home-assistant.io non soumise. Aucune certification custom revendiquée. |
 | docs-high-level-description | docs/guide-utilisateur.md (lié README) : Description Server/Player, usage réseau/Home/guide et lien officiel Free dans le guide. Preuve documentaire locale renforcée ; reste todo au sens formel, la règle officielle visant une page/revue home-assistant.io non soumise. Aucune certification custom revendiquée. |
 | docs-installation-instructions | docs/guide-utilisateur.md (lié README) : Installation HACS/manuelle, redémarrage et appairage pas à pas, prérequis locaux et confidentialité dans le guide. Preuve documentaire locale renforcée ; reste todo au sens formel, la règle officielle visant une page/revue home-assistant.io non soumise. Aucune certification custom revendiquée. |
 | docs-removal-instructions | docs/guide-utilisateur.md (lié README) : Suppression entrée/ressources/HACS et limites de conservation jetons, rappels et sauvegardes explicitement documentées. Preuve documentaire locale renforcée ; reste todo au sens formel, la règle officielle visant une page/revue home-assistant.io non soumise. Aucune certification custom revendiquée. |
-| entity-unique-id | Vraies plateformes multi-entrées : capteurs centraux ont IDs distincts et restent stables ; RAID ne change pas de unique_id au retrait/retour ni renommage. ScannerEntity HA utilise sa propriété unique_id MAC client, pas le _attr_unique_id préfixé défini dans FreeboxDevice ; aucun changement imposé. Inventaire collisions/stabilité de tous modèles et partitions encore incomplet. |
+| entity-unique-id | IDs historiques conservés ; plateformes multientrées, retour/disparition et variantes boutons testés. La stabilité RAID au renommage n’est prouvée que dans la même instance, pas au rechargement (constructeur utilise le nom). ScannerEntity fournit MAC client. Audit collisions/partitions et proposition de migration réversible restent nécessaires ; aucune migration imposée. |
 | has-entity-name | tnt_sensor.py:28 et sensor.py:371 mettent has_entity_name=False ; règle globale non satisfaite. |
 | unique-config-entry | config_flow.py:222 unique ID basé sur host ; hostname/IP/URL du même Server peuvent différer. Test de déduplication identité physique manquant. |
-| action-exceptions | media_player.py:217-221,389-390 journalise/absorbe certains échecs au lieu de lever une erreur utilisateur ; tous services à auditer. |
-| config-entry-unloading | Vraies plateformes HA sensor/binary_sensor/device_tracker/alarme et coordinateurs TNT testés ; listeners/timers retirés, isolement deux entrées et shutdown owning-entry vérifiés. Succès/refus unload intégration testés. Restent cycle complet simultané des 11 plateformes, caméra/volets et tâches/rappels en vol, et échecs après probe ; cleanup SDK limité par contrat amont. |
+| action-exceptions | Cover/camera utilisent async_execute_home_command : erreur HomeAssistantError command_failed traduite si helper booléen échoue ; état optimiste inchangé, SDK mocké en échec et commande absente testés. Mais media_player._command, remote, boutons, alarme et Wi-Fi absorbent encore certains échecs : règle globale reste todo. |
+| config-entry-unloading | Les 11 domaines ont maintenant au moins une vraie EntityPlatform ajoutée/retirée (incluant boutons/camera/cover/switch), hooks coopératifs et listeners vérifiés ; isolement deux entrées et shutdown coordinator propriétaire testés. Reste orchestration simultanée complète, setup échoué après probe et tâches en vol. SDK close peut échouer avant fermeture session : limitation source démontrée, pas contournée. |
 | docs-configuration-parameters | docs/guide-utilisateur.md (lié README) : Table des options général/groupes/types/répéteurs/TNT/profils, valeurs, défauts, effets et données privées ; conservation des codes Player absents testée. Preuve documentaire locale renforcée ; reste todo au sens formel, la règle officielle visant une page/revue home-assistant.io non soumise. Aucune certification custom revendiquée. |
 | docs-installation-parameters | docs/guide-utilisateur.md (lié README) : Table host/port initiaux, Server plutôt que Player et appairage physique ; limite host/identité expliquée. Preuve documentaire locale renforcée ; reste todo au sens formel, la règle officielle visant une page/revue home-assistant.io non soumise. Aucune certification custom revendiquée. |
-| entity-unavailable | Vraies plateformes HA testent perte/retour sur capteurs centraux, disque, RAID, Wi-Fi/AP/groupes ; Home/RTS mixin, trackers et TNT vérifiés séparément. RAID disparu plusieurs cycles récupère sans crash. Disponibilité spécifique Player/caméra/volets et toutes variantes/métadonnées absentes non encore prouvée globalement. |
+| entity-unavailable | Vraies plateformes couvrent perte/retour centraux, TNT, Player, télécommande, caméra, volets et Wi-Fi. Caméra remplace son node au signal, disparaît/récupère sans nouvelle identité ; Wi-Fi invalide devient indisponible ; inversion disque illisible inconnue, position incertaine sans commande ambiguë. Reste vérifier toutes variantes, événements/autorisation et erreurs partielles avant règle globale done. |
 | log-when-unavailable | tests/ha/test_router_recovery.py prouve une seule annonce INFO de perte puis retour sur trois erreurs du relevé central. __init__.py ne double plus les logs avant NotReady/AuthFailed. Les chemins Home/Player/TNT peuvent encore répéter des logs ; pas de preuve globale. |
 | reauthentication-flow | tests/ha/test_config_flow.py prouve reauth_successful et reload unique de la même entrée sans doublon. Le serveur physique peut toutefois changer derrière le même host ; absence de contrôle MAC/identité avant réauth. Lié au choix de migration unique ID host vers identité physique, non imposé ici. |
-| test-coverage | 187 tests HA 2026.10.4 ; 38 modules sans omit : lignes 2680/5732 (46,76 %), branches 401/1916 (20,93 %), combiné 40,29 %. Rapports JSON/XML CI, seuil officiel non atteint ; reste todo. Les tests de caractérisation de limitations SDK/reconfigure ne sont pas des correctifs de ces limitations. |
+| test-coverage | 234 tests HA 2026.10.4 ; 38 modules sans omit : lignes 3068/5724 (53,60 %), branches 500/1912 (26,15 %), combiné 46,73 %. Rapports JSON/XML CI ; seuil officiel non atteint. Certaines variantes sont des inventaires explicitement distincts du runtime. Les tests ne valident pas le matériel. |
 | devices | media_player.py:90-103 et tnt_sensor.py:14-29 DeviceInfo ; cohérence des associations/subdevices et de toutes plateformes non vérifiée sur plusieurs modèles. |
 | discovery | tests/ha/test_config_flow.py teste le flow zeroconf réel : préremplissage api_domain/https_port, formulaire utilisateur et rejet du même host configuré. L’identité physique, alias d’adresse et découverte de tous modèles restent non démontrés ; pas un passage en done sur seul préremplissage. |
 | discovery-update-info | config_flow.py:390-405 découvre le host ; aucun test prouvant mise à jour sûre des entrées existantes après changement adresse. |

@@ -246,3 +246,14 @@ identifiants ; masquer également les noms d'attributs inconnus si besoin.
 
 Une désinstallation n'est pas une garantie d'effacement des sauvegardes. Aucun
 script de nettoyage destructif automatique n'est fourni dans cette PR.
+
+
+### Inversion des volets et erreurs de commande (préparation 28.8.90)
+
+Le réglage d’inversion est stocké localement. Si sa lecture échoue, il est inconnu,
+non remis silencieusement à « désactivé ». Si l’inversion configurée est inconnue,
+Homexa refuse une position ambiguë : vérifier ce réglage avant de réessayer.
+Une position non fournie reste inconnue, sans l’afficher comme un volet ouvert.
+Les commandes camera/cover échouées remontent une erreur traduite et ne présentent
+plus un nouvel état optimiste comme acquis. Le succès d’un appel API ne garantit
+pas qu’un équipement physique a terminé son mouvement.

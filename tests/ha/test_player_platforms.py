@@ -115,3 +115,26 @@ async def test_app_button_identity_and_defaults(player_context, definition):
     assert entity.translation_key == f"player_app_{key}"
     assert entity.entity_registry_enabled_default == enabled
     router._api.player._access.post.assert_not_called()
+
+
+@pytest.mark.parametrize("kind", ["server", "remote", "app"])
+async def test_button_real_platform_lifecycle_no_automatic_action(hass, player_context, kind):
+    router, entry, player = player_context
+    entity = {"server": lambda: FreeboxButton(router, BUTTON_DESCRIPTIONS[0]),
+        "remote": lambda: FreeboxPlayerRemoteButton(router, player, entry, *PLAYER_REMOTE_BUTTONS[0]),
+        "app": lambda: FreeboxPlayerAppButton(router, player, *PLAYER_APP_BUTTONS[0])}[kind]()
+    uid = entity.unique_id
+    platform = EntityPlatform(hass=hass, logger=logging.getLogger(__name__), domain="button",
+        platform_name="freebox_homexa", platform=None, scan_interval=timedelta(seconds=30), entity_namespace=None)
+    try:
+        await platform.async_add_entities([entity])
+        await hass.async_block_till_done()
+        assert entity.registry_entry.unique_id == uid
+        assert hass.states.get(entity.entity_id) is not None
+        await platform.async_reset()
+        assert not platform.entities
+        router._api.remote.send_key.assert_not_called()
+        router._api.player._access.post.assert_not_called()
+        router._api.system.reboot.assert_not_called()
+    finally:
+        await platform.async_reset()

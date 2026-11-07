@@ -30,6 +30,24 @@ async def start(hass):
     return result
 
 
+async def finish_recovered_flow(hass, api, result):
+    """After an asserted link error, fix its cause and complete that same HA flow."""
+    api.open.side_effect = None
+    api.system.get_config.side_effect = None
+    api.player.get_players.side_effect = None
+    with patch("custom_components.freebox_homexa.config_flow.get_api", return_value=api), \
+         patch("custom_components.freebox_homexa.config_flow.get_hosts_list_if_supported", new=AsyncMock()), \
+         patch("custom_components.freebox_homexa.config_flow.Store.async_save", new=AsyncMock()), \
+         patch("custom_components.freebox_homexa.async_setup_entry", return_value=True):
+        result = await hass.config_entries.flow.async_configure(result["flow_id"], {})
+        assert result["step_id"] == "lan_options"
+        result = await hass.config_entries.flow.async_configure(result["flow_id"], {})
+        await hass.async_block_till_done()
+    assert result["type"] == FlowResultType.CREATE_ENTRY
+    assert result["result"].unique_id == HOST
+    return result
+
+
 async def test_success(hass, api):
     with patch('custom_components.freebox_homexa.config_flow.get_api', return_value=api), \
          patch('custom_components.freebox_homexa.config_flow.get_hosts_list_if_supported', new=AsyncMock()), \
@@ -42,6 +60,7 @@ async def test_success(hass, api):
         result = await hass.config_entries.flow.async_configure(result['flow_id'], {})
         assert result['type'] == FlowResultType.CREATE_ENTRY
         assert result['data']['host'] == HOST
+        assert result['result'].unique_id == HOST
         await hass.async_block_till_done()
 
 
@@ -54,7 +73,7 @@ async def test_network_failure_closes_and_no_entry(hass, api, error):
     assert result['errors'] == {'base': 'cannot_connect'}
     assert not hass.config_entries.async_entries(DOMAIN)
     api.close.assert_awaited_once()
-
+    await finish_recovered_flow(hass, api, result)
 
 async def test_duplicate_host(hass):
     entry = MockConfigEntry(domain=DOMAIN, unique_id=HOST, data={'host': HOST, 'port': 80})
@@ -86,7 +105,7 @@ async def test_auth_failure_no_entry(hass, api, error, expected, cleanup):
     assert clean.await_count == int(cleanup)
     assert not hass.config_entries.async_entries(DOMAIN)
     api.close.assert_awaited_once()
-
+    await finish_recovered_flow(hass, api, result)
 
 async def test_reauth_success_reloads_existing_entry(hass, api):
     entry = MockConfigEntry(domain=DOMAIN, unique_id=HOST, data={'host': HOST, 'port': 80})
@@ -116,7 +135,7 @@ async def test_failed_probe_no_entry(hass, api):
     assert result['errors'] == {'base': 'cannot_connect'}
     assert not hass.config_entries.async_entries(DOMAIN)
     api.close.assert_awaited_once()
-
+    await finish_recovered_flow(hass, api, result)
 
 from types import SimpleNamespace
 from homeassistant.config_entries import SOURCE_ZEROCONF, SOURCE_RECONFIGURE
@@ -150,3 +169,70 @@ async def test_characterize_reconfigure_identity_boundary_without_migration(hass
         assert result['reason'] == 'wrong_account'
         assert entry.data['host'] == HOST
         api.assert_not_called()
+
+
+@pytest.mark.parametrize("cannot_unlink", [False, True])
+async def test_invalid_token_cleanup_only_synthetic_file(hass, api, tmp_path, cannot_unlink):
+    from unittest.mock import Mock
+    token = tmp_path / "synthetic-token.json"
+    token.write_text("synthetic test data, not a credential")
+    path = Mock()
+    path.unlink.side_effect = PermissionError("synthetic") if cannot_unlink else lambda **kw: token.unlink(**kw)
+    api.open.side_effect = InvalidTokenError("synthetic invalid")
+    with patch("custom_components.freebox_homexa.config_flow.get_api", return_value=api), \
+         patch("custom_components.freebox_homexa.config_flow.resolve_token_file", return_value=path):
+        result = await start(hass)
+        result = await hass.config_entries.flow.async_configure(result["flow_id"], {})
+    assert result["errors"] == {"base": "invalid_token"}
+    assert token.exists() == cannot_unlink
+    path.unlink.assert_called_once_with(missing_ok=True)
+    api.close.assert_awaited_once()
+    await finish_recovered_flow(hass, api, result)
+
+async def test_optional_player_failure_and_unknown_probe_error(hass, api):
+    api.player.get_players.side_effect = TimeoutError
+    with patch("custom_components.freebox_homexa.config_flow.get_api", return_value=api), \
+         patch("custom_components.freebox_homexa.config_flow.get_hosts_list_if_supported", new=AsyncMock()), \
+         patch("custom_components.freebox_homexa.config_flow.Store.async_save", new=AsyncMock()):
+        result = await start(hass)
+        result = await hass.config_entries.flow.async_configure(result["flow_id"], {})
+        assert result["step_id"] == "lan_options"
+        hass.config_entries.flow.async_abort(result["flow_id"])
+        api.system.get_config.side_effect = ValueError("synthetic invalid response")
+        result = await start(hass)
+        result = await hass.config_entries.flow.async_configure(result["flow_id"], {})
+        assert result["errors"] == {"base": "unknown"}
+    assert not hass.config_entries.async_entries(DOMAIN)
+    assert api.close.await_count == 2
+    await finish_recovered_flow(hass, api, result)
+
+async def test_initial_codes_and_player_without_id(hass, api):
+    api.player.get_players.return_value = [{"name": "Unavailable"}, {"id": 1, "name": "Test"}]
+    with patch("custom_components.freebox_homexa.config_flow.get_api", return_value=api), \
+         patch("custom_components.freebox_homexa.config_flow.get_hosts_list_if_supported", new=AsyncMock()), \
+         patch("custom_components.freebox_homexa.config_flow.Store.async_save", new=AsyncMock()), \
+         patch("custom_components.freebox_homexa.async_setup_entry", return_value=True):
+        result = await start(hass)
+        result = await hass.config_entries.flow.async_configure(result["flow_id"], {})
+        result = await hass.config_entries.flow.async_configure(result["flow_id"], {
+            "remote_code": " synthetic-shared ", "remote_code_1": " synthetic-player "})
+        await hass.async_block_till_done()
+    assert result["type"] == FlowResultType.CREATE_ENTRY
+    assert result["result"].unique_id == HOST
+    assert result["data"]["remote_code"] == "synthetic-shared"
+    assert result["options"]["remote_codes"] == {"1": "synthetic-player"}
+
+
+async def test_characterize_same_host_port_change_preserves_identity(hass):
+    entry = MockConfigEntry(domain=DOMAIN, unique_id=HOST, data={"host": HOST, "port": 80, "remote_code": "synthetic"})
+    entry.add_to_hass(hass)
+    with patch.object(hass.config_entries, "async_reload", new=AsyncMock(return_value=True)) as reload:
+        result = await hass.config_entries.flow.async_init(DOMAIN,
+            context={"source": SOURCE_RECONFIGURE, "entry_id": entry.entry_id})
+        result = await hass.config_entries.flow.async_configure(result["flow_id"], {"host": HOST, "port": 443})
+        await hass.async_block_till_done()
+    assert result["type"] == FlowResultType.ABORT
+    assert entry.unique_id == HOST
+    assert entry.data["port"] == 443
+    assert entry.data["remote_code"] == "synthetic"
+    reload.assert_awaited_once_with(entry.entry_id)

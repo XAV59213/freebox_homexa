@@ -17,11 +17,261 @@
     "button": {
       "accueil": {
         "default": "mdi:home"
+      },
+      "remote_key_home": {
+        "default": "mdi:home"
+      },
+      "remote_key_back": {
+        "default": "mdi:arrow-u-left-top"
+      },
+      "remote_key_ok": {
+        "default": "mdi:checkbox-blank-circle-outline"
+      },
+      "remote_key_up": {
+        "default": "mdi:chevron-up"
+      },
+      "remote_key_down": {
+        "default": "mdi:chevron-down"
+      },
+      "remote_key_left": {
+        "default": "mdi:chevron-left"
+      },
+      "remote_key_right": {
+        "default": "mdi:chevron-right"
+      },
+      "remote_key_tv": {
+        "default": "mdi:television"
+      },
+      "remote_key_mute": {
+        "default": "mdi:volume-off"
+      },
+      "remote_key_vol_inc": {
+        "default": "mdi:volume-plus"
+      },
+      "remote_key_vol_dec": {
+        "default": "mdi:volume-minus"
+      },
+      "remote_key_prgm_inc": {
+        "default": "mdi:skip-next"
+      },
+      "remote_key_prgm_dec": {
+        "default": "mdi:skip-previous"
+      },
+      "remote_key_play": {
+        "default": "mdi:play-pause"
+      },
+      "remote_key_info": {
+        "default": "mdi:information-outline"
+      },
+      "remote_key_epg": {
+        "default": "mdi:television-guide"
+      },
+      "remote_key_list": {
+        "default": "mdi:format-list-bulleted"
+      },
+      "remote_key_red": {
+        "default": "mdi:square"
+      },
+      "remote_key_green": {
+        "default": "mdi:square"
+      },
+      "remote_key_yellow": {
+        "default": "mdi:square"
+      },
+      "remote_key_blue": {
+        "default": "mdi:square"
+      },
+      "remote_key_0": {
+        "default": "mdi:numeric-0"
+      },
+      "remote_key_1": {
+        "default": "mdi:numeric-1"
+      },
+      "remote_key_2": {
+        "default": "mdi:numeric-2"
+      },
+      "remote_key_3": {
+        "default": "mdi:numeric-3"
+      },
+      "remote_key_4": {
+        "default": "mdi:numeric-4"
+      },
+      "remote_key_5": {
+        "default": "mdi:numeric-5"
+      },
+      "remote_key_6": {
+        "default": "mdi:numeric-6"
+      },
+      "remote_key_7": {
+        "default": "mdi:numeric-7"
+      },
+      "remote_key_8": {
+        "default": "mdi:numeric-8"
+      },
+      "remote_key_9": {
+        "default": "mdi:numeric-9"
+      },
+      "player_app_youtube": {
+        "default": "mdi:youtube"
+      },
+      "player_app_netflix": {
+        "default": "mdi:netflix"
+      },
+      "player_app_disney": {
+        "default": "mdi:star-four-points"
+      },
+      "player_app_prime": {
+        "default": "mdi:amazon"
+      },
+      "player_app_browser": {
+        "default": "mdi:web"
+      },
+      "player_app_canal": {
+        "default": "mdi:ticket-confirmation"
+      },
+      "player_app_max": {
+        "default": "mdi:play-box"
+      },
+      "player_app_appletv": {
+        "default": "mdi:apple"
       }
     },
     "sensor": {
       "lan_group_clients": {
         "default": "mdi:lan-connect"
+      },
+      "rate_down": {
+        "default": "mdi:download-network"
+      },
+      "rate_up": {
+        "default": "mdi:upload-network"
+      },
+      "ipv4": {
+        "default": "mdi:ip-network"
+      },
+      "uptime": {
+        "default": "mdi:clock-outline"
+      },
+      "missed": {
+        "default": "mdi:phone-missed"
+      },
+      "calls_log": {
+        "default": "mdi:phone-log"
+      },
+      "partition_free_space": {
+        "default": "mdi:harddisk"
+      },
+      "wifi_repeaters": {
+        "default": "mdi:wifi-sync"
+      },
+      "wifi_clients": {
+        "default": "mdi:account-multiple"
+      },
+      "wifi_clients_box": {
+        "default": "mdi:account-multiple"
+      },
+      "wifi_client_list": {
+        "default": "mdi:devices"
+      },
+      "wifi_client_list_box": {
+        "default": "mdi:devices"
+      },
+      "wifi_clients_total": {
+        "default": "mdi:wifi"
+      },
+      "wifi_signal": {
+        "default": "mdi:wifi-strength-2"
+      },
+      "tnt_channel": {
+        "default": "mdi:television-classic"
+      },
+      "wifi_signal_named": {
+        "default": "mdi:wifi-strength-2"
+      }
+    },
+    "calendar": {
+      "tv_guide": {
+        "default": "mdi:television-guide"
+      }
+    },
+    "binary_sensor": {
+      "wifi_box": {
+        "default": "mdi:wifi"
+      },
+      "repeater_online": {
+        "default": "mdi:wifi-sync"
+      }
+    },
+    "switch": {
+      "invert_switch": {
+        "default": "mdi:directions-fork"
+      }
+    },
+    "device_tracker": {
+      "device_freebox_delta": {
+        "default": "mdi:television-guide"
+      },
+      "device_freebox_hd": {
+        "default": "mdi:television-guide"
+      },
+      "device_freebox_mini": {
+        "default": "mdi:television-guide"
+      },
+      "device_freebox_player": {
+        "default": "mdi:television-guide"
+      },
+      "device_freebox_wifi": {
+        "default": "mdi:wifi-sync"
+      },
+      "device_ip_camera": {
+        "default": "mdi:cctv"
+      },
+      "device_ip_phone": {
+        "default": "mdi:phone-voip"
+      },
+      "device_laptop": {
+        "default": "mdi:laptop"
+      },
+      "device_multimedia_device": {
+        "default": "mdi:play-network"
+      },
+      "device_nas": {
+        "default": "mdi:nas"
+      },
+      "device_networking_device": {
+        "default": "mdi:wifi-sync"
+      },
+      "device_printer": {
+        "default": "mdi:printer"
+      },
+      "device_router": {
+        "default": "mdi:router-wireless"
+      },
+      "device_smartphone": {
+        "default": "mdi:cellphone"
+      },
+      "device_tablet": {
+        "default": "mdi:tablet"
+      },
+      "device_television": {
+        "default": "mdi:television"
+      },
+      "device_vg_console": {
+        "default": "mdi:gamepad-variant"
+      },
+      "device_workstation": {
+        "default": "mdi:desktop-tower-monitor"
+      },
+      "device_unknown": {
+        "default": "mdi:help-network"
+      }
+    },
+    "media_player": {
+      "player_youtube": {
+        "default": "mdi:youtube"
+      },
+      "player_netflix": {
+        "default": "mdi:netflix"
       }
     }
   }

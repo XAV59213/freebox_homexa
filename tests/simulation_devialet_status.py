@@ -51,20 +51,36 @@ class Feature(IntFlag):
     PLAY_MEDIA = auto()
 
 
+class HomeAssistantError(Exception):
+    def __init__(self, message="", **kwargs):
+        self.translation_domain = kwargs.get("translation_domain")
+        self.translation_key = kwargs.get("translation_key")
+        self.translation_placeholders = kwargs.get("translation_placeholders")
+        super().__init__(message or self.translation_key)
+
+class ServiceValidationError(HomeAssistantError):
+    pass
+
+async def direct_read(factory):
+    return await factory()
+
+module('homeassistant.exceptions', HomeAssistantError=HomeAssistantError, ServiceValidationError=ServiceValidationError)
 module('homeassistant')
 module('homeassistant.components')
 module('homeassistant.components.media_player', MediaPlayerDeviceClass=types.SimpleNamespace(TV='tv'),
        MediaPlayerEntity=type('Entity', (), {}), MediaPlayerEntityFeature=Feature, MediaPlayerState=State)
 module('homeassistant.config_entries', ConfigEntry=object)
-module('homeassistant.core', HomeAssistant=object)
+module('homeassistant.core', HomeAssistant=object, callback=lambda func: func)
 module('homeassistant.helpers')
+module('homeassistant.helpers.dispatcher', async_dispatcher_send=lambda *a: None, async_dispatcher_connect=lambda *a: lambda: None)
+module('homeassistant.helpers.entity', Entity=type('Entity', (), {}))
 module('homeassistant.helpers.device_registry', DeviceInfo=dict)
 module('homeassistant.helpers.entity_platform', AddEntitiesCallback=object)
 pkg = module('freebox_homexa')
 pkg.__path__ = [str(ROOT / 'custom_components/freebox_homexa')]
 module('freebox_homexa.const', DOMAIN='freebox_homexa', URL_BASE='/freebox_homexa', option_remote_code=lambda *a: None)
 module('freebox_homexa.availability', FreeboxReachableMixin=type('Mixin', (), {}))
-module('freebox_homexa.player_remote', async_schedule_player_api_retry=AsyncMock(), filter_ready_players=lambda *a: [])
+module('freebox_homexa.player_remote', async_schedule_player_api_retry=AsyncMock(), async_send_player_keys=AsyncMock(return_value=[]), filter_ready_players=lambda *a: [])
 module('freebox_homexa.router', FreeboxConfigEntry=object, FreeboxRouter=object)
 # Stub guide TNT : l'artwork est testé à part ; ici on contrôle le retour.
 _artwork = {'url': None}
@@ -81,7 +97,7 @@ FIXTURE = json.loads((ROOT / 'tests/fixtures/devialet_tv_status.json').read_text
 
 async def run():
     access = types.SimpleNamespace(get=AsyncMock())
-    router = types.SimpleNamespace(mac='00:00:00:00:00:00', player_identifiers=set(),
+    router = types.SimpleNamespace(async_read=direct_read, mac='00:00:00:00:00:00', player_identifiers=set(), player_status_available={}, _player_standby=set(), note_source=lambda *args: None, hass=object(), signal_device_update='synthetic-device-update',
                                    _api=types.SimpleNamespace(player=types.SimpleNamespace(_access=access)))
     entity = mp.FreeboxPlayerMediaPlayer(router, {'id':17, 'device_model':'fbx7hd-delta', 'api_version':'11.0'}, object())
     entity.hass = object()  # suffisant pour déclencher le lookup artwork
@@ -133,7 +149,7 @@ async def run():
     await update({'power_state':'running', 'foreground_app':{'package':'com.netflix.mediaplayer'}})
     assert entity._attr_source == 'Netflix' and entity._attr_media_title == 'Netflix'
     assert entity._attr_media_image_url == '/freebox_homexa/netflix.png'
-    assert entity._attr_icon == 'mdi:netflix'
+    assert entity.translation_key == 'player_netflix'
     # YouTube sans métadonnées : repli UX, pas un titre de vidéo inventé.
     await update({'power_state':'running', 'foreground_app':{'package':'com.google.android.youtube.tv'}})
     assert entity._attr_source == 'YouTube' and entity._attr_media_title == 'YouTube'
@@ -161,17 +177,17 @@ async def run():
     await update({'power_state':'running', 'foreground_app':{'package':'com.google.android.youtube.tv'}})
     assert entity._attr_source == 'YouTube'
     assert entity._attr_media_image_url == '/freebox_homexa/youtube.png'
-    assert entity._attr_icon == 'mdi:youtube'
+    assert entity.translation_key == 'player_youtube'
     await update({'power_state':'running', 'foreground_app':{'package':'com.netflix.mediaplayer'}})
     assert entity._attr_source == 'Netflix'
     assert entity._attr_media_image_url == '/freebox_homexa/netflix.png'
-    assert entity._attr_icon == 'mdi:netflix'
+    assert entity.translation_key == 'player_netflix'
     # BFM + TNT reste prioritaire sur les icônes app.
     await update({**FIXTURE, 'foreground_app':{
         'package':'fr.freebox.tv',
         'context':{'channel':{'channelName':'BFM TV', 'channelNumber':15}}}})
     assert entity._attr_media_image_url == 'https://image.tmdb.org/t/p/w500/bfm-poster.jpg'
-    assert entity._attr_icon is None
+    assert entity.translation_key is None
     # Veille : image effacée.
     _artwork['url'] = 'https://image.tmdb.org/t/p/w500/bfm-poster.jpg'
     await update({**FIXTURE, 'foreground_app':{
@@ -180,7 +196,7 @@ async def run():
     assert entity._attr_media_image_url
     await update({'power_state':'standby'})
     assert entity._attr_state == State.OFF and entity._attr_media_image_url is None
-    assert entity._attr_icon is None
+    assert entity.translation_key is None
     _artwork['url'] = None
     # URLs artwork app alignées sur les constantes du module.
     assert mp.APP_ARTWORK_URLS['YouTube'] == '/freebox_homexa/youtube.png'

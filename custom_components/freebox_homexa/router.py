@@ -5,12 +5,12 @@ from __future__ import annotations
 
 import asyncio
 import logging
-import re
 import json
 from pathlib import Path
 from contextlib import suppress
 from datetime import datetime, timedelta
-from typing import Any, Mapping
+from typing import Any, Mapping, TypeVar
+from collections.abc import Awaitable, Callable
 
 from freebox_api import Freepybox
 from freebox_api.api.call import Call
@@ -41,8 +41,10 @@ from .registry_compat import (
     get_device_by_identifier,
     shared_with_other_entries,
 )
-from .errors import is_permission_denied, is_shutdown_error
+from .errors import api_error_code, is_permission_denied, is_shutdown_error
 from .wifi_ap import build_wifi_aps
+
+from .errors import async_action_errors
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -90,10 +92,10 @@ def extract_wifi_details(device: dict[str, Any]) -> dict[str, Any]:
     signal = wifi_info.get("signal")
     if signal is None:
         signal = station.get("signal")
-    if signal is not None:
+    if signal is not None and not isinstance(signal, bool):
         try:
             details["wifi_signal_dbm"] = int(signal)
-        except (TypeError, ValueError):
+        except (TypeError, ValueError, OverflowError):
             pass
 
     if wifi_info.get("ssid"):
@@ -195,19 +197,19 @@ async def get_hosts_list_if_supported(
     supports_hosts: bool = True
     fbx_devices: list[dict[str, Any]] = []
     try:
-        fbx_devices = await fbx_api.lan.get_hosts_list() or []
+        fbx_devices = await fbx_api.lan.get_hosts_list()
+        if not isinstance(fbx_devices, list):
+            raise ValueError("Invalid LAN hosts collection")
     except HttpRequestError as err:
-        if (
-            (matcher := re.search(r"Request failed \\(APIResponse: (.+)\\)", str(err)))
-            and (json_str := matcher.group(1))
-            and (json_resp := json.loads(json_str)).get("error_code") == "nodev"
-        ):
+        if api_error_code(err) == "nodev":
             supports_hosts = False
             _LOGGER.debug("Liste des hôtes non disponible en mode bridge")
         else:
             raise
     return supports_hosts, fbx_devices
 
+
+_ReadT = TypeVar("_ReadT")
 
 class FreeboxRouter:
     """Représentation du routeur Freebox dans Home Assistant."""
@@ -272,6 +274,18 @@ class FreeboxRouter:
         self.closing: bool = False
         # Journalisation unique de l'indisponibilité (règle log-when-unavailable).
         self.reachable: bool = True
+        self.sensors_available: bool = True
+        self.disks_available = True
+        self.raids_available = True
+        self.home_available = True
+        self.home_snapshot_known = False
+        self.lan_available = True
+        self.wifi_stations_available = True
+        self.player_status_available: dict[str, bool] = {}
+        self.player_status_providers: set[str] = set()
+        self._player_button_readers: dict[str, tuple[int, int, str]] = {}
+        self._player_standby: set[str] = set()
+        self._source_states: dict[object, bool] = {}
         # nœuds Home dont les entités vivent sur un appareil de groupe (module d'alarme)
         self.merged_node_ids: set[Any] = set()
         self.player_identifiers: set[str] = set()
@@ -282,6 +296,10 @@ class FreeboxRouter:
         self.lan_links: dict[str, str] = {}
         self._lan_link_pending: dict[str, tuple[str, int]] = {}
         self._home_update_lock = asyncio.Lock()
+        self._players_update_lock = asyncio.Lock()
+        self.players: list[dict[str, object]] = []
+        self.players_initialized = False
+        self.player_discovery_active = False
 
         self.supports_hosts = True
         self.devices: dict[str, dict[str, Any]] = {}
@@ -300,11 +318,15 @@ class FreeboxRouter:
         self.supports_raid = True
         self.raids: dict[int, dict[str, Any]] = {}
         self.sensors_temperature: dict[str, int] = {}
-        self.sensors_connection: dict[str, float] = {}
+        self.sensors_connection: dict[str, float | None] = {}
         self.call_list: list[dict[str, Any]] = []
         self.home_granted = True
         self.home_devices: dict[str, Any] = {}
         self.listeners: list = []
+        self.poll_tasks: set[asyncio.Task[None]] = set()
+        self.read_tasks: set[asyncio.Task[object]] = set()
+        self._close_lock = asyncio.Lock()
+        self._closed = False
 
         _LOGGER.debug("Routeur Freebox %s initialisé", self.name)
 
@@ -412,24 +434,28 @@ class FreeboxRouter:
 
     def _wifi_api_error(self, key: str, path: str, err: Exception) -> None:
         """Mémorise l'erreur d'une API Wi-Fi ; journal (info) une seule fois par API."""
-        first = key not in self.wifi_api_errors
-        self.wifi_api_errors[key] = f"{type(err).__name__}: {err}"
-        if first:
-            _LOGGER.info("API Freebox %s indisponible (état « Wi-Fi Freebox ») : %s", path, err)
+        self.wifi_api_errors[key] = type(err).__name__
+        self.note_source(("wifi", key), False, "API Freebox Wi-Fi " + key)
 
     async def _fetch_wifi_global_state(self) -> None:
         """/wifi/config/ (enabled, comme l'interrupteur) et /wifi/bss/ (état des BSS)."""
         try:
-            config = await self._api.wifi.get_global_config() or {}
+            config = await self._api.wifi.get_global_config()
+            if not isinstance(config, dict):
+                raise ValueError("Invalid Wi-Fi config")
             enabled = config.get("enabled") if isinstance(config, dict) else None
             self.wifi_global_enabled = enabled if isinstance(enabled, bool) else None
             self.wifi_api_errors.pop("config", None)
+            self.note_source(("wifi", "config"), True, "API Freebox Wi-Fi config")
         except Exception as err:  # noqa: BLE001
             self.wifi_global_enabled = None
             self._wifi_api_error("config", "wifi/config/", err)
         try:
-            bss_list = await self._api.wifi.get_bss() or []
+            bss_list = await self._api.wifi.get_bss()
+            if not isinstance(bss_list, list):
+                raise ValueError("Invalid Wi-Fi BSS collection")
             self.wifi_api_errors.pop("bss", None)
+            self.note_source(("wifi", "bss"), True, "API Freebox Wi-Fi bss")
         except Exception as err:  # noqa: BLE001 — API absente selon firmware
             self._wifi_api_error("bss", "wifi/bss/", err)
             bss_list = []
@@ -450,10 +476,17 @@ class FreeboxRouter:
 
     async def _enrich_wifi_stations(self) -> None:
         """Merge /wifi/ap/{id}/stations signal data onto LAN hosts."""
+        self.wifi_stations_available = True
+        for device in self.devices.values():
+            device.pop("_wifi_station", None)
         try:
-            access_points = await self._api.wifi.get_ap_list() or []
+            access_points = await self._api.wifi.get_ap_list()
+            if not isinstance(access_points, list):
+                raise ValueError("Invalid Wi-Fi AP collection")
             self.wifi_api_errors.pop("ap", None)
+            self.note_source(("wifi", "ap"), True, "API Freebox Wi-Fi ap")
         except Exception as err:  # noqa: BLE001 — API wifi absente selon firmware
+            self.wifi_stations_available = False
             self._wifi_api_error("ap", "wifi/ap/", err)
             access_points = []
         if not isinstance(access_points, list):
@@ -478,12 +511,16 @@ class FreeboxRouter:
             if ap_id is None:
                 continue
             try:
-                stations = await self._api.wifi.get_station_list(ap_id) or []
+                stations = await self._api.wifi.get_station_list(ap_id)
+                if not isinstance(stations, list):
+                    raise ValueError("Invalid Wi-Fi stations collection")
             except HttpRequestError as err:
-                _LOGGER.debug("Stations de l'AP %s indisponibles : %s", ap_id, err)
+                self.wifi_stations_available = False
+                _LOGGER.debug("Stations Wi-Fi indisponibles (%s)", type(err).__name__)
                 continue
             except Exception as err:  # noqa: BLE001
-                _LOGGER.debug("Stations de l'AP %s illisibles : %s", ap_id, err)
+                self.wifi_stations_available = False
+                _LOGGER.debug("Stations Wi-Fi illisibles (%s)", type(err).__name__)
                 continue
             for station in stations:
                 mac = (station.get("mac") or "").upper()
@@ -497,11 +534,95 @@ class FreeboxRouter:
                 merged["_ap_name"] = access_point.get("name")
                 stations_by_mac[mac] = merged
 
+        self.note_source("wifi_stations", self.wifi_stations_available, "Stations Wi-Fi")
         for mac, device in self.devices.items():
             station = stations_by_mac.get(str(mac).upper())
             if station:
                 device["_wifi_station"] = station
             device["wifi"] = extract_wifi_details(device)
+
+    def note_source(self, key: object, available: bool, label: str) -> None:
+        """One sanitized loss/recovery notification per source, not per poll."""
+        previous = self._source_states.get(key, True)
+        self._source_states[key] = available
+        if previous != available and not self.closing:
+            _LOGGER.info("%s %s", label, "de nouveau disponible" if available else "indisponible")
+
+    def register_player_button(self, player_id: int, version: str) -> Callable[[], None]:
+        """Reference-count active buttons, without adding one timer per button."""
+        key = str(player_id)
+        count, _, preferred = self._player_button_readers.get(key, (0, player_id, version))
+        self._player_button_readers[key] = (count + 1, player_id, preferred)
+
+        def remove() -> None:
+            count, identifier, preferred = self._player_button_readers[key]
+            if count == 1:
+                del self._player_button_readers[key]
+            else:
+                self._player_button_readers[key] = (count - 1, identifier, preferred)
+        return remove
+
+    async def update_player_buttons(self) -> None:
+        """Fallback at the existing central interval only if no media provider lives."""
+        from .player_status import async_read_player_status
+        from .const import option_remote_code
+
+        for key, (_, player_id, version) in list(self._player_button_readers.items()):
+            if key in self.player_status_providers:
+                continue
+            status, preferred = await async_read_player_status(self, player_id, version)
+            if key in self._player_button_readers:
+                count, _, _ = self._player_button_readers[key]
+                self._player_button_readers[key] = (count, player_id, preferred)
+            if status is not None:
+                power = str(status.get("power_state") or status.get("power") or "").lower()
+                if power in {"standby", "off", "shutdown"}:
+                    self._player_standby.add(key)
+                else:
+                    self._player_standby.discard(key)
+            entry = self.hass.config_entries.async_get_entry(self.entry_id)
+            can_wake = entry is not None and option_remote_code(entry, player_id) is not None
+            self.player_status_available[key] = (
+                (status is not None and status.get("reachable") is not False)
+                or (key in self._player_standby and can_wake)
+            )
+            self.note_source(("player", player_id), self.player_status_available[key], "Player")
+        if self._player_button_readers:
+            async_dispatcher_send(self.hass, self.signal_device_update)
+
+    async def async_update_players(self) -> None:
+        """Observe metadata once at the existing interval, never issue commands."""
+        if self.closing or self._players_update_lock.locked():
+            return
+        async with self._players_update_lock:
+            try:
+                payload: object = await self.async_read(self._api.player.get_players)
+                if self.closing:
+                    return
+                if not isinstance(payload, list):
+                    raise ValueError("Invalid Player collection")
+                players: list[dict[str, object]] = []
+                for item in payload:
+                    if not isinstance(item, dict):
+                        raise ValueError("Invalid Player metadata")
+                    player: dict[str, object] = {}
+                    for key, value in item.items():
+                        if not isinstance(key, str):
+                            raise ValueError("Invalid Player metadata key")
+                        player[key] = value
+                    players.append(player)
+                self.players = players
+                self.players_initialized = True
+                self.note_source(("player_inventory", self.entry_id), True, "Inventaire Player")
+                async_dispatcher_send(self.hass, self.signal_players_update)
+            except Exception:
+                if not self.closing:
+                    self.note_source(("player_inventory", self.entry_id), False, "Inventaire Player")
+
+    @property
+    def signal_players_update(self) -> str:
+        """Entry-owned discovery, unlike legacy host-scoped state signals."""
+        return f"{DOMAIN}-{self.entry_id}-players-update"
 
     async def update_all(self, now: datetime | None = None) -> None:
         """Relevé principal (appareils + capteurs).
@@ -516,22 +637,25 @@ class FreeboxRouter:
         try:
             await self.update_device_trackers()
             await self.update_sensors()
+            if self.player_discovery_active:
+                await self.async_update_players()
+            await self.update_player_buttons()
         except Exception as err:
-            if is_shutdown_error(err, self):
+            if self.closing and is_shutdown_error(err, self):
                 _LOGGER.debug("Relevé interrompu (connexion fermée, rechargement) : %s", err)
                 return
             if now is None:
                 raise
             if self.reachable:
                 self.reachable = False
-                _LOGGER.info("Freebox injoignable (%s) : %s", self._host, err)
+                _LOGGER.info("Freebox injoignable (%s)", type(err).__name__)
                 self._signal_reachability_changed()
             else:
-                _LOGGER.debug("Freebox toujours injoignable : %s", err)
+                _LOGGER.debug("Freebox toujours injoignable (%s)", type(err).__name__)
             return
         if not self.reachable:
             self.reachable = True
-            _LOGGER.info("Freebox de nouveau joignable (%s)", self._host)
+            _LOGGER.info("Freebox de nouveau joignable")
             self._signal_reachability_changed()
 
     def _signal_reachability_changed(self) -> None:
@@ -547,8 +671,21 @@ class FreeboxRouter:
     async def update_device_trackers(self) -> None:
         new_device = False
         fbx_devices: list[dict[str, Any]] = []
-        if self.supports_hosts:
+        # Bridge mode can change at runtime; retry at the existing poll interval.
+        try:
             self.supports_hosts, fbx_devices = await get_hosts_list_if_supported(self._api)
+        except Exception:
+            self.lan_available = False
+            self.note_source("lan", False, "Source LAN")
+            raise
+        self.note_source("lan", self.supports_hosts, "Source LAN")
+
+        self.lan_available = self.supports_hosts
+        seen_macs = {device["l2ident"]["id"] for device in fbx_devices}
+        if self.lan_available:
+            for mac, previous in self.devices.items():
+                if mac != self.mac and mac not in seen_macs:
+                    previous["active"] = False
 
         fbx_devices.append({
             "primary_name": self.name,
@@ -583,14 +720,18 @@ class FreeboxRouter:
     async def update_sensors(self) -> None:
         try:
             syst_datas: dict[str, Any] = await self._api.system.get_config()
-            for sensor in syst_datas["sensors"]:
-                self.sensors_temperature[sensor["name"]] = sensor.get("value")
+            self.sensors_temperature = {
+                sensor["name"]: sensor.get("value") for sensor in syst_datas["sensors"]
+            }
 
             connection_datas: dict[str, Any] = await self._api.connection.get_status()
             for sensor_key in CONNECTION_SENSORS_KEYS:
-                self.sensors_connection[sensor_key] = connection_datas.get(sensor_key, 0.0)
+                value = connection_datas.get(sensor_key)
+                self.sensors_connection[sensor_key] = value if isinstance(value, (int, float)) and not isinstance(value, bool) else None
 
-            uptime_seconds = syst_datas.get("uptime_val", 0)
+            raw_uptime = syst_datas.get("uptime_val")
+            uptime_seconds = (raw_uptime if isinstance(raw_uptime, (int, float))
+                              and not isinstance(raw_uptime, bool) and raw_uptime >= 0 else None)
             self.sensors_connection["uptime"] = uptime_seconds
 
             self._attrs = {
@@ -599,7 +740,7 @@ class FreeboxRouter:
                 "connection_type": connection_datas.get("media"),
                 "uptime": datetime.fromtimestamp(
                     round(datetime.now().timestamp()) - uptime_seconds
-                ),
+                ) if uptime_seconds is not None else None,
                 "firmware_version": self._sw_v,
                 "serial": syst_datas["serial"],
             }
@@ -608,38 +749,59 @@ class FreeboxRouter:
             await self._update_disks_sensors()
             await self._update_raids_sensors()
 
+            if not self.sensors_available:
+                _LOGGER.info("Capteurs Freebox de nouveau disponibles")
+            self.sensors_available = True
             async_dispatcher_send(self.hass, self.signal_sensor_update)
             _LOGGER.debug("Mise à jour des capteurs terminée")
-        except HttpRequestError as err:
-            _LOGGER.error("Erreur lors de la mise à jour des capteurs : %s", err)
+        except Exception:
+            # The global router may still answer LAN requests. Do not leave
+            # sensor snapshots looking fresh after a separate sensor API error.
+            if self.sensors_available:
+                _LOGGER.info("Capteurs Freebox indisponibles")
+            self.sensors_available = False
+            async_dispatcher_send(self.hass, self.signal_sensor_update)
 
     async def _update_disks_sensors(self) -> None:
         try:
-            fbx_disks: list[dict[str, Any]] = await self._api.storage.get_disks() or []
+            fbx_disks = await self._api.storage.get_disks()
+            if not isinstance(fbx_disks, list):
+                raise ValueError("Invalid disks collection")
+            disks: dict[int, dict[str, Any]] = {}
             for fbx_disk in fbx_disks:
-                disk: dict[str, Any] = {**fbx_disk}
-                disk_part: dict[int, dict[str, Any]] = {}
-                for fbx_disk_part in fbx_disk.get("partitions", []):
-                    disk_part[fbx_disk_part["id"]] = fbx_disk_part
-                disk["partitions"] = disk_part
-                self.disks[fbx_disk["id"]] = disk
-            _LOGGER.debug("Mise à jour des disques terminée")
-        except HttpRequestError as err:
-            _LOGGER.error("Erreur lors de la mise à jour des disques : %s", err)
+                disk = {**fbx_disk}
+                disk["partitions"] = {part["id"]: part for part in fbx_disk.get("partitions", [])}
+                disks[fbx_disk["id"]] = disk
+            self.disks = disks
+            if not self.disks_available:
+                _LOGGER.info("Source disques Freebox de nouveau disponible")
+            self.disks_available = True
+        except Exception:  # An unsuccessful read is never a successful empty snapshot.
+            if self.disks_available:
+                _LOGGER.info("Source disques Freebox indisponible")
+            self.disks_available = False
 
     async def _update_raids_sensors(self) -> None:
         if not self.supports_raid:
             return
         try:
-            fbx_raids: list[dict[str, Any]] = await self._api.storage.get_raids() or []
-            for fbx_raid in fbx_raids:
-                self.raids[fbx_raid["id"]] = fbx_raid
-            _LOGGER.debug("Mise à jour des RAID terminée")
-        except HttpRequestError:
-            self.supports_raid = False
-            _LOGGER.warning("L'API du routeur %s ne supporte pas les RAID", self.name)
+            fbx_raids = await self._api.storage.get_raids()
+            if not isinstance(fbx_raids, list):
+                raise ValueError("Invalid RAID collection")
+            raids = {raid["id"]: raid for raid in fbx_raids}
+            self.raids = raids
+            if not self.raids_available:
+                _LOGGER.info("Source RAID Freebox de nouveau disponible")
+            self.raids_available = True
+        except Exception:  # An unsuccessful read is never a successful empty snapshot.
+            # An API error is not proof of permanent hardware incapability.
+            if self.raids_available:
+                _LOGGER.info("Source RAID Freebox indisponible")
+            self.raids_available = False
 
     async def update_home_devices(self, now: datetime | None = None) -> None:
+        from .repairs import async_clear_home_permission_issue, async_home_permission_denied
+
         if not self.home_granted or self.closing:
             return
         if self._home_update_lock.locked():
@@ -647,61 +809,104 @@ class FreeboxRouter:
             return
         async with self._home_update_lock:
             try:
-                home_nodes: list[dict[str, Any]] = await self.home.get_home_nodes() or []
+                home_nodes = await self.home.get_home_nodes()
+                if not isinstance(home_nodes, list):
+                    raise ValueError("Invalid Home collection")
+                devices: dict[str, Any] = {}
                 new_device = False
                 for home_node in home_nodes:
                     if home_node["category"] in HOME_COMPATIBLE_CATEGORIES:
                         node_id = home_node["id"]
                         if node_id not in self.home_devices:
                             new_device = True
-                        self.home_devices[node_id] = home_node
+                        devices[node_id] = home_node
 
+                from .availability import home_node_reachable
+                for node_id in self.home_devices.keys() | devices.keys():
+                    node = devices.get(node_id)
+                    self.note_source(("home_node", node_id),
+                                     node is not None and home_node_reachable(node), "Appareil Home")
+                self.home_devices = devices
+                self.home_snapshot_known = True
+                async_clear_home_permission_issue(self.hass, self.entry_id)
+                if not self.home_available:
+                    _LOGGER.info("Source Freebox Home de nouveau disponible")
+                self.home_available = True
                 async_dispatcher_send(self.hass, self.signal_home_device_update)
                 if new_device:
                     async_dispatcher_send(self.hass, self.signal_home_device_new)
                 _LOGGER.debug("Mise à jour des appareils domestiques terminée")
-            except TimeoutError:
-                _LOGGER.debug("Timeout API home/nodes — prochain poll dans 15 s")
-            except HttpRequestError as err:
-                if is_shutdown_error(err, self):
-                    _LOGGER.debug("Poll Home interrompu (rechargement) : %s", err)
+            except Exception as err:  # Source failure; cancellation still propagates.
+                if self.closing and is_shutdown_error(err, self):
                     return
-                # Ne pas confondre un endpoint absent / une erreur réseau avec un refus
-                # de droit : sur Freebox v8 (api 16.x) il n'y a souvent aucune case
-                # « maison connectée » à cocher.
-                if is_permission_denied(err):
+                if self.home_available:
+                    _LOGGER.info("Source Freebox Home indisponible")
+                self.home_available = False
+                async_dispatcher_send(self.hass, self.signal_home_device_update)
+                if isinstance(err, HttpRequestError) and is_permission_denied(err):
+                    # Reload after granting rights rechecks the explicit gate.
+                    # Transient failures must not permanently disable polling.
                     self.home_granted = False
-                    _LOGGER.warning(
-                        "L'accès aux appareils domestiques n'est pas autorisé (%s). "
-                        "Dans Freebox OS → Paramètres → Gestion des accès → Applications, "
-                        "vérifiez les droits de l'application Homexa (alarme / maison "
-                        "connectée s'ils existent sur votre modèle).",
-                        err,
-                    )
-                    return
-                self.home_granted = False
-                _LOGGER.warning(
-                    "Impossible de lire les appareils Freebox Home (home/nodes) : %s. "
-                    "Ce n'est pas forcément un refus de droit — l'API peut être absente "
-                    "sur certains modèles (ex. Freebox v8 sans objets Home) ou temporairement "
-                    "indisponible. Si vous n'avez pas d'alarme / PIR / volets Freebox Home, "
-                    "ignorez ce message.",
-                    err,
-                )
+                    async_home_permission_denied(self.hass, self.entry_id)
+                    _LOGGER.warning("L'accès aux appareils domestiques n'est pas autorisé ; "
+                        "dans Freebox OS → Gestion des accès → Applications, vérifiez les droits Homexa")
 
+    @async_action_errors
     async def reboot(self) -> None:
+        await self._api.system.reboot()
+        _LOGGER.info("Redémarrage de la Freebox effectué")
+
+    async def async_read(self, read: Callable[[], Awaitable[_ReadT]]) -> _ReadT:
+        """Own entity I/O until it completes, independently of HA task teardown."""
+        if self.closing:
+            raise NotOpenError("Freebox connection is closing")
+        task = asyncio.current_task()
+        if task is not None:
+            self.read_tasks.add(task)
         try:
-            await self._api.system.reboot()
-            _LOGGER.info("Redémarrage de la Freebox effectué")
-        except HttpRequestError as err:
-            _LOGGER.error("Échec du redémarrage de la Freebox : %s", err)
+            return await read()
+        finally:
+            if task is not None:
+                self.read_tasks.discard(task)
+
+    async def async_poll(self, update: Callable[[], Awaitable[None]]) -> None:
+        """Own only integration interval jobs, not initial reads or entity actions."""
+        if self.closing:
+            return
+        task = asyncio.current_task()
+        if task is not None:
+            self.poll_tasks.add(task)
+        try:
+            await update()
+        finally:
+            if task is not None:
+                self.poll_tasks.discard(task)
+
+    def resume_reads_after_failed_unload(self) -> None:
+        """Do not reopen admission while another owner is closing the SDK."""
+        if not self._closed and not self._close_lock.locked():
+            self.closing = False
 
     async def close(self) -> None:
-        # Les relevés / mises à jour en vol ne journalisent plus d'erreur à partir d'ici.
-        self.closing = True
-        with suppress(NotOpenError):
-            await self._api.close()
+        async with self._close_lock:
+            if self._closed:
+                return
+            # Stop new interval reads, drain current ones, then close the public SDK.
+            self.closing = True
+            pending = (self.poll_tasks | self.read_tasks) - {asyncio.current_task()}
+            for task in pending:
+                task.cancel()
+            if pending:
+                await asyncio.gather(*pending, return_exceptions=True)
+            try:
+                await self._api.close()
+            except NotOpenError:
+                # Preserve historical suppression, but do not treat a missing
+                # access object as proof that the SDK session was closed.
+                return
             _LOGGER.debug("Connexion à la Freebox fermée")
+            # Failed close remains retryable; only memoize a normal SDK return.
+            self._closed = True
 
     @property
     def device_info(self) -> DeviceInfo:

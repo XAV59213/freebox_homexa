@@ -258,7 +258,7 @@ _VENDOR_GROUPS = (
     ("fairphone", NET_PHONES),
 )
 # (mot-clé nom d'hôte, groupe) — testés dans l'ordre
-_NAME_GROUPS = (
+_NAME_GROUPS: tuple[tuple[tuple[str, ...], str], ...] = (
     (("hikvision", "reolink", "foscam", "ezviz", "dahua", "ipcam", "ip-cam", "camera",
       "cam-", "-cam", "axis-"), GROUP_CAMERAS),
     (("echo", "alexa", "fire tv", "firetv", "fire-tv", "kindle"), NET_AMAZON),
@@ -277,7 +277,7 @@ _NAME_GROUPS = (
       "thermostat", "zigbee", "bridge", "raspberry", "homeassistant", "wled"), NET_IOT),
 )
 # Mots-clés forts du nom d'hôte, testés avant le fabricant (ex. carte Wi-Fi Intel dans un objet WLED).
-_STRONG_NAME_GROUPS = (
+_STRONG_NAME_GROUPS: tuple[tuple[tuple[str, ...], str], ...] = (
     (("wled", "tasmota", "esphome", "shelly", "sonoff"), NET_IOT),
     (("probook", "elitebook", "zbook", "thinkpad", "latitude", "macbook", "laptop",
       "desktop-", "-pc", "pc-"), NET_COMPUTERS),

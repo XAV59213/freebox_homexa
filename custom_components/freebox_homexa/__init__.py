@@ -1,6 +1,9 @@
 """Support pour les appareils Freebox (Freebox v6 et Freebox mini 4K)."""
 
 import logging
+from contextlib import suppress
+
+import aiohttp
 import homeassistant.helpers.config_validation as cv
 from homeassistant.const import CONF_HOST, CONF_PORT, EVENT_HOMEASSISTANT_STOP
 from datetime import datetime, timedelta
@@ -9,7 +12,12 @@ from homeassistant.exceptions import ConfigEntryAuthFailed, ConfigEntryNotReady
 from homeassistant.helpers.event import async_call_later, async_track_time_interval
 from homeassistant.helpers.storage import Store
 from homeassistant.helpers.typing import ConfigType
-from freebox_api.exceptions import AuthorizationError, HttpRequestError
+from freebox_api.exceptions import (
+    AuthorizationError,
+    HttpRequestError,
+    InsufficientPermissionsError,
+    InvalidTokenError,
+)
 import homeassistant.helpers.device_registry as dr
 
 from .calls_ws import async_register_calls_websocket_api
@@ -37,7 +45,7 @@ from .tnt_setup import (
     async_setup_bundled_tnt,
     async_unload_bundled_tnt,
 )
-from .services import async_setup_services
+from .services import async_setup_services, _save_config
 from .tnt_reminders import async_setup_reminders
 from .registry_compat import as_version
 
@@ -102,37 +110,71 @@ async def async_setup_entry(hass: HomeAssistant, entry: FreeboxConfigEntry) -> b
     hass.data[DOMAIN]["store"] = store
 
     async def save_data():
-        await store.async_save(hass.data[DOMAIN]["config"])
+        await _save_config(hass)
 
     host = entry.data[CONF_HOST]
     port = entry.data.get(CONF_PORT, 80)
     api = await get_api(hass, host)
 
     try:
-        await api.open(host, port)
+        connected = False
+        try:
+            await api.open(host, port)
+            freebox_config = await api.system.get_config()
+            connected = True
+        finally:
+            if not connected:
+                # Always attempt the public SDK cleanup, also on cancellation.
+                # The SDK may itself fail to close after a failed open; preserve
+                # the original error rather than touching its private session.
+                with suppress(Exception):
+                    await api.close()
         _LOGGER.debug("Connexion Freebox établie %s:%s", host, port)
-    except AuthorizationError as err:
+    except (AuthorizationError, InvalidTokenError, InsufficientPermissionsError) as err:
         message = str(err).lower()
-        if "timed out" in message:
-            _LOGGER.warning("Autorisation Freebox en attente pour %s : %s", host, err)
+        if isinstance(err, AuthorizationError) and "timed out" in message:
             raise ConfigEntryNotReady(
                 translation_domain=DOMAIN,
                 translation_key="auth_pending",
             ) from err
-        _LOGGER.error("Autorisation Freebox refusée pour %s: %s", host, err)
         raise ConfigEntryAuthFailed(
             translation_domain=DOMAIN,
             translation_key="auth_failed",
         ) from err
-    except HttpRequestError as err:
-        _LOGGER.error("Erreur réseau Freebox %s: %s", host, err)
+    except (HttpRequestError, TimeoutError, aiohttp.ClientError, OSError) as err:
         raise ConfigEntryNotReady(
             translation_domain=DOMAIN,
             translation_key="cannot_connect",
             translation_placeholders={"host": host, "error": str(err)},
         ) from err
 
-    freebox_config = await api.system.get_config()
+    # A successful probe is not the end of setup. Let HA own cleanup for any
+    # later failure, including failures before runtime_data/platform forwarding.
+    setup_complete = False
+    forward_started = False
+    router: FreeboxRouter | None = None
+
+    async def _close_failed_setup() -> None:
+        if setup_complete:
+            return  # Normal unload closes the router through async_unload_entry.
+        if router is not None:
+            router.closing = True
+        if forward_started:
+            try:
+                if not await hass.config_entries.async_unload_platforms(entry, PLATFORMS):
+                    _LOGGER.error("Nettoyage partiel des plateformes incomplet après échec du setup")
+            except Exception:
+                _LOGGER.error("Nettoyage des plateformes impossible après échec du setup")
+        async_unload_bundled_tnt(hass, entry)
+        # Attempt only the public SDK API. Its documented cleanup limitations
+        # still apply; a cleanup error must not replace the original setup error.
+        with suppress(Exception):
+            if router is not None:
+                await router.close()
+            else:
+                await api.close()
+
+    entry.async_on_unload(_close_failed_setup)
 
     # Migration des surcharges « Groupes des appareils » (groupes par type -> par service).
     saved = entry.options.get(CONF_DEVICE_GROUP_OVERRIDES)
@@ -199,16 +241,19 @@ async def async_setup_entry(hass: HomeAssistant, entry: FreeboxConfigEntry) -> b
         _LOGGER.debug("Résumé des répéteurs impossible", exc_info=True)
     await router.update_home_devices()
 
+    async def _poll_all(now: datetime | None = None) -> None:
+        await router.async_poll(lambda: router.update_all(now))
+
     async def _poll_home(_now: datetime | None = None) -> None:
         try:
-            await router.update_home_devices()
+            await router.async_poll(router.update_home_devices)
         except Exception:
             _LOGGER.debug("Poll Home ignoré (API lente ou occupée)", exc_info=True)
 
     home_interval = option_home_poll_interval(entry)
     _LOGGER.info("Poll Home toutes les %s s", home_interval)
 
-    entry.async_on_unload(async_track_time_interval(hass, router.update_all, SCAN_INTERVAL))
+    entry.async_on_unload(async_track_time_interval(hass, _poll_all, SCAN_INTERVAL))
     entry.async_on_unload(
         async_track_time_interval(hass, _poll_home, timedelta(seconds=home_interval))
     )
@@ -228,6 +273,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: FreeboxConfigEntry) -> b
     except Exception:  # noqa: BLE001
         _LOGGER.exception("Rappels TNT indisponibles (le reste de l'intégration n'est pas affecté)")
 
+    forward_started = True
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     # Parents virtuels créés à la demande par les entités. Les groupes inutilisés
     # sont retirés un peu plus tard : certaines plateformes ajoutent leurs entités
@@ -263,28 +309,43 @@ async def async_setup_entry(hass: HomeAssistant, entry: FreeboxConfigEntry) -> b
         hass.bus.async_listen_once(EVENT_HOMEASSISTANT_STOP, async_close_connection)
     )
 
+    setup_complete = True
     _LOGGER.info("Freebox Homexa prêt")
     return True
 
 
 async def async_unload_entry(hass: HomeAssistant, entry: FreeboxConfigEntry) -> bool:
+    # Persist before teardown: a swallowed HA Store write failure must not leave
+    # an already torn-down entry reporting a successful reload/unload.
+    await _save_config(hass)
     router: FreeboxRouter | None = getattr(entry, "runtime_data", None)
     if router is not None:
         # Déchargement / rechargement : les relevés encore en vol ne journalisent plus
         # « Connector is closed » comme une erreur.
         router.closing = True
-    unload_ok = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
+    try:
+        unload_ok = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
+    except BaseException:
+        # HA keeps an entry loaded when teardown fails or is cancelled. Restore
+        # read admission for its surviving platforms; never claim atomic rollback.
+        if router is not None:
+            router.resume_reads_after_failed_unload()
+        raise
     if not unload_ok:
         if router is not None:
-            router.closing = False
+            router.resume_reads_after_failed_unload()
         return False
     async_unload_bundled_tnt(hass, entry)
     if router is not None:
         await router.close()
-    store = hass.data[DOMAIN].get("store")
-    if store is not None and "config" in hass.data[DOMAIN]:
-        await store.async_save(hass.data[DOMAIN]["config"])
     # Services enregistrés une fois dans async_setup : conservés (ils renvoient une
     # erreur traduite tant qu'aucune entrée n'est chargée). Rappels TNT conservés.
     return True
 
+
+
+async def async_remove_entry(hass: HomeAssistant, entry: FreeboxConfigEntry) -> None:
+    """Delete only this entry's issue on permanent removal, not on unload."""
+    from .repairs import async_clear_home_permission_issue
+
+    async_clear_home_permission_issue(hass, entry.entry_id)

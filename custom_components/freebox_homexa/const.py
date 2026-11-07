@@ -2,9 +2,12 @@
 
 from __future__ import annotations
 import enum
-from typing import Any
+from typing import TYPE_CHECKING, Any
 from homeassistant.const import Platform
-from homeassistant.components.alarm_control_panel import AlarmControlPanelState  # noqa: F401
+if TYPE_CHECKING:
+    from homeassistant.components.alarm_control_panel.const import AlarmControlPanelState as AlarmControlPanelState
+else:
+    from homeassistant.components.alarm_control_panel import AlarmControlPanelState  # noqa: F401
 from homeassistant.config_entries import ConfigEntry
 
 DOMAIN = "freebox_homexa"
@@ -16,7 +19,7 @@ VALUE_NOT_SET = -1
 DEFAULT_DEVICE_NAME = "Unknown device"
 REPEATER_MODEL = "F-RP01A"
 
-VERSION = "28.8.89"
+VERSION = "28.8.90"
 URL_BASE = "/freebox_homexa"
 CARD_FILENAME = "freebox-homexa-card.js"
 STATIC_CARD_PATH = f"{URL_BASE}/{CARD_FILENAME}"

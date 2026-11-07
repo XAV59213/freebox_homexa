@@ -220,8 +220,8 @@ class FreeboxFlowHandler(ConfigFlow, domain=DOMAIN):
             CONF_PORT: user_input.get(CONF_PORT, 80),
         }
         await self.async_set_unique_id(self._data[CONF_HOST])
-        if self.source != SOURCE_REAUTH:
-            self._abort_if_unique_id_configured()
+        # Reauth enters reauth_confirm -> link, never the user/discovery step.
+        self._abort_if_unique_id_configured()
         return await self.async_step_link()
 
     async def async_step_reauth(self, entry_data: dict[str, Any]) -> ConfigFlowResult:
@@ -285,7 +285,7 @@ class FreeboxFlowHandler(ConfigFlow, domain=DOMAIN):
                 return await self.async_step_lan_options()
 
             finally:
-                # Toujours fermer la session, y compris en cas d'erreur après open().
+                # Toujours tenter close public ; sa réussite après open échoué dépend du SDK.
                 with suppress(Exception):
                     await fbx.close()
 
@@ -858,12 +858,21 @@ class FreeboxOptionsFlowHandler(OptionsFlowWithReload):
                 new_data.pop(CONF_REMOTE_CODE, None)
             self.hass.config_entries.async_update_entry(self.config_entry, data=new_data)
             # Conserver les options des autres écrans (Guide TNT, rappels…)
-            merged = {
+            # An absent/temporarily unlistable Player has no field on this form.
+            # Preserve its private code; only visible fields can explicitly clear one.
+            visible_ids = {str(p["id"]) for p in players if p.get("id") is not None}
+            merged = dict(self.config_entry.options)
+            for pid in visible_ids:
+                merged.pop(remote_code_field(pid), None)
+            previous_codes = merged.get(CONF_REMOTE_CODES)
+            codes = {
                 key: value
-                for key, value in self.config_entry.options.items()
-                if not key.startswith(f"{CONF_REMOTE_CODE}_")
+                for key, value in (previous_codes.items() if isinstance(previous_codes, dict) else ())
+                if str(key) not in visible_ids
             }
+            codes.update(options[CONF_REMOTE_CODES])
             merged.update(options)
+            merged[CONF_REMOTE_CODES] = codes
             return self.async_create_entry(title="", data=merged)
 
         names = ", ".join(_player_label(p) for p in players) or "aucun Player détecté"

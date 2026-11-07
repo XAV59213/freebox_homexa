@@ -4,12 +4,17 @@ from __future__ import annotations
 
 import logging
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from aiohttp import web
 
 from homeassistant.components.frontend import add_extra_js_url
-from homeassistant.components.http import HomeAssistantView, StaticPathConfig
+if TYPE_CHECKING:
+    from homeassistant.helpers.http import HomeAssistantView
+    from homeassistant.components.http.server import StaticPathConfig
+else:
+    # Keep the established public re-exports for older supported HA releases.
+    from homeassistant.components.http import HomeAssistantView, StaticPathConfig
 from homeassistant.const import EVENT_HOMEASSISTANT_STARTED
 from homeassistant.core import Event, HomeAssistant, callback
 from homeassistant.helpers.event import async_call_later
@@ -46,7 +51,7 @@ class HomexaCardView(HomeAssistantView):
     name = "api:freebox_homexa:card"
     requires_auth = False
 
-    async def get(self, request):
+    async def get(self, request: web.Request) -> web.Response:
         path = Path(__file__).parent / CARD_FILENAME
         body = await request.app["hass"].async_add_executor_job(path.read_text, "utf-8")
         return web.Response(
@@ -94,7 +99,7 @@ class JSModuleRegistration:
     async def _async_register_path(self) -> None:
         try:
             await self.hass.http.async_register_static_paths(
-                [StaticPathConfig(URL_BASE, Path(__file__).parent, False)]
+                [StaticPathConfig(URL_BASE, str(Path(__file__).parent), False)]
             )
         except RuntimeError:
             _LOGGER.debug("Chemin statique déjà enregistré : %s", URL_BASE)

@@ -23,7 +23,7 @@
 
 Intégration **Home Assistant** pour la Freebox Server, Freebox Home, les répéteurs Wi-Fi Free et le Freebox Player.
 
-**Version actuelle :** [28.8.89](https://github.com/XAV59213/freebox_homexa/releases/tag/28.8.89) · Home Assistant **2026.8.0+**
+**Version actuelle :** [28.8.90](https://github.com/XAV59213/freebox_homexa/releases/tag/28.8.90) · Home Assistant **2026.8.0+**
 
 Wiki : [Documentation](https://github.com/XAV59213/freebox_homexa/wiki)
 
@@ -170,6 +170,10 @@ Erreurs affichées (au lieu d’un échec silencieux) : aucun Player détecté, 
 
 ---
 
+## Documentation détaillée
+
+[Guide utilisateur : installation, options, six actions, fréquences, modèles/limites, dépannage et suppression](docs/guide-utilisateur.md). Il documente le projet custom, sans certification officielle HA.
+
 ## Disponibilité et journal
 
 - **Freebox injoignable** : le journal affiche **une seule fois** « Freebox injoignable » (niveau info), puis « Freebox de nouveau joignable » à son retour, sans erreur répétée à chaque relevé. Entre les deux, les entités Homexa passent **indisponibles** (capteurs, Wi-Fi, boutons, Player, Guide TV, entités Freebox Home…).
@@ -297,3 +301,7 @@ MIT · Merci à [@gvigroux](https://github.com/gvigroux) (projet d’origine) et
 
 <a href="https://www.buymeacoffee.com/xav59213"><img src="https://img.buymeacoffee.com/button-api/?text=xav59213&emoji=&slug=xav59213&button_colour=5F7FFF&font_colour=ffffff&font_family=Cookie&outline_colour=000000&coffee_colour=FFDD00" /></a>
 <a href="https://www.buymeacoffee.com/gvigroux"><img src="https://img.buymeacoffee.com/button-api/?text=gvigroux&emoji=&slug=gvigroux&button_colour=5F7FFF&font_colour=ffffff&font_family=Cookie&outline_colour=000000&coffee_colour=FFDD00" /></a>
+
+### Autoévaluation qualité
+
+[Audit Integration Quality Scale](docs/quality-scale-audit.md) : suivi prudent des règles, sans certification officielle HA. L’acceptation HACS n’attribue pas un niveau Quality Scale. [Revue globale des entités et activations](docs/quality-scale-entity-inventory.md) : noms/IDs existants préservés et nouveaux RSSI facultatifs.

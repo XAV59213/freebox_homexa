@@ -7,7 +7,7 @@ autorisées sont les durées/positions bornées des observations de lecture. Bor
 from datetime import datetime, timezone
 from itertools import islice
 import math
-from typing import Any
+from typing import Any, TypedDict
 
 _KEYS = frozenset('''foreground_app package package_id cur_url context player state
 metadata title artist author album description thumbnail thumbnail_url image artwork
@@ -49,7 +49,17 @@ MAX_SAMPLE_AGE = 120
 _STATES = frozenset({"playing", "paused", "stopped", "unknown", "idle", "buffering"})
 
 
-def _dict(value: Any) -> dict:
+class TimingSample(TypedDict):
+    """Only approved values, never arbitrary player metadata."""
+
+    observed_at: str
+    application_category: str
+    playback_state: str
+    duration_ms: int | float | None
+    position_ms: int | float | None
+
+
+def _dict(value: object) -> dict[object, object]:
     return value if isinstance(value, dict) else {}
 
 
@@ -61,7 +71,7 @@ def _timing(value: Any) -> int | float | None:
     return None
 
 
-def _recent(samples: list, now: datetime) -> list:
+def _recent(samples: list[TimingSample], now: datetime) -> list[TimingSample]:
     return [s for s in samples if 0 <= (
         now - datetime.fromisoformat(s["observed_at"])
     ).total_seconds() <= MAX_SAMPLE_AGE]
@@ -97,7 +107,7 @@ def cache_player_schema(router: Any, player_id: Any, status: Any, outcome: str) 
         elif "netflix" in blob:
             category = "Netflix"
         playback = state.get("playback_state")
-        sample = {
+        sample: TimingSample = {
             "observed_at": now.isoformat(),
             "application_category": category,
             "playback_state": playback if isinstance(playback, str) and playback in _STATES else "unknown",
@@ -113,7 +123,7 @@ def cache_player_schema(router: Any, player_id: Any, status: Any, outcome: str) 
     }
 
 
-def player_diagnostics(router: Any) -> list[dict]:
+def player_diagnostics(router: Any) -> list[dict[str, object]]:
     """Retire les observations périmées lors de l'export, sans trafic réseau."""
     now = datetime.now(timezone.utc)
     result = []

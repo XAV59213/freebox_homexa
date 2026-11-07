@@ -152,8 +152,8 @@ err = expect("remote_invalid_key", entry, code="power,bogus")
 assert api.remote.sent == [] and err.translation_placeholders == {"key": "bogus"}
 expect("remote_invalid_player", entry, code="power", player_id="abc")
 entry, api = make_entry([{"id": 1}], {"remote_code": "12345678"}, fail="ok")
-err = expect("remote_failed", entry, code="power,ok")
-assert api.remote.sent == [("12345678", "power")] and err.translation_placeholders["key"] == "ok"
-call(entry, code="")  # rien à envoyer : sans erreur (comportement historique)
+err = expect("command_failed", entry, code="power,ok")
+assert api.remote.sent == [("12345678", "power")] and not err.translation_placeholders
+expect("remote_empty_command", entry, code="")  # entrée invalide, aucun faux succès
 print("OK : aucun Player, code manquant, touche inconnue, Player invalide, échec d'envoi -> erreurs traduites")
 print("SIMULATION_ACTION_REMOTE_OK")

@@ -11,6 +11,8 @@ from __future__ import annotations
 import logging
 from typing import Any
 
+from homeassistant.exceptions import HomeAssistantError
+
 from .const import DOMAIN, option_remote_code
 
 _LOGGER = logging.getLogger(__name__)
@@ -67,8 +69,8 @@ async def async_send_player_keys(
 ) -> list[tuple[str, Exception]]:
     """Envoie les touches au Player ; renvoie les échecs (touche, erreur).
 
-    Une réponse non confirmée par la Player (`send_key` -> False) est seulement
-    journalisée en debug : l'entité « Télécommande » fonctionne ainsi depuis toujours.
+    False means unconfirmed, not proof of physical failure: expose a distinct
+    translated error and never automatically retry a potentially accepted key.
     """
     failures: list[tuple[str, Exception]] = []
     for key in keys:
@@ -80,7 +82,9 @@ async def async_send_player_keys(
             failures.append((key, err))
             continue
         if accepted is False:
-            _LOGGER.debug("Touche %s : réponse du Player non confirmée", key)
+            failures.append((key, HomeAssistantError(
+                translation_domain=DOMAIN, translation_key="command_unconfirmed"
+            )))
     return failures
 
 

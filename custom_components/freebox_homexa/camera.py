@@ -26,6 +26,8 @@ from .entity import FreeboxHomeEntity
 from .errors import is_shutdown_error, poll_log_level
 from .router import FreeboxConfigEntry, FreeboxRouter
 
+from .errors import async_action_errors
+
 _LOGGER = logging.getLogger(__name__)
 
 # SECTION: Configuration des entités
@@ -54,7 +56,7 @@ async def async_setup_entry(
         add_entities(hass, router, async_add_entities, tracked)
 
     # Écoute les nouveaux appareils domestiques et déclenche la mise à jour
-    router.listeners.append(
+    entry.async_on_unload(
         async_dispatcher_connect(hass, router.signal_home_device_new, update_callback)
     )
     update_callback()
@@ -132,39 +134,59 @@ class FreeboxCamera(FreeboxHomeEntity, FFmpegCamera):
         )
 
         # Attributs d'état supplémentaires
-        self._attr_extra_state_attributes = {}
+        self._video_available: bool | None = None
+        self._video_observer_active = False
+        self._video_observer_removed = False
+        self._attr_extra_state_attributes = {"video_available": None}
         self.update_node(node)
         _LOGGER.debug("Caméra %s initialisée avec succès", self._name)
 
+    async def async_added_to_hass(self) -> None:
+        await super().async_added_to_hass()
+        self._video_observer_active = True
+        self._video_observer_removed = False
+        self.async_on_remove(self._stop_video_observer)
+
+    def _stop_video_observer(self) -> None:
+        self._video_observer_active = False
+        self._video_observer_removed = True
+
+    def _observe_video(self, available: bool) -> None:
+        if self._video_observer_removed or self._router.closing:
+            return
+        self._video_available = available
+        self._attr_extra_state_attributes["video_available"] = available
+        self._router.note_source(("camera_image", self._id), available, "Image caméra")
+        if self._video_observer_active:
+            self.async_write_ha_state()
+
+    async def async_camera_image(self, width: int | None = None, height: int | None = None) -> bytes | None:
+        """Observe the public inherited image contract, without retries or a new poll."""
+        try:
+            image = await super().async_camera_image(width, height)
+        except Exception:
+            self._observe_video(False)
+            raise
+        self._observe_video(bool(image))
+        return image
+
+    @async_action_errors
     async def async_enable_motion_detection(self) -> None:
         """Active la détection de mouvement sur la caméra.
 
         Envoie la commande pour activer la détection via l'API Freebox.
         """
-        if self._command_motion_detection is None:
-            _LOGGER.error("Détection de mouvement non supportée pour %s", self._node_id)
-            return
-        try:
-            await self.set_home_endpoint_value(self._command_motion_detection, True)
-            self._attr_motion_detection_enabled = True
-            _LOGGER.info("Détection de mouvement activée pour %s", self._node_id)
-        except Exception as err:
-            _LOGGER.error("Échec de l'activation de la détection de mouvement pour %s: %s", self._node_id, err)
+        await self.async_execute_home_command(self._command_motion_detection, True)
+        self._attr_motion_detection_enabled = True
 
+    @async_action_errors
     async def async_disable_motion_detection(self) -> None:
         """Désactive la détection de mouvement sur la caméra.
 
         Envoie la commande pour désactiver la détection via l'API Freebox.
         """
-        if self._command_motion_detection is None:
-            _LOGGER.error("Détection de mouvement non supportée pour %s", self._node_id)
-            return
-        try:
-            await self.set_home_endpoint_value(self._command_motion_detection, False)
-            self._attr_motion_detection_enabled = False
-            _LOGGER.info("Détection de mouvement désactivée pour %s", self._node_id)
-        except Exception as err:
-            _LOGGER.error("Échec de la désactivation de la détection de mouvement pour %s: %s", self._node_id, err)
+        await self.async_execute_home_command(self._command_motion_detection, False)
+        self._attr_motion_detection_enabled = False
 
     async def async_update_signal(self) -> None:
         """Met à jour les données de la caméra à partir du routeur Freebox.
@@ -174,16 +196,24 @@ class FreeboxCamera(FreeboxHomeEntity, FFmpegCamera):
         try:
             node = self._router.home_devices.get(self._id)
             if node is None:
-                _LOGGER.warning("Caméra %s non trouvée dans les données du routeur", self._id)
+                self._router.note_source(("home_node", self._id), False, "Appareil Home")
+                self._attr_available = False
+                self.async_write_ha_state()
                 return
+            self._attr_available = True
+            self._node = node
             self.update_node(node)
+            self._router.note_source(("camera", self._id), True, "Source caméra Home")
             self.async_write_ha_state()
             _LOGGER.debug("Caméra %s mise à jour avec succès", self._name)
         except Exception as err:  # noqa: BLE001
             if is_shutdown_error(err, self._router):
-                _LOGGER.debug("Mise à jour de la caméra %s interrompue (rechargement) : %s", self._node_id, err)
+                _LOGGER.debug("Mise à jour de la caméra %s interrompue (rechargement) : %s", self._id, err)
                 return
-            _LOGGER.log(poll_log_level(self._router), "Échec de la mise à jour de la caméra %s : %s", self._node_id, err)
+            self._attr_available = False
+            self._router.note_source(("camera", self._id), False, "Source caméra Home")
+            self.async_write_ha_state()
+            _LOGGER.debug("Mise à jour caméra impossible (%s)", type(err).__name__)
 
     def update_node(self, node: dict[str, Any]) -> None:
         """Met à jour les paramètres de la caméra à partir des données du nœud.
@@ -199,6 +229,8 @@ class FreeboxCamera(FreeboxHomeEntity, FFmpegCamera):
         # Mise à jour des attributs d'état supplémentaires
         for endpoint in filter(lambda x: x["ep_type"] == "signal", node["show_endpoints"]):
             self._attr_extra_state_attributes[endpoint["name"]] = endpoint["value"]
+
+        self._attr_extra_state_attributes["video_available"] = self._video_available
 
         # Mise à jour de l'état de la détection de mouvement
         self._attr_motion_detection_enabled = self._attr_extra_state_attributes.get(ATTR_DETECTION, False)

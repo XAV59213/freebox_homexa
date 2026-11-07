@@ -1,5 +1,9 @@
 from __future__ import annotations
 
+from collections.abc import Iterable
+from functools import partial
+from dataclasses import replace
+
 import logging
 from typing import Any
 
@@ -23,6 +27,7 @@ from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.dispatcher import async_dispatcher_connect
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
+from .discovery import DiscoveryCandidate, async_setup_discovery
 from .const import (
     CONF_CREATE_LAN_DEVICES,
     CONF_CREATE_WIFI_SENSORS,
@@ -40,7 +45,7 @@ from .tnt_sensor import HomexaTntSensor
 from .lan_group_sensors import async_setup_lan_group_sensors
 from .wifi_ap_sensors import async_setup_wifi_ap_sensors
 from .registry_compat import as_version
-from .availability import FreeboxReachableMixin
+from .availability import FreeboxReachableMixin, FreeboxLanReachableMixin
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -61,11 +66,13 @@ CONNECTION_SENSORS: tuple[SensorEntityDescription, ...] = (
     ),
     SensorEntityDescription(
         key="ipv4",
+        entity_category=EntityCategory.DIAGNOSTIC,
         name="IP Externe Freebox",
         icon="mdi:ip-network",
     ),
     SensorEntityDescription(
         key="uptime",
+        entity_category=EntityCategory.DIAGNOSTIC,
         name="Temps de fonctionnement Freebox",
         device_class=SensorDeviceClass.DURATION,
         native_unit_of_measurement="s",
@@ -74,7 +81,7 @@ CONNECTION_SENSORS: tuple[SensorEntityDescription, ...] = (
 )
 
 CALL_SENSORS: tuple[SensorEntityDescription, ...] = (
-    SensorEntityDescription(key="missed", name="Appels manqués Freebox", icon="mdi:phone-missed"),
+    SensorEntityDescription(key="missed", entity_category=EntityCategory.DIAGNOSTIC, name="Appels manqués Freebox", icon="mdi:phone-missed"),
 )
 
 # Journal complet (entrants, sortants, manqués) pour la carte « Homexa Appels ».
@@ -84,6 +91,7 @@ CALL_LOG_SENSOR = SensorEntityDescription(
 DISK_PARTITION_SENSORS: tuple[SensorEntityDescription, ...] = (
     SensorEntityDescription(
         key="partition_free_space",
+        entity_category=EntityCategory.DIAGNOSTIC,
         name="espace libre",
         native_unit_of_measurement=PERCENTAGE,
         icon="mdi:harddisk",
@@ -124,6 +132,16 @@ def _async_remove_unselected_tnt_entities(
 PARALLEL_UPDATES = 0
 
 
+def temperature_sensor_description(sensor_name: str) -> SensorEntityDescription:
+    """Keep historical identity/name while classifying hardware telemetry."""
+    return SensorEntityDescription(
+        key=sensor_name, name=f"Freebox {sensor_name}",
+        native_unit_of_measurement=UnitOfTemperature.CELSIUS,
+        device_class=SensorDeviceClass.TEMPERATURE,
+        entity_category=EntityCategory.DIAGNOSTIC,
+    )
+
+
 async def async_setup_entry(
     hass: HomeAssistant, entry: FreeboxConfigEntry, async_add_entities: AddEntitiesCallback
 ) -> None:
@@ -136,35 +154,28 @@ async def async_setup_entry(
         entry, CONF_CREATE_LAN_DEVICES, DEFAULT_CREATE_LAN_DEVICES
     )
 
-    entities.extend(
-        FreeboxSensor(
-            router,
-            SensorEntityDescription(
-                key=sensor_name,
-                name=f"Freebox {sensor_name}",
-                native_unit_of_measurement=UnitOfTemperature.CELSIUS,
-                device_class=SensorDeviceClass.TEMPERATURE,
-            ),
-        )
-        for sensor_name in router.sensors_temperature
-    )
+    def candidates() -> Iterable[DiscoveryCandidate]:
+        for sensor_name in router.sensors_temperature:
+            yield f"temperature:{sensor_name}", partial(FreeboxSensor, router, temperature_sensor_description(sensor_name))
+        for disk in router.disks.values():
+            for partition in disk["partitions"].values():
+                for description in DISK_PARTITION_SENSORS:
+                    yield f"disk:{disk['id']}:{partition['id']}:{description.key}", partial(
+                        FreeboxDiskSensor, router, disk, partition, description)
+        for node in router.home_devices.values():
+            if any(endpoint["name"] == "battery" and endpoint["ep_type"] == "signal"
+                   and endpoint.get("value") is not None for endpoint in node["show_endpoints"]):
+                endpoint = next(endpoint for endpoint in node["show_endpoints"]
+                    if endpoint["name"] == "battery" and endpoint["ep_type"] == "signal"
+                    and endpoint.get("value") is not None)
+                yield f"battery:{node['id']}", partial(FreeboxBatterySensor, hass, router, node, endpoint)
+
     entities.extend(FreeboxSensor(router, description) for description in CONNECTION_SENSORS)
     entities.extend(FreeboxCallSensor(router, description) for description in CALL_SENSORS)
     entities.append(FreeboxCallLogSensor(router, CALL_LOG_SENSOR))
-    entities.extend(
-        FreeboxDiskSensor(router, disk, partition, description)
-        for disk in router.disks.values()
-        for partition in disk["partitions"].values()
-        for description in DISK_PARTITION_SENSORS
-    )
-    for node in router.home_devices.values():
-        for endpoint in node["show_endpoints"]:
-            if (
-                endpoint["name"] == "battery"
-                and endpoint["ep_type"] == "signal"
-                and endpoint.get("value") is not None
-            ):
-                entities.append(FreeboxBatterySensor(hass, router, node, endpoint))
+    async_setup_discovery(hass, entry, router,
+        [router.signal_sensor_update, router.signal_home_device_new, router.signal_home_device_update],
+        candidates, async_add_entities)
 
     coordinator = hass.data[DOMAIN].get(TNT_COORDINATORS_KEY, {}).get(entry.entry_id)
     if coordinator is not None:
@@ -181,7 +192,7 @@ async def async_setup_entry(
 
     @callback
     def add_wifi_signal_sensors() -> None:
-        if not create_wifi:
+        if router.closing or not create_wifi:
             return
         new_sensors: list[FreeboxWifiSignalSensor] = []
         for mac, device in router.devices.items():
@@ -209,12 +220,36 @@ async def async_setup_entry(
 
 
 class FreeboxSensor(FreeboxReachableMixin, SensorEntity):
+    _attr_has_entity_name = True
     _attr_should_poll = False
 
+    @property
+    def name(self) -> str | None:
+        """Preserve constructor-only display fallback, never mask loaded HA labels."""
+        if getattr(self, "platform_data", None) is None:
+            raw = getattr(self, "_attr_name", None)
+            if isinstance(raw, str):
+                return raw
+            name = self.entity_description.name
+            if isinstance(name, str):
+                label = name.removesuffix(" Freebox").removeprefix("Freebox ")
+                partition = getattr(self, "_attr_translation_placeholders", {}).get("partition")
+                return f"{partition} {label}" if partition else label
+            return None
+        translated = super().name
+        return translated if isinstance(translated, str) else None
+
+    @property
+    def available(self) -> bool:
+        return super().available and getattr(self._router, "sensors_available", True) is not False
+
     def __init__(self, router: FreeboxRouter, description: SensorEntityDescription) -> None:
-        self.entity_description = description
+        self.entity_description = replace(description, icon=None, translation_key=description.key if description.icon else description.translation_key)
         self._router = router
         self._attr_unique_id = f"{router.mac} {description.name}"
+        # Keep the historical description (and unique ID), change display only.
+        if description.key not in {"rate_down", "rate_up", "ipv4", "uptime", "missed", "calls_log", "partition_free_space"} and isinstance(description.name, str):
+            self._attr_name = description.name.removesuffix(" Freebox").removeprefix("Freebox ")
         self._attr_device_info = router.device_info
 
     @callback
@@ -228,7 +263,9 @@ class FreeboxSensor(FreeboxReachableMixin, SensorEntity):
         if state is None:
             self._attr_native_value = None
         elif self.native_unit_of_measurement == UnitOfDataRate.KILOBYTES_PER_SECOND:
-            self._attr_native_value = round(state / 8000, 2)
+            # Freebox OS connection.rate_* are bytes/s (not bandwidth_* bits/s).
+            # https://dev.freebox.fr/sdk/os/connection/
+            self._attr_native_value = round(state / 1000, 2)
         else:
             self._attr_native_value = state
 
@@ -281,9 +318,9 @@ class FreeboxDiskSensor(FreeboxSensor):
         super().__init__(router, description)
         self._disk_id = disk["id"]
         self._partition_id = partition["id"]
-        self._attr_name = f"{partition['label']} {description.name}"
+        self._attr_translation_placeholders = {"partition": str(partition["label"])}
         self._attr_unique_id = f"{router.mac} {description.key} {disk['id']} {partition['id']}"
-        device_info = {
+        device_info: DeviceInfo = {
             "identifiers": {(DOMAIN, disk["id"])},
             "model": disk["model"],
             "name": f"Disque {disk['id']}",
@@ -292,7 +329,13 @@ class FreeboxDiskSensor(FreeboxSensor):
         parent_id = router.parent_for(f"disk:{disk['id']}", f"Disque {disk['id']}", GROUP_SERVER)
         if parent_id:
             device_info["via_device_id"] = parent_id
-        self._attr_device_info = DeviceInfo(**device_info)
+        self._attr_device_info = device_info
+
+    @property
+    def available(self) -> bool:
+        disk = self._router.disks.get(self._disk_id)
+        return (super().available and self._router.disks_available
+                and disk is not None and self._partition_id in disk.get("partitions", {}))
 
     @callback
     def async_update_state(self) -> None:
@@ -306,16 +349,18 @@ class FreeboxDiskSensor(FreeboxSensor):
             return
         total_bytes = partition.get("total_bytes")
         free_bytes = partition.get("free_bytes")
-        if total_bytes is None or total_bytes <= 0:
-            self._attr_native_value = 0
-        elif free_bytes is None:
+        if (not isinstance(total_bytes, (int, float)) or isinstance(total_bytes, bool)
+                or total_bytes <= 0 or not isinstance(free_bytes, (int, float))
+                or isinstance(free_bytes, bool) or not 0 <= free_bytes <= total_bytes):
             self._attr_native_value = None
         else:
             self._attr_native_value = round((free_bytes / total_bytes) * 100, 2)
 
 
 class FreeboxBatterySensor(FreeboxHomeEntity, SensorEntity):
+    _home_use_device_class_name = True
     _attr_device_class = SensorDeviceClass.BATTERY
+    _attr_entity_category = EntityCategory.DIAGNOSTIC
     _attr_native_unit_of_measurement = PERCENTAGE
 
     @property
@@ -323,15 +368,20 @@ class FreeboxBatterySensor(FreeboxHomeEntity, SensorEntity):
         return self.get_value("signal", "battery")
 
 
-class FreeboxWifiSignalSensor(FreeboxReachableMixin, SensorEntity):
+class FreeboxWifiSignalSensor(FreeboxLanReachableMixin, SensorEntity):
+    _attr_translation_key = "wifi_signal"
     """Force du signal Wi-Fi (RSSI) d'un client vu par la Freebox."""
 
+    # Noisy per-client diagnostic; core client inventory remains available.
+    # Registry defaults apply only to newly discovered entities.
+    _attr_entity_registry_enabled_default = False
+
     _attr_should_poll = False
+    _attr_has_entity_name = True
     _attr_device_class = SensorDeviceClass.SIGNAL_STRENGTH
     _attr_state_class = SensorStateClass.MEASUREMENT
     _attr_native_unit_of_measurement = SIGNAL_STRENGTH_DECIBELS_MILLIWATT
     _attr_entity_category = EntityCategory.DIAGNOSTIC
-    _attr_icon = "mdi:wifi-strength-2"
 
     def __init__(
         self, router: FreeboxRouter, device: dict[str, Any], create_lan_devices: bool
@@ -347,7 +397,6 @@ class FreeboxWifiSignalSensor(FreeboxReachableMixin, SensorEntity):
 
     def _apply_device_info(self, device: dict[str, Any], name: str) -> None:
         if self._router.is_repeater_host(device):
-            self._attr_has_entity_name = True
             self._attr_translation_key = "wifi_signal"
             self._attr_device_info = self._router.repeater_device_info(
                 self._mac, name, device.get("model"), device.get("vendor_name")
@@ -355,9 +404,8 @@ class FreeboxWifiSignalSensor(FreeboxReachableMixin, SensorEntity):
             return
 
         if self._create_lan_devices:
-            self._attr_has_entity_name = True
             self._attr_translation_key = "wifi_signal"
-            device_info: dict[str, Any] = {
+            device_info: DeviceInfo = {
                 "connections": {(CONNECTION_NETWORK_MAC, self._mac)},
                 "manufacturer": device.get("vendor_name") or "Inconnu",
                 "name": name,
@@ -365,24 +413,25 @@ class FreeboxWifiSignalSensor(FreeboxReachableMixin, SensorEntity):
             parent_id = self._router.lan_client_parent(self._mac, name)
             if parent_id:
                 device_info["via_device_id"] = parent_id
-            self._attr_device_info = DeviceInfo(**device_info)
+            self._attr_device_info = device_info
             return
 
-        self._attr_has_entity_name = False
-        self._attr_name = f"{name} Signal Wi-Fi"
+        self._attr_translation_key = "wifi_signal_named"
+        self._attr_translation_placeholders = {"name": name}
         self._attr_device_info = None
 
     @callback
     def async_update_state(self) -> None:
         device = self._router.devices.get(self._mac)
-        if not device:
+        if not device or device.get("active") is False:
             self._attr_native_value = None
             self._attr_extra_state_attributes = {}
             self._attr_available = False
             return
         wifi = device.get("wifi") or {}
-        self._attr_available = True
-        self._attr_native_value = wifi.get("wifi_signal_dbm")
+        signal = wifi.get("wifi_signal_dbm")
+        self._attr_available = (signal is not None or self._router.wifi_stations_available)
+        self._attr_native_value = signal
         self._attr_extra_state_attributes = {
             key: value
             for key, value in wifi.items()

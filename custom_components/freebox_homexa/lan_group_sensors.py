@@ -27,7 +27,7 @@ from .device_groups import (
     lan_type_name,
 )
 from .router import FreeboxRouter
-from .availability import FreeboxReachableMixin
+from .availability import FreeboxLanReachableMixin
 
 # Noms listés dans l'attribut « appareils » (au-delà : « … +N »), pour rester loin de la
 # limite de taille des attributs de Home Assistant.
@@ -45,7 +45,7 @@ def _names(devices: list[dict[str, Any]]) -> list[str]:
     return names
 
 
-class FreeboxLanGroupClientsSensor(FreeboxReachableMixin, SensorEntity):
+class FreeboxLanGroupClientsSensor(FreeboxLanReachableMixin, SensorEntity):
     """Nombre de clients en ligne dans un groupe de clients réseau."""
 
     _attr_should_poll = False

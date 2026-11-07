@@ -8,6 +8,7 @@ from typing import Any
 
 from homeassistant.components.calendar import CalendarEntity, CalendarEvent
 from homeassistant.core import HomeAssistant
+from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.util import dt as dt_util
 
@@ -15,6 +16,8 @@ from .tnt_sensor import TNT_DEVICE_INFO
 from .availability import FreeboxReachableMixin
 from .router import FreeboxConfigEntry, FreeboxRouter
 from .tv_guide import summarize_guide
+
+from .errors import async_action_errors
 
 _LOGGER = logging.getLogger(__name__)
 MAX_EVENTS = 80
@@ -41,7 +44,7 @@ def _as_datetime(value: Any) -> datetime | None:
         if ts > 10_000_000_000:
             ts = ts / 1000
         return dt_util.utc_from_timestamp(ts)
-    except (TypeError, ValueError, OSError):
+    except (TypeError, ValueError, OSError, OverflowError):
         return None
 
 
@@ -86,7 +89,6 @@ class FreeboxTvGuideCalendar(FreeboxReachableMixin, CalendarEntity):
 
     _attr_has_entity_name = True
     _attr_translation_key = "tv_guide"
-    _attr_icon = "mdi:television-guide"
 
     def __init__(self, router: FreeboxRouter) -> None:
         self._router = router
@@ -111,6 +113,7 @@ class FreeboxTvGuideCalendar(FreeboxReachableMixin, CalendarEntity):
             "second_part": self._summary.get("second_part", []),
         }
 
+    @async_action_errors
     async def async_get_events(
         self,
         hass: HomeAssistant,
@@ -119,47 +122,45 @@ class FreeboxTvGuideCalendar(FreeboxReachableMixin, CalendarEntity):
     ) -> list[CalendarEvent]:
         events: list[CalendarEvent] = []
         self._snippets = []
-        try:
-            api_tv = self._router._api.tv
-            channels = await api_tv.get_tv_channels() or {}
-            if isinstance(channels, dict):
-                self._channels = channels
-            now_ts = int(dt_util.now().timestamp())
-            programs = await api_tv.get_tv_programs_by_date(now_ts) or {}
-            iterable = programs.values() if isinstance(programs, dict) else programs or []
-            for program in iterable:
-                if not isinstance(program, dict):
-                    continue
-                uuid = str(program.get("uuid") or program.get("channel_uuid") or "")
-                channel = self._channels.get(uuid) or {}
-                channel_name = (
-                    channel.get("name")
-                    or program.get("channel_name")
-                    or program.get("subname")
-                    or uuid
-                )
-                event = _program_to_event(program, str(channel_name))
-                if event is None:
-                    continue
-                self._snippets.append(
-                    {
-                        "channel": channel_name,
-                        "title": program.get("title") or program.get("name"),
-                        "category": program.get("category_name") or program.get("category"),
-                        "start": event.start,
-                        "stop": event.end,
-                        "_start": event.start,
-                        "_end": event.end,
-                    }
-                )
-                if event.end < start_date or event.start > end_date:
-                    continue
-                events.append(event)
-                if len(events) >= MAX_EVENTS:
-                    break
-        except Exception as err:
-            _LOGGER.warning("Impossible de lire le guide TV Freebox : %s", err)
+        api_tv = self._router._api.tv
+        channels = await self._router.async_read(api_tv.get_tv_channels) or {}
+        if isinstance(channels, dict):
+            self._channels = channels
+        now_ts = int(dt_util.now().timestamp())
+        programs = await self._router.async_read(lambda: api_tv.get_tv_programs_by_date(now_ts)) or {}
+        iterable = programs.values() if isinstance(programs, dict) else programs or []
+        for program in iterable:
+            if not isinstance(program, dict):
+                continue
+            uuid = str(program.get("uuid") or program.get("channel_uuid") or "")
+            channel = self._channels.get(uuid) or {}
+            channel_name = (
+                channel.get("name")
+                or program.get("channel_name")
+                or program.get("subname")
+                or uuid
+            )
+            event = _program_to_event(program, str(channel_name))
+            if event is None:
+                continue
+            self._snippets.append(
+                {
+                    "channel": channel_name,
+                    "title": program.get("title") or program.get("name"),
+                    "category": program.get("category_name") or program.get("category"),
+                    "start": event.start,
+                    "stop": event.end,
+                    "_start": event.start,
+                    "_end": event.end,
+                }
+            )
+            if event.end < start_date or event.start > end_date:
+                continue
+            events.append(event)
+            if len(events) >= MAX_EVENTS:
+                break
 
+        self._attr_available = True
         self._summary = summarize_guide(hass, self._snippets)
         events.sort(key=lambda item: item.start)
         now = dt_util.now()
@@ -168,5 +169,12 @@ class FreeboxTvGuideCalendar(FreeboxReachableMixin, CalendarEntity):
 
     async def async_update(self) -> None:
         now = dt_util.now()
-        events = await self.async_get_events(self.hass, now - timedelta(minutes=10), now + timedelta(hours=3))
+        try:
+            events = await self.async_get_events(self.hass, now - timedelta(minutes=10), now + timedelta(hours=3))
+        except HomeAssistantError:
+            self._attr_available = False
+            self._event = None
+            self._summary = {}
+            self._snippets = []
+            return
         self._event = next((item for item in events if item.start <= now <= item.end), events[0] if events else None)

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import math
 from typing import Any
 
 from homeassistant.components.media_player import (
@@ -250,7 +251,7 @@ class FreeboxPlayerMediaPlayer(FreeboxReachableMixin, MediaPlayerEntity):
                 self._api_version,
                 last_err,
             )
-            self._attr_available = bool(self._player.get("reachable"))
+            self._attr_available = False
             return
 
         cache_player_schema(self._router, self._player_id, status, "received")
@@ -293,12 +294,18 @@ class FreeboxPlayerMediaPlayer(FreeboxReachableMixin, MediaPlayerEntity):
                     status["mute"] = vol_data.get("mute")
             except Exception:
                 volume = None
-        if isinstance(volume, (int, float)):
+        self._attr_volume_level = None
+        if (
+            isinstance(volume, (int, float))
+            and not isinstance(volume, bool)
+            and math.isfinite(volume)
+        ):
             self._attr_volume_level = max(0.0, min(1.0, float(volume) / 100.0))
 
         mute = status.get("mute")
-        if mute is not None:
-            self._attr_is_volume_muted = bool(mute)
+        self._attr_is_volume_muted = (
+            bool(mute) if isinstance(mute, (bool, int)) and mute in (0, 1) else None
+        )
 
         title = (
             status.get("title")

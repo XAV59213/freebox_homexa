@@ -1,6 +1,7 @@
 # Changelog
 
 ## Non publié
+- 2026-11-07 — Quality Scale, lot 3 : 187 tests HA (+69), plateformes Player/télécommande/calendrier et inventaire des 41 boutons ; veille correctement reconnue, indisponibilité après échec du statut, volume/muet inconnus non réutilisés, dates TV débordantes ignorées. Évaluation prudente inchangée (12 done / 40 todo / 2 exempt), aucun niveau officiel revendiqué.
 - 2026-11-07 — Quality Scale, lot 2 : guide utilisateur détaillé, propriétaires CODEOWNERS cohérents avec le manifeste et métadonnées des six services FR/EN, vrais tests de plateformes HA/dispatcher/coordinateurs et multi-entrées, couverture mesurée renforcée. Aucun niveau officiel revendiqué.
 - 2026-11-07 — Options : conserve les codes télécommande des Players absents de la liste ou non listables ; un code visible reste effaçable explicitement. Autres options/IDs inchangés.
 - 2026-11-07 — Robustesse : RAID absent sur plusieurs cycles puis revenu sans crash ; watcher alarme remplacé sans fuite et nettoyé ; hooks Home coopératifs ; coordinateur TNT lié explicitement à son entrée. Rappel sans fuseau refusé avec message traduit avant sauvegarde ; erreurs XMLTV traduites. Aucune commande réelle lors des tests, aucun endpoint repeater/ modifié.

@@ -31,7 +31,7 @@ rules:
       structurel, pas preuve de couverture du flow.
   config-flow-test-coverage:
     status: todo
-    comment: '118 tests HA au total ; config_flow.py : 359/438 lignes (81,96 %), 97/148 branches (65,54 %).
+    comment: '187 tests HA au total ; config_flow.py : 359/438 lignes (81,96 %), 97/148 branches (65,54 %).
       Découverte et limite reconfigure, profils ajout/modification/suppression/erreurs, TNT, groupes/types
       et codes Player présents/absents testés via flow manager. Encore loin de 100 % : options répéteurs, conflits
       Alexa, chemins rares/auth/storage à couvrir.'
@@ -162,8 +162,8 @@ rules:
       avant réauth. Lié au choix de migration unique ID host vers identité physique, non imposé ici.
   test-coverage:
     status: todo
-    comment: '118 tests HA 2026.10.4 ; 38 modules sans omit : lignes 2244/5727 (39,18 %), branches 327/1914
-      (17,08 %), combiné 33,65 %. Rapports JSON/XML CI, seuil officiel non atteint ; reste todo. Les tests
+    comment: '187 tests HA 2026.10.4 ; 38 modules sans omit : lignes 2680/5732 (46,76 %), branches 401/1916
+      (20,93 %), combiné 40,29 %. Rapports JSON/XML CI, seuil officiel non atteint ; reste todo. Les tests
       de caractérisation de limitations SDK/reconfigure ne sont pas des correctifs de ces limitations.'
   devices:
     status: todo

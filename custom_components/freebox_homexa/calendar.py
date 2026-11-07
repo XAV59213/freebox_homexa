@@ -41,7 +41,7 @@ def _as_datetime(value: Any) -> datetime | None:
         if ts > 10_000_000_000:
             ts = ts / 1000
         return dt_util.utc_from_timestamp(ts)
-    except (TypeError, ValueError, OSError):
+    except (TypeError, ValueError, OSError, OverflowError):
         return None
 
 

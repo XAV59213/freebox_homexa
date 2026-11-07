@@ -112,6 +112,11 @@ class FreeboxRemote(FreeboxReachableMixin, RemoteEntity):
         try:
             status = await self._router._api.player.get_player_status(self._player_id) or {}
             power = str(status.get("power_state") or "").lower()
-            self._attr_is_on = power in {"running", "on"} or bool(status)
+            if power in {"running", "on"}:
+                self._attr_is_on = True
+            elif power in {"standby", "stopped", "off"}:
+                self._attr_is_on = False
+            else:
+                self._attr_is_on = None
         except Exception:
             self._attr_is_on = None

@@ -130,11 +130,11 @@ La règle globale reste todo : boutons seuls sans provider MediaPlayer actif et
 cadres d’erreur image FFmpeg restent à qualifier. Les limites de session SDK et
 rollback refusé ne sont pas cachées par ces tests.
 
-## Provenance SDK : réserve dependency-transparency levée au lot 10
+## Provenance SDK vérifiée, conflit de pin custom/core établi au lot 10
 
-Le manifest épingle maintenant **freebox-api==1.3.1**, version réellement installée
-et testée ; même pin que le [manifest officiel HA Freebox](https://github.com/home-assistant/core/blob/dev/homeassistant/components/freebox/manifest.json).
-Il ne s’agit pas d’une mise à jour de SDK ni d’un patch externe.
+La version réellement installée et testée est **1.3.1**, comme le [manifest officiel HA Freebox](https://github.com/home-assistant/core/blob/dev/homeassistant/components/freebox/manifest.json).
+Le manifest garde **freebox-api>=1.3.1**, minimum requis pour un custom partageant
+la dépendance avec HA ; voir conflit de pin ci-dessous. Aucun SDK mis à jour ou patché.
 
 - Source publique GPL-3.0 : [tag v1.3.1](https://github.com/hacf-fr/freebox-api/tree/v1.3.1),
   commit `96322885f37df37e6f491ab889b27cf912cc293a` ; [licence](https://github.com/hacf-fr/freebox-api/blob/v1.3.1/LICENSE.rst).
@@ -154,5 +154,14 @@ Il ne s’agit pas d’une mise à jour de SDK ni d’un patch externe.
   `gh api repos/hacf-fr/freebox-api/attestations/sha256:fb438c44d08293d7ca1a3d9ad55334a3e2905bdda270332345b7e30a1afbfa87`.
   Aucun lien signé temporaire, jeton ou credential n’est publié dans le dépôt.
 
-Cette preuve clôt seulement `dependency-transparency`. Elle ne fournit ni session
-publique injectable, ni close garanti, ni typings du SDK, ni validation matérielle.
+Cette preuve établit la provenance du SDK testé, **pas un done formel**.
+La [règle core](https://contributors.home-assistant.io/core/quality-scale/dependency-transparency/)
+demande aussi pin exact. L’essai de pin a réellement échoué au
+[hassfest custom](https://github.com/XAV59213/freebox_homexa/actions/runs/42400842458),
+qui refuse de pinner une dépendance partagée avec HA et exige `>=1.3.1` pour
+suivre ses mises à jour. [Source du validateur](https://github.com/home-assistant/core/blob/dev/script/hassfest/requirements.py),
+`validate_custom_requirements`, distinct de `validate_requirements_format` core.
+Le minimum original est rétabli : aucune validation désactivée ni code SDK patché
+pour le score. Réserve formelle custom/core explicite, versions futures à réauditer.
+Cette preuve ne fournit ni session injectable, ni close garanti, ni typings SDK,
+ni validation matérielle.

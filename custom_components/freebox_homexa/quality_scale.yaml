@@ -39,13 +39,14 @@ rules:
       defaults privés synthétiques et conservation des codes vérifiés. Reste ligne 369 et trois branches ;
       guard reauth/user à justifier, sans forcer un chemin artificiel. 100 % non atteint, donc todo.'
   dependency-transparency:
-    status: done
-    comment: Manifest épinglé freebox-api==1.3.1, version effectivement testée, comme HA core Freebox. Source
-      GPL-3.0 tag v1.3.1 commit 96322885f37df37e6f491ab889b27cf912cc293a ; wheel PyPI SHA256 fb438c44d08293d7ca1a3d9ad55334a3e2905bdda270332345b7e30a1afbfa87.
-      gh attestation verify réussi contre hacf-fr/freebox-api ; provenance signée relie ce wheel au même
-      commit et au workflow release.yml, run 23742463862 réussi. Source publique, hashes sdist/wheel, CI
-      de construction/attestation/publication et commandes dans docs/quality-scale-source-contracts.md.
-      Ne vaut ni injection de session ni validation matérielle.
+    status: todo
+    comment: 'Source GPL-3.0 tag v1.3.1 commit 96322885f37df37e6f491ab889b27cf912cc293a ; wheel PyPI SHA256
+      fb438c44d08293d7ca1a3d9ad55334a3e2905bdda270332345b7e30a1afbfa87, gh attestation verify réussi contre
+      hacf-fr/freebox-api. Provenance signée liée au même commit et au run public release.yml 23742463862
+      réussi : transparence démontrée pour le SDK testé 1.3.1. Réserve formelle précise : règle core demande
+      pin exact mais hassfest custom refuse ce pin pour dépendance partagée avec HA (run 42400842458). Minimum
+      freebox-api>=1.3.1 conservé, pas validation désactivée ni exemption artificielle ; nouvelles versions
+      à réauditer. Détails et hashes dans docs/quality-scale-source-contracts.md.'
   docs-actions:
     status: todo
     comment: 'docs/guide-utilisateur.md (lié README) : Les six actions et tous leurs champs, ciblage multi-entrées

@@ -19,9 +19,9 @@ Platinum absent). Le snapshot JSON documente noms et tiers ; il ne crée pas
 un second fichier de statut. Le seul checklist est
 `custom_components/freebox_homexa/quality_scale.yaml`, placement conventionnel.
 
-## Résultat : 17 done / 35 todo / 2 exempt
+## Résultat : 16 done / 36 todo / 2 exempt
 
-Les 48 anciens `todo` ont tous été relus : **13 démontrés** depuis l’audit initial, **35
+Les 48 anciens `todo` ont tous été relus : **12 démontrés** depuis l’audit initial, **36
 restent ouverts** avec réserve précise dans le YAML et ci-dessous. Pas de
 transformation administrative pour atteindre un score. Les numéros de lignes
 de l'audit initial se réfèrent à la base ; les preuves nouvelles utilisent les
@@ -38,7 +38,7 @@ noms de fonctions/tests pour éviter les décalages de lignes.
 | test-before-setup (nouveau) | open/probe avant forward, erreurs temporaires/auth converties ; nettoyage public tenté, limite SDK précisée ci-dessous |
 | diagnostics (lot 1) | export chargé/non chargé, valeurs privées synthétiques et clés inconnues absentes, cache borné, timings validés/périmés |
 | entity-event-setup (lot 2) | inventaire AST + vraies plateformes HA/dispatcher/CoordinatorEntity, retrait des listeners et timers, isolement deux entrées |
-| exception-translations (lot 2) | toutes les 35 levées custom HA/sous-classes traduites, placeholders vérifiés strings/FR/EN, moteur HA français réel |
+| exception-translations (lot 2) | toutes les 36 levées custom HA/sous-classes traduites, placeholders vérifiés strings/FR/EN, moteur HA français réel |
 | async-dependency (lot 2) | SDK asyncio/aiohttp ; SSL/fichiers dans asyncio.to_thread, signature coroutine publique testée et source v1.3.1 vérifiée |
 | action-exceptions (lot 5) | 42 frontières AST, 103 tests dédiés HA/SDK/Store, validation/annulation préservées, pas de succès silencieux démontré |
 | integration-owner (lot 2) | propriétaires du manifest repris sans ajout de personne dans CODEOWNERS ; cohérence testée, mainteneur XAV59213 actif dans les cinq derniers commits main |
@@ -117,10 +117,12 @@ PYTHONDONTWRITEBYTECODE=1 /tmp/homexa-ha-quality/bin/python -m pytest -q tests/h
 
 ## Lot 10 — contrat SDK vérifié et disponibilité sans faux états
 
-**490 tests HA (+39)** ; **17 done / 35 todo / 2 exempt**. La règle
-`dependency-transparency` est démontrée entièrement : source/version exacte, GPL,
-wheel PyPI et signature vérifiée liés au même commit et à la CI de release amont.
-Le pin `freebox-api==1.3.1` ne change pas le SDK utilisé par les tests.
+**490 tests HA (+39)** ; **16 done / 36 todo / 2 exempt**. La provenance de
+`freebox-api` 1.3.1 est désormais démontrée : GPL, source/tag, wheel PyPI et signature
+vérifiée liés au même commit et à la CI de release amont. **La règle reste todo** :
+le pin exact demandé par le guide core échoue réellement au hassfest custom, qui
+exige >= pour une dépendance partagée avec HA. Minimum original conservé plutôt
+que désactiver la validation ou revendiquer un faux done. Le SDK testé reste 1.3.1.
 [Preuves reproductibles et hashes](quality-scale-source-contracts.md).
 
 - Disponibilité Remote/Player/boutons, endpoints Home individuels, LAN/Wi-Fi/AP ;
@@ -140,8 +142,8 @@ Le pin `freebox-api==1.3.1` ne change pas le SDK utilisé par les tests.
 - Deux suites JS et douze simulations historiques, séparées du compte HA.
   Endpoints `repeater/`, IDs, options, préférences et données privées préservés.
 
-[Inventaire fini des 35 todo](quality-scale-remaining-work.md) : sept règles ont
-encore du travail local indépendant, deux travaux locaux avec réserve de
+[Inventaire fini des 36 todo](quality-scale-remaining-work.md) : sept règles ont
+encore du travail local indépendant, trois travaux locaux avec réserve de
 compatibilité/dépendance, onze décisions de compatibilité/SDK/publication, treize
 réserves documentaires formelles et deux critères transversaux de tests/typage.
 Les tests ne prouvent aucun succès physique. Ce jalon n’est **pas** la fin du mandat.
@@ -498,7 +500,7 @@ Provenance partielle connue au lot 9 : licence GPL-3.0 du tag, commit
 [workflow de publication](https://github.com/hacf-fr/freebox-api/blob/v1.3.1/.github/workflows/release.yml)
 vérifiés. Les runs verts trouvés sur ce commit correspondent à Tests/CodeQL,
 pas une preuve d'exécution du publish PyPI. La dépendance était `>=1.3.1`,
-pas épinglée exactement au lot 9. **Réserve levée au lot 10** : pin exact et attestation cryptographique du wheel publiés dans le contrat source ; règle désormais done. Ce paragraphe conserve la chronologie, pas l’état courant.
+pas épinglée exactement au lot 9. **Provenance établie au lot 10** : attestation cryptographique du wheel vérifiée. Le pin exact a été refusé par hassfest custom (dépendance partagée) puis minimum initial rétabli ; règle formelle toujours todo avec raison précise. Ce paragraphe conserve la chronologie, pas l’état courant.
 
 Proposition amont (non appliquée, personne contactée) : `close` doit fermer en
 finally même sans authentification complète, et une future injection de session
@@ -510,7 +512,7 @@ ou monkeypatch de `_session` dans le runtime pour cocher une règle.
 
 Ce plan des premiers lots est conservé pour traçabilité ; certains points (noms,
 exceptions) sont désormais done. Pour le restant courant exhaustif, suivre
-[les 35 critères](quality-scale-remaining-work.md), pas répéter ces travaux.
+[les 36 critères](quality-scale-remaining-work.md), pas répéter ces travaux.
 
 1. **Identité/flows** : réauth testé, mais unique ID = host et jetons nommés par host.
    Reconfigure refuse un nouveau host via `_abort_if_unique_id_mismatch` et ne
@@ -541,7 +543,7 @@ listés dans le tableau suivant ; celui-ci reprend le YAML, il n'est pas un seco
 | appropriate-polling | Règle officielle relue le 2026-11-07 : intervalle choisi par le développeur, pas de champ config flow. Le champ home_poll_interval existe encore ; ne pas le supprimer pour le score au risque de changer les réglages existants. Documenter une dépréciation compatible et vérifier les fréquences/doublons de toutes les plateformes avant done. |
 | brands | Règle officielle vérifiée : assets dans home-assistant/brands sous le domaine. Lecture GitHub de core_integrations/freebox_homexa le 2026-11-07 -> 404 ; logos locaux YouTube/Netflix ne sont pas le branding de cette intégration. Aucun ajout/PR amont ni création de logo effectué. Reste todo ; HACS accepté ne vaut pas branding validé. |
 | config-flow-test-coverage | 407 tests HA au total ; config_flow.py : 437/438 lignes (99,77 %), 145/148 branches (97,97 %). Les erreurs de link testées sont suivies de la correction de leur cause et de la finalisation du même flow avec unique_id vérifié. Options répéteurs (registre uniquement), conflits Alexa, doublons de libellés, defaults privés synthétiques et conservation des codes vérifiés. Reste ligne 369 et trois branches ; guard reauth/user à justifier, sans forcer un chemin artificiel. 100 % non atteint, donc todo. |
-| dependency-transparency | Manifest épinglé freebox-api==1.3.1, version effectivement testée, comme HA core Freebox. Source GPL-3.0 tag v1.3.1 commit 96322885f37df37e6f491ab889b27cf912cc293a ; wheel PyPI SHA256 fb438c44d08293d7ca1a3d9ad55334a3e2905bdda270332345b7e30a1afbfa87. gh attestation verify réussi contre hacf-fr/freebox-api ; provenance signée relie ce wheel au même commit et au workflow release.yml, run 23742463862 réussi. Source publique, hashes sdist/wheel, CI de construction/attestation/publication et commandes dans docs/quality-scale-source-contracts.md. Ne vaut ni injection de session ni validation matérielle. |
+| dependency-transparency | Source GPL-3.0 tag v1.3.1 commit 96322885f37df37e6f491ab889b27cf912cc293a ; wheel PyPI SHA256 fb438c44d08293d7ca1a3d9ad55334a3e2905bdda270332345b7e30a1afbfa87, gh attestation verify réussi contre hacf-fr/freebox-api. Provenance signée liée au même commit et au run public release.yml 23742463862 réussi : transparence démontrée pour le SDK testé 1.3.1. Réserve formelle précise : règle core demande pin exact mais hassfest custom refuse ce pin pour dépendance partagée avec HA (run 42400842458). Minimum freebox-api>=1.3.1 conservé, pas validation désactivée ni exemption artificielle ; nouvelles versions à réauditer. Détails et hashes dans docs/quality-scale-source-contracts.md. |
 | docs-actions | docs/guide-utilisateur.md (lié README) : Les six actions et tous leurs champs, ciblage multi-entrées et réponse scheduled_minutes sont documentés ; inventaire metadata/strings/FR/EN et YAML exemples testé. Preuve documentaire locale renforcée ; reste todo au sens formel, la règle officielle visant une page/revue home-assistant.io non soumise. Aucune certification custom revendiquée. |
 | docs-high-level-description | docs/guide-utilisateur.md (lié README) : Description Server/Player, usage réseau/Home/guide et lien officiel Free dans le guide. Preuve documentaire locale renforcée ; reste todo au sens formel, la règle officielle visant une page/revue home-assistant.io non soumise. Aucune certification custom revendiquée. |
 | docs-installation-instructions | docs/guide-utilisateur.md (lié README) : Installation HACS/manuelle, redémarrage et appairage pas à pas, prérequis locaux et confidentialité dans le guide. Preuve documentaire locale renforcée ; reste todo au sens formel, la règle officielle visant une page/revue home-assistant.io non soumise. Aucune certification custom revendiquée. |

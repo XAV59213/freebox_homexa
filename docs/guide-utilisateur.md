@@ -334,4 +334,5 @@ Une veille Player déjà confirmée peut rester off/available si le code téléc
 configuré permet le réveil par le canal Server existant. Un code seul ne prouve
 ni connexion initiale ni état off ; aucune commande automatique n’est envoyée.
 Les boutons utilisent les observations existantes, pas une collecte par bouton.
-Le SDK est épinglé à 1.3.1, version testée avec provenance publique vérifiée.
+Le SDK testé est 1.3.1, provenance publique vérifiée ; le manifest conserve
+>=1.3.1 pour compatibilité avec la dépendance partagée de Home Assistant.

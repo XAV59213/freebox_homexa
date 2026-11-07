@@ -360,12 +360,12 @@ async def test_temperature_disappearing_value_does_not_leave_old_cache(hass, hom
     assert entity.available
 
 
-def test_manifest_pins_the_verified_and_tested_dependency():
+def test_shared_requirement_preserves_hassfest_minimum_and_tested_version():
     import json
     from pathlib import Path
     from importlib.metadata import version
     manifest = json.loads((Path(__file__).parents[2] / 'custom_components/freebox_homexa/manifest.json').read_text())
-    assert manifest['requirements'] == ['freebox-api==1.3.1']
+    assert manifest['requirements'] == ['freebox-api>=1.3.1']
     assert version('freebox-api') == '1.3.1'
 
 

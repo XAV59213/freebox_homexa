@@ -1,6 +1,6 @@
 # Inventaire fini des travaux restants — lot 10
 
-**17 done / 35 todo / 2 exempt, préparation 28.8.90 ; aucune certification HA.**
+**16 done / 36 todo / 2 exempt, préparation 28.8.90 ; aucune certification HA.**
 Une ligne par todo, pas une liste infinie de tests. Les sept règles A sont du
 travail local indépendant ; B mêle travail local et réserve de compatibilité ou
 dépendance ; C exige proposition compatible ou action amont avant conformité.
@@ -19,10 +19,11 @@ la qualité transversale. Le mandat continue, ce document n’en annonce pas la 
 | icon-translations | Croiser 30 familles/81 variantes avec icons.json et classes HA ; déplacer seulement icônes de fonction traduisibles, conserver icônes dynamiques réellement justifiées. Tester résolution, sans inventer de nouveaux logos. |
 | repair-issues | Inventorier erreurs nécessitant intervention (droits/config), utiliser reauth existant pour auth quand approprié, Repairs traduits avec résolution/ownership pour autres cas réellement actionnables ; aucun Repair pour panne transitoire normale. |
 
-## B — deux règles mixtes : travail indépendant possible, réserve précise
+## B — trois règles mixtes : travail indépendant possible, réserve précise
 
 | Règle | Travail / limite avant done |
 |---|---|
+| dependency-transparency | Source/tag/GPL/PyPI et attestation cryptographique du wheel 1.3.1 vérifiés. Guide core exige pin exact ; hassfest custom refuse exactement ce pin partagé (run 42400842458) et exige >=. Minimum original conservé, pas de désactivation CI. Réserve formelle pas défaut de provenance ; réauditer les versions futures, pas une exemption. |
 | entity-device-class | Inventaire classes/unités déjà présent. Reste opener déduit du libellé (pas preuve garage), signal Free documenté dB mais historique dBm. Obtenir contrat vendor précis puis proposer mapping/option et compatibilité historique avant modifier classe/unité/exposition vocale. /1000 débit est maintenant démontré par documentation et HTTP JSON du vrai SDK ; ne pas rouvrir arbitrairement ce facteur. |
 | config-entry-unloading | Maintenir tests réels forward onze domaines, rollback partiel, lectures en vol et fermeture. Restent HA refusant rollback (plateformes peuvent rester), partial-open FFmpeg avant try/finally parent et SDK close échoué sans finally. Préparer stratégie explicite de récupération via API publique, pas prétendre rollback atomique ni toucher une session privée. Tests supplémentaires n’effacent pas ces contrats amont. |
 

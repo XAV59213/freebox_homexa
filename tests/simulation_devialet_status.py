@@ -199,6 +199,40 @@ async def run():
     await update({'power_state':'standby'})
     assert entity._attr_state == State.OFF and entity._attr_media_title is None
 
+    # freebox-api 1.3.1 Player.update_player_volume sends PUT {volume: int}
+    # and/or {mute: bool}; the entity must use the explicit Player id/version.
+    # With freebox-api installed this additionally executes the real SDK,
+    # comparing its request payloads to our entity wrapper (no network).
+    try:
+        from freebox_api.api.player import Player as SdkPlayer
+    except ImportError:
+        SdkPlayer = None
+    if SdkPlayer is not None:
+        sdk_access = types.SimpleNamespace(put=AsyncMock())
+        sdk = SdkPlayer(sdk_access, entity._api_version)
+        for level in (0, 0.2, 0.65, 1):
+            access.put = AsyncMock()
+            await entity.async_set_volume_level(level)
+            await sdk.update_player_volume(volume=round(level * 100), player_id=17)
+            assert access.put.await_args == sdk_access.put.await_args
+        for muted in (True, False):
+            access.put = AsyncMock()
+            await entity.async_mute_volume(muted)
+            await sdk.update_player_volume(mute=muted, player_id=17)
+            assert access.put.await_args == sdk_access.put.await_args
+        print('OK: real freebox-api Player payloads match entity volume/mute')
+    else:
+        print('SDK contract comparison skipped: install freebox-api to run it')
+    access.put = AsyncMock()
+    await entity.async_set_volume_level(0.65)
+    access.put.assert_awaited_with(entity._path('control/volume'), {'volume': 65})
+    await entity.async_mute_volume(True)
+    access.put.assert_awaited_with(entity._path('control/volume'), {'mute': True})
+    await entity.async_set_volume_level(0)
+    access.put.assert_awaited_with(entity._path('control/volume'), {'volume': 0})
+    await entity.async_set_volume_level(1)
+    access.put.assert_awaited_with(entity._path('control/volume'), {'volume': 100})
+
     access.get.side_effect = RuntimeError('offline')
     await entity.async_update()  # API failure must not raise.
     assert router.player_diagnostic_schemas[17]['outcome'] == 'unavailable'

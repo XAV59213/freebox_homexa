@@ -110,7 +110,7 @@ def load(name):
     return m
 
 
-load("registry_compat"); er_mod = load("errors"); dg = load("device_groups"); wa = load("wifi_ap"); rt = load("router")
+load("sdk_contracts"); load("registry_compat"); er_mod = load("errors"); dg = load("device_groups"); wa = load("wifi_ap"); rt = load("router")
 
 RM = "34:27:92:D9:E0:30"
 TRUTH = {"Grange": ("20:66:CF:4A:05:93", "192.168.1.165", ["22:66:CF:C9:A0:52", "22:66:CF:C9:A0:56"]),

@@ -41,3 +41,50 @@ class SystemConfiguration(Protocol):
     async def get_config(self) -> object:
         """Read system configuration; consumers validate identity/display fields."""
         ...
+
+
+class LanObservations(Protocol):
+    async def get_hosts_list(self, interface: str = "pub") -> object:
+        ...
+
+
+class WifiObservations(Protocol):
+    async def get_global_config(self) -> object:
+        ...
+
+    async def get_bss(self) -> object:
+        ...
+
+    async def get_ap_list(self) -> object:
+        ...
+
+    async def get_station_list(self, ap_id: object) -> object:
+        ...
+
+
+class SystemActions(SystemConfiguration, Protocol):
+    async def reboot(self) -> object:
+        ...
+
+
+class ConnectionObservations(Protocol):
+    async def get_status(self) -> object:
+        ...
+
+
+class CallObservations(Protocol):
+    async def get_calls_log(self) -> object:
+        ...
+
+
+class StorageObservations(Protocol):
+    async def get_disks(self) -> object:
+        ...
+
+    async def get_raids(self) -> object:
+        ...
+
+
+class HomeObservations(Protocol):
+    async def get_home_nodes(self) -> object:
+        ...

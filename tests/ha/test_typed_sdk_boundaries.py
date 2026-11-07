@@ -30,6 +30,7 @@ def platform_for(hass, domain):
     ("wifi", "async_turn_on", "wifi/config/", {"enabled": True}),
     ("wifi", "async_turn_off", "wifi/config/", {"enabled": False}),
     ("calls_button", "async_press", "call/log/mark_all_as_read/", None),
+    ("server_button", "async_press", "system/reboot", None),
 ])
 async def test_typed_actions_keep_actual_sdk_endpoint_body_error_and_recovery(
     hass, home_context, kind, method, path, body
@@ -38,6 +39,7 @@ async def test_typed_actions_keep_actual_sdk_endpoint_body_error_and_recovery(
     transport = Mock(put=AsyncMock(), post=AsyncMock())
     router._api.wifi = Wifi(transport)
     router._api.call = Call(transport)
+    router._api.system = System(transport)
     entry = hass.config_entries.async_get_entry(router.entry_id)
     entity, domain = build_entity(hass, router, node, entry, kind)
     platform = platform_for(hass, domain)

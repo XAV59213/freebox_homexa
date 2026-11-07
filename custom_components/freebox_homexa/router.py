@@ -36,11 +36,14 @@ from .const import (
 )
 from .registry_compat import (
     as_version,
+    registry_device_id,
     foreign_device_with_connection,
     get_device_by_connection,
     get_device_by_identifier,
     shared_with_other_entries,
 )
+from .sdk_contracts import (LanObservations, WifiObservations, SystemConfiguration,
+    SystemActions, ConnectionObservations, CallObservations, StorageObservations, HomeObservations)
 from .errors import api_error_code, is_permission_denied, is_shutdown_error
 from .wifi_ap import build_wifi_aps
 
@@ -170,7 +173,7 @@ async def get_api(hass: HomeAssistant, host: str) -> Freepybox:
     token_file = _token_path(hass, host)
     storage_dir = token_file.parent
 
-    def _ensure_directory():
+    def _ensure_directory() -> None:
         if storage_dir.is_file():
             backup = storage_dir.with_suffix(".bak")
             try:
@@ -197,9 +200,13 @@ async def get_hosts_list_if_supported(
     supports_hosts: bool = True
     fbx_devices: list[dict[str, Any]] = []
     try:
-        fbx_devices = await fbx_api.lan.get_hosts_list()
-        if not isinstance(fbx_devices, list):
+        lan: LanObservations = fbx_api.lan
+        response = await lan.get_hosts_list()
+        if not isinstance(response, list):
             raise ValueError("Invalid LAN hosts collection")
+        if any(not isinstance(row, dict) for row in response):
+            raise ValueError("Invalid LAN host record")
+        fbx_devices = response
     except HttpRequestError as err:
         if api_error_code(err) == "nodev":
             supports_hosts = False
@@ -322,7 +329,7 @@ class FreeboxRouter:
         self.call_list: list[dict[str, Any]] = []
         self.home_granted = True
         self.home_devices: dict[str, Any] = {}
-        self.listeners: list = []
+        self.listeners: list[object] = []
         self.poll_tasks: set[asyncio.Task[None]] = set()
         self.read_tasks: set[asyncio.Task[object]] = set()
         self._close_lock = asyncio.Lock()
@@ -369,7 +376,7 @@ class FreeboxRouter:
         payload = self.repeaters.get(canon) or {}
         macs = payload.get("macs") or [canon]
         name = payload.get("name") or name
-        info: dict[str, Any] = {
+        info: DeviceInfo = {
             "identifiers": {(DOMAIN, f"repeater_{canon}")},
             "connections": {(CONNECTION_NETWORK_MAC, m.lower()) for m in macs},
             "manufacturer": manufacturer or payload.get("vendor_name") or "Freebox SAS",
@@ -384,7 +391,7 @@ class FreeboxRouter:
         parent_id = self.parent_for(f"repeater_{canon}", name, "server", LINK_WIFI)
         if parent_id:
             info["via_device_id"] = parent_id
-        return DeviceInfo(**info)
+        return info
 
     def _refresh_repeaters(self) -> None:
         """Build gateway + repeater maps and attach Wi-Fi clients."""
@@ -450,7 +457,8 @@ class FreeboxRouter:
     async def _fetch_wifi_global_state(self) -> None:
         """/wifi/config/ (enabled, comme l'interrupteur) et /wifi/bss/ (état des BSS)."""
         try:
-            config = await self._api.wifi.get_global_config()
+            wifi: WifiObservations = self._api.wifi
+            config = await wifi.get_global_config()
             if not isinstance(config, dict):
                 raise ValueError("Invalid Wi-Fi config")
             enabled = config.get("enabled") if isinstance(config, dict) else None
@@ -462,7 +470,8 @@ class FreeboxRouter:
             self.wifi_global_enabled = None
             self._wifi_api_error("config", "wifi/config/", err)
         try:
-            bss_list = await self._api.wifi.get_bss()
+            bss_api: WifiObservations = self._api.wifi
+            bss_list = await bss_api.get_bss()
             if not isinstance(bss_list, list):
                 raise ValueError("Invalid Wi-Fi BSS collection")
             self.wifi_api_errors.pop("bss", None)
@@ -492,7 +501,8 @@ class FreeboxRouter:
         for device in self.devices.values():
             device.pop("_wifi_station", None)
         try:
-            access_points = await self._api.wifi.get_ap_list()
+            wifi: WifiObservations = self._api.wifi
+            access_points = await wifi.get_ap_list()
             if not isinstance(access_points, list):
                 raise ValueError("Invalid Wi-Fi AP collection")
             self.wifi_api_errors.pop("ap", None)
@@ -525,7 +535,7 @@ class FreeboxRouter:
             if ap_id is None:
                 continue
             try:
-                stations = await self._api.wifi.get_station_list(ap_id)
+                stations = await wifi.get_station_list(ap_id)
                 if not isinstance(stations, list):
                     raise ValueError("Invalid Wi-Fi stations collection")
                 stations_observed = True
@@ -743,7 +753,10 @@ class FreeboxRouter:
     async def update_sensors(self) -> None:
         permission_source = "system"
         try:
-            syst_datas: dict[str, Any] = await self._api.system.get_config()
+            system: SystemConfiguration = self._api.system
+            syst_datas = await system.get_config()
+            if not isinstance(syst_datas, dict):
+                raise ValueError("Invalid system configuration")
             self.sensors_temperature = {
                 sensor["name"]: sensor.get("value") for sensor in syst_datas["sensors"]
             }
@@ -751,7 +764,10 @@ class FreeboxRouter:
             serial = syst_datas["serial"]
             self.note_permission("system")
             permission_source = "connection"
-            connection_datas: dict[str, Any] = await self._api.connection.get_status()
+            connection: ConnectionObservations = self._api.connection
+            connection_datas = await connection.get_status()
+            if not isinstance(connection_datas, dict):
+                raise ValueError("Invalid connection status")
             for sensor_key in CONNECTION_SENSORS_KEYS:
                 value = connection_datas.get(sensor_key)
                 self.sensors_connection[sensor_key] = value if isinstance(value, (int, float)) and not isinstance(value, bool) else None
@@ -774,7 +790,8 @@ class FreeboxRouter:
             }
 
             permission_source = "calls"
-            calls = await self._api.call.get_calls_log()
+            call_api: CallObservations = self._api.call
+            calls = await call_api.get_calls_log()
             if not isinstance(calls, list):
                 raise ValueError("Invalid call log collection")
             self.call_list = calls
@@ -798,7 +815,8 @@ class FreeboxRouter:
 
     async def _update_disks_sensors(self) -> None:
         try:
-            fbx_disks = await self._api.storage.get_disks()
+            storage: StorageObservations = self._api.storage
+            fbx_disks = await storage.get_disks()
             if not isinstance(fbx_disks, list):
                 raise ValueError("Invalid disks collection")
             disks: dict[int, dict[str, Any]] = {}
@@ -821,7 +839,8 @@ class FreeboxRouter:
         if not self.supports_raid:
             return
         try:
-            fbx_raids = await self._api.storage.get_raids()
+            storage: StorageObservations = self._api.storage
+            fbx_raids = await storage.get_raids()
             if not isinstance(fbx_raids, list):
                 raise ValueError("Invalid RAID collection")
             raids = {raid["id"]: raid for raid in fbx_raids}
@@ -847,7 +866,8 @@ class FreeboxRouter:
             return
         async with self._home_update_lock:
             try:
-                home_nodes = await self.home.get_home_nodes()
+                home: HomeObservations = self.home
+                home_nodes = await home.get_home_nodes()
                 if self.closing:
                     return
                 if not isinstance(home_nodes, list):
@@ -894,7 +914,8 @@ class FreeboxRouter:
 
     @async_action_errors
     async def reboot(self) -> None:
-        await self._api.system.reboot()
+        system: SystemActions = self._api.system
+        await system.reboot()
         _LOGGER.info("Redémarrage de la Freebox effectué")
 
     async def async_read(self, read: Callable[[], Awaitable[_ReadT]]) -> _ReadT:
@@ -972,7 +993,7 @@ class FreeboxRouter:
             for ident in (identifier, f"repeater_{identifier}"):
                 device = get_device_by_identifier(registry, (DOMAIN, ident), self.entry_id)
                 if device is not None:
-                    return device.id
+                    return registry_device_id(device)
         return self.device_id
 
     def parent_for(
@@ -1076,8 +1097,10 @@ class FreeboxRouter:
                 registry, (DOMAIN, f"repeater_{canon}"), self.entry_id
             )
             if device is not None:
-                self.repeater_device_ids[canon] = device.id
-                return device.id  # clients Wi-Fi d'un répéteur : directement sous lui
+                identifier = registry_device_id(device)
+                if identifier is not None:
+                    self.repeater_device_ids[canon] = identifier
+                    return identifier  # clients Wi-Fi du répéteur
             # Répéteur pas encore enregistré : « Clients Wi-Fi » en attendant.
             link = LINK_WIFI
         group = {LINK_WIRED: GROUP_LAN_WIRED, LINK_WIFI: GROUP_LAN_WIFI}.get(link)
@@ -1291,14 +1314,17 @@ class FreeboxRouter:
                 name=name,
             )
             _LOGGER.debug("Appareil créé pour le client réseau %s (%s)", name, mac)
+        identifier = registry_device_id(entry)
+        if identifier is None:
+            return None
         parent_id = self.lan_client_parent(mac, lan_client_name(device))
-        if parent_id and parent_id != entry.id and entry.via_device_id != parent_id:
-            registry.async_update_device(entry.id, via_device_id=parent_id)
-        self.lan_device_ids[norm] = entry.id
+        if parent_id and parent_id != identifier and entry.via_device_id != parent_id:
+            registry.async_update_device(identifier, via_device_id=parent_id)
+        self.lan_device_ids[norm] = identifier
         placement = self._placement_of(parent_id)
         if placement:
             self.lan_client_placements[norm] = placement
-        return entry.id
+        return identifier
 
     def _placement_of(self, parent_id: str | None) -> str | None:
         """Clé du (sous-)groupe ou du répéteur correspondant à un device_id parent."""
@@ -1401,7 +1427,7 @@ class FreeboxRouter:
             for ident in idents:
                 device = get_device_by_identifier(registry, ident, self.entry_id)
                 if device is not None:
-                    return device.id
+                    return registry_device_id(device)
         return self.device_id
 
     @property

@@ -1,4 +1,4 @@
-# Inventaire fini des travaux restants — jalon16
+# Inventaire fini des travaux restants — jalon17
 
 **21 done / 31 todo / 2 exempt, préparation 28.8.90 ; aucune certification HA.**
 Une ligne par todo, pas une liste infinie de tests. La règle A est du
@@ -6,6 +6,12 @@ travail local indépendant ; B mêle travail local et réserve de compatibilité
 dépendance ; C exige proposition compatible ou action amont avant conformité.
 D contient du contenu local présent, pas treize documents manquants ; E mesure
 la qualité transversale. Le mandat continue, ce document n’en annonce pas la fin.
+
+Router désormais sans diagnostic (contrats object et validations), registry_compat
+100% lignes/96,67% branches ; aucune clôture globale strict/devices/coverage.
+Restent config_flow25, tnt_reminders17, tnt_ws16, base_class16, calls_ws9,
+sensor1 et camera1. Les callbacks/données peuvent être traités indépendamment
+du choix de moteur de schéma, qui reste une compatibilité locale à concevoir.
 
 La priorité utilisateur est désormais le typage réel par modules puis la couverture
 par module (>95% officiel, sans exception), sans extension indéfinie de Repairs/caméra.
@@ -77,7 +83,7 @@ modifier artificiellement le sens du YAML. Aucune soumission amont ici.
 | Règle | Minimum restant |
 |---|---|
 | test-coverage | Seuil officiel intégration entière encore non atteint (75,74 % lignes / 54,34 % branches / 70,38 % combiné). Cibler erreurs/récupération et comportements manquants via A/B, pas tests sans assertions ni exclusion opportuniste. Deux passages locaux et CI doivent donner mêmes 39 modules/totaux. |
-| strict-typing | 105 erreurs réelles/8 fichiers/42 modules ; résoudre contrats/narrowing/structures et appels SDK non annotés, sans Any/cast/ignore pour score. Conflit héritage FFmpeg et typage SDK doivent être distingués des défauts locaux corrigeables. |
+| strict-typing | 85 erreurs réelles/7 fichiers/42 modules ; résoudre contrats/narrowing/structures et appels SDK non annotés, sans Any/cast/ignore pour score. Conflit héritage FFmpeg et typage SDK doivent être distingués des défauts locaux corrigeables. |
 
 ## Exemptions inchangées : deux, pas une façon de masquer des défauts
 

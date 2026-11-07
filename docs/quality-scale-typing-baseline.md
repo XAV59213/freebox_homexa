@@ -179,3 +179,21 @@ prétendues supprimées. Détail105 diagnostics et réserves de compatibilité :
 [convergence jalon16](quality-scale-lot16-convergence.md).
 La règle strict-typing reste todo ; le code historique base_class/DUMMY et les
 IDs entiers ne sont ni effacés ni transformés pour faire disparaître des erreurs.
+
+
+## Jalon17 —85 erreurs /7 fichiers /42 modules
+
+Router n'a plus de diagnostic :20 appels/annotations/retours réglés sans
+Any/cast/ignore ajouté. Les contrats SDK retournent object : collections Wi-Fi,
+LAN, Home, stockage, journal et objets système/connexion sont bornés avant usage.
+Les cache/permissions/reprises et chemins sont prouvés via SDKpublic réel et
+transport mocké ; aucune requête/polling supplémentaire. DeviceInfo utilise les
+champs connus, pas ** d'un dictionnaire non borné. La liste historique listeners
+inutilisée reste list[object], pas un faux contrat de callbacks supposés.
+Les IDs registre sont réellement str vérifiés sans str() ; LAN les valide avant
+cache/reparentage. Registry ownership/version retirent des Any existants au
+profit de object et contrôles runtime, sans déclasser propriétaire malformé en
+propriétaire local. Tests des données du vrai registre, façades legacy déclarées
+comme telles. Frontières Any historiques encore présentes, pas de promesse
+Any-free.85 diagnostics globaux restent ; next config_flow/TNT/websocket,
+schémas multiversions, base_class/DUMMY/IDs, conflits FFmpeg expliqués.

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Iterable
 from datetime import datetime, timedelta
 import logging
 from typing import Any
@@ -14,6 +15,7 @@ from homeassistant.util import dt as dt_util
 
 from .tnt_sensor import TNT_DEVICE_INFO
 from .availability import FreeboxReachableMixin
+from .sdk_contracts import TvPrograms
 from .router import FreeboxConfigEntry, FreeboxRouter
 from .tv_guide import summarize_guide
 
@@ -41,9 +43,8 @@ def _as_datetime(value: Any) -> datetime | None:
         return value if value.tzinfo else value.replace(tzinfo=dt_util.DEFAULT_TIME_ZONE)
     try:
         ts = int(value)
-        if ts > 10_000_000_000:
-            ts = ts / 1000
-        return dt_util.utc_from_timestamp(ts)
+        seconds = ts / 1000 if ts > 10_000_000_000 else ts
+        return dt_util.utc_from_timestamp(seconds)
     except (TypeError, ValueError, OSError, OverflowError):
         return None
 
@@ -127,8 +128,15 @@ class FreeboxTvGuideCalendar(FreeboxReachableMixin, CalendarEntity):
         if isinstance(channels, dict):
             self._channels = channels
         now_ts = int(dt_util.now().timestamp())
-        programs = await self._router.async_read(lambda: api_tv.get_tv_programs_by_date(now_ts)) or {}
-        iterable = programs.values() if isinstance(programs, dict) else programs or []
+        tv_programs: TvPrograms = api_tv
+        programs = await self._router.async_read(lambda: tv_programs.get_tv_programs_by_date(now_ts))
+        iterable: Iterable[object]
+        if isinstance(programs, dict):
+            iterable = programs.values()
+        elif isinstance(programs, list):
+            iterable = programs
+        else:
+            raise ValueError("Invalid TV programs response")
         for program in iterable:
             if not isinstance(program, dict):
                 continue

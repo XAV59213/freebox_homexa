@@ -34,12 +34,13 @@ async def forwarded_empty(hass, home_context, request):
         'model_info': {'pretty_name': 'Test', 'name': 'test'}, 'firmware_version': '4.9.0'}
     api.player.get_players.return_value = []
     real_forward = hass.config_entries.async_forward_entry_setups
-    async def remote_first(owner, domains):
-        await real_forward(owner, ['remote'])
-        await real_forward(owner, [domain for domain in domains if domain != 'remote'])
+    first = {'remote_first': 'remote', 'media_player_first': 'media_player'}.get(getattr(request, 'param', None))
+    async def ordered_first(owner, domains):
+        await real_forward(owner, [first])
+        await real_forward(owner, [domain for domain in domains if domain != first])
     with ExitStack() as stack:
-        if getattr(request, 'param', None) == 'remote_first':
-            stack.enter_context(patch.object(hass.config_entries, 'async_forward_entry_setups', side_effect=remote_first))
+        if first is not None:
+            stack.enter_context(patch.object(hass.config_entries, 'async_forward_entry_setups', side_effect=ordered_first))
         for target in ('async_setup', 'JSModuleRegistration.async_register', 'async_setup_reminders'):
             stack.enter_context(patch(f'custom_components.freebox_homexa.{target}', new=AsyncMock(return_value=True)))
         stack.enter_context(patch('custom_components.freebox_homexa.get_api', return_value=api))
@@ -444,11 +445,11 @@ async def test_closing_drains_inventory_read_without_late_additions(hass, forwar
         assert task.cancelled()
 
 
-@pytest.mark.parametrize('forwarded_empty', ['remote_first'], indirect=True)
-async def test_remote_first_native_forward_produces_shared_metadata_once(hass, forwarded_empty):
+@pytest.mark.parametrize('forwarded_empty', ['remote_first', 'media_player_first'], indirect=True)
+async def test_each_first_native_forward_produces_shared_metadata_once(hass, forwarded_empty):
     router, entry, _, _, _ = forwarded_empty
-    # Public HA forwarding order, not a forged source/cache state: remote is a
-    # valid first platform and must initialize discovery without media/buttons.
+    # Public HA forwarding order, not a forged source/cache state: each platform
+    # can be the first metadata producer; both paths must be deterministic.
     assert router.players_initialized and router.player_discovery_active
     router._api.player.get_players.assert_awaited_once()
     assert owned(hass, entry)

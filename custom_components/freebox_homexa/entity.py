@@ -14,6 +14,7 @@ from freebox_api.exceptions import HttpRequestError
 from .const import CATEGORY_TO_MODEL, DOMAIN, FreeboxHomeCategory
 from .device_groups import GROUP_HOME, group_identifier, home_node_group, home_node_name, suggested_area
 from .availability import home_node_reachable, router_reachable
+from .sdk_contracts import HomeEndpoints
 from .errors import is_shutdown_error, poll_log_level
 from .router import FreeboxRouter
 from .registry_compat import as_version, get_device_by_identifier
@@ -133,8 +134,9 @@ class FreeboxHomeEntity(Entity):
             return False
         payload = _home_endpoint_payload(value)
         try:
+            home: HomeEndpoints = self._router.home
             await asyncio.wait_for(
-                self._router.home.set_home_endpoint_value(self._id, command_id, payload),
+                home.set_home_endpoint_value(self._id, command_id, payload),
                 timeout=10.0,
             )
             return True
@@ -170,12 +172,13 @@ class FreeboxHomeEntity(Entity):
         if self._id is None or command_id is None:
             return None
         try:
-            node = await self._router.async_read(
-                lambda: asyncio.wait_for(
-                    self._router.home.get_home_endpoint_value(self._id, command_id),
-                    timeout=8.0,
+            async def read_endpoint() -> object:
+                home: HomeEndpoints = self._router.home
+                return await asyncio.wait_for(
+                    home.get_home_endpoint_value(self._id, command_id), timeout=8.0
                 )
-            )
+
+            node = await self._router.async_read(read_endpoint)
             if not isinstance(node, dict) or "value" not in node:
                 raise ValueError("Invalid Home endpoint response")
             self._router.note_source(("home_endpoint", self._id, command_id), True, "Lecture Home")

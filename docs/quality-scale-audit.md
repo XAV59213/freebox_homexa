@@ -19,6 +19,27 @@ Platinum absent). Le snapshot JSON documente noms et tiers ; il ne crée pas
 un second fichier de statut. Le seul checklist est
 `custom_components/freebox_homexa/quality_scale.yaml`, placement conventionnel.
 
+## Jalon16 — priorité typage et convergence honnête
+
+**21done /31todo /2exempt**, inchangé ; **610tests HA** (+17),
+**5100/6438lignes79,22%**, **1311/2158branches60,75%**, combiné74,58%.
+Mypy **105diagnostics/8fichiers/42modules** (120/14/41 auparavant),
+six modules supplémentaires sans diagnostic, sans Any/cast/ignore ajouté.
+Protocoles SDK avec retours object, validations réelles et transports mockés ;
+MAC/identités/noms valides et réglages conservés. Une collection EPG absente
+n'est plus un faux guide vide ; vraie liste vide reste un guide disponible.
+48lignes automatiquement exclues par coverage (dont classes Protocol), aucune
+exclusion ajoutée/omit. Seuil officiel vérifié : >95% **par module**,19/42
+modules seulement en lignes. Branches publiées séparément, pas de seuil inventé.
+
+[Partition des31TODO et limites exactes](quality-scale-lot16-convergence.md) :
+13 réserves de placement documentaire officiel,3 contraintes livraison/amont,
+7 réserves identité/migration,4 architecture/compatibilité,4 lacunes locales
+encore traitables. Les catégories ne sont ni exemptions ni déclarations de
+blocage absolu. Repairs/caméra restent todo ; priorité aux travaux indépendants.
+Preuves de livraison CI/artefact à vérifier sur le SHA exact dans PR119.
+Préparation28.8.90, aucun merge/release/commentaire externe.
+
 ## Jalon15 — progrès sans fermeture artificielle de règle
 
 **21 done /31 todo /2 exempt**, inchangé ; 593tests HA (+26),
@@ -60,7 +81,7 @@ Les preuves CI lot12 conservées ci-dessous sont historiques, pas celles du jalo
 Disponibilité caméra globale, SDK public session/close, polling et migrations
 restent explicitement réservés ; aucune publication/merge/tag/commande réelle.
 
-## Résultat jalon15 : 21 done / 31 todo / 2 exempt
+## Résultat jalon16 : 21 done / 31 todo / 2 exempt
 
 Les 48 anciens `todo` ont tous été relus : **17 démontrés** depuis l’audit initial, **31
 restent ouverts** avec réserve précise dans le YAML et ci-dessous. Pas de
@@ -669,7 +690,7 @@ listés dans le tableau suivant ; celui-ci reprend le YAML, il n'est pas un seco
 | entity-unavailable | Lot 11 : boutons seuls sans MediaPlayer maintenant couverts par lecteur partagé au timer central existant ; refcount, absence de collecte doublée quand média actif, relais après retrait et annulation SDK en vol prouvés sous vrai HA. Veille connue/code et inconnu initial préservés. Wi-Fi valide sans enabled devient unknown disponible, pas panne. Autres sources inventoriées testées. Réserve restante précise : erreur/None de frame FFmpeg laisse caméra disponible via statut/contrôles Home valides ; pas de frame périmée renvoyée, mais pas modèle global séparant disponibilité vidéo et contrôle. Définir récupération vidéo sans lancer un nouveau polling FFmpeg coûteux ; ne pas déclarer règle entière done sur seul contrôle Home. |
 | log-when-unavailable | Lot 11 : router.note_source mémorise transitions par source, INFO perte puis retour une seule fois ; labels fixes sans host/ID/payload. Tests vrais HA/SDK test_source_ownership_logs : trois échecs successifs et récupération Root/LAN, Wi-Fi config/BSS/AP/stations/interrupteur, Home/endpoints/nœuds/caméra, Remote/Player, capteurs/disques/RAID ; aucun secret synthétique dans logs. TNT utilise réellement DataUpdateCoordinator/UpdateFailed, une perte puis récupération testée. Canal image FFmpeg public conserve exception/None sans retry et annonce ses transitions. Pas de prétention de succès physique ni de nettoyage SDK garanti. |
 | reauthentication-flow | tests/ha/test_config_flow.py prouve reauth_successful et reload unique de la même entrée sans doublon. Le serveur physique peut toutefois changer derrière le même host ; absence de contrôle MAC/identité avant réauth. Lié au choix de migration unique ID host vers identité physique, non imposé ici. |
-| test-coverage | Jalon15 : 593 tests HA2026.10.4, 41modules sans omit : 5052/6389 lignes (79,07 %), 1299/2144 branches (60,59 %), combiné74,43 %. 32lignes automatiquement exclues, aucune exclusion personnalisée. Deux passages locaux et artefact CI comparés intégralement pour livraison ; liens exacts dans PR119. Deux suites JS et douze simulations séparées. Seuil officiel non atteint ; aucune validation matérielle. |
+| test-coverage | Jalon16 : 610 tests HA2026.10.4, 42modules sans omit : 5100/6438 lignes (79,22 %), 1311/2158 branches (60,75 %), combiné74,58 %. 48lignes automatiquement exclues (dont protocoles SDK), aucune exclusion personnalisée. Livraison exige deux passages locaux et comparaison intégrale artefact CI ; preuves exactes en PR119. Seuil officiel relu : plus de95% du code dans chaque module, sans exception ; 19/42modules au-dessus en lignes, donc todo. Deux suites JS et douze simulations distinctes ; aucune validation matérielle. |
 | devices | media_player.py:90-103 et tnt_sensor.py:14-29 DeviceInfo ; cohérence des associations/subdevices et de toutes plateformes non vérifiée sur plusieurs modèles. |
 | discovery | tests/ha/test_config_flow.py teste le flow zeroconf réel : préremplissage api_domain/https_port, formulaire utilisateur et rejet du même host configuré. L’identité physique, alias d’adresse et découverte de tous modèles restent non démontrés ; pas un passage en done sur seul préremplissage. |
 | discovery-update-info | config_flow.py:390-405 découvre le host ; aucun test prouvant mise à jour sûre des entrées existantes après changement adresse. |
@@ -690,7 +711,7 @@ listés dans le tableau suivant ; celui-ci reprend le YAML, il n'est pas un seco
 | repair-issues | Jalon15 : refus structurés SDK observés sur Home plus12scopes de lecture existants (WiFi config/BSS/AP/stations, repeater, disques/RAID, system/connection/calls, LAN, Player). SDK public avec transport mocké et registre HA natif : ignorer conservé sur répétition/timeout/collection invalide, suppression seulement sur observation valide du même scope ou retrait définitif ciblé. Stations multi-AP ne déclarent pas reprise sur un autre AP sain ou zéro AP. FREN réellement chargé, aucune donnée privée ; repeater/ inchangé et payload erreur brut supprimé. Docs quality-scale-repair-inventory.md. Règle globale reste todo : lectures d’état par appareil et droits écriture/résolution sans commande-probe à inventorier, disparition volontaire de capacités à distinguer, API native config_entry_id absente dans HA2026.10.4 ; aucun masquage automatique sur désactivation revendiqué. |
 | stale-devices | router.py:941-994,1112-1123 nettoie certains registres ; stale sensor/client/disque/Home et garanties multi-intégrations non démontrées globalement. Aucun changement repeater/. |
 | inject-websession | Source SDK v1.3.1 vérifiée : constructeur sans session publique, open crée son ClientSession (aiofreepybox.py:126). Test signature réelle. Autre limite amont démontrée : après open échoué, close peut lever AttributeError _access avant session.close ; après logout échoué, close ne passe pas dans finally. Ne pas promettre une fermeture garantie sur erreur. Pas de monkeypatch/private session ni modification dépendance pour score ; proposition amont dans le rapport. |
-| strict-typing | Jalon15 : mypy strict120 erreurs/14fichiers/41modules, contre122/16/41 au jalon14. DeviceGroups : propriétaire canonique optionnel réellement borné, sans modifier le nettoyage ni les IDs ; frontend : Iterable[Mapping[str, object]] et conversion URL object fidèles aux valeurs consommées. Ces deux modules sans diagnostic, mais leurs frontières dynamiques historiques ne deviennent pas sans Any par magie. Aucun Any/cast/ignore artificiel ajouté. Restent contrats SDK, schémas voluptuous/probatio, callbacks et FFmpeg ; identité disque historique entière préservée. |
+| strict-typing | Jalon16 : mypy strict105 erreurs/8fichiers/42modules, contre120/14/41 au jalon15. Six modules supplémentaires sans diagnostic : __init__, entity, calendar, button, switch, device_tracker. Protocoles SDK réels renvoyant object, réponses Home/TV/system validées, MAC et noms valides conservés sans conversion, callback None et Store typés ; imports HA canoniques. Aucun Any/cast/ignore ajouté ; anciennes frontières Any non prétendues disparues. Restent config_flow25, router20, tnt_reminders17, tnt_ws16, base_class16, calls_ws9, sensor1, camera1. Identités disque, nom relatif caméra et compat voluptuous/probatio non sacrifiés pour score. Détails et partition des31todo : docs/quality-scale-lot16-convergence.md. |
 
 ## Validation reproductible
 

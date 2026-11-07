@@ -28,6 +28,7 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from .discovery import DiscoveryCandidate, async_setup_discovery
 from .const import DOMAIN, option_remote_code
 from .media_player import player_device_info
+from .sdk_contracts import CallActions
 from .router import FreeboxConfigEntry, FreeboxRouter
 from .player_remote import async_send_player_keys, filter_ready_players
 from .availability import FreeboxReachableMixin, FreeboxPlayerReachableMixin
@@ -42,6 +43,12 @@ class FreeboxButtonEntityDescription(ButtonEntityDescription):
     async_press: Callable[[FreeboxRouter], Awaitable[object]]
 
 
+def _mark_calls_as_read(router: FreeboxRouter) -> Awaitable[object]:
+    """Keep the callback typed without claiming a decoded SDK result."""
+    calls: CallActions = router.call
+    return calls.mark_calls_log_as_read()
+
+
 BUTTON_DESCRIPTIONS: tuple[FreeboxButtonEntityDescription, ...] = (
     FreeboxButtonEntityDescription(
         key="reboot",
@@ -54,7 +61,7 @@ BUTTON_DESCRIPTIONS: tuple[FreeboxButtonEntityDescription, ...] = (
         key="mark_calls_as_read",
         name="Marquer les appels comme lus",
         entity_category=EntityCategory.DIAGNOSTIC,
-        async_press=lambda router: router.call.mark_calls_log_as_read(),
+        async_press=_mark_calls_as_read,
     ),
 )
 

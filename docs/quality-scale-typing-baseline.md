@@ -163,3 +163,19 @@ conversion str déjà présente. Aucun nouvel Any/cast/ignore ni faux schéma so
 TYPE_CHECKING. Les Any dynamiques historiques de compat frontend ne sont pas
 présentés comme typés intégralement. 120 diagnostics réels restent, dont SDK et
 schemas incompatibles, sans conversion des identifiants disque historiques.
+
+
+## Jalon16 —105 erreurs /8 fichiers /42 modules
+
+Six modules supplémentaires sans diagnostic : __init__, entity, calendar,
+button, switch, device_tracker. Nouveau sdk_contracts vérifié lui aussi.
+Protocoles de signatures SDK publiques avec retours object : aucune promesse de
+forme JSON sans validation ; endpoints, corps, reprise et erreurs exécutés par
+SDK1.3.1 réel/transport mocké dans le framework HA. Narrowing MAC avant calcul
+du nom, pas de conversion d'identifiant ; Store[dict[str, object]], callback None,
+secondes/millisecondes sans affectation float dans variable int et imports
+canoniques HA. Aucun Any/cast/ignore ajouté, dettes dynamiques préexistantes non
+prétendues supprimées. Détail105 diagnostics et réserves de compatibilité :
+[convergence jalon16](quality-scale-lot16-convergence.md).
+La règle strict-typing reste todo ; le code historique base_class/DUMMY et les
+IDs entiers ne sont ni effacés ni transformés pour faire disparaître des erreurs.

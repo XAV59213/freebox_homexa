@@ -8,10 +8,9 @@ from urllib.parse import quote
 import logging
 from typing import Any
 
-from homeassistant.components.camera import CameraEntityFeature
+from homeassistant.components.camera.const import CameraEntityFeature
+from homeassistant.components.ffmpeg import CONF_EXTRA_ARGUMENTS, CONF_INPUT
 from homeassistant.components.ffmpeg.camera import (
-    CONF_EXTRA_ARGUMENTS,
-    CONF_INPUT,
     DEFAULT_ARGUMENTS,
     FFmpegCamera,
 )

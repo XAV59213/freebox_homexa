@@ -19,6 +19,7 @@ from homeassistant.util import slugify
 from .discovery import DiscoveryCandidate, async_setup_discovery
 from .errors import is_shutdown_error, poll_log_level
 from .router import FreeboxConfigEntry, FreeboxRouter
+from .sdk_contracts import WifiActions
 from .entity import FreeboxHomeEntity
 from .availability import FreeboxReachableMixin
 
@@ -77,7 +78,8 @@ class FreeboxSwitch(FreeboxReachableMixin, SwitchEntity):
         self._attr_translation_key = "wifi"
 
     async def _async_set_state(self, enabled: bool) -> None:
-        await self._router.wifi.set_global_config({"enabled": enabled})
+        wifi: WifiActions = self._router.wifi
+        await wifi.set_global_config({"enabled": enabled})
         _LOGGER.info("WiFi %s pour %s", 'activé' if enabled else 'désactivé', self._router.name)
 
     @property

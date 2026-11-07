@@ -5,7 +5,7 @@ from datetime import datetime
 from typing import Any
 import logging
 
-from homeassistant.components.device_tracker import ScannerEntity
+from homeassistant.components.device_tracker.entity import ScannerEntity
 from .availability import FreeboxReachableMixin
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers import entity_registry as er
@@ -93,8 +93,11 @@ class FreeboxDevice(FreeboxReachableMixin, ScannerEntity):
     ) -> None:
         self._router = router
         self._create_lan_devices = create_lan_devices
+        mac: object = device["l2ident"]["id"]
+        if not isinstance(mac, str):
+            raise ValueError("Invalid LAN MAC identifier")
+        self._mac = mac
         self._name = lan_client_name(device)
-        self._mac = device["l2ident"]["id"]
         self._manufacturer = device.get("vendor_name", "Inconnu")
         kind = device.get("host_type", "")
         self._attr_translation_key = f"device_{kind if kind in DEVICE_ICONS else 'unknown'}"

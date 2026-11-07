@@ -39,6 +39,7 @@ from .device_groups import (
     async_remove_unused_group_devices,
     migrate_overrides,
 )
+from .sdk_contracts import SystemConfiguration
 from .router import FreeboxConfigEntry, FreeboxRouter, get_api
 from .tnt_setup import (
     TNT_COORDINATORS_KEY,
@@ -100,7 +101,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: FreeboxConfigEntry) -> b
         await JSModuleRegistration(hass).async_register()
         hass.data[DOMAIN]["_card_registered"] = True
 
-    store = Store(hass, STORAGE_VERSION, STORAGE_KEY)
+    store: Store[dict[str, object]] = Store(hass, STORAGE_VERSION, STORAGE_KEY)
     stored_data = await store.async_load()
     if stored_data is None:
         _LOGGER.info("Aucune configuration Freebox stockée, démarrage avec un cache vide")
@@ -109,7 +110,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: FreeboxConfigEntry) -> b
     hass.data[DOMAIN]["config"] = stored_data
     hass.data[DOMAIN]["store"] = store
 
-    async def save_data():
+    async def save_data() -> None:
         await _save_config(hass)
 
     host = entry.data[CONF_HOST]
@@ -120,7 +121,22 @@ async def async_setup_entry(hass: HomeAssistant, entry: FreeboxConfigEntry) -> b
         connected = False
         try:
             await api.open(host, port)
-            freebox_config = await api.system.get_config()
+            system: SystemConfiguration = api.system
+            response = await system.get_config()
+            if not isinstance(response, dict):
+                raise ValueError("Invalid system configuration response")
+            freebox_config: dict[str, object] = {}
+            for key, value in response.items():
+                if not isinstance(key, str):
+                    raise ValueError("Invalid system configuration key")
+                freebox_config[key] = value
+            mac = freebox_config.get("mac")
+            model_info = freebox_config.get("model_info")
+            if not isinstance(mac, str) or not isinstance(model_info, dict):
+                raise ValueError("Invalid system identity response")
+            model_name = model_info.get("pretty_name")
+            if not isinstance(model_name, str):
+                raise ValueError("Invalid system model response")
             connected = True
         finally:
             if not connected:
@@ -187,11 +203,11 @@ async def async_setup_entry(hass: HomeAssistant, entry: FreeboxConfigEntry) -> b
     device_registry = dr.async_get(hass)
     parent_device = device_registry.async_get_or_create(
         config_entry_id=entry.entry_id,
-        identifiers={(DOMAIN, freebox_config["mac"])},
-        connections={(dr.CONNECTION_NETWORK_MAC, freebox_config["mac"])},
+        identifiers={(DOMAIN, mac)},
+        connections={(dr.CONNECTION_NETWORK_MAC, mac)},
         manufacturer="Freebox SAS",
         name="Freebox Server",
-        model=freebox_config["model_info"]["pretty_name"],
+        model=model_name,
         sw_version=as_version(freebox_config.get("firmware_version")),
     )
 
@@ -204,7 +220,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: FreeboxConfigEntry) -> b
     # lit cette valeur dès update_all.
     router.create_lan_devices = create_lan_devices
     if not create_lan_devices:
-        removed = async_remove_lan_client_devices(hass, entry, freebox_config["mac"])
+        removed = async_remove_lan_client_devices(hass, entry, mac)
         if removed:
             _LOGGER.info("%s appareil(s) client réseau retiré(s) du registre", removed)
     await router.update_all()
@@ -288,7 +304,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: FreeboxConfigEntry) -> b
             + [(DOMAIN, ident) for ident in router.player_identifiers],
         )
         removed = async_remove_unused_group_devices(
-            hass, entry, freebox_config["mac"], set(router.used_groups)
+            hass, entry, mac, set(router.used_groups)
         )
         for group in list(router.group_device_ids):
             if group not in router.used_groups:

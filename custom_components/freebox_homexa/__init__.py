@@ -1,6 +1,9 @@
 """Support pour les appareils Freebox (Freebox v6 et Freebox mini 4K)."""
 
 import logging
+from contextlib import suppress
+
+import aiohttp
 import homeassistant.helpers.config_validation as cv
 from homeassistant.const import CONF_HOST, CONF_PORT, EVENT_HOMEASSISTANT_STOP
 from datetime import datetime, timedelta
@@ -9,7 +12,12 @@ from homeassistant.exceptions import ConfigEntryAuthFailed, ConfigEntryNotReady
 from homeassistant.helpers.event import async_call_later, async_track_time_interval
 from homeassistant.helpers.storage import Store
 from homeassistant.helpers.typing import ConfigType
-from freebox_api.exceptions import AuthorizationError, HttpRequestError
+from freebox_api.exceptions import (
+    AuthorizationError,
+    HttpRequestError,
+    InsufficientPermissionsError,
+    InvalidTokenError,
+)
 import homeassistant.helpers.device_registry as dr
 
 from .calls_ws import async_register_calls_websocket_api
@@ -109,30 +117,35 @@ async def async_setup_entry(hass: HomeAssistant, entry: FreeboxConfigEntry) -> b
     api = await get_api(hass, host)
 
     try:
-        await api.open(host, port)
+        connected = False
+        try:
+            await api.open(host, port)
+            freebox_config = await api.system.get_config()
+            connected = True
+        finally:
+            if not connected:
+                # A failed (or cancelled) initial probe must not leak the SDK session.
+                # Keep the original failure even if closing also fails.
+                with suppress(Exception):
+                    await api.close()
         _LOGGER.debug("Connexion Freebox établie %s:%s", host, port)
-    except AuthorizationError as err:
+    except (AuthorizationError, InvalidTokenError, InsufficientPermissionsError) as err:
         message = str(err).lower()
-        if "timed out" in message:
-            _LOGGER.warning("Autorisation Freebox en attente pour %s : %s", host, err)
+        if isinstance(err, AuthorizationError) and "timed out" in message:
             raise ConfigEntryNotReady(
                 translation_domain=DOMAIN,
                 translation_key="auth_pending",
             ) from err
-        _LOGGER.error("Autorisation Freebox refusée pour %s: %s", host, err)
         raise ConfigEntryAuthFailed(
             translation_domain=DOMAIN,
             translation_key="auth_failed",
         ) from err
-    except HttpRequestError as err:
-        _LOGGER.error("Erreur réseau Freebox %s: %s", host, err)
+    except (HttpRequestError, TimeoutError, aiohttp.ClientError, OSError) as err:
         raise ConfigEntryNotReady(
             translation_domain=DOMAIN,
             translation_key="cannot_connect",
             translation_placeholders={"host": host, "error": str(err)},
         ) from err
-
-    freebox_config = await api.system.get_config()
 
     # Migration des surcharges « Groupes des appareils » (groupes par type -> par service).
     saved = entry.options.get(CONF_DEVICE_GROUP_OVERRIDES)

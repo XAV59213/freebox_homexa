@@ -1,0 +1,9 @@
+# Python/test build artifacts (tracked legacy files are not removed here).
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.coverage
+.coverage.*
+coverage.json
+coverage.xml
+htmlcov/

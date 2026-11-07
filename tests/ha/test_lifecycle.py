@@ -121,3 +121,28 @@ async def test_close_error_does_not_mask_probe_error(hass):
         with pytest.raises(ConfigEntryNotReady) as exc:
             await async_setup_entry(hass, entry_for(hass))
     assert isinstance(exc.value.__cause__, TimeoutError)
+
+
+@pytest.mark.parametrize("stage", ["registry", "initial_poll"])
+@pytest.mark.parametrize("close_fails", [False, True])
+async def test_real_ha_manager_cleans_failure_after_successful_probe(hass, stage, close_fails):
+    from homeassistant.config_entries import ConfigEntryState
+    entry = entry_for(hass)
+    api = AsyncMock()
+    api.system.get_config.return_value = {
+        "mac": "00:00:00:00:00:05", "model_info": {"pretty_name": "Test", "name": "test"},
+        "firmware_version": "4.9.0"}
+    if stage == "registry":
+        api.system.get_config.return_value["model_info"] = {}
+    if close_fails:
+        api.close.side_effect = RuntimeError("synthetic cleanup failure")
+    with patch("custom_components.freebox_homexa.async_setup", new=AsyncMock(return_value=True)), \
+         patch("custom_components.freebox_homexa.JSModuleRegistration.async_register", new=AsyncMock()), \
+         patch("custom_components.freebox_homexa.get_api", return_value=api), \
+         patch("custom_components.freebox_homexa.FreeboxRouter.update_all", new=AsyncMock(side_effect=RuntimeError("synthetic initial poll failure"))):
+        assert not await hass.config_entries.async_setup(entry.entry_id)
+        await hass.async_block_till_done()
+    assert entry.state is ConfigEntryState.SETUP_ERROR
+    api.open.assert_awaited_once()
+    api.system.get_config.assert_awaited_once()
+    api.close.assert_awaited_once()

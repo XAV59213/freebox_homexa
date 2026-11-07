@@ -15,13 +15,16 @@ from homeassistant.components.button import (
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import EntityCategory
 from homeassistant.core import HomeAssistant
+from homeassistant.exceptions import ServiceValidationError
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
-from .const import option_remote_code
+from .const import DOMAIN, option_remote_code
 from .media_player import player_device_info
 from .router import FreeboxConfigEntry, FreeboxRouter
-from .player_remote import async_schedule_player_api_retry, filter_ready_players
+from .player_remote import async_schedule_player_api_retry, async_send_player_keys, filter_ready_players
 from .availability import FreeboxReachableMixin
+
+from .errors import async_action_errors
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -163,13 +166,9 @@ class FreeboxButton(FreeboxReachableMixin, ButtonEntity):
         self._attr_unique_id = f"{router.mac} {description.name}"
         self._attr_translation_key = description.key
 
+    @async_action_errors
     async def async_press(self) -> None:
-        try:
-            await self.entity_description.async_press(self._router)
-        except Exception as err:
-            _LOGGER.error(
-                "Échec bouton '%s' : %s", self.entity_description.name, err
-            )
+        await self.entity_description.async_press(self._router)
 
 
 class FreeboxPlayerRemoteButton(FreeboxReachableMixin, ButtonEntity):
@@ -197,26 +196,17 @@ class FreeboxPlayerRemoteButton(FreeboxReachableMixin, ButtonEntity):
         self._attr_device_info = player_device_info(router, player)
         self._attr_entity_registry_enabled_default = enabled_by_default
 
+    @async_action_errors
     async def async_press(self) -> None:
         remote_code = option_remote_code(self._entry, self._player_id)
         if not remote_code:
-            _LOGGER.warning(
-                "Code télécommande manquant pour le Player %s. "
-                "Paramètres → Homexa → Configurer.",
-                self._player_id,
+            raise ServiceValidationError(
+                translation_domain=DOMAIN, translation_key="remote_code_missing",
+                translation_placeholders={"player": str(self._player_id)},
             )
-            return
-        try:
-            await self._router._api.remote.send_key(
-                code=str(remote_code), key=self._key
-            )
-        except Exception as err:
-            _LOGGER.error(
-                "Touche %s échouée sur Player %s : %s",
-                self._key,
-                self._player_id,
-                err,
-            )
+        failures = await async_send_player_keys(self._router, str(remote_code), [self._key])
+        if failures:
+            raise failures[0][1]
 
 
 class FreeboxPlayerAppButton(FreeboxReachableMixin, ButtonEntity):
@@ -245,14 +235,7 @@ class FreeboxPlayerAppButton(FreeboxReachableMixin, ButtonEntity):
         self._attr_device_info = player_device_info(router, player)
         self._attr_entity_registry_enabled_default = enabled_by_default
 
+    @async_action_errors
     async def async_press(self) -> None:
         path = f"player/{self._player_id}/api/{self._api_version}/control/open"
-        try:
-            await self._router._api.player._access.post(path, {"url": self._url})
-        except Exception as err:
-            _LOGGER.error(
-                "Impossible d'ouvrir %s sur Player %s : %s",
-                self._app_name,
-                self._player_id,
-                err,
-            )
+        await self._router._api.player._access.post(path, {"url": self._url})

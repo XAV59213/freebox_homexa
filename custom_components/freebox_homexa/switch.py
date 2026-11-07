@@ -7,8 +7,6 @@ from pathlib import Path
 from dataclasses import dataclass
 from typing import Any
 
-from freebox_api.exceptions import InsufficientPermissionsError
-
 from homeassistant.components.switch import SwitchEntity, SwitchEntityDescription
 from homeassistant.const import EntityCategory
 from homeassistant.core import HomeAssistant
@@ -19,6 +17,8 @@ from .errors import is_shutdown_error, poll_log_level
 from .router import FreeboxConfigEntry, FreeboxRouter
 from .entity import FreeboxHomeEntity
 from .availability import FreeboxReachableMixin
+
+from .errors import async_action_errors
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -72,15 +72,14 @@ class FreeboxSwitch(FreeboxReachableMixin, SwitchEntity):
         self._attr_unique_id = f"{router.mac} {entity_description.name}"
 
     async def _async_set_state(self, enabled: bool) -> None:
-        try:
-            await self._router.wifi.set_global_config({"enabled": enabled})
-            _LOGGER.info("WiFi %s pour %s", 'activé' if enabled else 'désactivé', self._router.name)
-        except InsufficientPermissionsError:
-            _LOGGER.warning("Home Assistant n'a pas les permissions WiFi.")
+        await self._router.wifi.set_global_config({"enabled": enabled})
+        _LOGGER.info("WiFi %s pour %s", 'activé' if enabled else 'désactivé', self._router.name)
 
+    @async_action_errors
     async def async_turn_on(self, **kwargs: Any) -> None:
         await self._async_set_state(True)
 
+    @async_action_errors
     async def async_turn_off(self, **kwargs: Any) -> None:
         await self._async_set_state(False)
 
@@ -127,12 +126,14 @@ class FreeboxShutterInvertSwitchEntity(FreeboxHomeEntity, SwitchEntity):
     def is_on(self) -> bool | None:
         return self._state
 
+    @async_action_errors
     async def async_turn_on(self, **kwargs: Any) -> None:
         await self.hass.async_add_executor_job(self._write, "1")
         self._state = True
         self.async_write_ha_state()
         _LOGGER.info("Inversion activée pour %s", self._attr_name)
 
+    @async_action_errors
     async def async_turn_off(self, **kwargs: Any) -> None:
         await self.hass.async_add_executor_job(self._write, "0")
         self._state = False

@@ -8,9 +8,10 @@ from typing import Any
 from homeassistant.components.remote import RemoteEntity, RemoteEntityFeature
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
+from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
-from .const import option_remote_code
+from .const import DOMAIN, option_remote_code
 from .player_remote import (
     VALID_COMMANDS as PLAYER_VALID_COMMANDS,
     async_schedule_player_api_retry,
@@ -20,6 +21,8 @@ from .player_remote import (
 from .media_player import player_device_info
 from .availability import FreeboxReachableMixin
 from .router import FreeboxConfigEntry, FreeboxRouter
+
+from .errors import async_action_errors
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -74,12 +77,15 @@ class FreeboxRemote(FreeboxReachableMixin, RemoteEntity):
     def _remote_code(self) -> str | None:
         return option_remote_code(self._entry, self._player_id)
 
+    @async_action_errors
     async def async_turn_on(self, **kwargs: Any) -> None:
         await self._send_commands(["power"], False, 0)
 
+    @async_action_errors
     async def async_turn_off(self, **kwargs: Any) -> None:
         await self._send_commands(["power"], False, 0)
 
+    @async_action_errors
     async def async_send_command(self, command: list[str], **kwargs: Any) -> None:
         commands = [kwargs["code"]] if kwargs.get("code") else command
         await self._send_commands(
@@ -89,24 +95,31 @@ class FreeboxRemote(FreeboxReachableMixin, RemoteEntity):
         )
 
     async def _send_commands(self, commands: list[str], long_press: bool, repeat: int) -> None:
+        if not commands:
+            raise ServiceValidationError(
+                translation_domain=DOMAIN, translation_key="remote_empty_command"
+            )
+        invalid = [cmd for cmd in commands if cmd not in VALID_COMMANDS]
+        if invalid:
+            raise ServiceValidationError(
+                translation_domain=DOMAIN, translation_key="remote_invalid_key",
+                translation_placeholders={"key": ", ".join(invalid)},
+            )
         remote_code = self._remote_code
         if not remote_code:
-            _LOGGER.warning(
-                "Code télécommande manquant pour le Player %s. "
-                "Paramètres → Homexa → Configurer → Télécommandes.",
-                self._player_id,
+            raise ServiceValidationError(
+                translation_domain=DOMAIN, translation_key="remote_code_missing",
+                translation_placeholders={"player": str(self._player_id)},
             )
-            return
-        valid = []
-        for cmd in commands:
-            if cmd not in VALID_COMMANDS:
-                _LOGGER.error("Commande invalide '%s'", cmd)
-                continue
-            valid.append(cmd)
-        for cmd, err in await async_send_player_keys(
-            self._router, str(remote_code), valid, long_press, repeat
-        ):
-            _LOGGER.error("Échec commande %s Player %s : %s", cmd, self._player_id, err)
+        failures = await async_send_player_keys(
+            self._router, str(remote_code), commands, long_press, repeat
+        )
+        if failures:
+            if isinstance(failures[0][1], HomeAssistantError):
+                raise failures[0][1]
+            raise HomeAssistantError(
+                translation_domain=DOMAIN, translation_key="command_failed"
+            ) from failures[0][1]
 
     async def async_update(self) -> None:
         try:

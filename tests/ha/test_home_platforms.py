@@ -125,8 +125,9 @@ async def test_inversion_storage_roundtrip_and_failed_write(hass, home_context, 
         assert entity.is_on is True
         assert entity._path.read_text() == "1"
         with patch.object(entity, "_write", side_effect=OSError("synthetic")):
-            with pytest.raises(OSError):
+            with pytest.raises(HomeAssistantError) as exc:
                 await entity.async_turn_off()
+            assert exc.value.translation_key == "command_failed"
         assert entity.is_on is True
         await entity.async_turn_off()
         assert entity._path.read_text() == "0"

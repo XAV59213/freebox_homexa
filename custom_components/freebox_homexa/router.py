@@ -44,6 +44,8 @@ from .registry_compat import (
 from .errors import is_permission_denied, is_shutdown_error
 from .wifi_ap import build_wifi_aps
 
+from .errors import async_action_errors
+
 _LOGGER = logging.getLogger(__name__)
 
 GROUP_SERVER_SERVICE = "server"
@@ -689,12 +691,10 @@ class FreeboxRouter:
                     err,
                 )
 
+    @async_action_errors
     async def reboot(self) -> None:
-        try:
-            await self._api.system.reboot()
-            _LOGGER.info("Redémarrage de la Freebox effectué")
-        except HttpRequestError as err:
-            _LOGGER.error("Échec du redémarrage de la Freebox : %s", err)
+        await self._api.system.reboot()
+        _LOGGER.info("Redémarrage de la Freebox effectué")
 
     async def close(self) -> None:
         # Les relevés / mises à jour en vol ne journalisent plus d'erreur à partir d'ici.

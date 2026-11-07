@@ -17,6 +17,7 @@ from datetime import datetime, timedelta
 
 from .const import FreeboxHomeCategory
 from .entity import FreeboxHomeEntity
+from .errors import async_action_errors
 from .router import FreeboxConfigEntry, FreeboxRouter
 
 # Signal endpoints that must never be exposed in Home Assistant attributes.
@@ -93,21 +94,24 @@ class FreeboxAlarm(FreeboxHomeEntity, AlarmControlPanelEntity):
 
         self.update_parameters(node)
 
+    @async_action_errors
     async def async_alarm_disarm(self, code: str | None = None) -> None:
         """Send disarm command."""
-        await self.set_home_endpoint_value(self._command_disarm)
+        await self.async_execute_home_command(self._command_disarm)
         await asyncio.sleep(1)
         await self.async_update()
 
+    @async_action_errors
     async def async_alarm_arm_away(self, code: str | None = None) -> None:
         """Send arm away command (Absent)."""
-        await self.set_home_endpoint_value(self._command_arm_away)
+        await self.async_execute_home_command(self._command_arm_away)
         await asyncio.sleep(1)
         self._start_arming_watcher()
 
+    @async_action_errors
     async def async_alarm_arm_home(self, code: str | None = None) -> None:
         """Send arm home command (Présent)."""
-        await self.set_home_endpoint_value(self._command_arm_home)
+        await self.async_execute_home_command(self._command_arm_home)
         await asyncio.sleep(1)
         self._start_arming_watcher()
 
@@ -119,9 +123,10 @@ class FreeboxAlarm(FreeboxHomeEntity, AlarmControlPanelEntity):
             self.hass, self.async_update_during_arming, timedelta(seconds=1)
         )
 
+    @async_action_errors
     async def async_alarm_trigger(self, code: str | None = None) -> None:
         """Send alarm trigger command."""
-        await self.set_home_endpoint_value(self._command_trigger)
+        await self.async_execute_home_command(self._command_trigger)
 
     async def async_update_during_arming(self, now: datetime | None = None) -> None:
         """Poll state during arming/alert phases."""

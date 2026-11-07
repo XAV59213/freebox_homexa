@@ -5,7 +5,13 @@ from __future__ import annotations
 import json
 import logging
 import re
-from typing import Any
+from typing import Any, ParamSpec, TypeVar
+from collections.abc import Awaitable, Callable
+from functools import wraps
+
+from homeassistant.exceptions import HomeAssistantError
+
+from .const import DOMAIN
 
 import aiohttp
 from freebox_api.exceptions import InsufficientPermissionsError, NotOpenError
@@ -78,3 +84,29 @@ def is_permission_denied(err: BaseException) -> bool:
         or "missing_right" in message
         or "access denied" in message
     )
+
+
+_P = ParamSpec("_P")
+_T = TypeVar("_T")
+
+
+def async_action_errors(
+    action: Callable[_P, Awaitable[_T]],
+) -> Callable[_P, Awaitable[_T]]:
+    """Normalize unexpected action failures without exposing SDK payloads.
+
+    Preserve HA validation/translated errors and cancellation. Polling and cleanup
+    are deliberately outside this boundary; it is only for user-facing actions.
+    """
+    @wraps(action)
+    async def guarded(*args: _P.args, **kwargs: _P.kwargs) -> _T:
+        try:
+            return await action(*args, **kwargs)
+        except HomeAssistantError:
+            raise
+        except Exception as err:
+            raise HomeAssistantError(
+                translation_domain=DOMAIN, translation_key="command_failed"
+            ) from err
+
+    return guarded

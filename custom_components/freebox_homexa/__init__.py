@@ -148,6 +148,23 @@ async def async_setup_entry(hass: HomeAssistant, entry: FreeboxConfigEntry) -> b
             translation_placeholders={"host": host, "error": str(err)},
         ) from err
 
+    # A successful probe is not the end of setup. Let HA own cleanup for any
+    # later failure, including failures before runtime_data/platform forwarding.
+    setup_complete = False
+    router: FreeboxRouter | None = None
+
+    async def _close_failed_setup() -> None:
+        if setup_complete:
+            return  # Normal unload closes the router through async_unload_entry.
+        if router is not None:
+            router.closing = True
+        # Attempt only the public SDK API. Its documented cleanup limitations
+        # still apply; a cleanup error must not replace the original setup error.
+        with suppress(Exception):
+            await api.close()
+
+    entry.async_on_unload(_close_failed_setup)
+
     # Migration des surcharges « Groupes des appareils » (groupes par type -> par service).
     saved = entry.options.get(CONF_DEVICE_GROUP_OVERRIDES)
     if saved and migrate_overrides(saved) != saved:
@@ -277,6 +294,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: FreeboxConfigEntry) -> b
         hass.bus.async_listen_once(EVENT_HOMEASSISTANT_STOP, async_close_connection)
     )
 
+    setup_complete = True
     _LOGGER.info("Freebox Homexa prêt")
     return True
 

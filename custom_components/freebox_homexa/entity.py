@@ -106,7 +106,7 @@ class FreeboxHomeEntity(Entity):
         )
 
     async def set_home_endpoint_value(
-        self, command_id: int | None, value: Any | None = None
+        self, command_id: int | None, value: Any | None = None, *, log_errors: bool = True
     ) -> bool:
         if self._id is None or command_id is None:
             return False
@@ -118,13 +118,16 @@ class FreeboxHomeEntity(Entity):
             )
             return True
         except asyncio.TimeoutError:
-            _LOGGER.warning("Timeout lors de la commande sur l'appareil %s", self._id)
+            if log_errors:
+                _LOGGER.warning("Timeout lors de la commande sur l'appareil %s", self._id)
             return False
         except Exception as err:  # noqa: BLE001
             if is_shutdown_error(err, self._router):
-                _LOGGER.debug("Commande sur l'appareil %s ignorée (rechargement) : %s", self._id, err)
+                if log_errors:
+                    _LOGGER.debug("Commande sur l'appareil %s ignorée (rechargement) : %s", self._id, err)
                 return False
-            _LOGGER.error("Erreur lors de la commande sur l'appareil %s : %s", self._id, err)
+            if log_errors:
+                _LOGGER.error("Erreur lors de la commande sur l'appareil %s : %s", self._id, err)
             return False
 
     async def async_execute_home_command(
@@ -133,9 +136,10 @@ class FreeboxHomeEntity(Entity):
         """Require acknowledgement before updating camera/cover optimistic state.
 
         Keep the historical boolean helper for its other existing callers.
-        No raw SDK error, URL or command payload is exposed in the UI message.
+        No raw SDK error, URL or command payload is exposed in the UI message,
+        nor logged again before HA reports the raised exception.
         """
-        if not await self.set_home_endpoint_value(command_id, value):
+        if not await self.set_home_endpoint_value(command_id, value, log_errors=False):
             raise HomeAssistantError(
                 translation_domain=DOMAIN, translation_key="command_failed"
             )

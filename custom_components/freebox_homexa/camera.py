@@ -26,6 +26,8 @@ from .entity import FreeboxHomeEntity
 from .errors import is_shutdown_error, poll_log_level
 from .router import FreeboxConfigEntry, FreeboxRouter
 
+from .errors import async_action_errors
+
 _LOGGER = logging.getLogger(__name__)
 
 # SECTION: Configuration des entités
@@ -136,6 +138,7 @@ class FreeboxCamera(FreeboxHomeEntity, FFmpegCamera):
         self.update_node(node)
         _LOGGER.debug("Caméra %s initialisée avec succès", self._name)
 
+    @async_action_errors
     async def async_enable_motion_detection(self) -> None:
         """Active la détection de mouvement sur la caméra.
 
@@ -144,6 +147,7 @@ class FreeboxCamera(FreeboxHomeEntity, FFmpegCamera):
         await self.async_execute_home_command(self._command_motion_detection, True)
         self._attr_motion_detection_enabled = True
 
+    @async_action_errors
     async def async_disable_motion_detection(self) -> None:
         """Désactive la détection de mouvement sur la caméra.
 

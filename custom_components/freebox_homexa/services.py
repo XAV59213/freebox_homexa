@@ -23,6 +23,8 @@ from .player_remote import (
     resolve_remote_code,
 )
 
+from .errors import async_action_errors
+
 _LOGGER = logging.getLogger(__name__)
 
 ATTR_PLAYER_ID = "player_id"
@@ -128,11 +130,13 @@ async def _save_config(hass: HomeAssistant) -> None:
 def async_setup_services(hass: HomeAssistant) -> None:
     """Enregistre les services reboot / reload / remote (une seule fois)."""
 
+    @async_action_errors
     async def async_reboot(call: ServiceCall) -> None:
         for entry in async_resolve_entries(hass, call):
             await _router(hass, entry).reboot()
         await _save_config(hass)
 
+    @async_action_errors
     async def async_reload_config(call: ServiceCall) -> None:
         # Recharge aussi une entrée en échec (ex. en attente d'autorisation) : c'est
         # justement à cela que sert « reload ». Sans cible : toutes les entrées actives.
@@ -151,8 +155,12 @@ def async_setup_services(hass: HomeAssistant) -> None:
                 translation_placeholders={"service": call.service},
             )
         for entry in entries:
-            await hass.config_entries.async_reload(entry.entry_id)
+            if not await hass.config_entries.async_reload(entry.entry_id):
+                raise HomeAssistantError(
+                    translation_domain=DOMAIN, translation_key="command_failed"
+                )
 
+    @async_action_errors
     async def async_freebox_player_remote(call: ServiceCall) -> None:
         """Touches de télécommande vers le Freebox Player (même chemin que l'entité).
 
@@ -160,7 +168,9 @@ def async_setup_services(hass: HomeAssistant) -> None:
         """
         keys = parse_keys(call.data.get("code", ""))
         if not keys:
-            return
+            raise ServiceValidationError(
+                translation_domain=DOMAIN, translation_key="remote_empty_command"
+            )
         invalid = [key for key in keys if key not in VALID_COMMANDS]
         if invalid:
             raise ServiceValidationError(
@@ -195,12 +205,11 @@ def async_setup_services(hass: HomeAssistant) -> None:
                 )
             failures = await async_send_player_keys(router, remote_code, keys)
             if failures:
-                key, err = failures[0]
+                if isinstance(failures[0][1], HomeAssistantError):
+                    raise failures[0][1]
                 raise HomeAssistantError(
-                    translation_domain=DOMAIN,
-                    translation_key="remote_failed",
-                    translation_placeholders={"key": key, "error": str(err)},
-                )
+                    translation_domain=DOMAIN, translation_key="command_failed"
+                ) from failures[0][1]
 
     for service, handler in (
         (SERVICE_REBOOT, async_reboot),

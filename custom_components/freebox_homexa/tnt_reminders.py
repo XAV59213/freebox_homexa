@@ -14,7 +14,7 @@ from datetime import timedelta
 import voluptuous as vol
 
 from homeassistant.core import HomeAssistant, ServiceCall, ServiceResponse, SupportsResponse
-from homeassistant.exceptions import ServiceValidationError
+from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
 from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.event import async_track_point_in_time
@@ -29,6 +29,8 @@ from .tnt_const import (
     CONF_REMINDER_PROFILES,
     CONF_TTS_ENGINE,
 )
+
+from .errors import async_action_errors
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -126,6 +128,7 @@ class _ReminderManager:
     def __init__(self, hass: HomeAssistant, store: Store) -> None:
         self._hass = hass
         self._store = store
+        self._storage_lock = asyncio.Lock()
 
     def _resolve_notify_targets(self) -> list[str]:
         """Pas de cibles globales dans Homexa : tout passe par les profils."""
@@ -173,6 +176,7 @@ class _ReminderManager:
             )
         return ([], [], None, None)
 
+    @async_action_errors
     async def async_handle_schedule(self, call: ServiceCall) -> None:
         channel_name = call.data["channel_name"]
         program_title = call.data["program_title"]
@@ -231,6 +235,7 @@ class _ReminderManager:
         await self._async_save(reminder)
         self._schedule(reminder)
 
+    @async_action_errors
     async def async_handle_cancel(self, call: ServiceCall) -> None:
         reminder_id = _reminder_id(
             call.data["channel_name"],
@@ -239,18 +244,22 @@ class _ReminderManager:
             call.data["minutes_before"],
             call.data.get("profile_name"),
         )
+        # If persistence fails, keep the existing timer rather than cancelling a
+        # reminder which will reappear after restart despite a reported failure.
+        await self._async_remove(reminder_id)
         unsub_map = self._hass.data.setdefault(_UNSUB_KEY, {})
         unsub = unsub_map.pop(reminder_id, None)
         if unsub:
             unsub()
-        await self._async_remove(reminder_id)
 
+    @async_action_errors
     async def async_handle_status(self, call: ServiceCall) -> ServiceResponse:
         channel_name = call.data["channel_name"]
         program_title = call.data["program_title"]
         start_time = call.data["start_time"]
         profile_name = call.data.get("profile_name")
-        data = await self._store.async_load() or {"reminders": []}
+        async with self._storage_lock:
+            data = await self._store.async_load() or {"reminders": []}
         existing_ids = {r["id"] for r in data.get("reminders", [])}
         scheduled = [
             minutes
@@ -431,17 +440,28 @@ class _ReminderManager:
                 player,
             )
 
-    async def _async_save(self, reminder: dict) -> None:
-        data = await self._store.async_load() or {"reminders": []}
-        reminders = [r for r in data.get("reminders", []) if r["id"] != reminder["id"]]
-        reminders.append(reminder)
-        data["reminders"] = reminders
+    async def _async_store_checked(self, data: dict) -> None:
+        # HA Store logs and swallows WriteError. A normal return alone is NOT a
+        # persistence acknowledgement. Verify using only its public API.
         await self._store.async_save(data)
+        if await self._store.async_load() != data:
+            raise HomeAssistantError(
+                translation_domain=DOMAIN, translation_key="reminder_storage_failed"
+            )
+
+    async def _async_save(self, reminder: dict) -> None:
+        async with self._storage_lock:
+            data = dict(await self._store.async_load() or {"reminders": []})
+            reminders = [r for r in data.get("reminders", []) if r["id"] != reminder["id"]]
+            reminders.append(reminder)
+            data["reminders"] = reminders
+            await self._async_store_checked(data)
 
     async def _async_remove(self, reminder_id: str) -> None:
-        data = await self._store.async_load() or {"reminders": []}
-        data["reminders"] = [r for r in data.get("reminders", []) if r["id"] != reminder_id]
-        await self._store.async_save(data)
+        async with self._storage_lock:
+            data = dict(await self._store.async_load() or {"reminders": []})
+            data["reminders"] = [r for r in data.get("reminders", []) if r["id"] != reminder_id]
+            await self._async_store_checked(data)
 
 
 def async_unload_reminders(hass: HomeAssistant) -> None:

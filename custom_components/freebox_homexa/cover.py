@@ -15,6 +15,8 @@ from .entity import FreeboxHomeEntity
 from .errors import is_shutdown_error, poll_log_level
 from .router import FreeboxConfigEntry, FreeboxRouter
 
+from .errors import async_action_errors
+
 _LOGGER = logging.getLogger(__name__)
 
 # Intervalle de mise à jour automatique des volets (en secondes)
@@ -105,6 +107,7 @@ class FreeboxBasicShutter(FreeboxHomeEntity, CoverEntity):
             return True
         return None
 
+    @async_action_errors
     async def async_open_cover(self, **kwargs) -> None:
         """Ouvre le volet.
 
@@ -114,6 +117,7 @@ class FreeboxBasicShutter(FreeboxHomeEntity, CoverEntity):
         self._state = CoverState.OPEN
         _LOGGER.info("Volet %s ouvert", self._attr_name)
 
+    @async_action_errors
     async def async_close_cover(self, **kwargs) -> None:
         """Ferme le volet.
 
@@ -123,6 +127,7 @@ class FreeboxBasicShutter(FreeboxHomeEntity, CoverEntity):
         self._state = CoverState.CLOSED
         _LOGGER.info("Volet %s fermé", self._attr_name)
 
+    @async_action_errors
     async def async_stop_cover(self, **kwargs) -> None:
         """Arrête le volet.
 
@@ -253,6 +258,7 @@ class FreeboxShutter(FreeboxHomeEntity, CoverEntity):
         corrected_position = self._get_corrected_position(self._current_cover_position)
         return corrected_position == 0 if corrected_position is not None else None
 
+    @async_action_errors
     async def async_set_cover_position(self, position: int, **kwargs) -> None:
         """Définit la position du volet.
 
@@ -268,14 +274,17 @@ class FreeboxShutter(FreeboxHomeEntity, CoverEntity):
         self._current_cover_position = corrected_position  # Même repère brut que le relevé API.
         _LOGGER.info("Position du volet %s définie à %s (corrigée à %s)", self._attr_name, position, corrected_position)
 
+    @async_action_errors
     async def async_open_cover(self, **kwargs) -> None:
         """Ouvre complètement le volet (position 100)."""
         await self.async_set_cover_position(100)
 
+    @async_action_errors
     async def async_close_cover(self, **kwargs) -> None:
         """Ferme complètement le volet (position 0)."""
         await self.async_set_cover_position(0)
 
+    @async_action_errors
     async def async_stop_cover(self, **kwargs) -> None:
         """Arrête le volet.
 

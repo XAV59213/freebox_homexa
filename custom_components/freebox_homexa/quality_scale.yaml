@@ -15,8 +15,8 @@ rules:
     status: todo
     comment: 'Règle officielle relue le 2026-11-07 : intervalle choisi par le développeur, pas de champ config
       flow. Le champ home_poll_interval existe encore ; ne pas le supprimer pour le score au risque de changer
-      les réglages existants. Documenter une dépréciation compatible et vérifier les fréquences/doublons de toutes
-      les plateformes avant done.'
+      les réglages existants. Documenter une dépréciation compatible et vérifier les fréquences/doublons de
+      toutes les plateformes avant done.'
   brands:
     status: todo
     comment: 'Règle officielle vérifiée : assets dans home-assistant/brands sous le domaine. Lecture GitHub
@@ -33,11 +33,11 @@ rules:
       structurel, pas preuve de couverture du flow.
   config-flow-test-coverage:
     status: todo
-    comment: '234 tests HA au total ; config_flow.py : 437/438 lignes (99,77 %), 145/148 branches (97,97 %).
-      Les erreurs de link testées sont suivies de la correction de leur cause et de la finalisation du même flow
-      avec unique_id vérifié. Options répéteurs (registre uniquement), conflits Alexa, doublons de libellés,
-      defaults privés synthétiques et conservation des codes vérifiés. Reste ligne 369 et trois branches ; guard
-      reauth/user à justifier, sans forcer un chemin artificiel. 100 % non atteint, donc todo.'
+    comment: '342 tests HA au total ; config_flow.py : 437/438 lignes (99,77 %), 145/148 branches (97,97 %).
+      Les erreurs de link testées sont suivies de la correction de leur cause et de la finalisation du même
+      flow avec unique_id vérifié. Options répéteurs (registre uniquement), conflits Alexa, doublons de libellés,
+      defaults privés synthétiques et conservation des codes vérifiés. Reste ligne 369 et trois branches ;
+      guard reauth/user à justifier, sans forcer un chemin artificiel. 100 % non atteint, donc todo.'
   dependency-transparency:
     status: todo
     comment: 'SDK 1.3.1 installé depuis PyPI ; source publique tag v1.3.1 et GPL-3.0 vérifiés via GitHub (commit
@@ -87,8 +87,8 @@ rules:
       sont rattachés à entry.async_on_unload.'
   entity-unique-id:
     status: todo
-    comment: IDs historiques conservés ; plateformes multientrées, retour/disparition et variantes boutons testés.
-      La stabilité RAID au renommage n’est prouvée que dans la même instance, pas au rechargement (constructeur
+    comment: IDs historiques conservés ; plateformes multientrées, retour/disparition et variantes boutons
+      testés. La stabilité RAID au renommage n’est prouvée que dans la même instance, pas au rechargement (constructeur
       utilise le nom). ScannerEntity fournit MAC client. Audit collisions/partitions et proposition de migration
       réversible restent nécessaires ; aucune migration imposée.
   has-entity-name:
@@ -114,17 +114,25 @@ rules:
     comment: config_flow.py:222 unique ID basé sur host ; hostname/IP/URL du même Server peuvent différer.
       Test de déduplication identité physique manquant.
   action-exceptions:
-    status: todo
-    comment: 'Cover/camera utilisent async_execute_home_command : erreur HomeAssistantError command_failed traduite
-      si helper booléen échoue ; état optimiste inchangé, SDK mocké en échec et commande absente testés. Mais
-      media_player._command, remote, boutons, alarme et Wi-Fi absorbent encore certains échecs : règle globale
-      reste todo.'
+    status: done
+    comment: 'errors.py:async_action_errors garde les 42 frontières explicites inventoriées par AST sur 11
+      modules (actions entités, six services, lecture calendrier et reboot routeur). Validation HA et annulation
+      préservées ; erreurs SDK/données traduites sans payload, état optimiste non changé en échec. tests/ha/test_action_errors.py
+      : 103 cas vrai HA, succès/échec/récupération des familles, appels services réels, contrats SDK Remote
+      et Store publics. False du SDK remote = commande non confirmée (elle peut avoir été exécutée), erreur
+      distincte sans retry automatique. Écriture rappel relue via API publique et sérialisée ; annulation ne
+      supprime pas le timer si persistance échoue. Tests camera/cover/local inversion du lot 4 conservés ;
+      aucune preuve de réussite physique revendiquée.'
   config-entry-unloading:
     status: todo
     comment: 'Les 11 domaines ont maintenant au moins une vraie EntityPlatform ajoutée/retirée (incluant boutons/camera/cover/switch),
-      hooks coopératifs et listeners vérifiés ; isolement deux entrées et shutdown coordinator propriétaire testés.
-      Reste orchestration simultanée complète, setup échoué après probe et tâches en vol. SDK close peut échouer
-      avant fermeture session : limitation source démontrée, pas contournée.'
+      hooks coopératifs et listeners vérifiés ; isolement deux entrées et shutdown coordinator propriétaire
+      testés. Restent discovery/forward complet, rollback partiel et tâches en vol. SDK close peut échouer
+      avant fermeture session : limitation source démontrée, pas contournée. Lot 5 : fermeture publique aussi
+      tentée après probe réussi si registre/relevé initial échoue, via callback possédé par HA (quatre tests
+      du vrai ConfigEntriesManager, dont close en échec). Onze EntityPlatforms simultanées possédées par entrée
+      + TNT : retrait états/listeners/watcher et close vérifiés ; dispatcher forward/unload substitué, pas
+      une preuve de setup complet transactionnel. Limite SDK amont reste ouverte.'
   docs-configuration-parameters:
     status: todo
     comment: 'docs/guide-utilisateur.md (lié README) : Table des options général/groupes/types/répéteurs/TNT/profils,
@@ -140,9 +148,9 @@ rules:
   entity-unavailable:
     status: todo
     comment: Vraies plateformes couvrent perte/retour centraux, TNT, Player, télécommande, caméra, volets et
-      Wi-Fi. Caméra remplace son node au signal, disparaît/récupère sans nouvelle identité ; Wi-Fi invalide devient
-      indisponible ; inversion disque illisible inconnue, position incertaine sans commande ambiguë. Reste vérifier
-      toutes variantes, événements/autorisation et erreurs partielles avant règle globale done.
+      Wi-Fi. Caméra remplace son node au signal, disparaît/récupère sans nouvelle identité ; Wi-Fi invalide
+      devient indisponible ; inversion disque illisible inconnue, position incertaine sans commande ambiguë.
+      Reste vérifier toutes variantes, événements/autorisation et erreurs partielles avant règle globale done.
   integration-owner:
     status: done
     comment: 'manifest.json déclare @gvigroux, @XAV59213 et @Steph73HB ; .github/CODEOWNERS reprend exactement
@@ -167,9 +175,9 @@ rules:
       avant réauth. Lié au choix de migration unique ID host vers identité physique, non imposé ici.
   test-coverage:
     status: todo
-    comment: '234 tests HA 2026.10.4 ; 38 modules sans omit : lignes 3068/5724 (53,60 %), branches 500/1912 (26,15
-      %), combiné 46,73 %. Rapports JSON/XML CI ; seuil officiel non atteint. Certaines variantes sont des inventaires
-      explicitement distincts du runtime. Les tests ne valident pas le matériel.'
+    comment: '342 tests HA 2026.10.4 ; 38 modules sans omit : lignes 3372/5812 (58,02 %), branches 590/1938
+      (30,44 %), combiné 51,12 %. Rapports JSON/XML CI ; seuil officiel non atteint. Certaines variantes sont
+      des inventaires explicitement distincts du runtime. Les tests ne valident pas le matériel.'
   devices:
     status: todo
     comment: media_player.py:90-103 et tnt_sensor.py:14-29 DeviceInfo ; cohérence des associations/subdevices
@@ -251,12 +259,11 @@ rules:
       incomplètes.
   exception-translations:
     status: done
-    comment: Toutes les 19 levées custom de HomeAssistantError/sous-classes (dont UpdateFailed TNT) ont domaine,
+    comment: Toutes les 32 levées custom de HomeAssistantError/sous-classes (dont UpdateFailed TNT) ont domaine,
       clé sans message dur, et placeholders cohérents. tests/ha/test_translations_services.py vérifie source
-      AST et strings/FR/EN, puis charge la traduction française via le vrai moteur HA. Les erreurs absorbées
-      restent un défaut distinct action-exceptions ; Unauthorized est une exception du framework, pas un message
-      custom. Nouveau command_failed sans placeholder privé ; échecs Home réellement levés, tests de clés/domaines/placeholders
-      FR/EN.
+      AST et strings/FR/EN, puis charge la traduction française via le vrai moteur HA. Unauthorized est une
+      exception du framework, pas un message custom. Nouveau command_failed sans placeholder privé ; échecs
+      Home réellement levés, tests de clés/domaines/placeholders FR/EN.
   icon-translations:
     status: todo
     comment: icons.json existe ; tnt_sensor.py:27 et autres plateformes gardent des icônes statiques ; inventaire

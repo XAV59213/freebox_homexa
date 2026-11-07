@@ -14,15 +14,18 @@ from homeassistant.components.media_player import (
 )
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
+from homeassistant.exceptions import ServiceValidationError
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from .const import DOMAIN, URL_BASE, option_remote_code
 from .availability import FreeboxReachableMixin
 from .player_diagnostics import cache_player_schema
-from .player_remote import async_schedule_player_api_retry, filter_ready_players
+from .player_remote import async_schedule_player_api_retry, async_send_player_keys, filter_ready_players
 from .router import FreeboxConfigEntry, FreeboxRouter
 from .tv_guide import tnt_artwork_url
+
+from .errors import async_action_errors
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -216,19 +219,23 @@ class FreeboxPlayerMediaPlayer(FreeboxReachableMixin, MediaPlayerEntity):
         try:
             await self._post("control/mediactrl", {"cmd": name})
         except Exception:
-            try:
-                await self._post("control/mediactrl", {"name": name})
-            except Exception as err:
-                _LOGGER.error("Commande %s échouée sur Player %s : %s", name, self._player_id, err)
+            # Preserve the established firmware compatibility fallback, but let its
+            # failure reach the user-facing error boundary instead of false success.
+            await self._post("control/mediactrl", {"name": name})
+
+    def _require_remote_code(self) -> str:
+        code = self._remote_code
+        if not code:
+            raise ServiceValidationError(
+                translation_domain=DOMAIN, translation_key="remote_code_missing",
+                translation_placeholders={"player": str(self._player_id)},
+            )
+        return str(code)
 
     async def _send_remote(self, key: str) -> None:
-        remote_code = self._remote_code
-        if not remote_code:
-            return
-        try:
-            await self._router._api.remote.send_key(code=str(remote_code), key=key)
-        except Exception as err:
-            _LOGGER.debug("Touche remote %s indisponible : %s", key, err)
+        failures = await async_send_player_keys(self._router, self._require_remote_code(), [key])
+        if failures:
+            raise failures[0][1]
 
     async def async_update(self) -> None:
         status: dict[str, Any] | None = None
@@ -360,58 +367,77 @@ class FreeboxPlayerMediaPlayer(FreeboxReachableMixin, MediaPlayerEntity):
             self._attr_media_image_url = APP_ARTWORK_URLS[self._attr_source]
             self._attr_icon = APP_ICONS[self._attr_source]
 
+    @async_action_errors
     async def async_set_volume_level(self, volume: float) -> None:
+        if isinstance(volume, bool) or not isinstance(volume, (int, float)) or not math.isfinite(volume) or not 0 <= volume <= 1:
+            raise ServiceValidationError(
+                translation_domain=DOMAIN, translation_key="invalid_action_value"
+            )
         await self._put("control/volume", {"volume": int(round(volume * 100))})
 
+    @async_action_errors
     async def async_mute_volume(self, mute: bool) -> None:
+        if not isinstance(mute, bool):
+            raise ServiceValidationError(
+                translation_domain=DOMAIN, translation_key="invalid_action_value"
+            )
         await self._put("control/volume", {"mute": mute})
 
+    @async_action_errors
     async def async_media_play(self) -> None:
         await self._command("play")
 
+    @async_action_errors
     async def async_media_pause(self) -> None:
         await self._command("pause")
 
+    @async_action_errors
     async def async_media_stop(self) -> None:
         await self._command("stop")
 
+    @async_action_errors
     async def async_media_next_track(self) -> None:
         await self._command("next")
 
+    @async_action_errors
     async def async_media_previous_track(self) -> None:
         await self._command("prev")
 
+    @async_action_errors
     async def async_select_source(self, source: str) -> None:
         spec = COMMON_SOURCES.get(source)
         if not spec:
-            _LOGGER.warning("Source inconnue : %s", source)
-            return
-        try:
-            if spec.get("url"):
-                await self._post("control/open", {"url": spec["url"]})
-            if spec.get("remote"):
-                await self._send_remote(spec["remote"])
-            self._attr_source = source
-            self.async_write_ha_state()
-        except Exception as err:
-            _LOGGER.error("Impossible d'ouvrir la source %s : %s", source, err)
+            raise ServiceValidationError(
+                translation_domain=DOMAIN, translation_key="invalid_source"
+            )
+        if spec.get("url"):
+            await self._post("control/open", {"url": spec["url"]})
+        if spec.get("remote"):
+            await self._send_remote(spec["remote"])
+        self._attr_source = source
+        self.async_write_ha_state()
 
+    @async_action_errors
     async def async_play_media(self, media_type: str, media_id: str, **kwargs: Any) -> None:
         payload: dict[str, Any] = {"url": media_id}
         if media_type:
             payload["type"] = media_type
         await self._post("control/open", payload)
 
+    @async_action_errors
     async def async_turn_on(self) -> None:
         if self.state == MediaPlayerState.OFF:
             await self._try_power()
             await self.async_select_source("HDMI (CEC)")
 
+    @async_action_errors
     async def async_turn_off(self) -> None:
         if self.state != MediaPlayerState.OFF:
             await self._try_power()
 
     async def _try_power(self) -> None:
+        # Validate before any preliminary media command can have a side effect.
+        self._require_remote_code()
         try:
             await self._command("play_pause")
         except Exception:

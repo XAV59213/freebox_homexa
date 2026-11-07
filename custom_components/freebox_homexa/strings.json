@@ -538,6 +538,21 @@
     },
     "inversion_unavailable": {
       "message": "The inversion setting is unavailable. Check that switch before moving the cover."
+    },
+    "remote_empty_command": {
+      "message": "Specify at least one remote key."
+    },
+    "invalid_action_value": {
+      "message": "The requested value is invalid."
+    },
+    "invalid_source": {
+      "message": "This source is not supported by the Player."
+    },
+    "command_unconfirmed": {
+      "message": "The Player response did not confirm the command. Check its state before retrying."
+    },
+    "reminder_storage_failed": {
+      "message": "The reminder save could not be confirmed. Check Home Assistant storage before retrying."
     }
   }
 }

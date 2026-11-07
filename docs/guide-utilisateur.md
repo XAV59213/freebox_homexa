@@ -257,3 +257,21 @@ Une position non fournie reste inconnue, sans l’afficher comme un volet ouvert
 Les commandes camera/cover échouées remontent une erreur traduite et ne présentent
 plus un nouvel état optimiste comme acquis. Le succès d’un appel API ne garantit
 pas qu’un équipement physique a terminé son mouvement.
+
+
+### Erreurs d’actions et rappels (préparation 28.8.90)
+
+Les erreurs des commandes sont remontées dans HA, pas seulement journalisées.
+Une saisie invalide (source, volume, touche ou code remote manquant) est refusée
+avant la commande concernée. L’état optimiste n’est pas présenté comme réussi
+après une erreur détectée. Aucun nouveau protocole de commande n’est ajouté.
+
+Une télécommande peut renvoyer « commande non confirmée » alors que le Player a
+réagi : le SDK ne considère pas toutes les réponses HTTP 200 comme confirmées.
+**Vérifier l’état du Player avant de réessayer**, surtout une touche bascule.
+Aucun retry automatique n’est ajouté. Une macro peut être partiellement exécutée.
+
+Pour les rappels, l’écriture est relue par l’API publique de stockage HA. Si la
+persistance échoue, le service remonte une erreur ; une annulation n’enlève pas le
+timer existant tant que l’enregistrement de sa suppression n’est pas confirmé.
+Ce contrôle ne garantit pas une transaction contre une coupure de courant.

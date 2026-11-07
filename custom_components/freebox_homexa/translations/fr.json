@@ -538,6 +538,21 @@
     },
     "inversion_unavailable": {
       "message": "Le réglage d’inversion est indisponible. Vérifiez cet interrupteur avant de déplacer le volet."
+    },
+    "remote_empty_command": {
+      "message": "Indiquez au moins une touche de télécommande."
+    },
+    "invalid_action_value": {
+      "message": "La valeur demandée n’est pas valide."
+    },
+    "invalid_source": {
+      "message": "Cette source n’est pas prise en charge par le Player."
+    },
+    "command_unconfirmed": {
+      "message": "La réponse du Player ne confirme pas la commande. Vérifiez son état avant de réessayer."
+    },
+    "reminder_storage_failed": {
+      "message": "La sauvegarde du rappel n’a pas pu être confirmée. Vérifiez le stockage Home Assistant avant de réessayer."
     }
   }
 }

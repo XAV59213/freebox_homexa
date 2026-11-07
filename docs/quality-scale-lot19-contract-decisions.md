@@ -24,6 +24,10 @@ Les quatre combinaisons DUMMY true/false et ID42/1001 prouvent le court-circuit
 uniquement au-dessus du seuil historique, y compris priorité sur VALUE_NOT_SET.
 Lectures absentes/None, sous-nœuds, catégories/héritages et erreurs sont testés.
 
+Le journal legacy ne reproduit plus le nœud brut : mot de passe, URI et libellé
+privé synthétiques sont absents du caplog DEBUG natif. Restaurer un import ne
+doit pas réactiver une fuite historique de données.
+
 94/94 lignes,28/28 branches de base_class couvertes dans vrai HA : le résidu
 n'est plus «callbacks ordinaires ou DUMMY non étudié». LegacyDeviceInfo décrit
 exactement le payload réel, sans prétendre satisfaire le DeviceInfo HA.

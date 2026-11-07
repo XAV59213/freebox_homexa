@@ -202,7 +202,7 @@ rules:
       avant réauth. Lié au choix de migration unique ID host vers identité physique, non imposé ici.
   test-coverage:
     status: todo
-    comment: 'Jalon19 : 666 tests HA2026.10.4, 42modules sans omit : 5439/6653 lignes (81,75 %), 1455/2248
+    comment: 'Jalon19 : 667 tests HA2026.10.4, 42modules sans omit : 5439/6653 lignes (81,75 %), 1455/2248
       branches (64,72 %), combiné77,45 %. 92lignes automatiquement exclues, aucune exclusion personnalisée.
       Deux passages locaux et artefact CI complet doivent concorder avant rapport livré. Seuil officiel
       plus de95% dans chaque module :22/42 au-dessus en lignes ; base_class94/94lignes et28/28branches100%,

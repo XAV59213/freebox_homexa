@@ -45,7 +45,7 @@ class FreeboxBaseClass(Entity):
     """Classe de base pour toutes les entités Freebox Home."""
 
     def __init__(self, hass: HomeAssistant, router: FreeboxRouter, node: LegacyHomeNode, sub_node: LegacyHomeSubNode | None = None) -> None:
-        _LOGGER.debug("Initialisation de l'entité pour le nœud: %s", node)
+        _LOGGER.debug("Initialisation de l'entité Home legacy")
         self._hass = hass
         self._router = router
         self._id = node["id"]

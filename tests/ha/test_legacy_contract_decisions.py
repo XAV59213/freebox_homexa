@@ -154,3 +154,15 @@ async def test_invalid_disk_contract_does_not_coerce_identity(hass, home_context
     router, _ = home_context
     with pytest.raises(ValueError, match='Invalid SDK disk'):
         FreeboxDiskSensor(router, disk, partition, SensorEntityDescription(key='free'))
+
+
+async def test_restored_legacy_constructor_does_not_log_node_credentials(hass, home_context, caplog):
+    import logging
+    router, _ = home_context
+    with caplog.at_level(logging.DEBUG, logger='custom_components.freebox_homexa.base_class'):
+        FreeboxBaseClass(hass, router, {'id': 42, 'label': 'Synthetic private label', 'category': 'camera',
+            'props': {'FwVersion': '1.0', 'Pass': 'SYNTHETIC_PRIVATE_PASSWORD',
+                      'Stream': 'rtsp://test:SYNTHETIC_PRIVATE_PASSWORD@camera.test/live'}})
+    assert 'SYNTHETIC_PRIVATE_PASSWORD' not in caplog.text
+    assert 'rtsp://' not in caplog.text
+    assert 'Synthetic private label' not in caplog.text

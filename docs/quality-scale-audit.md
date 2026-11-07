@@ -21,7 +21,7 @@ un second fichier de statut. Le seul checklist est
 
 ## Jalon19 — contrat legacy prouvé, FFmpeg composé, décisions réduites
 
-**21done /31todo /2exempt**, inchangé ; **666tests** (+21),
+**21done /31todo /2exempt**, inchangé ; **667tests** (+22),
 **5439/6653lignes81,75%**, **1455/2248branches64,72%**, combiné77,45%.
 **2diagnostics/2fichiers/42modules**, -16 ; plus de diagnostic caméra.
 22/42modules >95% lignes. Legacy base_class100% lignes/branches dans vrai HA,
@@ -270,7 +270,7 @@ Mesure globale : **75,74 % lignes / 54,34 % branches / 70,38 % combiné**.
 
 ## Lot 11 — une règle entière démontrée, limites restantes isolées
 
-**511 tests HA (+21), 17 done / 35 todo / 2 exempt.**
+**511 tests HA (+22), 17 done / 35 todo / 2 exempt.**
 `log-when-unavailable` est désormais done : vraie panne répétée puis récupération
 par source et vraie coordination TNT, pas simple preuve du logger central.
 Aucun host/ID/payload dans les nouvelles annonces. Les valeurs manquantes dans
@@ -427,7 +427,7 @@ aucune méthode supposée à partir d’un résumé de moteur de recherche.
 
 ## Lot 7 — ordre indépendant, lectures entités drainées, catégories revues
 
-**377 tests HA (+21)** et deux suites JS. **14 done / 38 todo / 2 exempt** :
+**377 tests HA (+22)** et deux suites JS. **14 done / 38 todo / 2 exempt** :
 seule `entity-category` passe done, après [revue globale](quality-scale-entity-inventory.md)
 des 30 familles/81 variantes et préservation réelle des préférences registre.
 L’inventaire ne valide pas par association naming, classes, defaults ni disponibilité.
@@ -744,7 +744,7 @@ listés dans le tableau suivant ; celui-ci reprend le YAML, il n'est pas un seco
 | entity-unavailable | Lot 11 : boutons seuls sans MediaPlayer maintenant couverts par lecteur partagé au timer central existant ; refcount, absence de collecte doublée quand média actif, relais après retrait et annulation SDK en vol prouvés sous vrai HA. Veille connue/code et inconnu initial préservés. Wi-Fi valide sans enabled devient unknown disponible, pas panne. Autres sources inventoriées testées. Réserve restante précise : erreur/None de frame FFmpeg laisse caméra disponible via statut/contrôles Home valides ; pas de frame périmée renvoyée, mais pas modèle global séparant disponibilité vidéo et contrôle. Définir récupération vidéo sans lancer un nouveau polling FFmpeg coûteux ; ne pas déclarer règle entière done sur seul contrôle Home. |
 | log-when-unavailable | Lot 11 : router.note_source mémorise transitions par source, INFO perte puis retour une seule fois ; labels fixes sans host/ID/payload. Tests vrais HA/SDK test_source_ownership_logs : trois échecs successifs et récupération Root/LAN, Wi-Fi config/BSS/AP/stations/interrupteur, Home/endpoints/nœuds/caméra, Remote/Player, capteurs/disques/RAID ; aucun secret synthétique dans logs. TNT utilise réellement DataUpdateCoordinator/UpdateFailed, une perte puis récupération testée. Canal image FFmpeg public conserve exception/None sans retry et annonce ses transitions. Pas de prétention de succès physique ni de nettoyage SDK garanti. |
 | reauthentication-flow | tests/ha/test_config_flow.py prouve reauth_successful et reload unique de la même entrée sans doublon. Le serveur physique peut toutefois changer derrière le même host ; absence de contrôle MAC/identité avant réauth. Lié au choix de migration unique ID host vers identité physique, non imposé ici. |
-| test-coverage | Jalon19 : 666 tests HA2026.10.4, 42modules sans omit : 5439/6653 lignes (81,75 %), 1455/2248 branches (64,72 %), combiné77,45 %. 92lignes automatiquement exclues, aucune exclusion personnalisée. Deux passages locaux et artefact CI complet doivent concorder avant rapport livré. Seuil officiel plus de95% dans chaque module :22/42 au-dessus en lignes ; base_class94/94lignes et28/28branches100%, caméra93,60%, disque/sensor92,31%. Règle globale todo ; aucune validation matérielle. |
+| test-coverage | Jalon19 : 667 tests HA2026.10.4, 42modules sans omit : 5439/6653 lignes (81,75 %), 1455/2248 branches (64,72 %), combiné77,45 %. 92lignes automatiquement exclues, aucune exclusion personnalisée. Deux passages locaux et artefact CI complet doivent concorder avant rapport livré. Seuil officiel plus de95% dans chaque module :22/42 au-dessus en lignes ; base_class94/94lignes et28/28branches100%, caméra93,60%, disque/sensor92,31%. Règle globale todo ; aucune validation matérielle. |
 | devices | Jalon17 : registre HA natif, identité/propriétaire/connexion, nom utilisateur conservé sur lookup moderne et façades legacy, parent router =id natif et jamais identité convertie ; retrait public testé seulement sur registre éphémère de test. Les façades ne valent pas ancien runtime HA installé. IDs invalides bloqués avant cache/reparentage et propriétaire inconnu protégé. Associations multi-modèles, sous-appareils et toutes plateformes pas encore démontrées globalement : règle reste todo. |
 | discovery | tests/ha/test_config_flow.py teste le flow zeroconf réel : préremplissage api_domain/https_port, formulaire utilisateur et rejet du même host configuré. L’identité physique, alias d’adresse et découverte de tous modèles restent non démontrés ; pas un passage en done sur seul préremplissage. |
 | discovery-update-info | config_flow.py:390-405 découvre le host ; aucun test prouvant mise à jour sûre des entrées existantes après changement adresse. |

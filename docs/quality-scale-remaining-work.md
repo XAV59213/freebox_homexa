@@ -83,7 +83,7 @@ modifier artificiellement le sens du YAML. Aucune soumission amont ici.
 
 | Règle | Minimum restant |
 |---|---|
-| test-coverage | 666tests,42modules,81,75% lignes/64,72% branches,combiné77,45%. Seuil officiel >95% dans CHAQUE module :22/42 le dépassent. Cibler vrais scénarios manquants (rappels voix/volume/échecs, associations), pas gardes inaccessibles pour score. Deux locaux et artefact CI complet concordants exigés. |
+| test-coverage | 667tests,42modules,81,75% lignes/64,72% branches,combiné77,45%. Seuil officiel >95% dans CHAQUE module :22/42 le dépassent. Cibler vrais scénarios manquants (rappels voix/volume/échecs, associations), pas gardes inaccessibles pour score. Deux locaux et artefact CI complet concordants exigés. |
 | strict-typing | Deux erreurs réelles/2fichiers/42modules : contrat HA identifiants str contre entiers historiques et parent legacy nullable. Caméra/DUMMY/callbacks résolus. Choix explicite décrit séparément ; pas de migration, cast, stub élargi ou Any implicite pour fabriquer un done. |
 
 ## Exemptions inchangées : deux, pas une façon de masquer des défauts

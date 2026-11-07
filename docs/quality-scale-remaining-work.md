@@ -1,22 +1,21 @@
-# Inventaire fini des travaux restants — lot 10
+# Inventaire fini des travaux restants — lot 11
 
-**16 done / 36 todo / 2 exempt, préparation 28.8.90 ; aucune certification HA.**
-Une ligne par todo, pas une liste infinie de tests. Les sept règles A sont du
+**17 done / 35 todo / 2 exempt, préparation 28.8.90 ; aucune certification HA.**
+Une ligne par todo, pas une liste infinie de tests. Les six règles A sont du
 travail local indépendant ; B mêle travail local et réserve de compatibilité ou
 dépendance ; C exige proposition compatible ou action amont avant conformité.
 D contient du contenu local présent, pas treize documents manquants ; E mesure
 la qualité transversale. Le mandat continue, ce document n’en annonce pas la fin.
 
-## A — sept règles localement traitables, sans migration ni appareil réel
+## A — six règles localement traitables, sans migration ni appareil réel
 
 | Règle | Minimum fini avant validation entière |
 |---|---|
 | config-flow-test-coverage | Couvrir réellement ligne 369 et trois branches user/reauth restantes par le manager HA ; vérifier récupération après erreurs et ID à chaque création, pas appel direct artificiel d’un état inaccessible. |
-| entity-unavailable | Tester boutons Player seuls lorsque MediaPlayer désactivé ; propriété d’un unique provider de statut partagé si nécessaire (pas une requête par bouton). Tester erreur de frame caméra et contrat parent FFmpeg sans processus. Une panne/récupération par toutes familles inventoriées, absent vs unknown vs veille contrôlable, sans changement d’ID. |
-| log-when-unavailable | Une transition perte puis retour par source Home/Player/TNT/LAN/Wi-Fi/endpoint, sans log répété sur erreurs répétées ni payload privé ; inclure permissions et échec initial. Ne pas assimiler debug à notification utilisateur. |
+| entity-unavailable | Boutons seuls désormais prouvés (refcount/timer existant, zéro doublon média, retrait/annulation). Reste vidéo/contrôle : frame FFmpeg None/exception ne renvoie pas ancienne image mais caméra reste disponible via Home ; définir disponibilité/récupération vidéo sans polling coûteux ni empêcher définitivement les prochaines images. |
 | dynamic-devices | Vérifier ajouts après setup (pas seulement premier forward) Home/Player/LAN/disques/répéteurs : ajout unique, ownership listener, retrait/unload. Préserver URLs repeater/, IDs et préférences. Corriger seulement les familles où le test démontre un défaut. |
 | entity-translations | Inventaire de chaque fonction/état/option, clés et résolution effective strings/FR/EN par HA. Les noms propres fournis par utilisateur/appareil ne sont pas à traduire. Conserver IDs et name_by_user ; has_entity_name est déjà done, pas preuve de traduction. |
-| icon-translations | Croiser 30 familles/81 variantes avec icons.json et classes HA ; déplacer seulement icônes de fonction traduisibles, conserver icônes dynamiques réellement justifiées. Tester résolution, sans inventer de nouveaux logos. |
+| icon-translations | Toutes icônes fixes des 30 familles/81 variantes migrées et chargées par vrai HA, choix utilisateur conservés. Reste icône principale Player selon attribut source, pas state : étudier registre public/translation_key dynamique et cache/lifecycle sans perdre YouTube/Netflix ou écraser icône utilisateur. Ce chemin paraît localement possible, pas déclaré impossible ni validé. |
 | repair-issues | Inventorier erreurs nécessitant intervention (droits/config), utiliser reauth existant pour auth quand approprié, Repairs traduits avec résolution/ownership pour autres cas réellement actionnables ; aucun Repair pour panne transitoire normale. |
 
 ## B — trois règles mixtes : travail indépendant possible, réserve précise
@@ -75,8 +74,8 @@ modifier artificiellement le sens du YAML. Aucune soumission amont ici.
 
 | Règle | Minimum restant |
 |---|---|
-| test-coverage | Seuil officiel intégration entière encore non atteint (74,44 % lignes / 52,12 % branches / 68,84 % combiné). Cibler erreurs/récupération et comportements manquants via A/B, pas tests sans assertions ni exclusion opportuniste. Deux passages locaux et CI doivent donner mêmes 38 modules/totaux. |
-| strict-typing | 167 erreurs réelles/24 fichiers/38 modules ; résoudre contrats/narrowing/structures et appels SDK non annotés, sans Any/cast/ignore pour score. Conflit héritage FFmpeg et typage SDK doivent être distingués des défauts locaux corrigeables. |
+| test-coverage | Seuil officiel intégration entière encore non atteint (74,72 % lignes / 52,59 % branches / 69,19 % combiné). Cibler erreurs/récupération et comportements manquants via A/B, pas tests sans assertions ni exclusion opportuniste. Deux passages locaux et CI doivent donner mêmes 39 modules/totaux. |
+| strict-typing | 162 erreurs réelles/23 fichiers/39 modules ; résoudre contrats/narrowing/structures et appels SDK non annotés, sans Any/cast/ignore pour score. Conflit héritage FFmpeg et typage SDK doivent être distingués des défauts locaux corrigeables. |
 
 ## Exemptions inchangées : deux, pas une façon de masquer des défauts
 

@@ -217,11 +217,15 @@ async def test_unknown_inversion_prevents_an_ambiguous_command(hass, home_contex
 async def test_wifi_unavailable_on_failed_or_invalid_fetch_and_recovers(hass, home_context):
     router, _ = home_context
     entity = FreeboxSwitch(router, SWITCH_DESCRIPTIONS[0])
-    for result in ({}, {"enabled": "false"}):
+    for result in (None, []):
         router.wifi.get_global_config.return_value = result
         await entity.async_update()
         assert not entity.available
         assert entity.is_on is None
+    for result in ({}, {"enabled": "false"}):
+        router.wifi.get_global_config.return_value = result
+        await entity.async_update()
+        assert entity.available and entity.is_on is None
     router.wifi.get_global_config.return_value = {"enabled": False}
     await entity.async_update()
     assert entity.available

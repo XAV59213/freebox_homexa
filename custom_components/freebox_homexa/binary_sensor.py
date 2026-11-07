@@ -196,7 +196,6 @@ class FreeboxWifiApSensor(FreeboxReachableMixin, BinarySensorEntity):
     _attr_has_entity_name = True
     _attr_device_class = BinarySensorDeviceClass.CONNECTIVITY
     _attr_entity_category = EntityCategory.DIAGNOSTIC
-    _attr_icon = "mdi:wifi"
 
     def __init__(self, router: FreeboxRouter, ap_id: str, access_point: dict[str, Any]) -> None:
         self._router = router
@@ -214,7 +213,6 @@ class FreeboxWifiApSensor(FreeboxReachableMixin, BinarySensorEntity):
             )
             self._attr_translation_key = "repeater_online"
             self._attr_unique_id = f"{router.mac}_repeater_{mac}"
-            self._attr_icon = "mdi:wifi-sync"
         self._attr_is_on = _ap_online(access_point)
         self._attr_extra_state_attributes = _ap_attributes(access_point)
 

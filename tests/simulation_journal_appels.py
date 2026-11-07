@@ -75,7 +75,20 @@ class SensorEntity(Entity):
 
 
 sys.modules["homeassistant.components.sensor"].SensorEntity = SensorEntity
-sys.modules["homeassistant.components.sensor"].SensorEntityDescription = lambda **kw: types.SimpleNamespace(**kw)
+# Real HA descriptions are dataclasses (including dataclasses.replace support).
+from dataclasses import dataclass
+
+@dataclass
+class SensorDescription:
+    key: str
+    name: str = ""
+    icon: str | None = None
+    translation_key: str | None = None
+    device_class: object = None
+    native_unit_of_measurement: object = None
+    entity_category: object = None
+
+sys.modules["homeassistant.components.sensor"].SensorEntityDescription = SensorDescription
 _tnt = types.ModuleType("freebox_homexa.tnt_sensor")
 _tnt.HomexaTntSensor = object
 sys.modules["freebox_homexa.tnt_sensor"] = _tnt

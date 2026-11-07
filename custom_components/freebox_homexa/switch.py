@@ -89,16 +89,18 @@ class FreeboxSwitch(FreeboxReachableMixin, SwitchEntity):
     async def async_update(self) -> None:
         try:
             data = await self._router.async_read(self._router.wifi.get_global_config)
+            if not isinstance(data, dict):
+                raise ValueError("Invalid Wi-Fi response")
             enabled = data.get("enabled")
-            if not isinstance(enabled, bool):
-                raise ValueError("Invalid Wi-Fi state")
-            self._attr_is_on = enabled
+            self._attr_is_on = enabled if isinstance(enabled, bool) else None
             self._attr_available = True
+            self._router.note_source("wifi_switch", True, "Interrupteur Wi-Fi")
         except Exception as err:  # noqa: BLE001
             if is_shutdown_error(err, self._router):
                 _LOGGER.debug("État du Wi-Fi non lu (rechargement) : %s", err)
                 return
-            _LOGGER.log(poll_log_level(self._router), "Échec de la mise à jour du WiFi : %s", err)
+            self._router.note_source("wifi_switch", False, "Interrupteur Wi-Fi")
+            _LOGGER.debug("Lecture Wi-Fi impossible (%s)", type(err).__name__)
             self._attr_is_on = None
             self._attr_available = False
 
@@ -107,7 +109,6 @@ class FreeboxShutterInvertSwitchEntity(FreeboxHomeEntity, SwitchEntity):
     """Interrupteur d'inversion pour les volets."""
 
     _attr_has_entity_name = True
-    _attr_icon = "mdi:directions-fork"
     _attr_name = "Inversion Positionnement"
     _home_entity_name = "Inversion Positionnement"
     _attr_entity_category = EntityCategory.CONFIG

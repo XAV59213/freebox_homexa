@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Awaitable, Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 import logging
 from typing import Any
 
@@ -160,7 +160,7 @@ class FreeboxButton(FreeboxReachableMixin, ButtonEntity):
     def __init__(
         self, router: FreeboxRouter, description: FreeboxButtonEntityDescription
     ) -> None:
-        self.entity_description = description
+        self.entity_description = replace(description, icon=None)
         self._router = router
         self._attr_device_info = router.device_info
         # unique_id historique construit sur le nom français : inchangé.
@@ -193,13 +193,15 @@ class FreeboxPlayerRemoteButton(FreeboxPlayerReachableMixin, ButtonEntity):
         self._initial_player_reachable = player.get("reachable") is not False
         self._key = key
         self._attr_translation_key = f"remote_key_{key}"
-        self._attr_icon = icon
         self._attr_unique_id = f"{router.mac}_player_{self._player_id}_key_{key}"
         self._attr_device_info = player_device_info(router, player)
         self._attr_entity_registry_enabled_default = enabled_by_default
 
     async def async_added_to_hass(self) -> None:
         await super().async_added_to_hass()
+        self.async_on_remove(self._router.register_player_button(
+            self._player_id, getattr(self, "_api_version", "v6")
+        ))
         self.async_on_remove(async_dispatcher_connect(
             self.hass, self._router.signal_device_update, self.async_write_ha_state
         ))
@@ -239,13 +241,15 @@ class FreeboxPlayerAppButton(FreeboxPlayerReachableMixin, ButtonEntity):
         self._url = url
         self._app_name = name
         self._attr_translation_key = f"player_app_{key}"
-        self._attr_icon = icon
         self._attr_unique_id = f"{router.mac}_player_{self._player_id}_app_{key}"
         self._attr_device_info = player_device_info(router, player)
         self._attr_entity_registry_enabled_default = enabled_by_default
 
     async def async_added_to_hass(self) -> None:
         await super().async_added_to_hass()
+        self.async_on_remove(self._router.register_player_button(
+            self._player_id, getattr(self, "_api_version", "v6")
+        ))
         self.async_on_remove(async_dispatcher_connect(
             self.hass, self._router.signal_device_update, self.async_write_ha_state
         ))

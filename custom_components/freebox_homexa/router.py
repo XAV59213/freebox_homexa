@@ -282,6 +282,10 @@ class FreeboxRouter:
         self.lan_available = True
         self.wifi_stations_available = True
         self.player_status_available: dict[str, bool] = {}
+        self.player_status_providers: set[str] = set()
+        self._player_button_readers: dict[str, tuple[int, int, str]] = {}
+        self._player_standby: set[str] = set()
+        self._source_states: dict[object, bool] = {}
         # nœuds Home dont les entités vivent sur un appareil de groupe (module d'alarme)
         self.merged_node_ids: set[Any] = set()
         self.player_identifiers: set[str] = set()
@@ -426,10 +430,8 @@ class FreeboxRouter:
 
     def _wifi_api_error(self, key: str, path: str, err: Exception) -> None:
         """Mémorise l'erreur d'une API Wi-Fi ; journal (info) une seule fois par API."""
-        first = key not in self.wifi_api_errors
         self.wifi_api_errors[key] = type(err).__name__
-        if first:
-            _LOGGER.info("API Freebox %s indisponible (%s)", path, type(err).__name__)
+        self.note_source(("wifi", key), False, "API Freebox Wi-Fi " + key)
 
     async def _fetch_wifi_global_state(self) -> None:
         """/wifi/config/ (enabled, comme l'interrupteur) et /wifi/bss/ (état des BSS)."""
@@ -440,6 +442,7 @@ class FreeboxRouter:
             enabled = config.get("enabled") if isinstance(config, dict) else None
             self.wifi_global_enabled = enabled if isinstance(enabled, bool) else None
             self.wifi_api_errors.pop("config", None)
+            self.note_source(("wifi", "config"), True, "API Freebox Wi-Fi config")
         except Exception as err:  # noqa: BLE001
             self.wifi_global_enabled = None
             self._wifi_api_error("config", "wifi/config/", err)
@@ -448,6 +451,7 @@ class FreeboxRouter:
             if not isinstance(bss_list, list):
                 raise ValueError("Invalid Wi-Fi BSS collection")
             self.wifi_api_errors.pop("bss", None)
+            self.note_source(("wifi", "bss"), True, "API Freebox Wi-Fi bss")
         except Exception as err:  # noqa: BLE001 — API absente selon firmware
             self._wifi_api_error("bss", "wifi/bss/", err)
             bss_list = []
@@ -476,6 +480,7 @@ class FreeboxRouter:
             if not isinstance(access_points, list):
                 raise ValueError("Invalid Wi-Fi AP collection")
             self.wifi_api_errors.pop("ap", None)
+            self.note_source(("wifi", "ap"), True, "API Freebox Wi-Fi ap")
         except Exception as err:  # noqa: BLE001 — API wifi absente selon firmware
             self.wifi_stations_available = False
             self._wifi_api_error("ap", "wifi/ap/", err)
@@ -525,11 +530,61 @@ class FreeboxRouter:
                 merged["_ap_name"] = access_point.get("name")
                 stations_by_mac[mac] = merged
 
+        self.note_source("wifi_stations", self.wifi_stations_available, "Stations Wi-Fi")
         for mac, device in self.devices.items():
             station = stations_by_mac.get(str(mac).upper())
             if station:
                 device["_wifi_station"] = station
             device["wifi"] = extract_wifi_details(device)
+
+    def note_source(self, key: object, available: bool, label: str) -> None:
+        """One sanitized loss/recovery notification per source, not per poll."""
+        previous = self._source_states.get(key, True)
+        self._source_states[key] = available
+        if previous != available and not self.closing:
+            _LOGGER.info("%s %s", label, "de nouveau disponible" if available else "indisponible")
+
+    def register_player_button(self, player_id: int, version: str) -> Callable[[], None]:
+        """Reference-count active buttons, without adding one timer per button."""
+        key = str(player_id)
+        count, _, preferred = self._player_button_readers.get(key, (0, player_id, version))
+        self._player_button_readers[key] = (count + 1, player_id, preferred)
+
+        def remove() -> None:
+            count, identifier, preferred = self._player_button_readers[key]
+            if count == 1:
+                del self._player_button_readers[key]
+            else:
+                self._player_button_readers[key] = (count - 1, identifier, preferred)
+        return remove
+
+    async def update_player_buttons(self) -> None:
+        """Fallback at the existing central interval only if no media provider lives."""
+        from .player_status import async_read_player_status
+        from .const import option_remote_code
+
+        for key, (_, player_id, version) in list(self._player_button_readers.items()):
+            if key in self.player_status_providers:
+                continue
+            status, preferred = await async_read_player_status(self, player_id, version)
+            if key in self._player_button_readers:
+                count, _, _ = self._player_button_readers[key]
+                self._player_button_readers[key] = (count, player_id, preferred)
+            if status is not None:
+                power = str(status.get("power_state") or status.get("power") or "").lower()
+                if power in {"standby", "off", "shutdown"}:
+                    self._player_standby.add(key)
+                else:
+                    self._player_standby.discard(key)
+            entry = self.hass.config_entries.async_get_entry(self.entry_id)
+            can_wake = entry is not None and option_remote_code(entry, player_id) is not None
+            self.player_status_available[key] = (
+                (status is not None and status.get("reachable") is not False)
+                or (key in self._player_standby and can_wake)
+            )
+            self.note_source(("player", player_id), self.player_status_available[key], "Player")
+        if self._player_button_readers:
+            async_dispatcher_send(self.hass, self.signal_device_update)
 
     async def update_all(self, now: datetime | None = None) -> None:
         """Relevé principal (appareils + capteurs).
@@ -544,6 +599,7 @@ class FreeboxRouter:
         try:
             await self.update_device_trackers()
             await self.update_sensors()
+            await self.update_player_buttons()
         except Exception as err:
             if self.closing and is_shutdown_error(err, self):
                 _LOGGER.debug("Relevé interrompu (connexion fermée, rechargement) : %s", err)
@@ -552,14 +608,14 @@ class FreeboxRouter:
                 raise
             if self.reachable:
                 self.reachable = False
-                _LOGGER.info("Freebox injoignable (%s) : %s", self._host, err)
+                _LOGGER.info("Freebox injoignable (%s)", type(err).__name__)
                 self._signal_reachability_changed()
             else:
-                _LOGGER.debug("Freebox toujours injoignable : %s", err)
+                _LOGGER.debug("Freebox toujours injoignable (%s)", type(err).__name__)
             return
         if not self.reachable:
             self.reachable = True
-            _LOGGER.info("Freebox de nouveau joignable (%s)", self._host)
+            _LOGGER.info("Freebox de nouveau joignable")
             self._signal_reachability_changed()
 
     def _signal_reachability_changed(self) -> None:
@@ -576,7 +632,13 @@ class FreeboxRouter:
         new_device = False
         fbx_devices: list[dict[str, Any]] = []
         # Bridge mode can change at runtime; retry at the existing poll interval.
-        self.supports_hosts, fbx_devices = await get_hosts_list_if_supported(self._api)
+        try:
+            self.supports_hosts, fbx_devices = await get_hosts_list_if_supported(self._api)
+        except Exception:
+            self.lan_available = False
+            self.note_source("lan", False, "Source LAN")
+            raise
+        self.note_source("lan", self.supports_hosts, "Source LAN")
 
         self.lan_available = self.supports_hosts
         seen_macs = {device["l2ident"]["id"] for device in fbx_devices}
@@ -717,6 +779,11 @@ class FreeboxRouter:
                             new_device = True
                         devices[node_id] = home_node
 
+                from .availability import home_node_reachable
+                for node_id in self.home_devices.keys() | devices.keys():
+                    node = devices.get(node_id)
+                    self.note_source(("home_node", node_id),
+                                     node is not None and home_node_reachable(node), "Appareil Home")
                 self.home_devices = devices
                 self.home_snapshot_known = True
                 if not self.home_available:

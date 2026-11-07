@@ -96,7 +96,7 @@ FIXTURE = json.loads((ROOT / 'tests/fixtures/devialet_tv_status.json').read_text
 
 async def run():
     access = types.SimpleNamespace(get=AsyncMock())
-    router = types.SimpleNamespace(async_read=direct_read, mac='00:00:00:00:00:00', player_identifiers=set(), player_status_available={}, hass=object(), signal_device_update='synthetic-device-update',
+    router = types.SimpleNamespace(async_read=direct_read, mac='00:00:00:00:00:00', player_identifiers=set(), player_status_available={}, _player_standby=set(), note_source=lambda *args: None, hass=object(), signal_device_update='synthetic-device-update',
                                    _api=types.SimpleNamespace(player=types.SimpleNamespace(_access=access)))
     entity = mp.FreeboxPlayerMediaPlayer(router, {'id':17, 'device_model':'fbx7hd-delta', 'api_version':'11.0'}, object())
     entity.hass = object()  # suffisant pour déclencher le lookup artwork

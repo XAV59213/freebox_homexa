@@ -24,7 +24,7 @@ TNT_DEVICE_INFO = DeviceInfo(
 
 
 class HomexaTntSensor(CoordinatorEntity[ProgrammeTntFrCoordinator], SensorEntity):
-    _attr_icon = "mdi:television-classic"
+    _attr_translation_key = "tnt_channel"
     _attr_has_entity_name = True
     _attr_device_info = TNT_DEVICE_INFO
 
@@ -39,6 +39,7 @@ class HomexaTntSensor(CoordinatorEntity[ProgrammeTntFrCoordinator], SensorEntity
         self._channel_id = channel_id
         self._attr_unique_id = f"{unique_prefix}_tnt_{channel_id}"
         self._attr_name = ALL_CHANNELS.get(channel_id, channel_id)
+        self._attr_translation_placeholders = {"channel": self._attr_name}
 
     @property
     def _data(self) -> dict:

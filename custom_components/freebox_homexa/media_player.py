@@ -58,7 +58,7 @@ DEVIALET_SOURCES = ["TV", "HDMI (CEC)", "YouTube", "Netflix", "Navigateur"]
 
 MINI_4K_MODELS = {"fbx6lc", "freebox_mini", "mini4k", "mini_4k", "stb_mini"}
 DEVIALET_MODELS = {"fbx7hd-delta", "stb_v7", "fbx7hd-one"}
-API_VERSION_FALLBACKS = ("v6", "v8", "v7", "v5")
+from .player_status import API_VERSION_FALLBACKS, async_read_player_status
 
 # Icônes carrées embarquées dans frontend/ (servies via URL_BASE, sans hotlink).
 # youtube.png 256x256 (source brands.home-assistant.io/youtube/icon.png).
@@ -186,6 +186,12 @@ class FreeboxPlayerMediaPlayer(FreeboxReachableMixin, MediaPlayerEntity):
         else:
             self._attr_source_list = list(DEVIALET_SOURCES)
 
+    async def async_added_to_hass(self) -> None:
+        await super().async_added_to_hass()
+        key = str(self._player_id)
+        self._router.player_status_providers.add(key)
+        self.async_on_remove(lambda: self._router.player_status_providers.discard(key))
+
     @property
     def _remote_code(self) -> str | None:
         return option_remote_code(self._entry, self._player_id)
@@ -239,32 +245,17 @@ class FreeboxPlayerMediaPlayer(FreeboxReachableMixin, MediaPlayerEntity):
             raise failures[0][1]
 
     async def async_update(self) -> None:
-        status: dict[str, Any] | None = None
-        last_err: Exception | None = None
-        versions = [self._api_version] + [v for v in API_VERSION_FALLBACKS if v != self._api_version]
-        for version in versions:
-            try:
-                status = await self._router.async_read(lambda: self._access.get(self._path("status/", version)))
-                if not isinstance(status, dict):
-                    raise ValueError("Invalid Player status")
-                self._api_version = version
-                break
-            except Exception as err:
-                last_err = err
-                status = None
+        status, self._api_version = await async_read_player_status(
+            self._router, self._player_id, self._api_version
+        )
 
         if status is None:
             cache_player_schema(self._router, self._player_id, None, "unavailable")
-            _LOGGER.debug(
-                "Statut Player %s (%s) indisponible : %s",
-                self._player_id,
-                self._api_version,
-                last_err,
-            )
             # A previously confirmed standby remains controllable through the
             # existing Server remote channel, but never infer off on first contact.
             self._attr_available = (self._attr_state == MediaPlayerState.OFF
                                     and self._remote_code is not None)
+            self._router.note_source(("player", self._player_id), self._attr_available, "Player")
             self._router.player_status_available[str(self._player_id)] = self._attr_available
             async_dispatcher_send(self._router.hass, self._router.signal_device_update)
             return
@@ -302,8 +293,13 @@ class FreeboxPlayerMediaPlayer(FreeboxReachableMixin, MediaPlayerEntity):
         else:
             self._attr_state = None
 
+        if self._attr_state == MediaPlayerState.OFF:
+            self._router._player_standby.add(str(self._player_id))
+        else:
+            self._router._player_standby.discard(str(self._player_id))
         if self._attr_state == MediaPlayerState.OFF and self._remote_code is not None:
             self._attr_available = True
+        self._router.note_source(("player", self._player_id), self._attr_available, "Player")
         self._router.player_status_available[str(self._player_id)] = self._attr_available
         async_dispatcher_send(self._router.hass, self._router.signal_device_update)
 

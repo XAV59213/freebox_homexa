@@ -165,3 +165,25 @@ Le minimum original est rétabli : aucune validation désactivée ni code SDK pa
 pour le score. Réserve formelle custom/core explicite, versions futures à réauditer.
 Cette preuve ne fournit ni session injectable, ni close garanti, ni typings SDK,
 ni validation matérielle.
+
+## Lot 11 — disponibilité des boutons et transitions de toutes sources
+
+`player_status.py` réutilise strictement les anciennes routes/versions de statut.
+Boutons actifs enregistrés avec refcount ; timer central existant lit une fois par
+Player seulement si aucun MediaPlayer actif ne possède la collecte. Retrait,
+reprise par boutons seuls, fallback v8, annulation en vol avant close et zéro
+commande testés sous vrai HA/SDK. Les boutons ne créent ni timer ni polling propre.
+
+`router.note_source` annonce INFO une perte puis un retour par source, labels fixes
+sans host/ID/payload. Tests répétés Home/nœuds/endpoints/caméra, Wi-Fi multi-sources
+et interrupteur, Remote/Player, LAN/Root et capteurs/disques/RAID ; vraie règle de
+log TNT portée par DataUpdateCoordinator et UpdateFailed. Canal image FFmpeg :
+public async_camera_image conserve None/exception, zéro retry ; annonce ses
+transitions sans logs de source/auth. Un Wi-Fi valide sans bool enabled est unknown
+disponible, pas une panne.
+
+Réserve précise disponibilité : frame échouée et contrôle/statut Home valide
+restent deux canaux distincts. Aucune frame périmée renvoyée mais caméra encore
+disponible ; concevoir récupération vidéo sans faire un nouveau poll FFmpeg lourd
+ou bloquer à jamais la prochaine image. SDK partial-open et rollback refusé restent
+limites du cycle de vie, distinctes des boutons désormais prouvés.

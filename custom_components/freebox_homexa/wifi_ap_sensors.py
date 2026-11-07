@@ -55,7 +55,6 @@ class FreeboxRepeaterCountSensor(FreeboxLanReachableMixin, SensorEntity):
     _attr_should_poll = False
     _attr_has_entity_name = True
     _attr_translation_key = "wifi_repeaters"
-    _attr_icon = "mdi:wifi-sync"
     _attr_state_class = SensorStateClass.MEASUREMENT
 
     def __init__(self, router: FreeboxRouter) -> None:
@@ -96,7 +95,6 @@ class FreeboxWifiClientCountSensor(FreeboxLanReachableMixin, SensorEntity):
     _attr_should_poll = False
     _attr_has_entity_name = True
     _attr_translation_key = "wifi_clients"
-    _attr_icon = "mdi:account-multiple"
     _attr_state_class = SensorStateClass.MEASUREMENT
 
     def __init__(self, router: FreeboxRouter, ap_id: str) -> None:
@@ -149,7 +147,6 @@ class FreeboxWifiClientListSensor(FreeboxLanReachableMixin, SensorEntity):
     _attr_should_poll = False
     _attr_has_entity_name = True
     _attr_translation_key = "wifi_client_list"
-    _attr_icon = "mdi:devices"
 
     def __init__(self, router: FreeboxRouter, ap_id: str) -> None:
         self._router = router
@@ -199,7 +196,6 @@ class FreeboxWifiTotalClientSensor(FreeboxLanReachableMixin, SensorEntity):
     _attr_should_poll = False
     _attr_has_entity_name = True
     _attr_translation_key = "wifi_clients_total"
-    _attr_icon = "mdi:wifi"
     _attr_state_class = SensorStateClass.MEASUREMENT
     _attr_entity_category = EntityCategory.DIAGNOSTIC
 

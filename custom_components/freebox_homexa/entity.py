@@ -171,9 +171,11 @@ class FreeboxHomeEntity(Entity):
             )
             if not isinstance(node, dict) or "value" not in node:
                 raise ValueError("Invalid Home endpoint response")
+            self._router.note_source(("home_endpoint", self._id, command_id), True, "Lecture Home")
             self._failed_read_endpoints.discard(command_id)
             return node["value"]
         except Exception as err:  # SDK/transport failures are not an explicit unknown value.
+            self._router.note_source(("home_endpoint", self._id, command_id), False, "Lecture Home")
             self._failed_read_endpoints.add(command_id)
             if self._router.closing and is_shutdown_error(err, self._router):
                 return None
@@ -244,12 +246,16 @@ class FreeboxHomeEntity(Entity):
                 device = get_device_by_identifier(registry, (DOMAIN, self._id), self._router.entry_id)
                 if device is not None and device.name != device_name:
                     registry.async_update_device(device.id, name=device_name)
+            self._attr_available = True
+            self._router.note_source(("home_metadata", self._id), True, "Métadonnées Home")
             self.async_write_ha_state()
         except Exception as err:  # noqa: BLE001
             if is_shutdown_error(err, self._router):
                 _LOGGER.debug("Mise à jour de %s interrompue (rechargement) : %s", self._attr_name, err)
                 return
-            _LOGGER.log(poll_log_level(self._router), "Échec mise à jour entité %s : %s", self._attr_name, err)
+            self._attr_available = False
+            self._router.note_source(("home_metadata", self._id), False, "Métadonnées Home")
+            _LOGGER.debug("Mise à jour Home impossible (%s)", type(err).__name__)
 
     async def async_added_to_hass(self) -> None:
         await super().async_added_to_hass()

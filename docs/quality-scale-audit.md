@@ -19,9 +19,9 @@ Platinum absent). Le snapshot JSON documente noms et tiers ; il ne crée pas
 un second fichier de statut. Le seul checklist est
 `custom_components/freebox_homexa/quality_scale.yaml`, placement conventionnel.
 
-## Résultat : 16 done / 36 todo / 2 exempt
+## Résultat : 17 done / 35 todo / 2 exempt
 
-Les 48 anciens `todo` ont tous été relus : **12 démontrés** depuis l’audit initial, **36
+Les 48 anciens `todo` ont tous été relus : **13 démontrés** depuis l’audit initial, **35
 restent ouverts** avec réserve précise dans le YAML et ci-dessous. Pas de
 transformation administrative pour atteindre un score. Les numéros de lignes
 de l'audit initial se réfèrent à la base ; les preuves nouvelles utilisent les
@@ -81,7 +81,7 @@ pas tester toute version HA ≥2026.8 ; un job minimum supporté reste à établ
 Le plugin HA bloque sockets externes et DNS ; toutes les réponses appareil sont
 synthétiques/mocks. Aucun secret/token de production, aucun appareil connecté.
 
-**490 tests passent** (451 au lot 9, +39 au lot 10) : config initiale, réseau/auth, duplicate host, réauth avec
+**511 tests passent** (490 au lot 10, +21 au lot 11) : config initiale, réseau/auth, duplicate host, réauth avec
 reload de l'entrée existante, options général/groupes, conservation options,
 migration LAN, setup/unload succès/refus, erreurs close/annulation, confidentialité,
 bornes cache/timings, Entity HA et signaux dispatcher/perte-retour, logs centraux
@@ -94,7 +94,7 @@ Les tests SDK/reconfigure de caractérisation documentent une limite, ils ne la 
 
 | Périmètre (38 modules, aucun omit) | Lignes exécutées | Branches | Combiné |
 |---|---:|---:|---:|
-| Intégration entière | 4506/6053 = **74,44 %** | 1057/2028 = **52,12 %** | **68,84 %** |
+| Intégration entière | 4582/6132 = **74,72 %** | 1076/2046 = **52,59 %** | **69,19 %** |
 | config_flow.py | 437/438 = **99,77 %** | 145/148 = **97,97 %** | **99,32 %** |
 | diagnostics.py | **100 %** | **100 %** | **100 %** |
 | player_diagnostics.py | **100 %** | **100 %** | **100 %** |
@@ -114,6 +114,39 @@ PYTHONDONTWRITEBYTECODE=1 /tmp/homexa-ha-quality/bin/python -m pytest -q tests/h
   --cov=custom_components.freebox_homexa --cov-branch \
   --cov-report=term --cov-report=json:coverage.json --cov-report=xml:coverage.xml
 ```
+
+## Lot 11 — une règle entière démontrée, limites restantes isolées
+
+**511 tests HA (+21), 17 done / 35 todo / 2 exempt.**
+`log-when-unavailable` est désormais done : vraie panne répétée puis récupération
+par source et vraie coordination TNT, pas simple preuve du logger central.
+Aucun host/ID/payload dans les nouvelles annonces. Les valeurs manquantes dans
+un Wi-Fi valide sont unknown disponibles, plus des erreurs répétées.
+
+Boutons sans MediaPlayer : lecteur refcounté au timer existant, un relevé par
+Player, aucune collecte doublée quand média actif ; retrait du provider, préférences
+et annulation/fermeture en vol testés. Le minimum « boutons seuls » est levé.
+La réserve disponibilité est maintenant **vidéo/contrôle FFmpeg**, pas le même
+travail déjà prouvé : une frame échouée ne rend pas les contrôles Home injoignables,
+mais un modèle de récupération vidéo reste à définir sans polling coûteux.
+
+Toutes icônes **fixes** de l’inventaire passent dans icons.json ; vrai chargeur HA,
+registre/icônes/noms personnalisés testés, snapshot ne change que translation_key.
+L’icône Player dépendant de source (YouTube/Netflix), et non state, est conservée ;
+transposition dynamique via registre/cache à qualifier, pas suppression pour score.
+Le placeholder TNT conserve le nom propre exact. Les autres noms fixes restant
+masqués par _attr_name/name Home sont listés précisément ; clés seules ≠ traduction.
+
+Couverture **4582/6132 lignes (74,72 %)**, **1076/2046 branches (52,59 %)**,
+combiné **69,19 %**, 39 modules. **17 lignes typing** automatiquement exclues
+contre 10 : nouveaux imports TYPE_CHECKING canoniques, aucune exclusion ajoutée.
+Mypy **167→162 erreurs**, 23 fichiers/39 modules : contrat web.Request/Response,
+chemin StaticPathConfig str, imports canoniques en typage et réexports runtime
+anciens HA conservés. Aucun cast/ignore/Any pour masquer des contrats.
+
+Deux suites JS et douze simulations historiques séparées, endpoints repeater/
+intacts, version préparée 28.8.90. Provenance SDK vérifiée mais minimum >=1.3.1
+conservé selon hassfest : réserve formelle de pin inchangée. Pas de merge/release.
 
 ## Lot 10 — contrat SDK vérifié et disponibilité sans faux états
 
@@ -555,10 +588,10 @@ listés dans le tableau suivant ; celui-ci reprend le YAML, il n'est pas un seco
 | config-entry-unloading | Lots 6-8 : vrai ConfigEntriesManager/discovery/forward des onze domaines et rollback partiel/complet ; six lectures SDK entités et deux intervalles drainés avant close, fermeture sérialisée. Refus/exception de rollback désormais caractérisés : des plateformes HA peuvent rester après erreur du setup, pas de faux rollback atomique ; nettoyage réel explicite du test. Unload normal refusé/échoué/annulé restaure admission des lectures sauf si un autre propriétaire ferme déjà le SDK ou si close est terminé, courses testées par Events. FFmpeg hérité testé sans processus/réseau : snapshot, source, fermeture après erreur lecteur/proxy/annulation ; ouverture en dehors du try/finally amont, fermeture sur échec d'ouverture non garantie. Limite SDK close/session publique inchangée. Pas garantie universelle donc todo. |
 | docs-configuration-parameters | docs/guide-utilisateur.md (lié README) : Table des options général/groupes/types/répéteurs/TNT/profils, valeurs, défauts, effets et données privées ; conservation des codes Player absents testée. Preuve documentaire locale renforcée ; reste todo au sens formel, la règle officielle visant une page/revue home-assistant.io non soumise. Aucune certification custom revendiquée. |
 | docs-installation-parameters | docs/guide-utilisateur.md (lié README) : Table host/port initiaux, Server plutôt que Player et appairage physique ; limite host/identité expliquée. Preuve documentaire locale renforcée ; reste todo au sens formel, la règle officielle visant une page/revue home-assistant.io non soumise. Aucune certification custom revendiquée. |
-| entity-unavailable | Lot 10 : tests/ha/test_availability_sources.py et test_partial_sources.py utilisent vrai HA/SDK, transport mocké. Remote et statut Player/boutons, endpoints Home individuels (échec distinct de value=None), six familles LAN, AP supprimé, sources Wi-Fi partielles, client disparu et températures disparues : panne/récupération sans faux zéro ni cache frais. Bridge nodev SDK correctement reconnu puis retenté. Veille connue avec code remote garde off/available via le canal Server existant ; code seul ne crée aucun état initial. Pas de polling par bouton. Restent provider Player désactivé et contrat frame FFmpeg, à qualifier globalement avant done ; voir inventaire fini docs/quality-scale-remaining-work.md. |
-| log-when-unavailable | tests/ha/test_router_recovery.py prouve une seule annonce INFO de perte puis retour sur trois erreurs du relevé central. __init__.py ne double plus les logs avant NotReady/AuthFailed. Les chemins Home/Player/TNT peuvent encore répéter des logs ; pas de preuve globale. |
+| entity-unavailable | Lot 11 : boutons seuls sans MediaPlayer maintenant couverts par lecteur partagé au timer central existant ; refcount, absence de collecte doublée quand média actif, relais après retrait et annulation SDK en vol prouvés sous vrai HA. Veille connue/code et inconnu initial préservés. Wi-Fi valide sans enabled devient unknown disponible, pas panne. Autres sources inventoriées testées. Réserve restante précise : erreur/None de frame FFmpeg laisse caméra disponible via statut/contrôles Home valides ; pas de frame périmée renvoyée, mais pas modèle global séparant disponibilité vidéo et contrôle. Définir récupération vidéo sans lancer un nouveau polling FFmpeg coûteux ; ne pas déclarer règle entière done sur seul contrôle Home. |
+| log-when-unavailable | Lot 11 : router.note_source mémorise transitions par source, INFO perte puis retour une seule fois ; labels fixes sans host/ID/payload. Tests vrais HA/SDK test_source_ownership_logs : trois échecs successifs et récupération Root/LAN, Wi-Fi config/BSS/AP/stations/interrupteur, Home/endpoints/nœuds/caméra, Remote/Player, capteurs/disques/RAID ; aucun secret synthétique dans logs. TNT utilise réellement DataUpdateCoordinator/UpdateFailed, une perte puis récupération testée. Canal image FFmpeg public conserve exception/None sans retry et annonce ses transitions. Pas de prétention de succès physique ni de nettoyage SDK garanti. |
 | reauthentication-flow | tests/ha/test_config_flow.py prouve reauth_successful et reload unique de la même entrée sans doublon. Le serveur physique peut toutefois changer derrière le même host ; absence de contrôle MAC/identité avant réauth. Lié au choix de migration unique ID host vers identité physique, non imposé ici. |
-| test-coverage | 490 tests HA 2026.10.4 (+39 au lot 10), 38 modules sans omit : 4506/6053 lignes (74,44 %), 1057/2028 branches (52,12 %), combiné 68,84 %. Deux suites JS et douze simulations historiques séparées. Deux passages locaux et artefact CI comparés ; seuil officiel non atteint. Dix lignes typing exclues automatiquement par coverage.py, aucune exclusion personnalisée. Pas validation matérielle. |
+| test-coverage | 511 tests HA 2026.10.4 (+21 au lot 11), 39 modules sans omit : 4582/6132 lignes (74,72 %), 1076/2046 branches (52,59 %), combiné 69,19 %. Deux suites JS et douze simulations historiques séparées. Deux passages locaux et artefact CI comparés en entier (lignes/branches exécutées par module). Seuil officiel non atteint. 17 lignes de typage exclues automatiquement par coverage.py (10 au lot 10), aucune exclusion personnalisée ; imports TYPE_CHECKING canoniques explicités, pas optimisation artificielle du périmètre. Aucune validation matérielle. |
 | devices | media_player.py:90-103 et tnt_sensor.py:14-29 DeviceInfo ; cohérence des associations/subdevices et de toutes plateformes non vérifiée sur plusieurs modèles. |
 | discovery | tests/ha/test_config_flow.py teste le flow zeroconf réel : préremplissage api_domain/https_port, formulaire utilisateur et rejet du même host configuré. L’identité physique, alias d’adresse et découverte de tous modèles restent non démontrés ; pas un passage en done sur seul préremplissage. |
 | discovery-update-info | config_flow.py:390-405 découvre le host ; aucun test prouvant mise à jour sûre des entrées existantes après changement adresse. |
@@ -573,13 +606,13 @@ listés dans le tableau suivant ; celui-ci reprend le YAML, il n'est pas un seco
 | entity-category | Revue sémantique globale des 30 familles et 81 variantes : docs/quality-scale-entity-inventory.md. Snapshot des constructeurs réels dans test_entity_inventory ; test_category_registry prouve la conservation des IDs, noms et choix utilisateur avec le vrai EntityPlatform HA. Classements diagnostic/config corrigés sans changer les activations ni les commandes. |
 | entity-device-class | Revue 30 familles/81 variantes, docs/quality-scale-source-contracts.md. rate_* natif byte/s vérifié documentation Free indexée, source HA, SDK Access+Connection réel décodant une réponse HTTP JSON : /1000 en kB/s ; bandwidth_* bit/s distinct et non utilisé. IDs/unité/historique conservés. Pourcentage disque invalide, uptime absent et RAID absent deviennent unknown. Opener garage déduit du libellé non prouvé ; documentation Wi-Fi dit signal attenuation in dB, pas preuve dBm pour toutes sources. Ne pas changer silencieusement classe/unité/historique ; todo avec proposition requise. |
 | entity-disabled-by-default | Lot 8 : revue des 81 variantes dans docs/quality-scale-entity-inventory.md. RSSI individuel bruyant off à la première création ; tracker, autoprotection et contrôles avancés opt-in conservés. Fonctions principales et supervision Server/Home/réseau gardées selon rôle, pas désactivation administrative des données des cartes. Vrai EntityPlatform : RSSI neuf disabled_by INTEGRATION, ancien activé reste activé, choix USER conservé. Les 81 variantes préservent préférences et IDs ; aucun dashboard modifié. Valeurs contextualisées du ScannerEntity HA explicitement distinguées des flags déclarés. |
-| entity-translations | has_entity_name global démontré au lot 8 et préférences registre préservées ; cela ne traduit pas toutes les fonctions. Noms provenant des appareils restent des données utilisateur, pas des textes à traduire. Restent inventaire exhaustif des clés/fonctions/états/options et passage des libellés de fonction en strings/FR/EN, avec vraie résolution HA et préservation des anciens entity_id/choix utilisateur ; pas de migration identité nécessaire. |
-| icon-translations | icons.json existe ; tnt_sensor.py:27 et autres plateformes gardent des icônes statiques ; inventaire complet non effectué. |
+| entity-translations | Inventaire global noms/icônes des 30 familles/81 variantes mis à jour au lot 11. Noms sources (chaînes, clients, appareils) ne doivent pas être traduits ; placeholder TNT channel préserve nom exact. Noms principaux/classes HA déjà corrects ; vrais noms utilisateur/IDs/icônes préservés. Restent libellés fixes des descriptions réseau/appels/disques, nom WiFi/inversion/autoprotection et repli RSSI nommé, masquant parfois translation_key via _attr_name ou propriété name Home. Corriger consommation par vrai moteur HA FR/EN sans modifier entrées historiques ni noms utilisateur ; clés seules ne prouvent pas traduction. |
+| icon-translations | Lot 11 : icônes fixes des 30 familles/81 variantes auditées et déplacées dans icons.json : boutons, capteurs réseau/appels/disques, AP/LAN/RSSI, calendrier/TNT, inversion, types trackers. Descripteurs clonés avec icon=None, IDs/noms sources/préférences inchangés ; vrai chargeur HA async_get_icons et registre (icône/nom personnalisés) testés. Classes natives gardent icône HA. Reste icône principale Player dépendant de source YouTube/Netflix, pas du state on/off : comportement utilisateur conservé en Python. Étudier métadonnée dynamique via API publique du registre et cache/lifecycle avant done, pas supprimer fonctionnalité pour score. |
 | reconfiguration-flow | Test HA de caractérisation confirme : nouveau host -> wrong_account, données inchangées, aucun appel SDK. Le changement de port seul manque aussi de probe. Corriger exige plan compatible identité physique/host/jeton ; aucune migration ni changement IDs imposé. |
 | repair-issues | Pas de preuve de Repairs pour tous états actionnables nécessitant intervention ; logs et ConfigEntryAuthFailed ne suffisent pas. |
 | stale-devices | router.py:941-994,1112-1123 nettoie certains registres ; stale sensor/client/disque/Home et garanties multi-intégrations non démontrées globalement. Aucun changement repeater/. |
 | inject-websession | Source SDK v1.3.1 vérifiée : constructeur sans session publique, open crée son ClientSession (aiofreepybox.py:126). Test signature réelle. Autre limite amont démontrée : après open échoué, close peut lever AttributeError _access avant session.close ; après logout échoué, close ne passe pas dans finally. Ne pas promettre une fermeture garantie sur erreur. Pas de monkeypatch/private session ni modification dépendance pour score ; proposition amont dans le rapport. |
-| strict-typing | Mypy 2.4.1 strict : 167 erreurs dans 24 fichiers/38 analysés (186 au lot 8). Tables de classement tuple homogènes, Programme/datetime/retours callback, TmdbResult TypedDict, ClientTimeout public équivalent. tnt_coordinator et tnt_tmdb sans erreur stricte. Aucun cast/ignore/Any pour masquer une erreur, aucun omit. Restent SDK non annoté, schémas WebSocket HA et structures d’autres plateformes ; voir docs/quality-scale-typing-baseline.md. Aucun patch de dépendance/session privée. |
+| strict-typing | Mypy 2.4.1 strict : 162 erreurs /23 fichiers/39 modules (167 au lot 10). Imports des classes HA canoniques pour typage avec réexports runtime compatibles anciens HA ; vrai handler web.Request -> web.Response et chemin StaticPathConfig str selon contrat public. Nouveau lecteur Player typé sans dette ajoutée. Aucun Any/cast/ignore ajouté pour masquer une erreur. Restent contrats SDK non annotés, schémas voluptuous/probatio, rappels et autres plateformes ; baselines et limites documentées. |
 
 ## Validation reproductible
 

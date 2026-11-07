@@ -94,7 +94,8 @@ class FreeboxDevice(FreeboxReachableMixin, ScannerEntity):
         self._name = lan_client_name(device)
         self._mac = device["l2ident"]["id"]
         self._manufacturer = device.get("vendor_name", "Inconnu")
-        self._attr_icon = icon_for_freebox_device(device)
+        kind = device.get("host_type", "")
+        self._attr_translation_key = f"device_{kind if kind in DEVICE_ICONS else 'unknown'}"
         self._attr_unique_id = f"{router.mac}_{self._mac}"
         self._active = False
         self._attr_extra_state_attributes: dict[str, Any] = {}

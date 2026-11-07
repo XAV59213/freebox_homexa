@@ -142,3 +142,4 @@ class FreeboxRemote(FreeboxReachableMixin, RemoteEntity):
         except Exception:
             self._attr_available = self._last_known_standby and self._remote_code is not None
             self._attr_is_on = False if self._attr_available else None
+        self._router.note_source(("remote", self._player_id), self._attr_available, "Télécommande Player")

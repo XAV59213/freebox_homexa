@@ -89,7 +89,6 @@ class FreeboxTvGuideCalendar(FreeboxReachableMixin, CalendarEntity):
 
     _attr_has_entity_name = True
     _attr_translation_key = "tv_guide"
-    _attr_icon = "mdi:television-guide"
 
     def __init__(self, router: FreeboxRouter) -> None:
         self._router = router

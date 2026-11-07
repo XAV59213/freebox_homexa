@@ -138,6 +138,16 @@ class FreeboxCamera(FreeboxHomeEntity, FFmpegCamera):
         self.update_node(node)
         _LOGGER.debug("Caméra %s initialisée avec succès", self._name)
 
+    async def async_camera_image(self, width: int | None = None, height: int | None = None) -> bytes | None:
+        """Observe the public inherited image contract, without retries or a new poll."""
+        try:
+            image = await super().async_camera_image(width, height)
+        except Exception:
+            self._router.note_source(("camera_image", self._id), False, "Image caméra")
+            raise
+        self._router.note_source(("camera_image", self._id), image is not None, "Image caméra")
+        return image
+
     @async_action_errors
     async def async_enable_motion_detection(self) -> None:
         """Active la détection de mouvement sur la caméra.
@@ -164,20 +174,24 @@ class FreeboxCamera(FreeboxHomeEntity, FFmpegCamera):
         try:
             node = self._router.home_devices.get(self._id)
             if node is None:
-                _LOGGER.warning("Caméra %s non trouvée dans les données du routeur", self._id)
+                self._router.note_source(("home_node", self._id), False, "Appareil Home")
                 self._attr_available = False
                 self.async_write_ha_state()
                 return
             self._attr_available = True
             self._node = node
             self.update_node(node)
+            self._router.note_source(("camera", self._id), True, "Source caméra Home")
             self.async_write_ha_state()
             _LOGGER.debug("Caméra %s mise à jour avec succès", self._name)
         except Exception as err:  # noqa: BLE001
             if is_shutdown_error(err, self._router):
                 _LOGGER.debug("Mise à jour de la caméra %s interrompue (rechargement) : %s", self._id, err)
                 return
-            _LOGGER.log(poll_log_level(self._router), "Échec de la mise à jour de la caméra %s : %s", self._id, err)
+            self._attr_available = False
+            self._router.note_source(("camera", self._id), False, "Source caméra Home")
+            self.async_write_ha_state()
+            _LOGGER.debug("Mise à jour caméra impossible (%s)", type(err).__name__)
 
     def update_node(self, node: dict[str, Any]) -> None:
         """Met à jour les paramètres de la caméra à partir des données du nœud.

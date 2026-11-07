@@ -356,6 +356,9 @@
       },
       "wifi_signal": {
         "name": "Signal Wi-Fi"
+      },
+      "tnt_channel": {
+        "name": "{channel}"
       }
     },
     "button": {

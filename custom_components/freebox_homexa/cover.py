@@ -143,7 +143,7 @@ class FreeboxBasicShutter(FreeboxHomeEntity, CoverEntity):
         Récupère l'état actuel via l'API Freebox.
         """
         if self._command_state is None:
-            _LOGGER.error("Commande d'état non disponible pour %s", self._attr_unique_id)
+            _LOGGER.debug("Endpoint d'état du volet absent")
             self._state = None
             return
         try:
@@ -300,7 +300,7 @@ class FreeboxShutter(FreeboxHomeEntity, CoverEntity):
                 _LOGGER.debug("Position du volet %s mise à jour: %s", self._attr_name, position)
             else:
                 self._current_cover_position = None
-                _LOGGER.warning("Position non valide reçue pour %s", self._attr_name)
+                _LOGGER.debug("Position de volet inconnue dans une réponse valide")
         except Exception as err:  # noqa: BLE001
             if is_shutdown_error(err, self._router):
                 _LOGGER.debug("Position de %s non lue (rechargement) : %s", self._attr_unique_id, err)

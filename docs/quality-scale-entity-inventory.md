@@ -129,3 +129,25 @@ Restent Remote/boutons Player, Wi-Fi/LAN multi-sources et lectures individuelles
 d’endpoints. Les gardes d’inventaire et quatre sources ne suffisent donc toujours
 pas à valider la règle entière. Aucun changement de préférence, d’ID ou d’endpoint
 `repeater/` pour augmenter un score.
+
+## Lot 11 — icônes fixes et noms réellement consommés
+
+Les 81 variantes sont réinventoriées ; seul `translation_key` change dans le
+snapshot, aucune classe/unité/catégorie/activation. Descripteurs historiques
+conservés pour leurs inputs d’ID, clones avec icon=None. Icônes fixes : boutons,
+réseau/appels/disques, AP/RSSI/LAN, calendrier/TNT, inversion et types de trackers
+dans icons.json. Vrai chargeur HA `async_get_icons`, vrai registre avec icône et
+nom utilisateur, ancien entity_id/unique_id conservés ; pas seulement lecture JSON.
+Les classes natives gardent leur icône HA ; l’icône Player dépendant de `source`
+reste en Python pour préserver le comportement demandé, à transposer/tester via
+métadonnées dynamiques compatibles avant de clôturer icon-translations.
+
+Inventaire des noms restant à traduire : `FreeboxSensor` descriptions rate_down,
+rate_up, ipv4, uptime, missed, calls_log ; `FreeboxDiskSensor` partition_free_space
+avec placeholder de partition ; `FreeboxSwitch` WiFi ; Home autoprotection et
+inversion via propriété name/attributs historiques ; RSSI sans appareil propre avec
+placeholder client. Les noms propres appareils/clients/chaînes/partitions ne sont
+pas du texte à traduire. TNT reçoit un placeholder channel identique FR/EN, sans
+inventer de titre. Les entités principales Home/Player restent sans suffixe et les
+états standards relèvent des classes HA. Les clés présentes mais masquées par
+_attr_name/name ne suffisent pas à déclarer une traduction fonctionnelle.

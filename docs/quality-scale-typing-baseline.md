@@ -106,3 +106,13 @@ Mypy strict : **167 erreurs / 24 fichiers / 38 modules**, ensemble normalisé
 identique au lot 9 (positions seules décalées). Aucun Any/cast/ignore ajouté pour
 masquer ces contrats. Les nouveaux guards de sources, flags et états inconnus
 restent testés sous le vrai HA ; ce lot ne prétend pas clôturer strict-typing.
+
+## Lot 11 — 162 erreurs / 23 fichiers / 39 modules
+
+167→162 par contrats réels : handler aiohttp web.Request -> web.Response,
+StaticPathConfig reçoit str et non Path ; imports de classes HA canoniques en
+TYPE_CHECKING avec réexports runtime historiques conservés pour compatibilité.
+Nouveau lecteur Player partagé entièrement typé, zéro nouvelle erreur. Aucun
+Any/cast/ignore ajouté pour masquer les contrats SDK/HA. La couverture exclut
+automatiquement 17 lignes typing (10 avant), sans règle personnalisée ; variation
+de périmètre explicitée, pas présentée comme une hausse de couverture fonctionnelle.

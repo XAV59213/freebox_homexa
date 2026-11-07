@@ -1,4 +1,5 @@
 from __future__ import annotations
+from dataclasses import replace
 
 import logging
 from typing import Any
@@ -225,7 +226,7 @@ class FreeboxSensor(FreeboxReachableMixin, SensorEntity):
         return super().available and getattr(self._router, "sensors_available", True) is not False
 
     def __init__(self, router: FreeboxRouter, description: SensorEntityDescription) -> None:
-        self.entity_description = description
+        self.entity_description = replace(description, icon=None, translation_key=description.key if description.icon else description.translation_key)
         self._router = router
         self._attr_unique_id = f"{router.mac} {description.name}"
         # Keep the historical description (and unique ID), change display only.
@@ -349,6 +350,7 @@ class FreeboxBatterySensor(FreeboxHomeEntity, SensorEntity):
 
 
 class FreeboxWifiSignalSensor(FreeboxLanReachableMixin, SensorEntity):
+    _attr_translation_key = "wifi_signal"
     """Force du signal Wi-Fi (RSSI) d'un client vu par la Freebox."""
 
     # Noisy per-client diagnostic; core client inventory remains available.
@@ -361,7 +363,6 @@ class FreeboxWifiSignalSensor(FreeboxLanReachableMixin, SensorEntity):
     _attr_state_class = SensorStateClass.MEASUREMENT
     _attr_native_unit_of_measurement = SIGNAL_STRENGTH_DECIBELS_MILLIWATT
     _attr_entity_category = EntityCategory.DIAGNOSTIC
-    _attr_icon = "mdi:wifi-strength-2"
 
     def __init__(
         self, router: FreeboxRouter, device: dict[str, Any], create_lan_devices: bool

@@ -38,7 +38,7 @@ async def test_periodic_failure_logged_once_and_recovers(hass, router, caplog):
             await router.update_all(datetime.now(timezone.utc))
             await hass.async_block_till_done()
             assert router.reachable
-            assert caplog.text.count('Freebox de nouveau joignable (') == 1
+            assert caplog.text.count('Freebox de nouveau joignable') == 1
             assert signal.call_count == 2
             sensors.assert_awaited_once()
     finally:

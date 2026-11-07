@@ -84,7 +84,7 @@ il n'est pas à lui seul une preuve sémantique.
   du travail réel ; tester le vrai pipeline avant de modifier sa compatibilité.
 - SDK : constructeur sans injection de session publique et close après failed-open
   restent limites prouvées par tests/source, non résolues par ces nouveaux flags.
-- Le rollback refusé/exceptionnel et FFmpeg open avant try/finally hérités restent
+- Le rollback refusé/exceptionnel et FFmpeg open avant try/finally amont restent
   des caractérisations, pas des garanties de fermeture inventées.
 
 ## Lot 10 — débit, décodage SDK et prudence RSSI
@@ -196,7 +196,7 @@ limites du cycle de vie, distinctes des boutons désormais prouvés.
 - Player.translation_key est une property non cachée. Le registre public ne
   reçoit que translation_key et seulement à transition. display_json_repr (cache
   frontend réel), événement et reload conservent name/icon/options/hidden/IDs.
-- video_available ne décrit que la dernière requête d’image héritée FFmpeg,
+- video_available ne décrit que la dernière requête d’image fournie par FFmpeg public,
   pas un stream RTSP continuellement vérifié : None non observé, False EOF/None/
   exception, True octets non vides. Metadata Home saine ne le réinitialise pas.
   Aucun timer, retry, commande ni processus FFmpeg additionnel. Callback de

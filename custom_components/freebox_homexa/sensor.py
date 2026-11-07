@@ -1,4 +1,5 @@
 from __future__ import annotations
+from collections.abc import Mapping
 
 from collections.abc import Iterable
 from functools import partial
@@ -314,15 +315,23 @@ class FreeboxCallLogSensor(FreeboxSensor):
 
 
 class FreeboxDiskSensor(FreeboxSensor):
-    def __init__(self, router, disk, partition, description) -> None:
+    def __init__(self, router: FreeboxRouter, disk: Mapping[str, object],
+                 partition: Mapping[str, object], description: SensorEntityDescription) -> None:
         super().__init__(router, description)
-        self._disk_id = disk["id"]
-        self._partition_id = partition["id"]
+        disk_id = disk["id"]
+        partition_id = partition["id"]
+        model = disk["model"]
+        if not isinstance(disk_id, int) or not isinstance(partition_id, int):
+            raise ValueError("Invalid SDK disk or partition identity")
+        if model is not None and not isinstance(model, str):
+            raise ValueError("Invalid SDK disk model")
+        self._disk_id = disk_id
+        self._partition_id = partition_id
         self._attr_translation_placeholders = {"partition": str(partition["label"])}
         self._attr_unique_id = f"{router.mac} {description.key} {disk['id']} {partition['id']}"
         device_info: DeviceInfo = {
-            "identifiers": {(DOMAIN, disk["id"])},
-            "model": disk["model"],
+            "identifiers": {(DOMAIN, disk_id)},
+            "model": model,
             "name": f"Disque {disk['id']}",
             "sw_version": as_version(disk.get("firmware")),
         }

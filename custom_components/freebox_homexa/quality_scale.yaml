@@ -33,8 +33,11 @@ rules:
       structurel, pas preuve de couverture du flow.
   config-flow-test-coverage:
     status: done
-    comment: >-
-      Lots 13–14 : config_flow.py 437/437 lignes et 146/146 branches, 100 %. Vrai manager HA : reconfigure de deux entrées legacy partageant le même unique_id avorte sans mutation, reload ni API ; correction de conflit Alexa puis Echo distinct prouvés dans le même flow. La garde reauth dans user était inaccessible : reauth passe par reauth_confirm puis link, non user. Aucun pragma ni état artificiel forcé. Les réserves identité physique/reauth restent dans leurs règles distinctes.
+    comment: 'Jalon19 : config_flow.py477/477lignes et164/164branches100%. Entrée de profil décrite par
+      TypedDict exact validé par le schéma HA public avant callback ; validation dupliquée inaccessible
+      retirée, sans pragma ni bypass. Vrai manager HA refuse notify_target malformé par InvalidData sans
+      mutation, puis corrige et termine le même flow. Succès/erreurs/reprises et unique_id des autres
+      flows conservés. Les réserves identité physique/reauth restent dans leurs règles distinctes.'
   dependency-transparency:
     status: todo
     comment: 'Source GPL-3.0 tag v1.3.1 commit 96322885f37df37e6f491ab889b27cf912cc293a ; wheel PyPI SHA256
@@ -137,17 +140,15 @@ rules:
       dans la carte (plus de catch silencieux), tests JS sans appel HA.'
   config-entry-unloading:
     status: todo
-    comment: >-
-      Lots 6-8 : vrai ConfigEntriesManager/discovery/forward des onze domaines et rollback
-      partiel/complet ; six lectures SDK entités et deux intervalles drainés avant close, fermeture
-      sérialisée. Refus/exception de rollback désormais caractérisés : des plateformes HA peuvent
-      rester après erreur du setup, pas de faux rollback atomique ; nettoyage réel explicite du
-      test. Unload normal refusé/échoué/annulé restaure admission des lectures sauf si un autre
-      propriétaire ferme déjà le SDK ou si close est terminé, courses testées par Events. FFmpeg
-      hérité testé sans processus/réseau : snapshot, source, fermeture après erreur
-      lecteur/proxy/annulation ; ouverture en dehors du try/finally amont, fermeture sur échec
-      d'ouverture non garantie. Limite SDK close/session publique inchangée. Pas garantie
-      universelle donc todo.
+    comment: 'Lots 6-8 : vrai ConfigEntriesManager/discovery/forward des onze domaines et rollback partiel/complet
+      ; six lectures SDK entités et deux intervalles drainés avant close, fermeture sérialisée. Refus/exception
+      de rollback désormais caractérisés : des plateformes HA peuvent rester après erreur du setup, pas
+      de faux rollback atomique ; nettoyage réel explicite du test. Unload normal refusé/échoué/annulé
+      restaure admission des lectures sauf si un autre propriétaire ferme déjà le SDK ou si close est
+      terminé, courses testées par Events. FFmpeg public délégué testé sans processus/réseau : snapshot,
+      source, fermeture après erreur lecteur/proxy/annulation ; ouverture en dehors du try/finally amont,
+      fermeture sur échec d''ouverture non garantie. Limite SDK close/session publique inchangée. Pas
+      garantie universelle donc todo.'
   docs-configuration-parameters:
     status: todo
     comment: 'docs/guide-utilisateur.md (lié README) : Table des options général/groupes/types/répéteurs/TNT/profils,
@@ -201,8 +202,11 @@ rules:
       avant réauth. Lié au choix de migration unique ID host vers identité physique, non imposé ici.
   test-coverage:
     status: todo
-    comment: >-
-      Jalon17 : 617 tests HA2026.10.4, 42modules sans omit : 5167/6489 lignes (79,63 %), 1343/2184 branches (61,49 %), combiné75,06 %. 88lignes automatiquement exclues (classes Protocol incluses), aucune exclusion personnalisée. Registry compat atteint66/66 lignes100% et29/30branches96,67% avec vrai registre HA et façades legacy explicitement distinguées. Seuil officiel plus de95% dans chaque module :20/42 au-dessus en lignes, donc règle globale todo. Livraison exige deux passages locaux et comparaison intégrale artefact CI ; preuves exactes en PR119. Douze simulations/deuxJS distincts ; aucune validation matérielle.
+    comment: 'Jalon19 : 666 tests HA2026.10.4, 42modules sans omit : 5439/6653 lignes (81,75 %), 1455/2248
+      branches (64,72 %), combiné77,45 %. 92lignes automatiquement exclues, aucune exclusion personnalisée.
+      Deux passages locaux et artefact CI complet doivent concorder avant rapport livré. Seuil officiel
+      plus de95% dans chaque module :22/42 au-dessus en lignes ; base_class94/94lignes et28/28branches100%,
+      caméra93,60%, disque/sensor92,31%. Règle globale todo ; aucune validation matérielle.'
   devices:
     status: todo
     comment: >-
@@ -294,16 +298,14 @@ rules:
       ScannerEntity HA explicitement distinguées des flags déclarés.
   entity-translations:
     status: done
-    comment: >-
-      Lot 12 : les 81 variantes passent par le vrai EntityPlatform et sa méthode publique
-      async_load_translations, en français puis anglais. 66 clés propres et nom batterie natif HA
-      consommés réellement, pas seulement présents dans JSON. Réseau/appels/disques, Wi-
-      Fi/inversion/autoprotection/RSSI nommé et TNT ne masquent plus les traductions. Noms source
-      séparés des libellés ; placeholders conservent partitions/clients/chaînes exacts, heuristique
-      garage inchangée. Noms français historiques restent entrées des unique_id et fallback avant
-      plateforme, pas affichage chargé. Vrais friendly_name personnalisés et icônes utilisateur
-      préservés ; IDs et préférences inchangés. Preuves :
-      test_every_fixed_label_consumed_by_real_entity_platform et inventaires globaux.
+    comment: 'Lot 12 : les 81 variantes passent par le vrai EntityPlatform et sa méthode publique async_load_translations,
+      en français puis anglais. 66 clés propres et nom batterie natif HA consommés réellement, pas seulement
+      présents dans JSON. Réseau/appels/disques, Wi-Fi/inversion/autoprotection/RSSI nommé et TNT ne masquent
+      plus les traductions. Noms source séparés des libellés ; placeholders conservent partitions/clients/chaînes
+      exacts, heuristique garage inchangée. Noms français historiques restent entrées des unique_id et
+      fallback avant plateforme, pas affichage chargé. Vrais friendly_name personnalisés et icônes utilisateur
+      préservés ; IDs et préférences inchangés. Preuves : test_every_fixed_label_consumed_by_real_entity_platform
+      et inventaires globaux.'
   exception-translations:
     status: done
     comment: Toutes les 36 levées custom de HomeAssistantError/sous-classes (dont UpdateFailed TNT) ont domaine,
@@ -352,5 +354,11 @@ rules:
       dépendance pour score ; proposition amont dans le rapport.'
   strict-typing:
     status: todo
-    comment: >-
-      Jalon17 : mypy strict85 erreurs/7fichiers/42modules, contre105/8/42 au jalon16. Router clôturé sans diagnostic (-20) : contrats publics LAN/WiFi/system/connection/calls/storage/Home/reboot renvoient object, collections/objets validés, callback annoté, liste historique opaque object, DeviceInfo construit par champs connus, IDs registre réellement bornés avant retour/cache/reparentage. Registry ownership/version passent de Any à object et vrais checks, propriétaires malformés protégés et jamais convertis. Aucun Any/cast/ignore ajouté ; frontières Any historiques non prétendues disparues. Restent config_flow25, tnt_reminders17, tnt_ws16, base_class16, calls_ws9, sensor1, camera1. Identités/compat schémas/FFmpeg non sacrifiées pour score.
+    comment: 'Jalon19 : mypy strict2 erreurs/2fichiers/42modules, contre18/3/42 (-16). DUMMY=False restauré
+      selon source historique5e42e63 et suppression7cf0c60, branches sandbox et vrais appels SDK/transport
+      mocké testés. Contrats legacy et callbacks annotés sans Any/cast/ignore ; caméra compose FFmpeg
+      public sans falsifier son nom relatif optionnel, snapshots/stream/cleanup et préférences HA préservés.
+      Restent seulement incompatibilité LegacyDeviceInfo avec HA (IDentier et parent nullable) et identifiant
+      disque entier contre str ; Native HA prouve que convertir crée une identité distincte. Pas de cast
+      ni migration pour score : décision de contrat HA/amont ou migration explicite requise, pas blocage
+      SDK. Global strict reste rouge.'

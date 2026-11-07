@@ -2,7 +2,7 @@
 
 import logging
 from contextlib import suppress
-from typing import Any, TypeVar
+from typing import Any, NotRequired, TypedDict, TypeVar
 from collections.abc import Callable
 
 import aiohttp
@@ -512,13 +512,14 @@ def _profile_name(profile: dict[str, object]) -> str:
     return name
 
 
-def _profile_targets(value: object) -> list[str]:
-    """Validate submitted multiple selectors without rewriting saved defaults."""
-    if value is None:
-        return []
-    if not isinstance(value, list) or not all(isinstance(item, str) for item in value):
-        raise vol.Invalid("Invalid reminder target list")
-    return value
+class ReminderProfileFormInput(TypedDict):
+    """Payload validated by the public HA form schema before its step callback."""
+
+    name: str
+    notify_target: NotRequired[list[str]]
+    media_player_targets: NotRequired[list[str]]
+    tts_engine: NotRequired[str]
+    announce_volume: NotRequired[float]
 
 
 def _profile_schema(
@@ -807,14 +808,13 @@ class FreeboxOptionsFlowHandler(OptionsFlowWithReload):
         )
 
     async def async_step_add_profile(
-        self, user_input: dict[str, object] | None = None
+        self, user_input: ReminderProfileFormInput | None = None
     ) -> ConfigFlowResult:
         profiles = self._get_profiles()
         errors: dict[str, str] = {}
         editing_name = self._editing_profile
         if user_input is not None:
-            raw_name = user_input.get("name")
-            name = raw_name.strip() if isinstance(raw_name, str) else ""
+            name = user_input["name"].strip()
             if not name:
                 errors["base"] = "no_name"
             elif any(
@@ -825,20 +825,20 @@ class FreeboxOptionsFlowHandler(OptionsFlowWithReload):
                 errors["base"] = "duplicate_name"
             elif _notify_media_player_conflict(
                 self.hass,
-                _profile_targets(user_input.get(CONF_NOTIFY_TARGET)),
-                _profile_targets(user_input.get(CONF_MEDIA_PLAYER_TARGETS)),
+                user_input.get("notify_target") or [],
+                user_input.get("media_player_targets") or [],
             ):
                 errors["base"] = "device_conflict"
             else:
                 profile: dict[str, object] = {"name": name}
-                if user_input.get(CONF_NOTIFY_TARGET):
-                    profile[CONF_NOTIFY_TARGET] = user_input[CONF_NOTIFY_TARGET]
-                if user_input.get(CONF_MEDIA_PLAYER_TARGETS):
-                    profile[CONF_MEDIA_PLAYER_TARGETS] = user_input[CONF_MEDIA_PLAYER_TARGETS]
-                if user_input.get(CONF_TTS_ENGINE):
-                    profile[CONF_TTS_ENGINE] = user_input[CONF_TTS_ENGINE]
-                if user_input.get(CONF_ANNOUNCE_VOLUME) is not None:
-                    profile[CONF_ANNOUNCE_VOLUME] = user_input[CONF_ANNOUNCE_VOLUME]
+                if user_input.get("notify_target"):
+                    profile[CONF_NOTIFY_TARGET] = user_input["notify_target"]
+                if user_input.get("media_player_targets"):
+                    profile[CONF_MEDIA_PLAYER_TARGETS] = user_input["media_player_targets"]
+                if user_input.get("tts_engine"):
+                    profile[CONF_TTS_ENGINE] = user_input["tts_engine"]
+                if user_input.get("announce_volume") is not None:
+                    profile[CONF_ANNOUNCE_VOLUME] = user_input["announce_volume"]
                 if editing_name is not None:
                     updated = []
                     for saved in profiles:
@@ -863,12 +863,19 @@ class FreeboxOptionsFlowHandler(OptionsFlowWithReload):
                 (p for p in profiles if p["name"] == editing_name), None
             )
 
+        # Defaults from saved options remain opaque and are forwarded unchanged
+        # to HA selectors; submitted data above has a separate validated DTO.
+        name_default: object
+        notify_default: object
+        media_player_default: object
+        tts_default: object
+        announce_volume_default: object
         if errors and user_input is not None:
             name_default = user_input.get("name")
-            notify_default = user_input.get(CONF_NOTIFY_TARGET)
-            media_player_default = user_input.get(CONF_MEDIA_PLAYER_TARGETS)
-            tts_default = user_input.get(CONF_TTS_ENGINE)
-            announce_volume_default = user_input.get(CONF_ANNOUNCE_VOLUME)
+            notify_default = user_input.get("notify_target")
+            media_player_default = user_input.get("media_player_targets")
+            tts_default = user_input.get("tts_engine")
+            announce_volume_default = user_input.get("announce_volume")
         else:
             name_default = existing["name"] if existing else None
             notify_default = existing.get(CONF_NOTIFY_TARGET) if existing else None

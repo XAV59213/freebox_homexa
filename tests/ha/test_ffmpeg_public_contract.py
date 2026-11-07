@@ -1,4 +1,4 @@
-"""Inherited real HA FFmpeg methods, subprocess/HTTP stream seams mocked."""
+"""Delegated real HA FFmpeg methods, subprocess/HTTP stream seams mocked."""
 import asyncio
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -9,7 +9,7 @@ from custom_components.freebox_homexa.camera import FreeboxCamera
 from test_home_platforms import home_context
 
 
-async def test_inherited_snapshot_and_stream_source_without_subprocess(hass, home_context):
+async def test_public_snapshot_and_stream_source_without_subprocess(hass, home_context):
     router, node = home_context
     camera = FreeboxCamera(hass, router, {**node, "category": "camera"})
     camera.hass = hass
@@ -22,7 +22,7 @@ async def test_inherited_snapshot_and_stream_source_without_subprocess(hass, hom
 
 
 @pytest.mark.parametrize("stage", ["success", "proxy_error", "proxy_cancel", "reader_error", "open_error"])
-async def test_inherited_mjpeg_closes_after_open_but_not_on_open_failure(hass, home_context, stage):
+async def test_public_mjpeg_closes_after_open_but_not_on_open_failure(hass, home_context, stage):
     router, node = home_context
     hass.data[DATA_FFMPEG] = SimpleNamespace(binary="synthetic-ffmpeg", ffmpeg_stream_content_type="multipart/synthetic")
     camera = FreeboxCamera(hass, router, {**node, "category": "camera"})

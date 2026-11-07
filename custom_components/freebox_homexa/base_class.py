@@ -1,17 +1,50 @@
 """Support pour les appareils Freebox Home (détecteurs, volets, etc.)."""
+from __future__ import annotations
 import logging
-from typing import Dict, Optional
+from typing import NotRequired, TypedDict
+from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity import Entity
 from .const import DOMAIN, VALUE_NOT_SET, DUMMY
 from .router import FreeboxRouter
 from .registry_compat import as_version
+from .sdk_contracts import HomeEndpoints
 
 _LOGGER = logging.getLogger(__name__)
+
+class LegacyHomeNode(TypedDict):
+    id: int
+    label: str
+    category: str
+    props: NotRequired[dict[str, object]]
+    type: NotRequired[dict[str, object]]
+
+
+class LegacyHomeSubNode(TypedDict):
+    label: str
+    name: str
+
+
+class LegacyHomeEndpoint(TypedDict):
+    id: int
+    name: str
+    ep_type: str
+    value: NotRequired[object]
+
+
+class LegacyDeviceInfo(TypedDict):
+    """Exact legacy registry payload; intentionally not falsely a HA DeviceInfo."""
+    identifiers: set[tuple[str, int]]
+    name: str
+    manufacturer: str
+    model: str
+    sw_version: str | None
+    via_device_id: str | None
+
 
 class FreeboxBaseClass(Entity):
     """Classe de base pour toutes les entités Freebox Home."""
 
-    def __init__(self, hass, router: FreeboxRouter, node: Dict[str, any], sub_node=None) -> None:
+    def __init__(self, hass: HomeAssistant, router: FreeboxRouter, node: LegacyHomeNode, sub_node: LegacyHomeSubNode | None = None) -> None:
         _LOGGER.debug("Initialisation de l'entité pour le nœud: %s", node)
         self._hass = hass
         self._router = router
@@ -50,7 +83,7 @@ class FreeboxBaseClass(Entity):
             self._model = "IOcontrol"
 
     @property
-    def device_info(self) -> Optional[Dict[str, any]]:
+    def device_info(self) -> LegacyDeviceInfo | None:
         """Device info avec via_device corrigé (obligatoire pour HA 2025.12)."""
         if not self._is_device:
             return None
@@ -64,26 +97,30 @@ class FreeboxBaseClass(Entity):
         }
 
     # === Méthodes API (inchangées) ===
-    async def set_home_endpoint_value(self, command_id, value) -> bool:
+    async def set_home_endpoint_value(self, command_id: int, value: dict[str, object]) -> bool:
         if self._id >= 1000 and DUMMY:
             return True
         if command_id == VALUE_NOT_SET:
             return False
-        await self._router._api.home.set_home_endpoint_value(self._id, command_id, value)
+        home: HomeEndpoints = self._router._api.home
+        await home.set_home_endpoint_value(self._id, command_id, value)
         return True
 
-    async def get_home_endpoint_value(self, command_id):
+    async def get_home_endpoint_value(self, command_id: int) -> object:
         if self._id >= 1000 and DUMMY:
             return VALUE_NOT_SET
         if command_id == VALUE_NOT_SET:
             return VALUE_NOT_SET
-        node = await self._router._api.home.get_home_endpoint_value(self._id, command_id)
+        home: HomeEndpoints = self._router._api.home
+        node = await home.get_home_endpoint_value(self._id, command_id)
+        if not isinstance(node, dict):
+            raise ValueError("Invalid Home endpoint response")
         return node.get("value", VALUE_NOT_SET)
 
-    def get_command_id(self, nodes, ep_type, name):
+    def get_command_id(self, nodes: list[LegacyHomeEndpoint], ep_type: str, name: str) -> int:
         node = next((x for x in nodes if x.get("name") == name and x.get("ep_type") == ep_type), None)
         return node["id"] if node else VALUE_NOT_SET
 
-    def get_node_value(self, nodes, ep_type, name):
+    def get_node_value(self, nodes: list[LegacyHomeEndpoint], ep_type: str, name: str) -> object:
         node = next((x for x in nodes if x.get("name") == name and x.get("ep_type") == ep_type), None)
         return node.get("value", VALUE_NOT_SET) if node else VALUE_NOT_SET

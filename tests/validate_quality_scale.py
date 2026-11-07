@@ -8,6 +8,7 @@ import argparse
 import ast
 from collections import Counter
 import json
+import re
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -28,6 +29,16 @@ def validate(data, rules):
         assert isinstance(value['comment'], str) and value['comment'].strip(), name
 
 
+def validate_evidence_coherence(data, matrix):
+    """Keep shipped YAML comments/statuses identical to the proof matrix."""
+    rows = {}
+    for line in matrix.splitlines():
+        match = re.match(r"^\| \[([^\]]+)\]\([^)]*\) \| (done|todo|exempt) \| (.*?) \|", line)
+        if match:
+            rows[match[1]] = {"status": match[2], "comment": match[3]}
+    assert rows == data["rules"], "YAML/matrix evidence or status drift"
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--upstream-schema', type=Path)
@@ -36,6 +47,8 @@ def main():
     data = yaml.safe_load((ROOT / 'custom_components/freebox_homexa/quality_scale.yaml').read_text())
     rules = snapshot['rules']
     validate(data, rules)
+    matrix = (ROOT / "docs/quality-scale-proof-matrix.md").read_text()
+    validate_evidence_coherence(data, matrix)
     # Negative controls: missing rule, invented rule, invalid status must fail.
     import copy
     for mutate in (
@@ -51,6 +64,14 @@ def main():
             pass
         else:
             raise AssertionError('Negative control accepted')
+    stale = copy.deepcopy(data)
+    stale["rules"]["test-coverage"]["comment"] = "stale evidence"
+    try:
+        validate_evidence_coherence(stale, matrix)
+    except AssertionError:
+        pass
+    else:
+        raise AssertionError("Evidence drift negative control accepted")
     if args.upstream_schema:
         import probatio
         tree = ast.parse(args.upstream_schema.read_text())

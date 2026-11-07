@@ -317,3 +317,22 @@ async def test_invalid_saved_profiles_fail_closed_without_erasing_preferences(ha
     with pytest.raises(vol.Invalid, match="Invalid saved reminder profile"):
         await hass.config_entries.options.async_configure(result["flow_id"], {"next_step_id": "profiles"})
     assert entry.options == before
+
+
+async def test_profile_selector_rejects_malformed_input_then_recovers_via_native_manager(hass):
+    entry = MockConfigEntry(domain=DOMAIN, data={'host': 'freebox.test'}, options={'home_poll_interval': 20})
+    entry.add_to_hass(hass)
+    with patch.object(hass.config_entries, 'async_reload', new=AsyncMock(return_value=True)):
+        result = await hass.config_entries.options.async_init(entry.entry_id)
+        result = await hass.config_entries.options.async_configure(result['flow_id'], {'next_step_id': 'profiles'})
+        result = await hass.config_entries.options.async_configure(result['flow_id'], {'action': 'add'})
+        from homeassistant.data_entry_flow import InvalidData
+        with pytest.raises(InvalidData, match='notify_target'):
+            await hass.config_entries.options.async_configure(result['flow_id'], {'name': 'New', 'notify_target': 42})
+        assert entry.options == {'home_poll_interval': 20}
+        result = await hass.config_entries.options.async_configure(result['flow_id'], {'name': 'New', 'notify_target': []})
+        assert result['step_id'] == 'profiles'
+        result = await hass.config_entries.options.async_configure(result['flow_id'], {'action': 'done'})
+        await hass.async_block_till_done()
+        assert result['type'] == FlowResultType.CREATE_ENTRY
+    assert entry.options == {'home_poll_interval': 20, 'reminder_profiles': [{'name': 'New'}]}

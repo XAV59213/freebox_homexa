@@ -1,4 +1,4 @@
-# Inventaire fini des travaux restants — jalon17
+# Inventaire fini des travaux restants — jalon19
 
 **21 done / 31 todo / 2 exempt, préparation 28.8.90 ; aucune certification HA.**
 Une ligne par todo, pas une liste infinie de tests. La règle A est du
@@ -7,11 +7,12 @@ dépendance ; C exige proposition compatible ou action amont avant conformité.
 D contient du contenu local présent, pas treize documents manquants ; E mesure
 la qualité transversale. Le mandat continue, ce document n’en annonce pas la fin.
 
-Router désormais sans diagnostic (contrats object et validations), registry_compat
-100% lignes/96,67% branches ; aucune clôture globale strict/devices/coverage.
-Restent config_flow25, tnt_reminders17, tnt_ws16, base_class16, calls_ws9,
-sensor1 et camera1. Les callbacks/données peuvent être traités indépendamment
-du choix de moteur de schéma, qui reste une compatibilité locale à concevoir.
+Quatre modules config/TNT/WS et caméra désormais sans diagnostic. **Deux erreurs**
+restent : LegacyDeviceInfo avec IDentier/parent nullable et DeviceInfo disque avec
+IDentier. DUMMY et contrat de payload ne sont plus des blocages non étudiés :
+historique/source/SDK/branches sandbox démontrés ; base_class100% lignes/branches.
+Ne pas proposer à nouveau des annotations ordinaires pour ces deux résidus : voir
+[choix finis et conséquences](quality-scale-lot19-contract-decisions.md).
 
 La priorité utilisateur est désormais le typage réel par modules puis la couverture
 par module (>95% officiel, sans exception), sans extension indéfinie de Repairs/caméra.
@@ -82,8 +83,8 @@ modifier artificiellement le sens du YAML. Aucune soumission amont ici.
 
 | Règle | Minimum restant |
 |---|---|
-| test-coverage | Seuil officiel intégration entière encore non atteint (75,74 % lignes / 54,34 % branches / 70,38 % combiné). Cibler erreurs/récupération et comportements manquants via A/B, pas tests sans assertions ni exclusion opportuniste. Deux passages locaux et CI doivent donner mêmes 39 modules/totaux. |
-| strict-typing | 85 erreurs réelles/7 fichiers/42 modules ; résoudre contrats/narrowing/structures et appels SDK non annotés, sans Any/cast/ignore pour score. Conflit héritage FFmpeg et typage SDK doivent être distingués des défauts locaux corrigeables. |
+| test-coverage | 666tests,42modules,81,75% lignes/64,72% branches,combiné77,45%. Seuil officiel >95% dans CHAQUE module :22/42 le dépassent. Cibler vrais scénarios manquants (rappels voix/volume/échecs, associations), pas gardes inaccessibles pour score. Deux locaux et artefact CI complet concordants exigés. |
+| strict-typing | Deux erreurs réelles/2fichiers/42modules : contrat HA identifiants str contre entiers historiques et parent legacy nullable. Caméra/DUMMY/callbacks résolus. Choix explicite décrit séparément ; pas de migration, cast, stub élargi ou Any implicite pour fabriquer un done. |
 
 ## Exemptions inchangées : deux, pas une façon de masquer des défauts
 

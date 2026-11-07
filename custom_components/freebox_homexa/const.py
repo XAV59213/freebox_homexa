@@ -10,6 +10,10 @@ else:
     from homeassistant.components.alarm_control_panel import AlarmControlPanelState  # noqa: F401
 from homeassistant.config_entries import ConfigEntry
 
+# Legacy Home sandbox contract, present before 7cf0c60 (2025-02-20).
+# Retained for external users of base_class; active platforms do not use it.
+DUMMY: bool = False
+
 DOMAIN = "freebox_homexa"
 SERVICE_REBOOT = "reboot"
 SERVICE_RELOAD = "reload"

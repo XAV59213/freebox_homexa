@@ -4,6 +4,8 @@
 
 from __future__ import annotations
 from urllib.parse import quote
+from aiohttp import web
+from homeassistant.components.camera import Camera
 
 import logging
 from typing import Any
@@ -92,11 +94,13 @@ def add_entities(
         async_add_entities(new_tracked, True)
 
 # SECTION: Classe de la caméra Freebox
-class FreeboxCamera(FreeboxHomeEntity, FFmpegCamera):
+class FreeboxCamera(FreeboxHomeEntity, Camera):
     """Représentation d'une caméra Freebox dans Home Assistant.
 
-    Hérite de FreeboxHomeEntity et FFmpegCamera pour gérer les flux vidéo et la détection de mouvement.
+    Compose le transport FFmpeg public ; le nom relatif Home reste optionnel.
     """
+
+    _attr_supported_features = CameraEntityFeature.STREAM
 
     def __init__(
         self, hass: HomeAssistant, router: FreeboxRouter, node: dict[str, Any]
@@ -120,7 +124,12 @@ class FreeboxCamera(FreeboxHomeEntity, FFmpegCamera):
             CONF_INPUT: str(path),
             CONF_EXTRA_ARGUMENTS: DEFAULT_ARGUMENTS,
         }
-        FFmpegCamera.__init__(self, hass, device_info)
+        Camera.__init__(self)
+        # The helper is a transport delegate only, never a second registered
+        # entity. Its required source name must not become the Home entity name.
+        self._ffmpeg = FFmpegCamera(hass, device_info)
+        self._ffmpeg.hass = hass
+        self._input = str(path)
 
         # Fonctionnalités supportées
         self._supported_features = (
@@ -160,14 +169,22 @@ class FreeboxCamera(FreeboxHomeEntity, FFmpegCamera):
             self.async_write_ha_state()
 
     async def async_camera_image(self, width: int | None = None, height: int | None = None) -> bytes | None:
-        """Observe the public inherited image contract, without retries or a new poll."""
+        """Observe the public delegated image contract, without retries or a new poll."""
         try:
-            image = await super().async_camera_image(width, height)
+            image = await self._ffmpeg.async_camera_image(width, height)
         except Exception:
             self._observe_video(False)
             raise
         self._observe_video(bool(image))
         return image
+
+    async def stream_source(self) -> str:
+        """Preserve the public FFmpeg source contract, without another poll."""
+        return await self._ffmpeg.stream_source()
+
+    async def handle_async_mjpeg_stream(self, request: web.Request) -> web.StreamResponse:
+        """Delegate HTTP streaming and its upstream cleanup unchanged."""
+        return await self._ffmpeg.handle_async_mjpeg_stream(request)
 
     @async_action_errors
     async def async_enable_motion_detection(self) -> None:

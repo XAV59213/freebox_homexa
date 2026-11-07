@@ -205,3 +205,12 @@ Jalon18 : mypy strict18 erreurs/3fichiers/42modules, contre85/7/42 au jalon17 (-
 Tests :645 natifs, deux passages complets ;12 simulations et2JS distincts.
 92 lignes exclues automatiquement par coverage, dont4 nouvelles lignes imports
 TYPE_CHECKING ; aucun omit/exclude personnalisé. Aucun nouveau Any/cast/ignore.
+
+## Jalon19 —2 erreurs /2 fichiers /42 modules
+
+Jalon19 : mypy strict2 erreurs/2fichiers/42modules, contre18/3/42 (-16). DUMMY=False restauré selon source historique5e42e63 et suppression7cf0c60, branches sandbox et vrais appels SDK/transport mocké testés. Contrats legacy et callbacks annotés sans Any/cast/ignore ; caméra compose FFmpeg public sans falsifier son nom relatif optionnel, snapshots/stream/cleanup et préférences HA préservés. Restent seulement incompatibilité LegacyDeviceInfo avec HA (IDentier et parent nullable) et identifiant disque entier contre str ; Native HA prouve que convertir crée une identité distincte. Pas de cast ni migration pour score : décision de contrat HA/amont ou migration explicite requise, pas blocage SDK. Global strict reste rouge.
+
+Base legacy : contrat de retour réellement LegacyDeviceInfo, pas un faux DeviceInfo.
+Le override incompatible reste signalé ; sensor expose explicitement tuple domaine/int
+face au tuple domaine/str attendu. Aucun nouvel Any/cast/ignore, aucun changement IDs.
+Détails et options finis : quality-scale-lot19-contract-decisions.md.

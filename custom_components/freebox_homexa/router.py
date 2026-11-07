@@ -5,7 +5,6 @@ from __future__ import annotations
 
 import asyncio
 import logging
-import re
 import json
 from pathlib import Path
 from contextlib import suppress
@@ -17,7 +16,6 @@ from freebox_api import Freepybox
 from freebox_api.api.call import Call
 from freebox_api.api.home import Home
 from freebox_api.api.wifi import Wifi
-from aiohttp import ClientError
 from freebox_api.exceptions import HttpRequestError, NotOpenError
 
 from homeassistant.config_entries import ConfigEntry
@@ -43,7 +41,7 @@ from .registry_compat import (
     get_device_by_identifier,
     shared_with_other_entries,
 )
-from .errors import is_permission_denied, is_shutdown_error
+from .errors import api_error_code, is_permission_denied, is_shutdown_error
 from .wifi_ap import build_wifi_aps
 
 from .errors import async_action_errors
@@ -94,10 +92,10 @@ def extract_wifi_details(device: dict[str, Any]) -> dict[str, Any]:
     signal = wifi_info.get("signal")
     if signal is None:
         signal = station.get("signal")
-    if signal is not None:
+    if signal is not None and not isinstance(signal, bool):
         try:
             details["wifi_signal_dbm"] = int(signal)
-        except (TypeError, ValueError):
+        except (TypeError, ValueError, OverflowError):
             pass
 
     if wifi_info.get("ssid"):
@@ -199,13 +197,11 @@ async def get_hosts_list_if_supported(
     supports_hosts: bool = True
     fbx_devices: list[dict[str, Any]] = []
     try:
-        fbx_devices = await fbx_api.lan.get_hosts_list() or []
+        fbx_devices = await fbx_api.lan.get_hosts_list()
+        if not isinstance(fbx_devices, list):
+            raise ValueError("Invalid LAN hosts collection")
     except HttpRequestError as err:
-        if (
-            (matcher := re.search(r"Request failed \\(APIResponse: (.+)\\)", str(err)))
-            and (json_str := matcher.group(1))
-            and (json_resp := json.loads(json_str)).get("error_code") == "nodev"
-        ):
+        if api_error_code(err) == "nodev":
             supports_hosts = False
             _LOGGER.debug("Liste des hôtes non disponible en mode bridge")
         else:
@@ -283,6 +279,9 @@ class FreeboxRouter:
         self.raids_available = True
         self.home_available = True
         self.home_snapshot_known = False
+        self.lan_available = True
+        self.wifi_stations_available = True
+        self.player_status_available: dict[str, bool] = {}
         # nœuds Home dont les entités vivent sur un appareil de groupe (module d'alarme)
         self.merged_node_ids: set[Any] = set()
         self.player_identifiers: set[str] = set()
@@ -428,14 +427,16 @@ class FreeboxRouter:
     def _wifi_api_error(self, key: str, path: str, err: Exception) -> None:
         """Mémorise l'erreur d'une API Wi-Fi ; journal (info) une seule fois par API."""
         first = key not in self.wifi_api_errors
-        self.wifi_api_errors[key] = f"{type(err).__name__}: {err}"
+        self.wifi_api_errors[key] = type(err).__name__
         if first:
-            _LOGGER.info("API Freebox %s indisponible (état « Wi-Fi Freebox ») : %s", path, err)
+            _LOGGER.info("API Freebox %s indisponible (%s)", path, type(err).__name__)
 
     async def _fetch_wifi_global_state(self) -> None:
         """/wifi/config/ (enabled, comme l'interrupteur) et /wifi/bss/ (état des BSS)."""
         try:
-            config = await self._api.wifi.get_global_config() or {}
+            config = await self._api.wifi.get_global_config()
+            if not isinstance(config, dict):
+                raise ValueError("Invalid Wi-Fi config")
             enabled = config.get("enabled") if isinstance(config, dict) else None
             self.wifi_global_enabled = enabled if isinstance(enabled, bool) else None
             self.wifi_api_errors.pop("config", None)
@@ -443,7 +444,9 @@ class FreeboxRouter:
             self.wifi_global_enabled = None
             self._wifi_api_error("config", "wifi/config/", err)
         try:
-            bss_list = await self._api.wifi.get_bss() or []
+            bss_list = await self._api.wifi.get_bss()
+            if not isinstance(bss_list, list):
+                raise ValueError("Invalid Wi-Fi BSS collection")
             self.wifi_api_errors.pop("bss", None)
         except Exception as err:  # noqa: BLE001 — API absente selon firmware
             self._wifi_api_error("bss", "wifi/bss/", err)
@@ -465,10 +468,16 @@ class FreeboxRouter:
 
     async def _enrich_wifi_stations(self) -> None:
         """Merge /wifi/ap/{id}/stations signal data onto LAN hosts."""
+        self.wifi_stations_available = True
+        for device in self.devices.values():
+            device.pop("_wifi_station", None)
         try:
-            access_points = await self._api.wifi.get_ap_list() or []
+            access_points = await self._api.wifi.get_ap_list()
+            if not isinstance(access_points, list):
+                raise ValueError("Invalid Wi-Fi AP collection")
             self.wifi_api_errors.pop("ap", None)
         except Exception as err:  # noqa: BLE001 — API wifi absente selon firmware
+            self.wifi_stations_available = False
             self._wifi_api_error("ap", "wifi/ap/", err)
             access_points = []
         if not isinstance(access_points, list):
@@ -493,12 +502,16 @@ class FreeboxRouter:
             if ap_id is None:
                 continue
             try:
-                stations = await self._api.wifi.get_station_list(ap_id) or []
+                stations = await self._api.wifi.get_station_list(ap_id)
+                if not isinstance(stations, list):
+                    raise ValueError("Invalid Wi-Fi stations collection")
             except HttpRequestError as err:
-                _LOGGER.debug("Stations de l'AP %s indisponibles : %s", ap_id, err)
+                self.wifi_stations_available = False
+                _LOGGER.debug("Stations Wi-Fi indisponibles (%s)", type(err).__name__)
                 continue
             except Exception as err:  # noqa: BLE001
-                _LOGGER.debug("Stations de l'AP %s illisibles : %s", ap_id, err)
+                self.wifi_stations_available = False
+                _LOGGER.debug("Stations Wi-Fi illisibles (%s)", type(err).__name__)
                 continue
             for station in stations:
                 mac = (station.get("mac") or "").upper()
@@ -562,8 +575,15 @@ class FreeboxRouter:
     async def update_device_trackers(self) -> None:
         new_device = False
         fbx_devices: list[dict[str, Any]] = []
-        if self.supports_hosts:
-            self.supports_hosts, fbx_devices = await get_hosts_list_if_supported(self._api)
+        # Bridge mode can change at runtime; retry at the existing poll interval.
+        self.supports_hosts, fbx_devices = await get_hosts_list_if_supported(self._api)
+
+        self.lan_available = self.supports_hosts
+        seen_macs = {device["l2ident"]["id"] for device in fbx_devices}
+        if self.lan_available:
+            for mac, previous in self.devices.items():
+                if mac != self.mac and mac not in seen_macs:
+                    previous["active"] = False
 
         fbx_devices.append({
             "primary_name": self.name,
@@ -598,8 +618,9 @@ class FreeboxRouter:
     async def update_sensors(self) -> None:
         try:
             syst_datas: dict[str, Any] = await self._api.system.get_config()
-            for sensor in syst_datas["sensors"]:
-                self.sensors_temperature[sensor["name"]] = sensor.get("value")
+            self.sensors_temperature = {
+                sensor["name"]: sensor.get("value") for sensor in syst_datas["sensors"]
+            }
 
             connection_datas: dict[str, Any] = await self._api.connection.get_status()
             for sensor_key in CONNECTION_SENSORS_KEYS:
@@ -631,7 +652,7 @@ class FreeboxRouter:
             self.sensors_available = True
             async_dispatcher_send(self.hass, self.signal_sensor_update)
             _LOGGER.debug("Mise à jour des capteurs terminée")
-        except HttpRequestError:
+        except Exception:
             # The global router may still answer LAN requests. Do not leave
             # sensor snapshots looking fresh after a separate sensor API error.
             if self.sensors_available:
@@ -653,7 +674,7 @@ class FreeboxRouter:
             if not self.disks_available:
                 _LOGGER.info("Source disques Freebox de nouveau disponible")
             self.disks_available = True
-        except (HttpRequestError, NotOpenError, TimeoutError, ClientError, OSError, ValueError, TypeError, KeyError):
+        except Exception:  # An unsuccessful read is never a successful empty snapshot.
             if self.disks_available:
                 _LOGGER.info("Source disques Freebox indisponible")
             self.disks_available = False
@@ -670,7 +691,7 @@ class FreeboxRouter:
             if not self.raids_available:
                 _LOGGER.info("Source RAID Freebox de nouveau disponible")
             self.raids_available = True
-        except (HttpRequestError, NotOpenError, TimeoutError, ClientError, OSError, ValueError, TypeError, KeyError):
+        except Exception:  # An unsuccessful read is never a successful empty snapshot.
             # An API error is not proof of permanent hardware incapability.
             if self.raids_available:
                 _LOGGER.info("Source RAID Freebox indisponible")
@@ -705,7 +726,7 @@ class FreeboxRouter:
                 if new_device:
                     async_dispatcher_send(self.hass, self.signal_home_device_new)
                 _LOGGER.debug("Mise à jour des appareils domestiques terminée")
-            except (HttpRequestError, NotOpenError, TimeoutError, ClientError, OSError, ValueError, TypeError, KeyError) as err:
+            except Exception as err:  # Source failure; cancellation still propagates.
                 if self.closing and is_shutdown_error(err, self):
                     return
                 if self.home_available:

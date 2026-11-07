@@ -40,7 +40,7 @@ from .tnt_sensor import HomexaTntSensor
 from .lan_group_sensors import async_setup_lan_group_sensors
 from .wifi_ap_sensors import async_setup_wifi_ap_sensors
 from .registry_compat import as_version
-from .availability import FreeboxReachableMixin
+from .availability import FreeboxReachableMixin, FreeboxLanReachableMixin
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -348,7 +348,7 @@ class FreeboxBatterySensor(FreeboxHomeEntity, SensorEntity):
         return self.get_value("signal", "battery")
 
 
-class FreeboxWifiSignalSensor(FreeboxReachableMixin, SensorEntity):
+class FreeboxWifiSignalSensor(FreeboxLanReachableMixin, SensorEntity):
     """Force du signal Wi-Fi (RSSI) d'un client vu par la Freebox."""
 
     # Noisy per-client diagnostic; core client inventory remains available.
@@ -402,14 +402,15 @@ class FreeboxWifiSignalSensor(FreeboxReachableMixin, SensorEntity):
     @callback
     def async_update_state(self) -> None:
         device = self._router.devices.get(self._mac)
-        if not device:
+        if not device or device.get("active") is False:
             self._attr_native_value = None
             self._attr_extra_state_attributes = {}
             self._attr_available = False
             return
         wifi = device.get("wifi") or {}
-        self._attr_available = True
-        self._attr_native_value = wifi.get("wifi_signal_dbm")
+        signal = wifi.get("wifi_signal_dbm")
+        self._attr_available = (signal is not None or self._router.wifi_stations_available)
+        self._attr_native_value = signal
         self._attr_extra_state_attributes = {
             key: value
             for key, value in wifi.items()

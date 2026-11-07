@@ -65,6 +65,7 @@ class FreeboxHomeEntity(Entity):
             self._attr_unique_id += "-" + sub_node["name"].strip()
 
         self._available = True
+        self._failed_read_endpoints: set[int] = set()
         self._firmware = node.get("props", {}).get("FwVersion")
         self._manufacturer = "Freebox SAS"
         self._remove_signal_update: Callable[[], None] | None = None
@@ -168,25 +169,15 @@ class FreeboxHomeEntity(Entity):
                     timeout=8.0,
                 )
             )
-            return node.get("value")
-        except asyncio.TimeoutError:
-            _LOGGER.debug("Timeout sur la lecture de l'endpoint %s (appareil %s)", command_id, self._id)
-            return None
-        except HttpRequestError as err:
-            _LOGGER.debug("Erreur HTTP sur endpoint %s (appareil %s) : %s", command_id, self._id, err)
-            return None
-        except Exception as err:  # noqa: BLE001
-            if is_shutdown_error(err, self._router):
-                # « Connector is closed » pendant un rechargement : normal, rien à signaler.
-                _LOGGER.debug(
-                    "Lecture de l'endpoint %s (appareil %s) interrompue (rechargement) : %s",
-                    command_id, self._id, err,
-                )
+            if not isinstance(node, dict) or "value" not in node:
+                raise ValueError("Invalid Home endpoint response")
+            self._failed_read_endpoints.discard(command_id)
+            return node["value"]
+        except Exception as err:  # SDK/transport failures are not an explicit unknown value.
+            self._failed_read_endpoints.add(command_id)
+            if self._router.closing and is_shutdown_error(err, self._router):
                 return None
-            _LOGGER.log(
-                poll_log_level(self._router, logging.WARNING),
-                "Erreur inattendue sur endpoint %s (appareil %s) : %s", command_id, self._id, err
-            )
+            _LOGGER.debug("Lecture Home indisponible (%s)", type(err).__name__)
             return None
 
     def get_command_id(self, nodes: Sequence[Mapping[str, object]], ep_type: str, name: str) -> int | None:
@@ -223,6 +214,8 @@ class FreeboxHomeEntity(Entity):
     @property
     def available(self) -> bool:
         """Indisponible si la Freebox est injoignable ou si elle signale le nœud « unreachable »."""
+        if self._failed_read_endpoints:
+            return False
         if not router_reachable(self._router):
             return False
         if getattr(self._router, "home_available", True) is False:

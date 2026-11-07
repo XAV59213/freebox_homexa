@@ -16,13 +16,14 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import EntityCategory
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ServiceValidationError
+from homeassistant.helpers.dispatcher import async_dispatcher_connect
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from .const import DOMAIN, option_remote_code
 from .media_player import player_device_info
 from .router import FreeboxConfigEntry, FreeboxRouter
 from .player_remote import async_schedule_player_api_retry, async_send_player_keys, filter_ready_players
-from .availability import FreeboxReachableMixin
+from .availability import FreeboxReachableMixin, FreeboxPlayerReachableMixin
 
 from .errors import async_action_errors
 
@@ -171,7 +172,7 @@ class FreeboxButton(FreeboxReachableMixin, ButtonEntity):
         await self.entity_description.async_press(self._router)
 
 
-class FreeboxPlayerRemoteButton(FreeboxReachableMixin, ButtonEntity):
+class FreeboxPlayerRemoteButton(FreeboxPlayerReachableMixin, ButtonEntity):
     """Touche de la télécommande réseau du Player."""
 
     _attr_has_entity_name = True
@@ -189,12 +190,19 @@ class FreeboxPlayerRemoteButton(FreeboxReachableMixin, ButtonEntity):
         self._router = router
         self._entry = entry
         self._player_id = player["id"]
+        self._initial_player_reachable = player.get("reachable") is not False
         self._key = key
         self._attr_translation_key = f"remote_key_{key}"
         self._attr_icon = icon
         self._attr_unique_id = f"{router.mac}_player_{self._player_id}_key_{key}"
         self._attr_device_info = player_device_info(router, player)
         self._attr_entity_registry_enabled_default = enabled_by_default
+
+    async def async_added_to_hass(self) -> None:
+        await super().async_added_to_hass()
+        self.async_on_remove(async_dispatcher_connect(
+            self.hass, self._router.signal_device_update, self.async_write_ha_state
+        ))
 
     @async_action_errors
     async def async_press(self) -> None:
@@ -209,7 +217,7 @@ class FreeboxPlayerRemoteButton(FreeboxReachableMixin, ButtonEntity):
             raise failures[0][1]
 
 
-class FreeboxPlayerAppButton(FreeboxReachableMixin, ButtonEntity):
+class FreeboxPlayerAppButton(FreeboxPlayerReachableMixin, ButtonEntity):
     """Ouvre une app / URL sur le Freebox Player."""
 
     _attr_has_entity_name = True
@@ -226,6 +234,7 @@ class FreeboxPlayerAppButton(FreeboxReachableMixin, ButtonEntity):
     ) -> None:
         self._router = router
         self._player_id = player["id"]
+        self._initial_player_reachable = player.get("reachable") is not False
         self._api_version = _player_api_version(player)
         self._url = url
         self._app_name = name
@@ -234,6 +243,12 @@ class FreeboxPlayerAppButton(FreeboxReachableMixin, ButtonEntity):
         self._attr_unique_id = f"{router.mac}_player_{self._player_id}_app_{key}"
         self._attr_device_info = player_device_info(router, player)
         self._attr_entity_registry_enabled_default = enabled_by_default
+
+    async def async_added_to_hass(self) -> None:
+        await super().async_added_to_hass()
+        self.async_on_remove(async_dispatcher_connect(
+            self.hass, self._router.signal_device_update, self.async_write_ha_state
+        ))
 
     @async_action_errors
     async def async_press(self) -> None:

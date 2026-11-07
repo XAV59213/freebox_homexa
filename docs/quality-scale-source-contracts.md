@@ -86,3 +86,73 @@ il n'est pas à lui seul une preuve sémantique.
   restent limites prouvées par tests/source, non résolues par ces nouveaux flags.
 - Le rollback refusé/exceptionnel et FFmpeg open avant try/finally hérités restent
   des caractérisations, pas des garanties de fermeture inventées.
+
+## Lot 10 — débit, décodage SDK et prudence RSSI
+
+`tests/ha/test_availability_sources.py::test_sdk_access_connection_router_rate_preserves_native_bytes`
+utilise le
+vrai `Access`, le vrai `Connection` et une réponse HTTP JSON simulée avec son
+Content-Type. `rate_down=8000` donne 8 kB/s, 125000 donne 125 ; `bandwidth_*`,
+en bits/s, reçoit volontairement une valeur différente. Le SDK retourne `result`
+sans conversion. [Code HA Freebox sensor](https://github.com/home-assistant/core/blob/dev/homeassistant/components/freebox/sensor.py)
+emploie aussi kB/s et /1000. Le [SDK officiel Connection](https://dev.freebox.fr/sdk/os/connection/)
+indexé indique `rate_*` en byte/s et `bandwidth_*` en bit/s ; la tentative de
+lecture directe a rendu HTTP 500, ne pas la présenter comme une page récupérée.
+Aucune réécriture des statistiques historiques, aucun ID/unité changé.
+
+**Réserve RSSI précise** : [documentation Wi-Fi Free](https://dev.freebox.fr/sdk/os/wifi/)
+indexée décrit `signal` comme « signal attenuation (in dB) », exemple -38. Cela
+ne prouve pas dBm pour toutes sources LAN/stations. L’unité historique est gardée
+sans conversion arbitraire. Une donnée vendor/firmware et un plan compatible
+pour l’historique sont requis avant changement. Booléens et valeurs non finies
+ne deviennent plus un signal numérique plausible.
+
+## Lot 10 — sources partielles et veille réellement contrôlable
+
+`tests/ha/test_availability_sources.py` apporte 39 cas avec vrai HA/SDK :
+- Home : absence de `value`/erreur = source indisponible ; `value=None` explicite
+  = disponible mais unknown. Une autre lecture réussie n’efface pas l’échec.
+- Remote/Player : panne puis récupération ; statut vide = unknown, pas idle/on.
+  Boutons synchronisés par dispatcher existant, sans nouvelle collecte par bouton.
+- Veille précédemment confirmée + code remote configuré : off/available via le
+  canal Server déjà implémenté ; aucun code seul ne crée un premier état off.
+  Le test n’envoie aucune touche ni commande. Sans code, panne = unavailable.
+- LAN : vrai format SDK `Request failed (APIResponse: {…'error_code': 'nodev'…})`
+  reconnu par `errors.api_error_code`, pas par l’ancienne regex erronée ; reprise
+  au timer existant. Client absent d’une liste fraîche devient absent sans effacer
+  son registre. Six familles dérivées LAN couvrent panne et récupération.
+- Wi-Fi : absence d’AP et sources config/BSS/AP en panne distinctes d’un champ
+  manquant dans une réponse valide. Échec station ne conserve pas son ancien RSSI ;
+  un signal fraîchement reçu par LAN reste utilisable.
+- Température disparue : ancienne mesure retirée du snapshot, pas gardée fraîche.
+
+La règle globale reste todo : boutons seuls sans provider MediaPlayer actif et
+cadres d’erreur image FFmpeg restent à qualifier. Les limites de session SDK et
+rollback refusé ne sont pas cachées par ces tests.
+
+## Provenance SDK : réserve dependency-transparency levée au lot 10
+
+Le manifest épingle maintenant **freebox-api==1.3.1**, version réellement installée
+et testée ; même pin que le [manifest officiel HA Freebox](https://github.com/home-assistant/core/blob/dev/homeassistant/components/freebox/manifest.json).
+Il ne s’agit pas d’une mise à jour de SDK ni d’un patch externe.
+
+- Source publique GPL-3.0 : [tag v1.3.1](https://github.com/hacf-fr/freebox-api/tree/v1.3.1),
+  commit `96322885f37df37e6f491ab889b27cf912cc293a` ; [licence](https://github.com/hacf-fr/freebox-api/blob/v1.3.1/LICENSE.rst).
+- [PyPI 1.3.1 et hashes](https://pypi.org/pypi/freebox-api/1.3.1/json) :
+  wheel `fb438c44d08293d7ca1a3d9ad55334a3e2905bdda270332345b7e30a1afbfa87` ;
+  sdist `4499889cb32a734f7dd64c7256420041593421ead4a122d27a8cabcd88909433`.
+- [Workflow public de release](https://github.com/hacf-fr/freebox-api/blob/v1.3.1/.github/workflows/release.yml)
+  construit, atteste et publie. [Run effectif réussi](https://github.com/hacf-fr/freebox-api/actions/runs/23742463862/attempts/1),
+  même commit. Les anciens logs détaillés des steps ne sont plus disponibles :
+  aucune prétention de les avoir inspectés.
+- **Vérification cryptographique réussie**, pas seulement workflow présent :
+  `gh attestation verify freebox_api-1.3.1-py3-none-any.whl --repo hacf-fr/freebox-api --format json`.
+  La provenance signée SLSA v1 lie les deux hashes ci-dessus au commit, au workflow
+  `release.yml@refs/heads/main` et à ce run. Le commit est également celui du tag
+  v1.3.1 ; ne pas présenter l’attestation comme exécutée sur une ref de tag.
+  API publique reproductible :
+  `gh api repos/hacf-fr/freebox-api/attestations/sha256:fb438c44d08293d7ca1a3d9ad55334a3e2905bdda270332345b7e30a1afbfa87`.
+  Aucun lien signé temporaire, jeton ou credential n’est publié dans le dépôt.
+
+Cette preuve clôt seulement `dependency-transparency`. Elle ne fournit ni session
+publique injectable, ni close garanti, ni typings du SDK, ni validation matérielle.

@@ -128,6 +128,11 @@ class FreeboxDevice(FreeboxReachableMixin, ScannerEntity):
                 self.entity_id, device_id=device_id
             )
 
+    @property
+    def available(self) -> bool:
+        return (super().available and
+                (self._mac == self._router.mac or self._router.lan_available))
+
     @callback
     def async_update_state(self) -> None:
         device = self._router.devices.get(self._mac)

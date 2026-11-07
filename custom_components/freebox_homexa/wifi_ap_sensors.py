@@ -15,7 +15,7 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from .const import REPEATER_MODEL
 from .router import FreeboxRouter
-from .availability import FreeboxReachableMixin
+from .availability import FreeboxLanReachableMixin
 
 
 def _ap_device_info(router: FreeboxRouter, access_point: dict[str, Any]) -> DeviceInfo:
@@ -51,7 +51,7 @@ def _client_label(access_point: dict[str, Any], max_length: int = MAX_STATE_LENG
     return f"{len(names)} appareils"[:max_length]
 
 
-class FreeboxRepeaterCountSensor(FreeboxReachableMixin, SensorEntity):
+class FreeboxRepeaterCountSensor(FreeboxLanReachableMixin, SensorEntity):
     _attr_should_poll = False
     _attr_has_entity_name = True
     _attr_translation_key = "wifi_repeaters"
@@ -92,7 +92,7 @@ class FreeboxRepeaterCountSensor(FreeboxReachableMixin, SensorEntity):
         )
 
 
-class FreeboxWifiClientCountSensor(FreeboxReachableMixin, SensorEntity):
+class FreeboxWifiClientCountSensor(FreeboxLanReachableMixin, SensorEntity):
     _attr_should_poll = False
     _attr_has_entity_name = True
     _attr_translation_key = "wifi_clients"
@@ -113,6 +113,10 @@ class FreeboxWifiClientCountSensor(FreeboxReachableMixin, SensorEntity):
         self._attr_device_info = _ap_device_info(router, access_point or {"kind": "gateway"})
         self._attr_native_value = 0
         self._attr_extra_state_attributes = {}
+
+    @property
+    def available(self) -> bool:
+        return super().available and self._ap_id in self._router.wifi_aps
 
     @callback
     def async_update_state(self) -> None:
@@ -139,7 +143,7 @@ class FreeboxWifiClientCountSensor(FreeboxReachableMixin, SensorEntity):
         )
 
 
-class FreeboxWifiClientListSensor(FreeboxReachableMixin, SensorEntity):
+class FreeboxWifiClientListSensor(FreeboxLanReachableMixin, SensorEntity):
     """Liste nominative des clients d'un AP, visible dans l'état du capteur."""
 
     _attr_should_poll = False
@@ -161,6 +165,10 @@ class FreeboxWifiClientListSensor(FreeboxReachableMixin, SensorEntity):
         self._attr_device_info = _ap_device_info(router, access_point or {"kind": "gateway"})
         self._attr_native_value = "Aucun"
         self._attr_extra_state_attributes = {}
+
+    @property
+    def available(self) -> bool:
+        return super().available and self._ap_id in self._router.wifi_aps
 
     @callback
     def async_update_state(self) -> None:
@@ -187,7 +195,7 @@ class FreeboxWifiClientListSensor(FreeboxReachableMixin, SensorEntity):
         )
 
 
-class FreeboxWifiTotalClientSensor(FreeboxReachableMixin, SensorEntity):
+class FreeboxWifiTotalClientSensor(FreeboxLanReachableMixin, SensorEntity):
     _attr_should_poll = False
     _attr_has_entity_name = True
     _attr_translation_key = "wifi_clients_total"

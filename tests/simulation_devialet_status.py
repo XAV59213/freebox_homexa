@@ -72,6 +72,7 @@ module('homeassistant.components.media_player', MediaPlayerDeviceClass=types.Sim
 module('homeassistant.config_entries', ConfigEntry=object)
 module('homeassistant.core', HomeAssistant=object)
 module('homeassistant.helpers')
+module('homeassistant.helpers.dispatcher', async_dispatcher_send=lambda *a: None)
 module('homeassistant.helpers.device_registry', DeviceInfo=dict)
 module('homeassistant.helpers.entity_platform', AddEntitiesCallback=object)
 pkg = module('freebox_homexa')
@@ -95,7 +96,7 @@ FIXTURE = json.loads((ROOT / 'tests/fixtures/devialet_tv_status.json').read_text
 
 async def run():
     access = types.SimpleNamespace(get=AsyncMock())
-    router = types.SimpleNamespace(async_read=direct_read, mac='00:00:00:00:00:00', player_identifiers=set(),
+    router = types.SimpleNamespace(async_read=direct_read, mac='00:00:00:00:00:00', player_identifiers=set(), player_status_available={}, hass=object(), signal_device_update='synthetic-device-update',
                                    _api=types.SimpleNamespace(player=types.SimpleNamespace(_access=access)))
     entity = mp.FreeboxPlayerMediaPlayer(router, {'id':17, 'device_model':'fbx7hd-delta', 'api_version':'11.0'}, object())
     entity.hass = object()  # suffisant pour déclencher le lookup artwork

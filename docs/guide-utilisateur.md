@@ -324,3 +324,14 @@ manquant ou non numérique est inconnu, pas zéro. Un vrai zéro numérique rest
 zéro. Cela ne garantit pas encore tous les scénarios partiels stockage/Home/XMLTV.
 Un unload refusé ou annulé garde l’erreur visible et n’affirme pas que toutes les
 plateformes ont été retirées ; aucune reconnexion ou commande appareil automatique.
+
+### Sources indisponibles et veille Player (préparation 28.8.90)
+
+Une panne de lecture Home/Player/LAN/Wi-Fi ne confirme pas un état vide ou zéro.
+Une réponse valide sans valeur donne unknown ; une source perdue donne unavailable.
+Un client absent d’une liste LAN fraîche devient absent, son registre est conservé.
+Une veille Player déjà confirmée peut rester off/available si le code télécommande
+configuré permet le réveil par le canal Server existant. Un code seul ne prouve
+ni connexion initiale ni état off ; aucune commande automatique n’est envoyée.
+Les boutons utilisent les observations existantes, pas une collecte par bouton.
+Le SDK est épinglé à 1.3.1, version testée avec provenance publique vérifiée.

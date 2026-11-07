@@ -71,7 +71,9 @@ class FreeboxRemote(FreeboxReachableMixin, RemoteEntity):
         self._player_id = player["id"]
         self._attr_unique_id = f"{router.mac}_player_{self._player_id}_remote"
         self._attr_device_info = player_device_info(router, player)
-        self._attr_is_on = bool(player.get("reachable"))
+        self._attr_is_on = None
+        self._last_known_standby = False
+        self._attr_available = player.get("reachable") is not False
 
     @property
     def _remote_code(self) -> str | None:
@@ -123,7 +125,10 @@ class FreeboxRemote(FreeboxReachableMixin, RemoteEntity):
 
     async def async_update(self) -> None:
         try:
-            status = await self._router.async_read(lambda: self._router._api.player.get_player_status(self._player_id)) or {}
+            status = await self._router.async_read(lambda: self._router._api.player.get_player_status(self._player_id))
+            if not isinstance(status, dict):
+                raise ValueError("Invalid Player status")
+            self._attr_available = status.get("reachable") is not False
             power = str(status.get("power_state") or "").lower()
             if power in {"running", "on"}:
                 self._attr_is_on = True
@@ -131,5 +136,9 @@ class FreeboxRemote(FreeboxReachableMixin, RemoteEntity):
                 self._attr_is_on = False
             else:
                 self._attr_is_on = None
+            self._last_known_standby = self._attr_is_on is False
+            if self._last_known_standby and self._remote_code is not None:
+                self._attr_available = True
         except Exception:
-            self._attr_is_on = None
+            self._attr_available = self._last_known_standby and self._remote_code is not None
+            self._attr_is_on = False if self._attr_available else None

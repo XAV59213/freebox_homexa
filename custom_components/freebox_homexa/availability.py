@@ -50,3 +50,23 @@ class FreeboxReachableMixin(Entity):
         if not router_reachable(getattr(self, "_router", None)):
             return False
         return super().available
+
+
+class FreeboxLanReachableMixin(FreeboxReachableMixin):
+    """LAN-derived inventory is unavailable when bridge mode has no hosts source."""
+
+    @property
+    def available(self) -> bool:
+        return super().available and getattr(self._router, "lan_available", True) is not False
+
+
+class FreeboxPlayerReachableMixin(FreeboxReachableMixin):
+    """Reuse the media Player's existing status reads; no per-button polling."""
+
+    _player_id: int
+    _initial_player_reachable: bool = True
+
+    @property
+    def available(self) -> bool:
+        observed = self._router.player_status_available.get(str(self._player_id))
+        return super().available and (self._initial_player_reachable if observed is None else observed)

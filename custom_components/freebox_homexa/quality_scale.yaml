@@ -39,12 +39,13 @@ rules:
       defaults privés synthétiques et conservation des codes vérifiés. Reste ligne 369 et trois branches ;
       guard reauth/user à justifier, sans forcer un chemin artificiel. 100 % non atteint, donc todo.'
   dependency-transparency:
-    status: todo
-    comment: 'SDK 1.3.1 installé depuis PyPI ; source publique tag v1.3.1 et GPL-3.0 vérifiés via GitHub (commit
-      96322885f37df37e6f491ab889b27cf912cc293a), fichier client installé identique au raw. Workflow public
-      release.yml de ce tag prévoit build/attestation/publication PyPI, mais exécution effective de publication
-      non établie : les runs verts trouvés sont Tests/CodeQL, pas preuve de publish. Manifest reste freebox-api>=1.3.1,
-      pas pin exact. Aucune dépendance changée ; todo reste justifié.'
+    status: done
+    comment: Manifest épinglé freebox-api==1.3.1, version effectivement testée, comme HA core Freebox. Source
+      GPL-3.0 tag v1.3.1 commit 96322885f37df37e6f491ab889b27cf912cc293a ; wheel PyPI SHA256 fb438c44d08293d7ca1a3d9ad55334a3e2905bdda270332345b7e30a1afbfa87.
+      gh attestation verify réussi contre hacf-fr/freebox-api ; provenance signée relie ce wheel au même
+      commit et au workflow release.yml, run 23742463862 réussi. Source publique, hashes sdist/wheel, CI
+      de construction/attestation/publication et commandes dans docs/quality-scale-source-contracts.md.
+      Ne vaut ni injection de session ni validation matérielle.
   docs-actions:
     status: todo
     comment: 'docs/guide-utilisateur.md (lié README) : Les six actions et tous leurs champs, ciblage multi-entrées
@@ -163,14 +164,13 @@ rules:
       custom revendiquée.'
   entity-unavailable:
     status: todo
-    comment: >-
-      Lot 9 : tests/ha/test_partial_sources.py, vrai SDK Storage/Home et vrais états HA : pertes
-      HTTP/timeout/payload/malformed, cache conservé mais unavailable, disparition puis retour
-      sans ID changé. Dix variantes Home gardées, inversion locale indépendante. RAID transitoire
-      ne désactive plus le support ; droit Home explicite reste bloquant. XMLTV UpdateFailed même
-      avec cache, puis récupération. Fermeture SDK hors unload reconnue comme panne. Restent
-      Remote/boutons Player, Wi-Fi/LAN multi-sources et lectures individuelles : global todo, pas
-      généralisation depuis quatre sources. Voir docs/quality-scale-source-contracts.md.
+    comment: 'Lot 10 : tests/ha/test_availability_sources.py et test_partial_sources.py utilisent vrai HA/SDK,
+      transport mocké. Remote et statut Player/boutons, endpoints Home individuels (échec distinct de value=None),
+      six familles LAN, AP supprimé, sources Wi-Fi partielles, client disparu et températures disparues
+      : panne/récupération sans faux zéro ni cache frais. Bridge nodev SDK correctement reconnu puis retenté.
+      Veille connue avec code remote garde off/available via le canal Server existant ; code seul ne crée
+      aucun état initial. Pas de polling par bouton. Restent provider Player désactivé et contrat frame
+      FFmpeg, à qualifier globalement avant done ; voir inventaire fini docs/quality-scale-remaining-work.md.'
   integration-owner:
     status: done
     comment: 'manifest.json déclare @gvigroux, @XAV59213 et @Steph73HB ; .github/CODEOWNERS reprend exactement
@@ -195,11 +195,10 @@ rules:
       avant réauth. Lié au choix de migration unique ID host vers identité physique, non imposé ici.
   test-coverage:
     status: todo
-    comment: >-
-      451 tests HA 2026.10.4 (+44 au lot 9), 38 modules sans omit : 4090/5973 lignes (68,47 %),
-      880/1994 branches (44,13 %), combiné 62,38 %. Deux suites JS. Rapports JSON/XML CI ; seuil
-      officiel non atteint. Dix lignes typing exclues automatiquement par coverage.py, aucune
-      exclusion personnalisée. Pas validation du matériel.
+    comment: '490 tests HA 2026.10.4 (+39 au lot 10), 38 modules sans omit : 4506/6053 lignes (74,44 %),
+      1057/2028 branches (52,12 %), combiné 68,84 %. Deux suites JS et douze simulations historiques séparées.
+      Deux passages locaux et artefact CI comparés ; seuil officiel non atteint. Dix lignes typing exclues
+      automatiquement par coverage.py, aucune exclusion personnalisée. Pas validation matérielle.'
   devices:
     status: todo
     comment: media_player.py:90-103 et tnt_sensor.py:14-29 DeviceInfo ; cohérence des associations/subdevices
@@ -273,13 +272,12 @@ rules:
       Classements diagnostic/config corrigés sans changer les activations ni les commandes.'
   entity-device-class:
     status: todo
-    comment: >-
-      Revue des 30 familles/81 variantes dans docs/quality-scale-source-contracts.md et
-      inventaire. Défaut démontré : rate_* Freebox = octets/s, conversion /8000 corrigée /1000 en
-      kB/s comme source officielle HA ; IDs/unité/historique conservés, prochains échantillons
-      corrigés huit fois plus grands. Pourcentage disque invalide, uptime absent et RAID absent
-      deviennent unknown. Heuristique opener garage par libellé et replis RSSI non entièrement
-      prouvés : todo, pas de changement silencieux de classe/exposition vocale.
+    comment: 'Revue 30 familles/81 variantes, docs/quality-scale-source-contracts.md. rate_* natif byte/s
+      vérifié documentation Free indexée, source HA, SDK Access+Connection réel décodant une réponse HTTP
+      JSON : /1000 en kB/s ; bandwidth_* bit/s distinct et non utilisé. IDs/unité/historique conservés.
+      Pourcentage disque invalide, uptime absent et RAID absent deviennent unknown. Opener garage déduit
+      du libellé non prouvé ; documentation Wi-Fi dit signal attenuation in dB, pas preuve dBm pour toutes
+      sources. Ne pas changer silencieusement classe/unité/historique ; todo avec proposition requise.'
   entity-disabled-by-default:
     status: done
     comment: >-
@@ -292,8 +290,11 @@ rules:
       ScannerEntity HA explicitement distinguées des flags déclarés.
   entity-translations:
     status: todo
-    comment: sensor.py:371 et tnt_sensor.py:28 noms historiques sans has_entity_name ; traductions globales
-      incomplètes.
+    comment: has_entity_name global démontré au lot 8 et préférences registre préservées ; cela ne traduit
+      pas toutes les fonctions. Noms provenant des appareils restent des données utilisateur, pas des textes
+      à traduire. Restent inventaire exhaustif des clés/fonctions/états/options et passage des libellés
+      de fonction en strings/FR/EN, avec vraie résolution HA et préservation des anciens entity_id/choix
+      utilisateur ; pas de migration identité nécessaire.
   exception-translations:
     status: done
     comment: Toutes les 35 levées custom de HomeAssistantError/sous-classes (dont UpdateFailed TNT) ont domaine,

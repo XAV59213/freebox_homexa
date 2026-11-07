@@ -16,6 +16,7 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ServiceValidationError
 from homeassistant.helpers.device_registry import DeviceInfo
+from homeassistant.helpers.dispatcher import async_dispatcher_send
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from .const import DOMAIN, URL_BASE, option_remote_code
@@ -243,7 +244,9 @@ class FreeboxPlayerMediaPlayer(FreeboxReachableMixin, MediaPlayerEntity):
         versions = [self._api_version] + [v for v in API_VERSION_FALLBACKS if v != self._api_version]
         for version in versions:
             try:
-                status = await self._router.async_read(lambda: self._access.get(self._path("status/", version))) or {}
+                status = await self._router.async_read(lambda: self._access.get(self._path("status/", version)))
+                if not isinstance(status, dict):
+                    raise ValueError("Invalid Player status")
                 self._api_version = version
                 break
             except Exception as err:
@@ -258,11 +261,16 @@ class FreeboxPlayerMediaPlayer(FreeboxReachableMixin, MediaPlayerEntity):
                 self._api_version,
                 last_err,
             )
-            self._attr_available = False
+            # A previously confirmed standby remains controllable through the
+            # existing Server remote channel, but never infer off on first contact.
+            self._attr_available = (self._attr_state == MediaPlayerState.OFF
+                                    and self._remote_code is not None)
+            self._router.player_status_available[str(self._player_id)] = self._attr_available
+            async_dispatcher_send(self._router.hass, self._router.signal_device_update)
             return
 
         cache_player_schema(self._router, self._player_id, status, "received")
-        self._attr_available = True
+        self._attr_available = status.get("reachable") is not False
         # Devialet : champs observés dans /player/{id}/api/{version}/status/.
         # Les formats plats restent prioritaires pour les autres firmwares.
         def as_dict(value: Any) -> dict[str, Any]:
@@ -289,8 +297,15 @@ class FreeboxPlayerMediaPlayer(FreeboxReachableMixin, MediaPlayerEntity):
             self._attr_state = MediaPlayerState.PAUSED
         elif power in {"running", "on"}:
             self._attr_state = MediaPlayerState.ON
-        else:
+        elif playback in {"stopped", "stop", "idle"}:
             self._attr_state = MediaPlayerState.IDLE
+        else:
+            self._attr_state = None
+
+        if self._attr_state == MediaPlayerState.OFF and self._remote_code is not None:
+            self._attr_available = True
+        self._router.player_status_available[str(self._player_id)] = self._attr_available
+        async_dispatcher_send(self._router.hass, self._router.signal_device_update)
 
         volume = status.get("volume")
         if volume is None:

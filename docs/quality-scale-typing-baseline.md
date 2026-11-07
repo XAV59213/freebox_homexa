@@ -99,3 +99,10 @@ tnt_tmdb et tnt_coordinator : aucune erreur stricte. Pas de casts/ignores ajout�
 pas de Any de confort ni d’omit ; appels SDK non annotés encore visibles.
 Le pipeline WebSocket HA et ses schémas voluptuous/probatio doivent être testés
 avant changement de compatibilité, pas masqués par un type Any.
+
+## Lot 10 — disponibilité sans dette de typage masquée
+
+Mypy strict : **167 erreurs / 24 fichiers / 38 modules**, ensemble normalisé
+identique au lot 9 (positions seules décalées). Aucun Any/cast/ignore ajouté pour
+masquer ces contrats. Les nouveaux guards de sources, flags et états inconnus
+restent testés sous le vrai HA ; ce lot ne prétend pas clôturer strict-typing.

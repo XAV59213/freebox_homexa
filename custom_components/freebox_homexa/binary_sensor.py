@@ -218,6 +218,17 @@ class FreeboxWifiApSensor(FreeboxReachableMixin, BinarySensorEntity):
         self._attr_is_on = _ap_online(access_point)
         self._attr_extra_state_attributes = _ap_attributes(access_point)
 
+    @property
+    def available(self) -> bool:
+        access_point = self._router.wifi_aps.get(self._ap_id)
+        if access_point is None:
+            return False
+        if access_point.get("kind") == "gateway" and _ap_online(access_point) is None:
+            # Unknown with a successful source is valid; all reads failing is not.
+            if {"config", "ap", "bss"} <= self._router.wifi_api_errors.keys():
+                return False
+        return super().available
+
     @callback
     def async_update_state(self) -> None:
         access_point = self._router.wifi_aps.get(self._ap_id)

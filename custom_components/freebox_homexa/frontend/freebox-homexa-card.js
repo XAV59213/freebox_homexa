@@ -120,6 +120,8 @@ const STYLES = `
   .center { text-align: center; }
   .walk { width: 64px; height: 64px; margin: 10px auto 6px; border-radius: 50%; display: flex; align-items: center; justify-content: center; background: var(--secondary-background-color); font-size: 28px; }
   .walk.on { background: color-mix(in srgb, var(--error-color, #f44336) 20%, transparent); }
+  .player-artwork { display: block; width: 100%; height: 180px; max-height: 40vh; object-fit: contain; border-radius: 10px; margin: 10px auto; }
+  .player-artwork[hidden] { display: none; }
   .apps { display: flex; justify-content: center; gap: 10px; margin: 8px 0; }
   .app { width: 44px; height: 44px; border-radius: 12px; border: none; cursor: pointer; color: #fff; font-weight: 800; font-size: 11px; pointer-events: auto; touch-action: manipulation; }
   .yt { background: #e11d2e; }
@@ -424,10 +426,17 @@ class FreeboxHomexaCard extends HTMLElement {
     const st = player ? player.state : "";
     const label = st === "playing" ? "Lecture" : st === "paused" ? "En pause" : st === "on" ? "Allumé" : st === "off" ? "Éteint" : player ? st : "—";
     const e = _esc(id);
+    const attrs = player ? player.attributes || {} : {};
+    const rawImage = attrs.entity_picture || attrs.media_image_url || "";
+    // Only existing HA artwork; never create thumbnails or infer a title.
+    const image = !["off", "standby", "unavailable", "unknown", ""].includes(st)
+      && typeof rawImage === "string"
+      && (/^https?:\/\//i.test(rawImage) || /^\/(?!\/)/.test(rawImage)) ? rawImage : "";
     return {
-      key: `${id}:${label}`,
+      key: JSON.stringify([id, label, image]),
       html: `<div class="card center">
         <div class="head"><span class="title">${_esc(player ? _name(hass, id) : "Freebox Player")}</span><span class="sub">${_esc(label)}</span></div>
+        ${image ? `<img class="player-artwork" src="${_esc(image)}" alt="Illustration de la lecture en cours">` : ""}
         ${player ? `<div class="apps"><button type="button" class="app yt" data-src="YouTube" data-entity="${e}">YT</button><button type="button" class="app nf" data-src="Netflix" data-entity="${e}">N</button><button type="button" class="app pr" data-prime="1" data-entity="${e}">prime</button></div><div class="transport"><button type="button" data-media="media_previous_track" data-entity="${e}">|◀</button><button type="button" data-media="media_play_pause" data-entity="${e}">▮▶</button><button type="button" data-media="media_next_track" data-entity="${e}">▶|</button></div>` : `<div class="empty">Aucun Player Homexa</div>`}
       </div>`,
     };
@@ -479,6 +488,11 @@ class FreeboxHomexaCard extends HTMLElement {
         ${!top.length && !bottom.length ? `<div class="empty">Toutes les sections sont masquées</div>` : ""}
       </div>
     `;
+    this.shadowRoot.querySelectorAll(".player-artwork").forEach((img) => {
+      img.addEventListener("error", () => { img.hidden = true; });
+      // Also handle a cached failure that occurred before the listener was bound.
+      if (img.complete && !img.naturalWidth) img.hidden = true;
+    });
     this._bound = false;
     this._bindOnce();
   }

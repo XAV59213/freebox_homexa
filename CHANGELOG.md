@@ -1,6 +1,7 @@
 # Changelog
 
 ## Non publié
+- 2026-11-07 — Carte Freebox Homexa : image de lecture du Player (`entity_picture`, sinon `media_image_url`) au-dessus des commandes. Affichage sans recadrage ni étirement ; masqué sans image, en veille ou sur erreur. Carte TNT inchangée.
 
 
 ## 28.8.87 — 2026-11-06

@@ -5,7 +5,10 @@ from homeassistant.components.sensor import SensorEntity
 from homeassistant.helpers.device_registry import DeviceEntryType, DeviceInfo
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from typing import Any
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from .router import FreeboxRouter
 
 from .const import DOMAIN
 from .tnt_const import ALL_CHANNELS, freebox_channel_number
@@ -33,33 +36,39 @@ class HomexaTntSensor(CoordinatorEntity[ProgrammeTntFrCoordinator], SensorEntity
         coordinator: ProgrammeTntFrCoordinator,
         channel_id: str,
         unique_prefix: str,
-        router: Any = None,
+        router: FreeboxRouter | None = None,
     ) -> None:
         super().__init__(coordinator)
         self._channel_id = channel_id
         self._attr_unique_id = f"{unique_prefix}_tnt_{channel_id}"
-        self._attr_name = ALL_CHANNELS.get(channel_id, channel_id)
-        self._attr_translation_placeholders = {"channel": self._attr_name}
+        self._source_channel_name = ALL_CHANNELS.get(channel_id, channel_id)
+        self._attr_translation_placeholders = {"channel": self._source_channel_name}
 
     @property
-    def _data(self) -> dict:
+    def _data(self) -> dict[str, object]:
         return self.coordinator.data.get(self._channel_id, {}) if self.coordinator.data else {}
 
     @property
     def native_value(self) -> str | None:
         current = self._data.get("current")
-        return current.get("title") if isinstance(current, dict) else None
+        title = current.get("title") if isinstance(current, dict) else None
+        return title if isinstance(title, str) else None
 
     @property
     def entity_picture(self) -> str | None:
-        return self._data.get("channel_icon") or (self._data.get("current") or {}).get("icon")
+        icon = self._data.get("channel_icon")
+        if isinstance(icon, str) and icon:
+            return icon
+        current = self._data.get("current")
+        icon = current.get("icon") if isinstance(current, dict) else None
+        return icon if isinstance(icon, str) else None
 
     @property
-    def extra_state_attributes(self) -> dict:
+    def extra_state_attributes(self) -> dict[str, object]:
         data = self._data
-        attrs = {
+        attrs: dict[str, object] = {
             "channel_id": self._channel_id,
-            "channel_name": data.get("channel_name") or self._attr_name,
+            "channel_name": data.get("channel_name") or self._source_channel_name,
             "channel_icon": data.get("channel_icon"),
             "homexa_tnt": True,
             "current": data.get("current"),

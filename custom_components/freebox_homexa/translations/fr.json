@@ -320,6 +320,9 @@
       },
       "raid_degraded": {
         "name": "Array RAID {raid_id} degradé"
+      },
+      "tamper": {
+        "name": "Autoprotection"
       }
     },
     "calendar": {
@@ -359,6 +362,30 @@
       },
       "tnt_channel": {
         "name": "{channel}"
+      },
+      "rate_down": {
+        "name": "Vitesse de téléchargement"
+      },
+      "rate_up": {
+        "name": "Vitesse de téléversement"
+      },
+      "ipv4": {
+        "name": "IP Externe"
+      },
+      "uptime": {
+        "name": "Temps de fonctionnement"
+      },
+      "missed": {
+        "name": "Appels manqués"
+      },
+      "calls_log": {
+        "name": "Derniers appels"
+      },
+      "partition_free_space": {
+        "name": "{partition} espace libre"
+      },
+      "wifi_signal_named": {
+        "name": "{name} Signal Wi-Fi"
       }
     },
     "button": {
@@ -484,6 +511,14 @@
       },
       "player_app_appletv": {
         "name": "Apple TV"
+      }
+    },
+    "switch": {
+      "wifi": {
+        "name": "Wi-Fi"
+      },
+      "invert_switch": {
+        "name": "Inversion Positionnement"
       }
     }
   },

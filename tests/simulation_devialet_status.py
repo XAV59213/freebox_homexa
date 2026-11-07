@@ -148,7 +148,7 @@ async def run():
     await update({'power_state':'running', 'foreground_app':{'package':'com.netflix.mediaplayer'}})
     assert entity._attr_source == 'Netflix' and entity._attr_media_title == 'Netflix'
     assert entity._attr_media_image_url == '/freebox_homexa/netflix.png'
-    assert entity._attr_icon == 'mdi:netflix'
+    assert entity.translation_key == 'player_netflix'
     # YouTube sans métadonnées : repli UX, pas un titre de vidéo inventé.
     await update({'power_state':'running', 'foreground_app':{'package':'com.google.android.youtube.tv'}})
     assert entity._attr_source == 'YouTube' and entity._attr_media_title == 'YouTube'
@@ -176,17 +176,17 @@ async def run():
     await update({'power_state':'running', 'foreground_app':{'package':'com.google.android.youtube.tv'}})
     assert entity._attr_source == 'YouTube'
     assert entity._attr_media_image_url == '/freebox_homexa/youtube.png'
-    assert entity._attr_icon == 'mdi:youtube'
+    assert entity.translation_key == 'player_youtube'
     await update({'power_state':'running', 'foreground_app':{'package':'com.netflix.mediaplayer'}})
     assert entity._attr_source == 'Netflix'
     assert entity._attr_media_image_url == '/freebox_homexa/netflix.png'
-    assert entity._attr_icon == 'mdi:netflix'
+    assert entity.translation_key == 'player_netflix'
     # BFM + TNT reste prioritaire sur les icônes app.
     await update({**FIXTURE, 'foreground_app':{
         'package':'fr.freebox.tv',
         'context':{'channel':{'channelName':'BFM TV', 'channelNumber':15}}}})
     assert entity._attr_media_image_url == 'https://image.tmdb.org/t/p/w500/bfm-poster.jpg'
-    assert entity._attr_icon is None
+    assert entity.translation_key is None
     # Veille : image effacée.
     _artwork['url'] = 'https://image.tmdb.org/t/p/w500/bfm-poster.jpg'
     await update({**FIXTURE, 'foreground_app':{
@@ -195,7 +195,7 @@ async def run():
     assert entity._attr_media_image_url
     await update({'power_state':'standby'})
     assert entity._attr_state == State.OFF and entity._attr_media_image_url is None
-    assert entity._attr_icon is None
+    assert entity.translation_key is None
     _artwork['url'] = None
     # URLs artwork app alignées sur les constantes du module.
     assert mp.APP_ARTWORK_URLS['YouTube'] == '/freebox_homexa/youtube.png'

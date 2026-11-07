@@ -2,10 +2,15 @@
 
 from __future__ import annotations
 
+from collections.abc import Iterable
 import logging
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
-from homeassistant.components.remote import RemoteEntity, RemoteEntityFeature
+from homeassistant.components.remote import RemoteEntity
+if TYPE_CHECKING:
+    from homeassistant.components.remote.const import RemoteEntityFeature
+else:
+    from homeassistant.components.remote import RemoteEntityFeature
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
@@ -88,7 +93,7 @@ class FreeboxRemote(FreeboxReachableMixin, RemoteEntity):
         await self._send_commands(["power"], False, 0)
 
     @async_action_errors
-    async def async_send_command(self, command: list[str], **kwargs: Any) -> None:
+    async def async_send_command(self, command: Iterable[str], **kwargs: Any) -> None:
         commands = [kwargs["code"]] if kwargs.get("code") else command
         await self._send_commands(
             [str(c) for c in commands if c],

@@ -222,6 +222,22 @@ class FreeboxSensor(FreeboxReachableMixin, SensorEntity):
     _attr_should_poll = False
 
     @property
+    def name(self) -> str | None:
+        """Preserve constructor-only display fallback, never mask loaded HA labels."""
+        if getattr(self, "platform_data", None) is None:
+            raw = getattr(self, "_attr_name", None)
+            if isinstance(raw, str):
+                return raw
+            name = self.entity_description.name
+            if isinstance(name, str):
+                label = name.removesuffix(" Freebox").removeprefix("Freebox ")
+                partition = getattr(self, "_attr_translation_placeholders", {}).get("partition")
+                return f"{partition} {label}" if partition else label
+            return None
+        translated = super().name
+        return translated if isinstance(translated, str) else None
+
+    @property
     def available(self) -> bool:
         return super().available and getattr(self._router, "sensors_available", True) is not False
 
@@ -230,7 +246,7 @@ class FreeboxSensor(FreeboxReachableMixin, SensorEntity):
         self._router = router
         self._attr_unique_id = f"{router.mac} {description.name}"
         # Keep the historical description (and unique ID), change display only.
-        if isinstance(description.name, str):
+        if description.key not in {"rate_down", "rate_up", "ipv4", "uptime", "missed", "calls_log", "partition_free_space"} and isinstance(description.name, str):
             self._attr_name = description.name.removesuffix(" Freebox").removeprefix("Freebox ")
         self._attr_device_info = router.device_info
 
@@ -300,9 +316,9 @@ class FreeboxDiskSensor(FreeboxSensor):
         super().__init__(router, description)
         self._disk_id = disk["id"]
         self._partition_id = partition["id"]
-        self._attr_name = f"{partition['label']} {description.name}"
+        self._attr_translation_placeholders = {"partition": str(partition["label"])}
         self._attr_unique_id = f"{router.mac} {description.key} {disk['id']} {partition['id']}"
-        device_info = {
+        device_info: DeviceInfo = {
             "identifiers": {(DOMAIN, disk["id"])},
             "model": disk["model"],
             "name": f"Disque {disk['id']}",
@@ -311,7 +327,7 @@ class FreeboxDiskSensor(FreeboxSensor):
         parent_id = router.parent_for(f"disk:{disk['id']}", f"Disque {disk['id']}", GROUP_SERVER)
         if parent_id:
             device_info["via_device_id"] = parent_id
-        self._attr_device_info = DeviceInfo(**device_info)
+        self._attr_device_info = device_info
 
     @property
     def available(self) -> bool:
@@ -340,6 +356,7 @@ class FreeboxDiskSensor(FreeboxSensor):
 
 
 class FreeboxBatterySensor(FreeboxHomeEntity, SensorEntity):
+    _home_use_device_class_name = True
     _attr_device_class = SensorDeviceClass.BATTERY
     _attr_entity_category = EntityCategory.DIAGNOSTIC
     _attr_native_unit_of_measurement = PERCENTAGE
@@ -386,7 +403,7 @@ class FreeboxWifiSignalSensor(FreeboxLanReachableMixin, SensorEntity):
 
         if self._create_lan_devices:
             self._attr_translation_key = "wifi_signal"
-            device_info: dict[str, Any] = {
+            device_info: DeviceInfo = {
                 "connections": {(CONNECTION_NETWORK_MAC, self._mac)},
                 "manufacturer": device.get("vendor_name") or "Inconnu",
                 "name": name,
@@ -394,10 +411,11 @@ class FreeboxWifiSignalSensor(FreeboxLanReachableMixin, SensorEntity):
             parent_id = self._router.lan_client_parent(self._mac, name)
             if parent_id:
                 device_info["via_device_id"] = parent_id
-            self._attr_device_info = DeviceInfo(**device_info)
+            self._attr_device_info = device_info
             return
 
-        self._attr_name = f"{name} Signal Wi-Fi"
+        self._attr_translation_key = "wifi_signal_named"
+        self._attr_translation_placeholders = {"name": name}
         self._attr_device_info = None
 
     @callback

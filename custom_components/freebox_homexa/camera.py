@@ -134,18 +134,40 @@ class FreeboxCamera(FreeboxHomeEntity, FFmpegCamera):
         )
 
         # Attributs d'état supplémentaires
-        self._attr_extra_state_attributes = {}
+        self._video_available: bool | None = None
+        self._video_observer_active = False
+        self._video_observer_removed = False
+        self._attr_extra_state_attributes = {"video_available": None}
         self.update_node(node)
         _LOGGER.debug("Caméra %s initialisée avec succès", self._name)
+
+    async def async_added_to_hass(self) -> None:
+        await super().async_added_to_hass()
+        self._video_observer_active = True
+        self._video_observer_removed = False
+        self.async_on_remove(self._stop_video_observer)
+
+    def _stop_video_observer(self) -> None:
+        self._video_observer_active = False
+        self._video_observer_removed = True
+
+    def _observe_video(self, available: bool) -> None:
+        if self._video_observer_removed or self._router.closing:
+            return
+        self._video_available = available
+        self._attr_extra_state_attributes["video_available"] = available
+        self._router.note_source(("camera_image", self._id), available, "Image caméra")
+        if self._video_observer_active:
+            self.async_write_ha_state()
 
     async def async_camera_image(self, width: int | None = None, height: int | None = None) -> bytes | None:
         """Observe the public inherited image contract, without retries or a new poll."""
         try:
             image = await super().async_camera_image(width, height)
         except Exception:
-            self._router.note_source(("camera_image", self._id), False, "Image caméra")
+            self._observe_video(False)
             raise
-        self._router.note_source(("camera_image", self._id), image is not None, "Image caméra")
+        self._observe_video(bool(image))
         return image
 
     @async_action_errors
@@ -207,6 +229,8 @@ class FreeboxCamera(FreeboxHomeEntity, FFmpegCamera):
         # Mise à jour des attributs d'état supplémentaires
         for endpoint in filter(lambda x: x["ep_type"] == "signal", node["show_endpoints"]):
             self._attr_extra_state_attributes[endpoint["name"]] = endpoint["value"]
+
+        self._attr_extra_state_attributes["video_available"] = self._video_available
 
         # Mise à jour de l'état de la détection de mouvement
         self._attr_motion_detection_enabled = self._attr_extra_state_attributes.get(ATTR_DETECTION, False)

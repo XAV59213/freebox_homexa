@@ -5,13 +5,16 @@ from __future__ import annotations
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, replace
 import logging
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from homeassistant.components.button import (
-    ButtonDeviceClass,
     ButtonEntity,
     ButtonEntityDescription,
 )
+if TYPE_CHECKING:
+    from homeassistant.components.button.const import ButtonDeviceClass
+else:
+    from homeassistant.components.button import ButtonDeviceClass
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import EntityCategory
 from homeassistant.core import HomeAssistant
@@ -32,7 +35,7 @@ _LOGGER = logging.getLogger(__name__)
 
 @dataclass(frozen=True, kw_only=True)
 class FreeboxButtonEntityDescription(ButtonEntityDescription):
-    async_press: Callable[[FreeboxRouter], Awaitable]
+    async_press: Callable[[FreeboxRouter], Awaitable[object]]
 
 
 BUTTON_DESCRIPTIONS: tuple[FreeboxButtonEntityDescription, ...] = (

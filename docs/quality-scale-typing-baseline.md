@@ -116,3 +116,23 @@ Nouveau lecteur Player partagé entièrement typé, zéro nouvelle erreur. Aucun
 Any/cast/ignore ajouté pour masquer les contrats SDK/HA. La couverture exclut
 automatiquement 17 lignes typing (10 avant), sans règle personnalisée ; variation
 de périmètre explicitée, pas présentée comme une hausse de couverture fonctionnelle.
+
+## Lot 12 — 130 erreurs /18 fichiers/39 modules
+
+162→130 diagnostics stricts. Cover, Remote, MediaPlayer, tnt_const, tnt_sensor
+et tnt_coordinator ne signalent plus d’erreur. DeviceInfo directs typés, enum HA
+canoniques avec réexports historiques conservés au runtime, vrai SDK Access,
+Remote Iterable, callbacks Awaitable[object] dont le résultat est ignoré,
+descriptions Switch frozen. Cover conserve appels positionnels et accepte les
+kwargs HA ; valeur absente/non entière/bool/hors 0–100 échoue avant transport.
+
+Coordinator TNT est maintenant DataUpdateCoordinator[dict[str, dict[str, object]]],
+pas son défaut générique Any. Les consommateurs narrow titre/image en str et
+renvoient None pour valeur malformée, tests réseau mocké. Aucun cast/ignore ni
+Any ajouté pour maquiller un résultat ; les Any de frontières historiques ne sont
+pas revendiqués comme supprimés partout. 28 lignes TYPE_CHECKING automatiquement
+exclues par coverage (17 avant) ; aucun omit/exclude_lines ajouté.
+
+Restent SDK non annoté, schémas voluptuous/probatio, rappels/config/storage,
+dictionnaires historiques et conflit MRO nom principal None vs FFmpeg str.
+La règle globale reste todo, pas de gate strict artificiellement vert.

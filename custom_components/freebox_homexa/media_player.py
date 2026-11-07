@@ -4,14 +4,16 @@ from __future__ import annotations
 
 import logging
 import math
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from homeassistant.components.media_player import (
-    MediaPlayerDeviceClass,
     MediaPlayerEntity,
-    MediaPlayerEntityFeature,
-    MediaPlayerState,
 )
+if TYPE_CHECKING:
+    from freebox_api.access import Access
+    from homeassistant.components.media_player.const import MediaPlayerDeviceClass, MediaPlayerEntityFeature, MediaPlayerState
+else:
+    from homeassistant.components.media_player import MediaPlayerDeviceClass, MediaPlayerEntityFeature, MediaPlayerState
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ServiceValidationError
@@ -68,10 +70,7 @@ APP_ARTWORK_URLS = {
     "YouTube": f"{URL_BASE}/youtube.png",
     "Netflix": f"{URL_BASE}/netflix.png",
 }
-APP_ICONS = {
-    "YouTube": "mdi:youtube",
-    "Netflix": "mdi:netflix",
-}
+
 
 
 def _normalize_api_version(raw: Any) -> str:
@@ -108,7 +107,7 @@ def _player_model(player: dict[str, Any]) -> str:
 def player_device_info(router: FreeboxRouter, player: dict[str, Any]) -> DeviceInfo:
     player_id = player["id"]
     name = player.get("device_name") or player.get("name") or f"Freebox Player {player_id}"
-    info: dict[str, Any] = {
+    info: DeviceInfo = {
         "identifiers": {(DOMAIN, f"player_{player_id}")},
         "manufacturer": "Freebox SAS",
         "model": _player_model(player),
@@ -118,7 +117,7 @@ def player_device_info(router: FreeboxRouter, player: dict[str, Any]) -> DeviceI
         info["connections"] = {("mac", player["mac"])}
     # Service de premier niveau : pas de via_device (retiré par le nettoyage différé).
     router.player_identifiers.add(f"player_{player_id}")
-    return DeviceInfo(**info)
+    return info
 
 
 # Une seule action / mise à jour à la fois vers la Freebox pour cette plateforme.
@@ -180,14 +179,30 @@ class FreeboxPlayerMediaPlayer(FreeboxReachableMixin, MediaPlayerEntity):
         self._attr_device_info = player_device_info(router, player)
         self._attr_available = bool(player.get("reachable", True))
         self._attr_source = None
-        self._channel_number = None
+        self._channel_number: int | str | None = None
         if self._kind == "mini4k":
             self._attr_source_list = list(MINI_4K_SOURCES)
         else:
             self._attr_source_list = list(DEVIALET_SOURCES)
 
+    @property
+    def translation_key(self) -> str | None:
+        """Source is not the on/off state; expose its current frontend icon key."""
+        return {"YouTube": "player_youtube", "Netflix": "player_netflix"}.get(self._attr_source or "")
+
+    def _sync_icon_metadata(self) -> None:
+        """Update only integration-owned metadata on a source transition."""
+        entry = getattr(self, "registry_entry", None)
+        if entry is None or entry.translation_key == self.translation_key:
+            return
+        from homeassistant.helpers import entity_registry as er
+        self.registry_entry = er.async_get(self.hass).async_update_entity(
+            self.entity_id, translation_key=self.translation_key
+        )
+
     async def async_added_to_hass(self) -> None:
         await super().async_added_to_hass()
+        self._sync_icon_metadata()
         key = str(self._player_id)
         self._router.player_status_providers.add(key)
         self.async_on_remove(lambda: self._router.player_status_providers.discard(key))
@@ -200,7 +215,7 @@ class FreeboxPlayerMediaPlayer(FreeboxReachableMixin, MediaPlayerEntity):
         return f"player/{self._player_id}/api/{version or self._api_version}/{suffix}"
 
     @property
-    def _access(self):
+    def _access(self) -> Access:
         return self._router._api.player._access
 
     @property
@@ -344,11 +359,11 @@ class FreeboxPlayerMediaPlayer(FreeboxReachableMixin, MediaPlayerEntity):
         )
         self._attr_source = None
         self._attr_media_image_url = None
-        self._attr_icon = None
         if self._attr_state == MediaPlayerState.OFF:
             self._attr_media_title = None
             self._attr_media_channel = None
             self._channel_number = None
+            self._sync_icon_metadata()
             return
         if isinstance(current, str) and (
             current.startswith("tv:") or current == "fr.freebox.tv"
@@ -376,7 +391,8 @@ class FreeboxPlayerMediaPlayer(FreeboxReachableMixin, MediaPlayerEntity):
                 )
         elif self._attr_source in APP_ARTWORK_URLS:
             self._attr_media_image_url = APP_ARTWORK_URLS[self._attr_source]
-            self._attr_icon = APP_ICONS[self._attr_source]
+
+        self._sync_icon_metadata()
 
     @async_action_errors
     async def async_set_volume_level(self, volume: float) -> None:

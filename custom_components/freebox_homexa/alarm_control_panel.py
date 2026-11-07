@@ -148,7 +148,7 @@ class FreeboxAlarm(FreeboxHomeEntity, AlarmControlPanelEntity):
 
     def update_parameters(self, node):
         """Update name and extra attributes."""
-        self._attr_name = node["label"].strip()
+        self._source_name = node["label"].strip()
 
         self._attr_extra_state_attributes = {}
         for endpoint in filter(lambda x: x["ep_type"] == "signal", node["show_endpoints"]):

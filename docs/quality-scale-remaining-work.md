@@ -1,27 +1,25 @@
-# Inventaire fini des travaux restants — lot 11
+# Inventaire fini des travaux restants — lot 12
 
-**17 done / 35 todo / 2 exempt, préparation 28.8.90 ; aucune certification HA.**
-Une ligne par todo, pas une liste infinie de tests. Les six règles A sont du
+**19 done / 33 todo / 2 exempt, préparation 28.8.90 ; aucune certification HA.**
+Une ligne par todo, pas une liste infinie de tests. Les trois règles A sont du
 travail local indépendant ; B mêle travail local et réserve de compatibilité ou
 dépendance ; C exige proposition compatible ou action amont avant conformité.
 D contient du contenu local présent, pas treize documents manquants ; E mesure
 la qualité transversale. Le mandat continue, ce document n’en annonce pas la fin.
 
-## A — six règles localement traitables, sans migration ni appareil réel
+## A — trois règles localement traitables, sans migration ni appareil réel
 
 | Règle | Minimum fini avant validation entière |
 |---|---|
 | config-flow-test-coverage | Couvrir réellement ligne 369 et trois branches user/reauth restantes par le manager HA ; vérifier récupération après erreurs et ID à chaque création, pas appel direct artificiel d’un état inaccessible. |
-| entity-unavailable | Boutons seuls désormais prouvés (refcount/timer existant, zéro doublon média, retrait/annulation). Reste vidéo/contrôle : frame FFmpeg None/exception ne renvoie pas ancienne image mais caméra reste disponible via Home ; définir disponibilité/récupération vidéo sans polling coûteux ni empêcher définitivement les prochaines images. |
 | dynamic-devices | Vérifier ajouts après setup (pas seulement premier forward) Home/Player/LAN/disques/répéteurs : ajout unique, ownership listener, retrait/unload. Préserver URLs repeater/, IDs et préférences. Corriger seulement les familles où le test démontre un défaut. |
-| entity-translations | Inventaire de chaque fonction/état/option, clés et résolution effective strings/FR/EN par HA. Les noms propres fournis par utilisateur/appareil ne sont pas à traduire. Conserver IDs et name_by_user ; has_entity_name est déjà done, pas preuve de traduction. |
-| icon-translations | Toutes icônes fixes des 30 familles/81 variantes migrées et chargées par vrai HA, choix utilisateur conservés. Reste icône principale Player selon attribut source, pas state : étudier registre public/translation_key dynamique et cache/lifecycle sans perdre YouTube/Netflix ou écraser icône utilisateur. Ce chemin paraît localement possible, pas déclaré impossible ni validé. |
 | repair-issues | Inventorier erreurs nécessitant intervention (droits/config), utiliser reauth existant pour auth quand approprié, Repairs traduits avec résolution/ownership pour autres cas réellement actionnables ; aucun Repair pour panne transitoire normale. |
 
-## B — trois règles mixtes : travail indépendant possible, réserve précise
+## B — quatre règles mixtes : travail indépendant possible, réserve précise
 
 | Règle | Travail / limite avant done |
 |---|---|
+| entity-unavailable | Observation snapshot distincte Home prouvée (video_available, EOF/None/erreur, vraie reprise foreground, pas de write après unload). Reste projection globale des deux canaux : unavailable sur panne vidéo seule désactive les services Home via HA ; état Camera final ne doit pas être overridé. API image vérifie is_on, pas available, donc ne pas inventer blocage d’accès. Concevoir reprise UI et compatibilité sans nouveau polling FFmpeg coûteux ni migration imposée. |
 | dependency-transparency | Source/tag/GPL/PyPI et attestation cryptographique du wheel 1.3.1 vérifiés. Guide core exige pin exact ; hassfest custom refuse exactement ce pin partagé (run 42400842458) et exige >=. Minimum original conservé, pas de désactivation CI. Réserve formelle pas défaut de provenance ; réauditer les versions futures, pas une exemption. |
 | entity-device-class | Inventaire classes/unités déjà présent. Reste opener déduit du libellé (pas preuve garage), signal Free documenté dB mais historique dBm. Obtenir contrat vendor précis puis proposer mapping/option et compatibilité historique avant modifier classe/unité/exposition vocale. /1000 débit est maintenant démontré par documentation et HTTP JSON du vrai SDK ; ne pas rouvrir arbitrairement ce facteur. |
 | config-entry-unloading | Maintenir tests réels forward onze domaines, rollback partiel, lectures en vol et fermeture. Restent HA refusant rollback (plateformes peuvent rester), partial-open FFmpeg avant try/finally parent et SDK close échoué sans finally. Préparer stratégie explicite de récupération via API publique, pas prétendre rollback atomique ni toucher une session privée. Tests supplémentaires n’effacent pas ces contrats amont. |
@@ -74,8 +72,8 @@ modifier artificiellement le sens du YAML. Aucune soumission amont ici.
 
 | Règle | Minimum restant |
 |---|---|
-| test-coverage | Seuil officiel intégration entière encore non atteint (74,72 % lignes / 52,59 % branches / 69,19 % combiné). Cibler erreurs/récupération et comportements manquants via A/B, pas tests sans assertions ni exclusion opportuniste. Deux passages locaux et CI doivent donner mêmes 39 modules/totaux. |
-| strict-typing | 162 erreurs réelles/23 fichiers/39 modules ; résoudre contrats/narrowing/structures et appels SDK non annotés, sans Any/cast/ignore pour score. Conflit héritage FFmpeg et typage SDK doivent être distingués des défauts locaux corrigeables. |
+| test-coverage | Seuil officiel intégration entière encore non atteint (75,74 % lignes / 54,34 % branches / 70,38 % combiné). Cibler erreurs/récupération et comportements manquants via A/B, pas tests sans assertions ni exclusion opportuniste. Deux passages locaux et CI doivent donner mêmes 39 modules/totaux. |
+| strict-typing | 130 erreurs réelles/18 fichiers/39 modules ; résoudre contrats/narrowing/structures et appels SDK non annotés, sans Any/cast/ignore pour score. Conflit héritage FFmpeg et typage SDK doivent être distingués des défauts locaux corrigeables. |
 
 ## Exemptions inchangées : deux, pas une façon de masquer des défauts
 

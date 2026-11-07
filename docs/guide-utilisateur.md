@@ -336,3 +336,15 @@ ni connexion initiale ni état off ; aucune commande automatique n’est envoyé
 Les boutons utilisent les observations existantes, pas une collecte par bouton.
 Le SDK testé est 1.3.1, provenance publique vérifiée ; le manifest conserve
 >=1.3.1 pour compatibilité avec la dépendance partagée de Home Assistant.
+
+### Image caméra et contrôles Home (préparation 28.8.90)
+
+L’attribut `video_available` est le résultat de la dernière demande d’image :
+valeur inconnue avant le premier essai, faux si aucune image/erreur, vrai après
+image obtenue. Ce n’est pas une sonde permanente ni une garantie du flux RTSP.
+Une lecture Home valide ne confirme pas le retour de l’image : seule une nouvelle
+image le fait. Une panne d’image seule ne coupe pas les commandes Home qui
+fonctionnent encore ; une panne de la source Home conserve son état unavailable.
+Aucune relance FFmpeg périodique ni commande automatique n’est ajoutée.
+Les noms fixes suivent réellement la langue HA FR/EN, sans renommer les IDs ni
+les noms personnalisés ; l’icône Player selon source respecte l’icône choisie.

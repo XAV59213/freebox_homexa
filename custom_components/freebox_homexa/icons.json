@@ -184,6 +184,9 @@
       },
       "tnt_channel": {
         "default": "mdi:television-classic"
+      },
+      "wifi_signal_named": {
+        "default": "mdi:wifi-strength-2"
       }
     },
     "calendar": {
@@ -261,6 +264,14 @@
       },
       "device_unknown": {
         "default": "mdi:help-network"
+      }
+    },
+    "media_player": {
+      "player_youtube": {
+        "default": "mdi:youtube"
+      },
+      "player_netflix": {
+        "default": "mdi:netflix"
       }
     }
   }

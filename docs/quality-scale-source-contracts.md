@@ -187,3 +187,33 @@ restent deux canaux distincts. Aucune frame périmée renvoyée mais caméra enc
 disponible ; concevoir récupération vidéo sans faire un nouveau poll FFmpeg lourd
 ou bloquer à jamais la prochaine image. SDK partial-open et rollback refusé restent
 limites du cycle de vie, distinctes des boutons désormais prouvés.
+
+## Lot 12 — frontières frontend et deux canaux caméra
+
+- EntityPlatformData.async_load_translations est réellement appelé pour les 81
+  variantes en FR/EN. Les attributs de noms fixes ne masquent plus HA ; source
+  Home/partition/client/chaîne reste donnée, jamais traduction ni nouvel ID.
+- Player.translation_key est une property non cachée. Le registre public ne
+  reçoit que translation_key et seulement à transition. display_json_repr (cache
+  frontend réel), événement et reload conservent name/icon/options/hidden/IDs.
+- video_available ne décrit que la dernière requête d’image héritée FFmpeg,
+  pas un stream RTSP continuellement vérifié : None non observé, False EOF/None/
+  exception, True octets non vides. Metadata Home saine ne le réinitialise pas.
+  Aucun timer, retry, commande ni processus FFmpeg additionnel. Callback de
+  retrait public et closing empêchent les écritures tardives, Events déterministes.
+- Contrat HA 2026.10.4 : camera.Camera.state est final ; helper.get_camera_from_entity_id
+  vérifie is_on, **pas available**. Les services entités, eux, filtrent available
+  (helpers/service.py). Ne pas présenter une interdiction de lecture image comme
+  un fait. Mettre tout le device caméra unavailable sur une panne image bloquerait
+  aussi ses commandes Home valides ; garder le contrôle rend la conformité globale
+  encore discutable. D’où entity-unavailable todo jusqu’à projection/reprise
+  compatibles, sans nouvelle entité/migration imposée ni sonde FFmpeg lourde.
+- Ce lot ne promet pas santé permanente du stream, ni couverture de tous chemins
+  de décodage MJPEG/FFmpeg. Les limites partial-open/SDK privées restent ouvertes.
+
+Sources publiques vérifiées le 7 novembre 2026 :
+[entity-unavailable](https://contributors.home-assistant.io/core/quality-scale/entity-unavailable/),
+[entity-translations](https://contributors.home-assistant.io/core/quality-scale/entity-translations/),
+[icon-translations](https://contributors.home-assistant.io/core/quality-scale/icon-translations/),
+[caméra core](https://github.com/home-assistant/core/blob/2026.10.4/homeassistant/components/camera/__init__.py),
+[helper caméra](https://github.com/home-assistant/core/blob/2026.10.4/homeassistant/components/camera/helper.py).

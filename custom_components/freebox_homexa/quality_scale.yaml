@@ -165,14 +165,17 @@ rules:
       custom revendiquée.'
   entity-unavailable:
     status: todo
-    comment: 'Lot 11 : boutons seuls sans MediaPlayer maintenant couverts par lecteur partagé au timer central
-      existant ; refcount, absence de collecte doublée quand média actif, relais après retrait et annulation
-      SDK en vol prouvés sous vrai HA. Veille connue/code et inconnu initial préservés. Wi-Fi valide sans
-      enabled devient unknown disponible, pas panne. Autres sources inventoriées testées. Réserve restante
-      précise : erreur/None de frame FFmpeg laisse caméra disponible via statut/contrôles Home valides ;
-      pas de frame périmée renvoyée, mais pas modèle global séparant disponibilité vidéo et contrôle. Définir
-      récupération vidéo sans lancer un nouveau polling FFmpeg coûteux ; ne pas déclarer règle entière done
-      sur seul contrôle Home.'
+    comment: >-
+      Lot 12 : disponibilité des sources d’état Home/Player/réseau/stockage/XMLTV et boutons seuls
+      prouvée. Caméra expose séparément video_available : dernier résultat d’image FFmpeg (None non
+      observé, False None/octets vides/exception, True frame obtenue), sans image périmée, sonde ni
+      timer nouveau. Un poll Home sain ne prouve pas récupération vidéo ; seules prochaines images
+      la prouvent. Pas de write/log de frame tardive après retrait/closing, concurrence Events
+      testée. Les contrôles Home restent disponibles si leur source fonctionne. Réserve formelle :
+      panne RTSP isolée ne met pas toute caméra unavailable ; le faire bloquerait aussi ses services
+      Home via HA. Définir projection compatible état vidéo/contrôles et reprise UI sans polling
+      FFmpeg lourd ; ne pas compter cette observation comme conformité entière. API image publique
+      contrôle is_on et ne bloque pas intrinsèquement sur available ; ne pas inventer ce blocage.
   integration-owner:
     status: done
     comment: 'manifest.json déclare @gvigroux, @XAV59213 et @Steph73HB ; .github/CODEOWNERS reprend exactement
@@ -201,12 +204,12 @@ rules:
       avant réauth. Lié au choix de migration unique ID host vers identité physique, non imposé ici.
   test-coverage:
     status: todo
-    comment: '511 tests HA 2026.10.4 (+21 au lot 11), 39 modules sans omit : 4582/6132 lignes (74,72 %),
-      1076/2046 branches (52,59 %), combiné 69,19 %. Deux suites JS et douze simulations historiques séparées.
-      Deux passages locaux et artefact CI comparés en entier (lignes/branches exécutées par module). Seuil
-      officiel non atteint. 17 lignes de typage exclues automatiquement par coverage.py (10 au lot 10),
-      aucune exclusion personnalisée ; imports TYPE_CHECKING canoniques explicités, pas optimisation artificielle
-      du périmètre. Aucune validation matérielle.'
+    comment: >-
+      536 tests HA 2026.10.4 (+25 au lot 12), 39 modules sans omit : 4701/6207 lignes (75,74 %),
+      1126/2072 branches (54,34 %), combiné 70,38 %. Deux suites JS et douze simulations historiques
+      séparées. 28 lignes typing automatiquement exclues par coverage.py (17 au lot 11), aucun omit
+      ni exclusion personnalisée ; imports TYPE_CHECKING canoniques et générique réel explicités.
+      Seuil officiel non atteint ; aucune validation matérielle.
   devices:
     status: todo
     comment: media_player.py:90-103 et tnt_sensor.py:14-29 DeviceInfo ; cohérence des associations/subdevices
@@ -297,30 +300,36 @@ rules:
       préservent préférences et IDs ; aucun dashboard modifié. Valeurs contextualisées du
       ScannerEntity HA explicitement distinguées des flags déclarés.
   entity-translations:
-    status: todo
-    comment: Inventaire global noms/icônes des 30 familles/81 variantes mis à jour au lot 11. Noms sources
-      (chaînes, clients, appareils) ne doivent pas être traduits ; placeholder TNT channel préserve nom
-      exact. Noms principaux/classes HA déjà corrects ; vrais noms utilisateur/IDs/icônes préservés. Restent
-      libellés fixes des descriptions réseau/appels/disques, nom WiFi/inversion/autoprotection et repli
-      RSSI nommé, masquant parfois translation_key via _attr_name ou propriété name Home. Corriger consommation
-      par vrai moteur HA FR/EN sans modifier entrées historiques ni noms utilisateur ; clés seules ne prouvent
-      pas traduction.
+    status: done
+    comment: >-
+      Lot 12 : les 81 variantes passent par le vrai EntityPlatform et sa méthode publique
+      async_load_translations, en français puis anglais. 66 clés propres et nom batterie natif HA
+      consommés réellement, pas seulement présents dans JSON. Réseau/appels/disques, Wi-
+      Fi/inversion/autoprotection/RSSI nommé et TNT ne masquent plus les traductions. Noms source
+      séparés des libellés ; placeholders conservent partitions/clients/chaînes exacts, heuristique
+      garage inchangée. Noms français historiques restent entrées des unique_id et fallback avant
+      plateforme, pas affichage chargé. Vrais friendly_name personnalisés et icônes utilisateur
+      préservés ; IDs et préférences inchangés. Preuves :
+      test_every_fixed_label_consumed_by_real_entity_platform et inventaires globaux.
   exception-translations:
     status: done
-    comment: Toutes les 35 levées custom de HomeAssistantError/sous-classes (dont UpdateFailed TNT) ont domaine,
+    comment: Toutes les 36 levées custom de HomeAssistantError/sous-classes (dont UpdateFailed TNT) ont domaine,
       clé sans message dur, et placeholders cohérents. tests/ha/test_translations_services.py vérifie source
       AST et strings/FR/EN, puis charge la traduction française via le vrai moteur HA. Unauthorized est une
       exception du framework, pas un message custom. Nouveau command_failed sans placeholder privé ; échecs
       Home réellement levés, tests de clés/domaines/placeholders FR/EN.
   icon-translations:
-    status: todo
-    comment: 'Lot 11 : icônes fixes des 30 familles/81 variantes auditées et déplacées dans icons.json :
-      boutons, capteurs réseau/appels/disques, AP/LAN/RSSI, calendrier/TNT, inversion, types trackers. Descripteurs
-      clonés avec icon=None, IDs/noms sources/préférences inchangés ; vrai chargeur HA async_get_icons et
-      registre (icône/nom personnalisés) testés. Classes natives gardent icône HA. Reste icône principale
-      Player dépendant de source YouTube/Netflix, pas du state on/off : comportement utilisateur conservé
-      en Python. Étudier métadonnée dynamique via API publique du registre et cache/lifecycle avant done,
-      pas supprimer fonctionnalité pour score.'
+    status: done
+    comment: >-
+      Lot 12 : toutes icônes propres sont dans icons.json. Le Player expose une translation_key non
+      cachée selon YouTube/Netflix et ne définit plus de MDI en Python. API publique
+      EntityRegistry.async_update_entity ne modifie que translation_key lors du changement de source
+      ; aucun événement supplémentaire si clé identique. Tests vrais HA : async_get_icons,
+      représentation frontend JSON mise en cache avant chaque changement, événements du registre,
+      TV/app inconnue/off, premier update avant ajout et reload. Icône/nom/hidden/options
+      utilisateur et IDs préservés. Icône de classe native conservée quand aucune icône propre ;
+      artwork/TNT inchangés. Preuves :
+      test_dynamic_icons_follow_source_frontend_cache_preferences_and_reload et test_icon_resources.
   reconfiguration-flow:
     status: todo
     comment: 'Test HA de caractérisation confirme : nouveau host -> wrong_account, données inchangées, aucun
@@ -350,8 +359,12 @@ rules:
       dépendance pour score ; proposition amont dans le rapport.'
   strict-typing:
     status: todo
-    comment: 'Mypy 2.4.1 strict : 162 erreurs /23 fichiers/39 modules (167 au lot 10). Imports des classes
-      HA canoniques pour typage avec réexports runtime compatibles anciens HA ; vrai handler web.Request
-      -> web.Response et chemin StaticPathConfig str selon contrat public. Nouveau lecteur Player typé sans
-      dette ajoutée. Aucun Any/cast/ignore ajouté pour masquer une erreur. Restent contrats SDK non annotés,
-      schémas voluptuous/probatio, rappels et autres plateformes ; baselines et limites documentées.'
+    comment: >-
+      Mypy 2.4.1 strict : 130 erreurs /18 fichiers/39 modules (162 au lot 11). Cover, Remote,
+      MediaPlayer, TNT const/sensor/coordinator : zéro diagnostic strict. Contrat cover compatible
+      kwargs et appels positionnels historiques, positions invalides rejetées avant transport.
+      DeviceInfo typés, vrai SDK Access, Iterable remote, descriptions frozen, imports canoniques
+      avec runtime ancien HA conservé. Coordinator TNT générique réellement borné dict[str,
+      dict[str, object]], titres/images malformés deviennent None, pas Any implicite de data pour
+      masquer les consommateurs. Aucun Any/cast/ignore artificiel ajouté. Restent SDK non annoté,
+      voluptuous/probatio, rappels, autres modules et conflit nom FFmpeg.

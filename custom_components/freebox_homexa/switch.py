@@ -23,7 +23,7 @@ from .errors import async_action_errors
 _LOGGER = logging.getLogger(__name__)
 
 
-@dataclass
+@dataclass(frozen=True)
 class FreeboxSwitchEntityDescription(SwitchEntityDescription):
     """Description des entités interrupteurs Freebox."""
     pass
@@ -47,7 +47,7 @@ async def async_setup_entry(
 ) -> None:
     """Configure les entités interrupteurs pour la Freebox."""
     router: FreeboxRouter = entry.runtime_data
-    entities = []
+    entities: list[SwitchEntity] = []
 
     for nodeid, node in router.home_devices.items():
         if node["category"] in {"shutter", "opener"}:
@@ -72,11 +72,19 @@ class FreeboxSwitch(FreeboxReachableMixin, SwitchEntity):
         self._router = router
         self._attr_device_info = router.device_info
         self._attr_unique_id = f"{router.mac} {entity_description.name}"
-        self._attr_name = "WiFi"
+        self._attr_translation_key = "wifi"
 
     async def _async_set_state(self, enabled: bool) -> None:
         await self._router.wifi.set_global_config({"enabled": enabled})
         _LOGGER.info("WiFi %s pour %s", 'activé' if enabled else 'désactivé', self._router.name)
+
+    @property
+    def name(self) -> str | None:
+        if getattr(self, "platform_data", None) is None:
+            name = self.entity_description.name
+            return name.removeprefix("Freebox ") if isinstance(name, str) else None
+        translated = super().name
+        return translated if isinstance(translated, str) else None
 
     @async_action_errors
     async def async_turn_on(self, **kwargs: Any) -> None:
@@ -109,7 +117,6 @@ class FreeboxShutterInvertSwitchEntity(FreeboxHomeEntity, SwitchEntity):
     """Interrupteur d'inversion pour les volets."""
 
     _attr_has_entity_name = True
-    _attr_name = "Inversion Positionnement"
     _home_entity_name = "Inversion Positionnement"
     _attr_entity_category = EntityCategory.CONFIG
 
@@ -137,14 +144,14 @@ class FreeboxShutterInvertSwitchEntity(FreeboxHomeEntity, SwitchEntity):
         await self.hass.async_add_executor_job(self._write, "1")
         self._state = True
         self.async_write_ha_state()
-        _LOGGER.info("Inversion activée pour %s", self._attr_name)
+        _LOGGER.info("Inversion activée pour %s", self._source_name)
 
     @async_action_errors
     async def async_turn_off(self, **kwargs: Any) -> None:
         await self.hass.async_add_executor_job(self._write, "0")
         self._state = False
         self.async_write_ha_state()
-        _LOGGER.info("Inversion désactivée pour %s", self._attr_name)
+        _LOGGER.info("Inversion désactivée pour %s", self._source_name)
 
     @property
     def available(self) -> bool:
@@ -165,5 +172,5 @@ class FreeboxShutterInvertSwitchEntity(FreeboxHomeEntity, SwitchEntity):
             else:
                 self._state = False
         except OSError as err:
-            _LOGGER.error("Erreur lecture inversion %s: %s", self._attr_name, err)
+            _LOGGER.error("Erreur lecture inversion %s: %s", self._source_name, err)
             self._state = None

@@ -151,7 +151,7 @@ class Programme:
         }
 
 
-class ProgrammeTntFrCoordinator(DataUpdateCoordinator):
+class ProgrammeTntFrCoordinator(DataUpdateCoordinator[dict[str, dict[str, object]]]):
     def __init__(
         self, hass: HomeAssistant, channels: list[str], tmdb_api_key: str | None = None,
         *, config_entry: ConfigEntry | None = None,

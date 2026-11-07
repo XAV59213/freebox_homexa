@@ -33,15 +33,22 @@ class FreeboxHomeEntity(Entity):
 
     _attr_has_entity_name = True
     _home_entity_name: str | None = None
+    _home_use_device_class_name = False
 
     @property
     def name(self) -> str | None:
         """Keep device labels out of relative names, without altering legacy IDs."""
+        if (getattr(self, "translation_key", None) or self._home_use_device_class_name) and getattr(self, "platform_data", None) is not None:
+            translated = super().name
+            if isinstance(translated, str):
+                return translated
+        if self._home_entity_name is not None:
+            return self._home_entity_name
         if self._sub_node is not None:
             return str(self._sub_node["label"]).strip()
         if self._node.get("category") == FreeboxHomeCategory.ALARM:
             # Alarm entities share the Home group device, not a dedicated node.
-            return self._attr_name
+            return self._source_name
         return self._home_entity_name
 
     def __init__(
@@ -56,12 +63,12 @@ class FreeboxHomeEntity(Entity):
         self._node = node
         self._sub_node = sub_node
         self._id = node["id"]
-        self._attr_name = (node.get("label") or "").strip()
-        self._device_name = self._attr_name
+        self._source_name = (node.get("label") or "").strip()
+        self._device_name = self._source_name
         self._attr_unique_id = f"{self._router.mac}-node_{self._id}"
 
         if sub_node is not None:
-            self._attr_name += " " + sub_node["label"].strip()
+            self._source_name += " " + sub_node["label"].strip()
             self._attr_unique_id += "-" + sub_node["name"].strip()
 
         self._available = True
@@ -81,7 +88,7 @@ class FreeboxHomeEntity(Entity):
 
         if not (node.get("label") or "").strip() or self._device_name.lower() == "unknown device":
             self._device_name = home_node_name(node, self._model)
-            self._attr_name = self._device_name + (
+            self._source_name = self._device_name + (
                 " " + sub_node["label"].strip() if sub_node is not None else ""
             )
 
@@ -236,9 +243,9 @@ class FreeboxHomeEntity(Entity):
         try:
             self._node = self._router.home_devices[self._id]
             if self._sub_node is None:
-                self._attr_name = self._node["label"].strip()
+                self._source_name = self._node["label"].strip()
             else:
-                self._attr_name = f"{self._node['label'].strip()} {self._sub_node['label'].strip()}"
+                self._source_name = f"{self._node['label'].strip()} {self._sub_node['label'].strip()}"
             if self._node.get("category") != FreeboxHomeCategory.ALARM:
                 # Update the device's source name, retaining name_by_user and IDs.
                 device_name = (self._node.get("label") or "").strip() or home_node_name(self._node, self._model)
@@ -251,7 +258,7 @@ class FreeboxHomeEntity(Entity):
             self.async_write_ha_state()
         except Exception as err:  # noqa: BLE001
             if is_shutdown_error(err, self._router):
-                _LOGGER.debug("Mise à jour de %s interrompue (rechargement) : %s", self._attr_name, err)
+                _LOGGER.debug("Mise à jour de %s interrompue (rechargement) : %s", self._source_name, err)
                 return
             self._attr_available = False
             self._router.note_source(("home_metadata", self._id), False, "Métadonnées Home")

@@ -86,7 +86,7 @@
     "device_class": "safety",
     "enabled_default": false,
     "has_entity_name": true,
-    "translation_key": null,
+    "translation_key": "tamper",
     "unit": null
   },
   {
@@ -696,7 +696,7 @@
     "device_class": null,
     "enabled_default": true,
     "has_entity_name": true,
-    "translation_key": null,
+    "translation_key": "wifi",
     "unit": null
   },
   {
@@ -776,7 +776,7 @@
     "device_class": "signal_strength",
     "enabled_default": false,
     "has_entity_name": true,
-    "translation_key": "wifi_signal",
+    "translation_key": "wifi_signal_named",
     "unit": "dBm"
   },
   {

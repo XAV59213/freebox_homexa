@@ -19,9 +19,9 @@ Platinum absent). Le snapshot JSON documente noms et tiers ; il ne crée pas
 un second fichier de statut. Le seul checklist est
 `custom_components/freebox_homexa/quality_scale.yaml`, placement conventionnel.
 
-## Résultat : 17 done / 35 todo / 2 exempt
+## Résultat : 19 done / 33 todo / 2 exempt
 
-Les 48 anciens `todo` ont tous été relus : **13 démontrés** depuis l’audit initial, **35
+Les 48 anciens `todo` ont tous été relus : **15 démontrés** depuis l’audit initial, **33
 restent ouverts** avec réserve précise dans le YAML et ci-dessous. Pas de
 transformation administrative pour atteindre un score. Les numéros de lignes
 de l'audit initial se réfèrent à la base ; les preuves nouvelles utilisent les
@@ -81,7 +81,7 @@ pas tester toute version HA ≥2026.8 ; un job minimum supporté reste à établ
 Le plugin HA bloque sockets externes et DNS ; toutes les réponses appareil sont
 synthétiques/mocks. Aucun secret/token de production, aucun appareil connecté.
 
-**511 tests passent** (490 au lot 10, +21 au lot 11) : config initiale, réseau/auth, duplicate host, réauth avec
+**536 tests passent** (511 au lot 11, +25 au lot 12) : config initiale, réseau/auth, duplicate host, réauth avec
 reload de l'entrée existante, options général/groupes, conservation options,
 migration LAN, setup/unload succès/refus, erreurs close/annulation, confidentialité,
 bornes cache/timings, Entity HA et signaux dispatcher/perte-retour, logs centraux
@@ -92,9 +92,9 @@ coordinateurs TNT réels et shutdown owning-entry, options profils/TNT/types,
 conservation/effacement explicite de codes, messages FR/EN, rappels et contrat SDK.
 Les tests SDK/reconfigure de caractérisation documentent une limite, ils ne la corrigent pas.
 
-| Périmètre (38 modules, aucun omit) | Lignes exécutées | Branches | Combiné |
+| Périmètre (39 modules, aucun omit) | Lignes exécutées | Branches | Combiné |
 |---|---:|---:|---:|
-| Intégration entière | 4582/6132 = **74,72 %** | 1076/2046 = **52,59 %** | **69,19 %** |
+| Intégration entière | 4701/6207 = **75,74 %** | 1126/2072 = **54,34 %** | **70,38 %** |
 | config_flow.py | 437/438 = **99,77 %** | 145/148 = **97,97 %** | **99,32 %** |
 | diagnostics.py | **100 %** | **100 %** | **100 %** |
 | player_diagnostics.py | **100 %** | **100 %** | **100 %** |
@@ -114,6 +114,42 @@ PYTHONDONTWRITEBYTECODE=1 /tmp/homexa-ha-quality/bin/python -m pytest -q tests/h
   --cov=custom_components.freebox_homexa --cov-branch \
   --cov-report=term --cov-report=json:coverage.json --cov-report=xml:coverage.xml
 ```
+
+## Lot 12 — deux règles entières, consommation frontend réelle
+
+**536 tests HA (+25), 19 done / 33 todo / 2 exempt ; préparation 28.8.90.**
+`entity-translations` et `icon-translations` deviennent done sur preuves runtime,
+pas sur seules clés JSON. Chaque variante de l’inventaire est réellement ajoutée
+à une plateforme HA avec traductions chargées publiquement en FR puis EN :
+**66 clés propres et batterie native HA**, placeholders exacts, original_name,
+friendly_name personnalisé et icône utilisateur. Les libellés historiques servant
+aux IDs restent intacts ; nom source Home distinct, heuristique garage préservée.
+
+L’icône Player YouTube/Netflix vient de icons.json. Sa clé dynamique ne passe
+pas par le cached_property Entity ; le registre public ne reçoit que la clé
+modifiée. La représentation JSON frontend **déjà mise en cache** est vérifiée
+après transitions, source identique, TV/inconnue/off, premier état avant ajout
+et reload ; noms/icônes/options/hidden/IDs utilisateur conservés, zéro commande.
+
+La vidéo est observée séparément : video_available est le dernier résultat de
+snapshot, non une sonde continue ni preuve de tous les streams. None = pas encore
+observé ; False = None/octets vides/exception ; True = image décodée obtenue.
+Un Home sain ne blanchit jamais une image échouée. Les frames tardives après
+retrait ou closing ne recréent pas l’état (Events, pas sleep). La réserve globale
+`entity-unavailable` reste honnête : toute caméra unavailable bloquerait aussi
+les services Home pourtant fonctionnels. Le helper image HA vérifie is_on, pas
+available : **ce n’est pas un blocage intrinsèque d’API image**. Il reste à définir
+une projection compatible des deux canaux et une reprise UI sans processus
+FFmpeg périodique ajouté ; pas d’override du state final de Camera ni migration
+imposée. Voir les contrats sources, pas une impossibilité arbitraire.
+
+Strict : **162 → 130 diagnostics /18 fichiers/39 modules**. Cover, Remote,
+MediaPlayer, TNT const/sensor/coordinator sans diagnostic strict. Contrats vrais,
+DeviceInfo et Access réels, kwargs/Iterable compatibles, coordinator générique
+sans Any implicite, titres/images TNT invalides = None. Aucune exclusion mypy ni
+Any/cast/ignore ajouté pour score. 28 lignes automatiquement exclues par coverage
+(17 au lot 11), aucune configuration opportuniste ; périmètre 39 modules inchangé.
+Mesure globale : **75,74 % lignes / 54,34 % branches / 70,38 % combiné**.
 
 ## Lot 11 — une règle entière démontrée, limites restantes isolées
 

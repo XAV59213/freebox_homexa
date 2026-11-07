@@ -74,3 +74,13 @@ panne vidéo seule couperait les contrôles Home encore sains. Le helper image
 vérifie `is_on`, pas `available` ; aucune impossibilité de lecture image inventée.
 Une projection UI compatible/reprise utilisateur reste du travail de conception,
 pas un manque de tests à masquer ni un nouveau poll à ajouter pour le score.
+
+## Reproductibilité CI
+
+La première CI e6be91a était verte mais son artefact manquait la branche où Remote
+est le premier consommateur du cache metadata, l'ordre concurrent des plateformes
+étant variable. Aucun résultat n'a été déclaré concordant sur cette base. Un test
+utilise désormais le vrai forwarding public HA avec Remote en premier, puis les
+autres plateformes : une unique lecture partagée est prouvée sans forger le cache
+ni omettre la branche. Les deux runs finaux et la CI du commit de suivi doivent
+être comparés intégralement avant livraison.

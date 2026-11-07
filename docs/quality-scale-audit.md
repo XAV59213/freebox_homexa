@@ -21,7 +21,7 @@ un second fichier de statut. Le seul checklist est
 
 ## Jalon15 — progrès sans fermeture artificielle de règle
 
-**21 done /31 todo /2 exempt**, inchangé ; 592tests HA (+25),
+**21 done /31 todo /2 exempt**, inchangé ; 593tests HA (+26),
 5052/6389lignes (79,07 %), 1299/2144branches (60,59 %), combiné74,43 %.
 Mypy120 diagnostics/14fichiers/41modules (122/16 auparavant).
 [Inventaire Repairs](quality-scale-repair-inventory.md) : Home plus12scopes
@@ -83,7 +83,7 @@ noms de fonctions/tests pour éviter les décalages de lignes.
 | exception-translations (lot 2) | toutes les 36 levées custom HA/sous-classes traduites, placeholders vérifiés strings/FR/EN, moteur HA français réel |
 | async-dependency (lot 2) | SDK asyncio/aiohttp ; SSL/fichiers dans asyncio.to_thread, signature coroutine publique testée et source v1.3.1 vérifiée |
 | action-exceptions (lot 5) | 42 frontières AST, 103 tests dédiés HA/SDK/Store, validation/annulation préservées, pas de succès silencieux démontré |
-| integration-owner (lot 2) | propriétaires du manifest repris sans ajout de personne dans CODEOWNERS ; cohérence testée, mainteneur XAV59213 actif dans les cinq derniers commits main |
+| integration-owner (lot 2) | propriétaires du manifest repris sans ajout de personne dans CODEOWNERS ; cohérence testée, mainteneur XAV59313 actif dans les cinq derniers commits main |
 
 | entity-category (lot 7) | 30 familles/81 variantes revues ; vrai registre conserve IDs/noms/hidden/disabled utilisateur, voir quality-scale-entity-inventory.md |
 
@@ -159,7 +159,7 @@ PYTHONDONTWRITEBYTECODE=1 /tmp/homexa-ha-quality/bin/python -m pytest -q tests/h
 
 ## Lot 12 — deux règles entières, consommation frontend réelle
 
-**536 tests HA (+25), 19 done / 33 todo / 2 exempt ; préparation 28.8.90.**
+**536 tests HA (+26), 19 done / 33 todo / 2 exempt ; préparation 28.8.90.**
 `entity-translations` et `icon-translations` deviennent done sur preuves runtime,
 pas sur seules clés JSON. Chaque variante de l’inventaire est réellement ajoutée
 à une plateforme HA avec traductions chargées publiquement en FR puis EN :
@@ -562,7 +562,7 @@ restent inchangées ; aucune session privée, API repeater ou identité n'est mo
   home-assistant.io. La matrice physique/firmware n'est pas inventée.
 - **Propriétaire actif** : `.github/CODEOWNERS` reprend exactement les trois noms
   déjà déclarés au manifest, sur le seul composant. Un test vérifie la correspondance ;
-  cinq derniers commits main par XAV59213 confirment au moins un mainteneur actif.
+  cinq derniers commits main par XAV59313 confirment au moins un mainteneur actif.
   Pas de demande de review envoyée par cette tâche ni de nomination core revendiquée.
 - **Métadonnées services FR/EN** : expose les champs `config_entry_id`/`device_id`
   déjà gérés, sans changer le routage ; tous les champs et messages sont testés.
@@ -669,7 +669,7 @@ listés dans le tableau suivant ; celui-ci reprend le YAML, il n'est pas un seco
 | entity-unavailable | Lot 11 : boutons seuls sans MediaPlayer maintenant couverts par lecteur partagé au timer central existant ; refcount, absence de collecte doublée quand média actif, relais après retrait et annulation SDK en vol prouvés sous vrai HA. Veille connue/code et inconnu initial préservés. Wi-Fi valide sans enabled devient unknown disponible, pas panne. Autres sources inventoriées testées. Réserve restante précise : erreur/None de frame FFmpeg laisse caméra disponible via statut/contrôles Home valides ; pas de frame périmée renvoyée, mais pas modèle global séparant disponibilité vidéo et contrôle. Définir récupération vidéo sans lancer un nouveau polling FFmpeg coûteux ; ne pas déclarer règle entière done sur seul contrôle Home. |
 | log-when-unavailable | Lot 11 : router.note_source mémorise transitions par source, INFO perte puis retour une seule fois ; labels fixes sans host/ID/payload. Tests vrais HA/SDK test_source_ownership_logs : trois échecs successifs et récupération Root/LAN, Wi-Fi config/BSS/AP/stations/interrupteur, Home/endpoints/nœuds/caméra, Remote/Player, capteurs/disques/RAID ; aucun secret synthétique dans logs. TNT utilise réellement DataUpdateCoordinator/UpdateFailed, une perte puis récupération testée. Canal image FFmpeg public conserve exception/None sans retry et annonce ses transitions. Pas de prétention de succès physique ni de nettoyage SDK garanti. |
 | reauthentication-flow | tests/ha/test_config_flow.py prouve reauth_successful et reload unique de la même entrée sans doublon. Le serveur physique peut toutefois changer derrière le même host ; absence de contrôle MAC/identité avant réauth. Lié au choix de migration unique ID host vers identité physique, non imposé ici. |
-| test-coverage | Jalon15 : 592 tests HA2026.10.4, 41modules sans omit : 5052/6389 lignes (79,07 %), 1299/2144 branches (60,59 %), combiné74,43 %. 32lignes automatiquement exclues, aucune exclusion personnalisée. Deux passages locaux et artefact CI comparés intégralement pour livraison ; liens exacts dans PR119. Deux suites JS et douze simulations séparées. Seuil officiel non atteint ; aucune validation matérielle. |
+| test-coverage | Jalon15 : 593 tests HA2026.10.4, 41modules sans omit : 5052/6389 lignes (79,07 %), 1299/2144 branches (60,59 %), combiné74,43 %. 32lignes automatiquement exclues, aucune exclusion personnalisée. Deux passages locaux et artefact CI comparés intégralement pour livraison ; liens exacts dans PR119. Deux suites JS et douze simulations séparées. Seuil officiel non atteint ; aucune validation matérielle. |
 | devices | media_player.py:90-103 et tnt_sensor.py:14-29 DeviceInfo ; cohérence des associations/subdevices et de toutes plateformes non vérifiée sur plusieurs modèles. |
 | discovery | tests/ha/test_config_flow.py teste le flow zeroconf réel : préremplissage api_domain/https_port, formulaire utilisateur et rejet du même host configuré. L’identité physique, alias d’adresse et découverte de tous modèles restent non démontrés ; pas un passage en done sur seul préremplissage. |
 | discovery-update-info | config_flow.py:390-405 découvre le host ; aucun test prouvant mise à jour sûre des entrées existantes après changement adresse. |

@@ -175,9 +175,9 @@ rules:
       contrôle is_on et ne bloque pas intrinsèquement sur available ; ne pas inventer ce blocage.
   integration-owner:
     status: done
-    comment: 'manifest.json déclare @gvigroux, @XAV59213 et @Steph73HB ; .github/CODEOWNERS reprend exactement
+    comment: 'manifest.json déclare @gvigroux, @XAV59313 et @Steph73HB ; .github/CODEOWNERS reprend exactement
       ces propriétaires pour le composant, testé par test_codeowners_match_manifest_for_component_scope. Historique
-      public origin/main : cinq derniers commits par XAV59213 (b6a2599,30f872d,bbabf79,9e5816f,7fe5fe9) démontre
+      public origin/main : cinq derniers commits par XAV59313 (b6a2599,30f872d,bbabf79,9e5816f,7fe5fe9) démontre
       au moins un mainteneur actif. Aucune nomination/notification/revue core ni niveau Silver revendiqué ;
       règle locale de propriétaire actif démontrée.'
   log-when-unavailable:
@@ -202,7 +202,7 @@ rules:
   test-coverage:
     status: todo
     comment: >-
-      Jalon15 : 592 tests HA2026.10.4, 41modules sans omit : 5052/6389 lignes (79,07 %), 1299/2144 branches (60,59 %), combiné74,43 %. 32lignes automatiquement exclues, aucune exclusion personnalisée. Deux passages locaux et artefact CI comparés intégralement pour livraison ; liens exacts dans PR119. Deux suites JS et douze simulations séparées. Seuil officiel non atteint ; aucune validation matérielle.
+      Jalon15 : 593 tests HA2026.10.4, 41modules sans omit : 5052/6389 lignes (79,07 %), 1299/2144 branches (60,59 %), combiné74,43 %. 32lignes automatiquement exclues, aucune exclusion personnalisée. Deux passages locaux et artefact CI comparés intégralement pour livraison ; liens exacts dans PR119. Deux suites JS et douze simulations séparées. Seuil officiel non atteint ; aucune validation matérielle.
   devices:
     status: todo
     comment: media_player.py:90-103 et tnt_sensor.py:14-29 DeviceInfo ; cohérence des associations/subdevices

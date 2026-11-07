@@ -243,7 +243,7 @@ class FreeboxPlayerMediaPlayer(FreeboxReachableMixin, MediaPlayerEntity):
         versions = [self._api_version] + [v for v in API_VERSION_FALLBACKS if v != self._api_version]
         for version in versions:
             try:
-                status = await self._access.get(self._path("status/", version)) or {}
+                status = await self._router.async_read(lambda: self._access.get(self._path("status/", version))) or {}
                 self._api_version = version
                 break
             except Exception as err:

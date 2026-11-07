@@ -198,17 +198,6 @@ class FreeboxShutter(FreeboxHomeEntity, CoverEntity):
         self._state = None
         self._invert_entity_id = None
 
-        # Recherche de l'entité "invert switch" dans le registre
-        entity_registry = async_get(hass)
-        unique_id_invert = self._attr_unique_id + "_InvertSwitch"
-        for entity in entity_registry.entities.values():
-            if entity.unique_id == unique_id_invert:
-                self._invert_entity_id = entity.entity_id
-                _LOGGER.debug("Entité invert_switch trouvée pour %s: %s", self._attr_name, self._invert_entity_id)
-                break
-        else:
-            _LOGGER.warning("Entité invert_switch non trouvée pour %s avec ID %s", self._attr_name, unique_id_invert)
-
     def _get_corrected_position(self, position: int | None) -> int | None:
         """Retourne la position corrigée en fonction de l'état d'inversion.
 
@@ -220,8 +209,13 @@ class FreeboxShutter(FreeboxHomeEntity, CoverEntity):
         """
         if position is None:
             return None
+        # Resolve by the existing unique ID at use time: HA forwards switch and
+        # cover concurrently, and registry entity IDs may later be renamed.
+        self._invert_entity_id = async_get(self._hass).async_get_entity_id(
+            "switch", DOMAIN, f"{self.unique_id}_InvertSwitch"
+        )
         if self._invert_entity_id:
-            invert_state = self.hass.states.get(self._invert_entity_id)
+            invert_state = self._hass.states.get(self._invert_entity_id)
             if invert_state is None or invert_state.state not in {"on", "off"}:
                 return None
             if invert_state.state == "on":

@@ -73,7 +73,10 @@ async def test_position_unknown_is_unknown_even_with_inversion(hass, home_contex
     router, node = home_context
     entity = FreeboxShutter(hass, router, node)
     entity.hass = hass
-    entity._invert_entity_id = "switch.test_inversion"
+    from homeassistant.helpers.entity_registry import async_get
+    entity._invert_entity_id = async_get(hass).async_get_or_create(
+        "switch", "freebox_homexa", f"{entity.unique_id}_InvertSwitch",
+        suggested_object_id="test_inversion").entity_id
     hass.states.async_set(entity._invert_entity_id, "on")
     entity._current_cover_position = None
     assert entity.current_cover_position is None
@@ -91,7 +94,10 @@ async def test_inverted_set_keeps_raw_coordinate_contract(hass, home_context):
     router, node = home_context
     entity = FreeboxShutter(hass, router, node)
     entity.hass = hass
-    entity._invert_entity_id = "switch.test_inversion"
+    from homeassistant.helpers.entity_registry import async_get
+    entity._invert_entity_id = async_get(hass).async_get_or_create(
+        "switch", "freebox_homexa", f"{entity.unique_id}_InvertSwitch",
+        suggested_object_id="test_inversion").entity_id
     hass.states.async_set(entity._invert_entity_id, "on")
     await entity.async_set_cover_position(30)
     router.home.set_home_endpoint_value.assert_awaited_once_with(42, 4, {"value": 70})
@@ -195,7 +201,10 @@ async def test_unknown_inversion_prevents_an_ambiguous_command(hass, home_contex
     router, node = home_context
     entity = FreeboxShutter(hass, router, node)
     entity.hass = hass
-    entity._invert_entity_id = "switch.test_inversion"
+    from homeassistant.helpers.entity_registry import async_get
+    entity._invert_entity_id = async_get(hass).async_get_or_create(
+        "switch", "freebox_homexa", f"{entity.unique_id}_InvertSwitch",
+        suggested_object_id="test_inversion").entity_id
     hass.states.async_set(entity._invert_entity_id, "unavailable")
     assert entity.current_cover_position is None
     assert entity.is_closed is None

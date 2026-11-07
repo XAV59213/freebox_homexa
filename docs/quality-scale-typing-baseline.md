@@ -60,3 +60,11 @@ La commande **sort actuellement en échec** ; elle n’est pas maquillée en che
 vert. Traiter les erreurs par module/famille après inventaires de comportements,
 avec tests de régression, avant d’ajouter un gate strict global. Le contrat du
 SDK doit rester réel ; pas de patch dépendance ni lecture de session privée.
+
+## Lot 7
+
+Mesure finale : **227 erreurs / 27 fichiers / 38 analysés**. Les trois erreurs
+des types génériques diagnostics sont corrigées : TimingSample TypedDict,
+listes d’observations typées, dictionnaire d’entrée arbitraire explicitement
+object et sortie list[dict[str, object]]. Aucun cast/ignore ajouté. Le contenu
+filtré et les tests privacy restent identiques ; strict-typing reste todo.

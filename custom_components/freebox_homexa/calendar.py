@@ -124,11 +124,11 @@ class FreeboxTvGuideCalendar(FreeboxReachableMixin, CalendarEntity):
         events: list[CalendarEvent] = []
         self._snippets = []
         api_tv = self._router._api.tv
-        channels = await api_tv.get_tv_channels() or {}
+        channels = await self._router.async_read(api_tv.get_tv_channels) or {}
         if isinstance(channels, dict):
             self._channels = channels
         now_ts = int(dt_util.now().timestamp())
-        programs = await api_tv.get_tv_programs_by_date(now_ts) or {}
+        programs = await self._router.async_read(lambda: api_tv.get_tv_programs_by_date(now_ts)) or {}
         iterable = programs.values() if isinstance(programs, dict) else programs or []
         for program in iterable:
             if not isinstance(program, dict):

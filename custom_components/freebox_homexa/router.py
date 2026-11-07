@@ -10,7 +10,7 @@ import json
 from pathlib import Path
 from contextlib import suppress
 from datetime import datetime, timedelta
-from typing import Any, Mapping
+from typing import Any, Mapping, TypeVar
 from collections.abc import Awaitable, Callable
 
 from freebox_api import Freepybox
@@ -212,6 +212,8 @@ async def get_hosts_list_if_supported(
     return supports_hosts, fbx_devices
 
 
+_ReadT = TypeVar("_ReadT")
+
 class FreeboxRouter:
     """Représentation du routeur Freebox dans Home Assistant."""
 
@@ -309,6 +311,7 @@ class FreeboxRouter:
         self.home_devices: dict[str, Any] = {}
         self.listeners: list = []
         self.poll_tasks: set[asyncio.Task[None]] = set()
+        self.read_tasks: set[asyncio.Task[object]] = set()
         self._close_lock = asyncio.Lock()
         self._closed = False
 
@@ -700,6 +703,19 @@ class FreeboxRouter:
         await self._api.system.reboot()
         _LOGGER.info("Redémarrage de la Freebox effectué")
 
+    async def async_read(self, read: Callable[[], Awaitable[_ReadT]]) -> _ReadT:
+        """Own entity I/O until it completes, independently of HA task teardown."""
+        if self.closing:
+            raise NotOpenError("Freebox connection is closing")
+        task = asyncio.current_task()
+        if task is not None:
+            self.read_tasks.add(task)
+        try:
+            return await read()
+        finally:
+            if task is not None:
+                self.read_tasks.discard(task)
+
     async def async_poll(self, update: Callable[[], Awaitable[None]]) -> None:
         """Own only integration interval jobs, not initial reads or entity actions."""
         if self.closing:
@@ -719,7 +735,7 @@ class FreeboxRouter:
                 return
             # Stop new interval reads, drain current ones, then close the public SDK.
             self.closing = True
-            pending = self.poll_tasks - {asyncio.current_task()}
+            pending = (self.poll_tasks | self.read_tasks) - {asyncio.current_task()}
             for task in pending:
                 task.cancel()
             if pending:

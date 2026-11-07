@@ -1,0 +1,812 @@
+[
+  {
+    "class": "FreeboxAlarm",
+    "variant": "alarm",
+    "category": null,
+    "device_class": null,
+    "enabled_default": true,
+    "has_entity_name": false,
+    "translation_key": null,
+    "unit": null
+  },
+  {
+    "class": "FreeboxBasicShutter",
+    "variant": "basic-shutter",
+    "category": null,
+    "device_class": "shutter",
+    "enabled_default": true,
+    "has_entity_name": false,
+    "translation_key": null,
+    "unit": null
+  },
+  {
+    "class": "FreeboxBatterySensor",
+    "variant": "battery",
+    "category": "diagnostic",
+    "device_class": "battery",
+    "enabled_default": true,
+    "has_entity_name": false,
+    "translation_key": null,
+    "unit": "%"
+  },
+  {
+    "class": "FreeboxButton",
+    "variant": "server-button/mark_calls_as_read",
+    "category": "diagnostic",
+    "device_class": null,
+    "enabled_default": true,
+    "has_entity_name": true,
+    "translation_key": "mark_calls_as_read",
+    "unit": null
+  },
+  {
+    "class": "FreeboxButton",
+    "variant": "server-button/reboot",
+    "category": "config",
+    "device_class": "restart",
+    "enabled_default": true,
+    "has_entity_name": true,
+    "translation_key": "reboot",
+    "unit": null
+  },
+  {
+    "class": "FreeboxCallLogSensor",
+    "variant": "call-log",
+    "category": null,
+    "device_class": null,
+    "enabled_default": true,
+    "has_entity_name": false,
+    "translation_key": null,
+    "unit": null
+  },
+  {
+    "class": "FreeboxCallSensor",
+    "variant": "calls/missed",
+    "category": "diagnostic",
+    "device_class": null,
+    "enabled_default": true,
+    "has_entity_name": false,
+    "translation_key": null,
+    "unit": null
+  },
+  {
+    "class": "FreeboxCamera",
+    "variant": "camera",
+    "category": null,
+    "device_class": null,
+    "enabled_default": true,
+    "has_entity_name": false,
+    "translation_key": null,
+    "unit": null
+  },
+  {
+    "class": "FreeboxCoverSensor",
+    "variant": "tamper",
+    "category": "diagnostic",
+    "device_class": "safety",
+    "enabled_default": false,
+    "has_entity_name": false,
+    "translation_key": null,
+    "unit": null
+  },
+  {
+    "class": "FreeboxDevice",
+    "variant": "tracker/devices=False",
+    "category": "diagnostic",
+    "device_class": null,
+    "enabled_default": false,
+    "has_entity_name": false,
+    "translation_key": null,
+    "unit": null
+  },
+  {
+    "class": "FreeboxDevice",
+    "variant": "tracker/devices=True",
+    "category": "diagnostic",
+    "device_class": null,
+    "enabled_default": false,
+    "has_entity_name": false,
+    "translation_key": null,
+    "unit": null
+  },
+  {
+    "class": "FreeboxDiskSensor",
+    "variant": "disk/partition_free_space",
+    "category": "diagnostic",
+    "device_class": null,
+    "enabled_default": true,
+    "has_entity_name": false,
+    "translation_key": null,
+    "unit": "%"
+  },
+  {
+    "class": "FreeboxDwsSensor",
+    "variant": "dws",
+    "category": null,
+    "device_class": "door",
+    "enabled_default": true,
+    "has_entity_name": false,
+    "translation_key": null,
+    "unit": null
+  },
+  {
+    "class": "FreeboxLanGroupClientsSensor",
+    "variant": "wired-group",
+    "category": null,
+    "device_class": null,
+    "enabled_default": true,
+    "has_entity_name": true,
+    "translation_key": "lan_group_clients",
+    "unit": null
+  },
+  {
+    "class": "FreeboxPirSensor",
+    "variant": "pir",
+    "category": null,
+    "device_class": "motion",
+    "enabled_default": true,
+    "has_entity_name": false,
+    "translation_key": null,
+    "unit": null
+  },
+  {
+    "class": "FreeboxPlayerAppButton",
+    "variant": "app-button/appletv",
+    "category": null,
+    "device_class": null,
+    "enabled_default": false,
+    "has_entity_name": true,
+    "translation_key": "player_app_appletv",
+    "unit": null
+  },
+  {
+    "class": "FreeboxPlayerAppButton",
+    "variant": "app-button/browser",
+    "category": null,
+    "device_class": null,
+    "enabled_default": true,
+    "has_entity_name": true,
+    "translation_key": "player_app_browser",
+    "unit": null
+  },
+  {
+    "class": "FreeboxPlayerAppButton",
+    "variant": "app-button/canal",
+    "category": null,
+    "device_class": null,
+    "enabled_default": false,
+    "has_entity_name": true,
+    "translation_key": "player_app_canal",
+    "unit": null
+  },
+  {
+    "class": "FreeboxPlayerAppButton",
+    "variant": "app-button/disney",
+    "category": null,
+    "device_class": null,
+    "enabled_default": true,
+    "has_entity_name": true,
+    "translation_key": "player_app_disney",
+    "unit": null
+  },
+  {
+    "class": "FreeboxPlayerAppButton",
+    "variant": "app-button/max",
+    "category": null,
+    "device_class": null,
+    "enabled_default": false,
+    "has_entity_name": true,
+    "translation_key": "player_app_max",
+    "unit": null
+  },
+  {
+    "class": "FreeboxPlayerAppButton",
+    "variant": "app-button/netflix",
+    "category": null,
+    "device_class": null,
+    "enabled_default": true,
+    "has_entity_name": true,
+    "translation_key": "player_app_netflix",
+    "unit": null
+  },
+  {
+    "class": "FreeboxPlayerAppButton",
+    "variant": "app-button/prime",
+    "category": null,
+    "device_class": null,
+    "enabled_default": true,
+    "has_entity_name": true,
+    "translation_key": "player_app_prime",
+    "unit": null
+  },
+  {
+    "class": "FreeboxPlayerAppButton",
+    "variant": "app-button/youtube",
+    "category": null,
+    "device_class": null,
+    "enabled_default": true,
+    "has_entity_name": true,
+    "translation_key": "player_app_youtube",
+    "unit": null
+  },
+  {
+    "class": "FreeboxPlayerMediaPlayer",
+    "variant": "player/devialet",
+    "category": null,
+    "device_class": "tv",
+    "enabled_default": true,
+    "has_entity_name": true,
+    "translation_key": null,
+    "unit": null
+  },
+  {
+    "class": "FreeboxPlayerMediaPlayer",
+    "variant": "player/generic",
+    "category": null,
+    "device_class": "tv",
+    "enabled_default": true,
+    "has_entity_name": true,
+    "translation_key": null,
+    "unit": null
+  },
+  {
+    "class": "FreeboxPlayerMediaPlayer",
+    "variant": "player/mini4k",
+    "category": null,
+    "device_class": "tv",
+    "enabled_default": true,
+    "has_entity_name": true,
+    "translation_key": null,
+    "unit": null
+  },
+  {
+    "class": "FreeboxPlayerRemoteButton",
+    "variant": "remote-button/0",
+    "category": null,
+    "device_class": null,
+    "enabled_default": false,
+    "has_entity_name": true,
+    "translation_key": "remote_key_0",
+    "unit": null
+  },
+  {
+    "class": "FreeboxPlayerRemoteButton",
+    "variant": "remote-button/1",
+    "category": null,
+    "device_class": null,
+    "enabled_default": false,
+    "has_entity_name": true,
+    "translation_key": "remote_key_1",
+    "unit": null
+  },
+  {
+    "class": "FreeboxPlayerRemoteButton",
+    "variant": "remote-button/2",
+    "category": null,
+    "device_class": null,
+    "enabled_default": false,
+    "has_entity_name": true,
+    "translation_key": "remote_key_2",
+    "unit": null
+  },
+  {
+    "class": "FreeboxPlayerRemoteButton",
+    "variant": "remote-button/3",
+    "category": null,
+    "device_class": null,
+    "enabled_default": false,
+    "has_entity_name": true,
+    "translation_key": "remote_key_3",
+    "unit": null
+  },
+  {
+    "class": "FreeboxPlayerRemoteButton",
+    "variant": "remote-button/4",
+    "category": null,
+    "device_class": null,
+    "enabled_default": false,
+    "has_entity_name": true,
+    "translation_key": "remote_key_4",
+    "unit": null
+  },
+  {
+    "class": "FreeboxPlayerRemoteButton",
+    "variant": "remote-button/5",
+    "category": null,
+    "device_class": null,
+    "enabled_default": false,
+    "has_entity_name": true,
+    "translation_key": "remote_key_5",
+    "unit": null
+  },
+  {
+    "class": "FreeboxPlayerRemoteButton",
+    "variant": "remote-button/6",
+    "category": null,
+    "device_class": null,
+    "enabled_default": false,
+    "has_entity_name": true,
+    "translation_key": "remote_key_6",
+    "unit": null
+  },
+  {
+    "class": "FreeboxPlayerRemoteButton",
+    "variant": "remote-button/7",
+    "category": null,
+    "device_class": null,
+    "enabled_default": false,
+    "has_entity_name": true,
+    "translation_key": "remote_key_7",
+    "unit": null
+  },
+  {
+    "class": "FreeboxPlayerRemoteButton",
+    "variant": "remote-button/8",
+    "category": null,
+    "device_class": null,
+    "enabled_default": false,
+    "has_entity_name": true,
+    "translation_key": "remote_key_8",
+    "unit": null
+  },
+  {
+    "class": "FreeboxPlayerRemoteButton",
+    "variant": "remote-button/9",
+    "category": null,
+    "device_class": null,
+    "enabled_default": false,
+    "has_entity_name": true,
+    "translation_key": "remote_key_9",
+    "unit": null
+  },
+  {
+    "class": "FreeboxPlayerRemoteButton",
+    "variant": "remote-button/back",
+    "category": null,
+    "device_class": null,
+    "enabled_default": true,
+    "has_entity_name": true,
+    "translation_key": "remote_key_back",
+    "unit": null
+  },
+  {
+    "class": "FreeboxPlayerRemoteButton",
+    "variant": "remote-button/blue",
+    "category": null,
+    "device_class": null,
+    "enabled_default": false,
+    "has_entity_name": true,
+    "translation_key": "remote_key_blue",
+    "unit": null
+  },
+  {
+    "class": "FreeboxPlayerRemoteButton",
+    "variant": "remote-button/down",
+    "category": null,
+    "device_class": null,
+    "enabled_default": true,
+    "has_entity_name": true,
+    "translation_key": "remote_key_down",
+    "unit": null
+  },
+  {
+    "class": "FreeboxPlayerRemoteButton",
+    "variant": "remote-button/epg",
+    "category": null,
+    "device_class": null,
+    "enabled_default": true,
+    "has_entity_name": true,
+    "translation_key": "remote_key_epg",
+    "unit": null
+  },
+  {
+    "class": "FreeboxPlayerRemoteButton",
+    "variant": "remote-button/green",
+    "category": null,
+    "device_class": null,
+    "enabled_default": false,
+    "has_entity_name": true,
+    "translation_key": "remote_key_green",
+    "unit": null
+  },
+  {
+    "class": "FreeboxPlayerRemoteButton",
+    "variant": "remote-button/home",
+    "category": null,
+    "device_class": null,
+    "enabled_default": true,
+    "has_entity_name": true,
+    "translation_key": "remote_key_home",
+    "unit": null
+  },
+  {
+    "class": "FreeboxPlayerRemoteButton",
+    "variant": "remote-button/info",
+    "category": null,
+    "device_class": null,
+    "enabled_default": true,
+    "has_entity_name": true,
+    "translation_key": "remote_key_info",
+    "unit": null
+  },
+  {
+    "class": "FreeboxPlayerRemoteButton",
+    "variant": "remote-button/left",
+    "category": null,
+    "device_class": null,
+    "enabled_default": true,
+    "has_entity_name": true,
+    "translation_key": "remote_key_left",
+    "unit": null
+  },
+  {
+    "class": "FreeboxPlayerRemoteButton",
+    "variant": "remote-button/list",
+    "category": null,
+    "device_class": null,
+    "enabled_default": true,
+    "has_entity_name": true,
+    "translation_key": "remote_key_list",
+    "unit": null
+  },
+  {
+    "class": "FreeboxPlayerRemoteButton",
+    "variant": "remote-button/mute",
+    "category": null,
+    "device_class": null,
+    "enabled_default": true,
+    "has_entity_name": true,
+    "translation_key": "remote_key_mute",
+    "unit": null
+  },
+  {
+    "class": "FreeboxPlayerRemoteButton",
+    "variant": "remote-button/ok",
+    "category": null,
+    "device_class": null,
+    "enabled_default": true,
+    "has_entity_name": true,
+    "translation_key": "remote_key_ok",
+    "unit": null
+  },
+  {
+    "class": "FreeboxPlayerRemoteButton",
+    "variant": "remote-button/play",
+    "category": null,
+    "device_class": null,
+    "enabled_default": true,
+    "has_entity_name": true,
+    "translation_key": "remote_key_play",
+    "unit": null
+  },
+  {
+    "class": "FreeboxPlayerRemoteButton",
+    "variant": "remote-button/prgm_dec",
+    "category": null,
+    "device_class": null,
+    "enabled_default": true,
+    "has_entity_name": true,
+    "translation_key": "remote_key_prgm_dec",
+    "unit": null
+  },
+  {
+    "class": "FreeboxPlayerRemoteButton",
+    "variant": "remote-button/prgm_inc",
+    "category": null,
+    "device_class": null,
+    "enabled_default": true,
+    "has_entity_name": true,
+    "translation_key": "remote_key_prgm_inc",
+    "unit": null
+  },
+  {
+    "class": "FreeboxPlayerRemoteButton",
+    "variant": "remote-button/red",
+    "category": null,
+    "device_class": null,
+    "enabled_default": false,
+    "has_entity_name": true,
+    "translation_key": "remote_key_red",
+    "unit": null
+  },
+  {
+    "class": "FreeboxPlayerRemoteButton",
+    "variant": "remote-button/right",
+    "category": null,
+    "device_class": null,
+    "enabled_default": true,
+    "has_entity_name": true,
+    "translation_key": "remote_key_right",
+    "unit": null
+  },
+  {
+    "class": "FreeboxPlayerRemoteButton",
+    "variant": "remote-button/tv",
+    "category": null,
+    "device_class": null,
+    "enabled_default": true,
+    "has_entity_name": true,
+    "translation_key": "remote_key_tv",
+    "unit": null
+  },
+  {
+    "class": "FreeboxPlayerRemoteButton",
+    "variant": "remote-button/up",
+    "category": null,
+    "device_class": null,
+    "enabled_default": true,
+    "has_entity_name": true,
+    "translation_key": "remote_key_up",
+    "unit": null
+  },
+  {
+    "class": "FreeboxPlayerRemoteButton",
+    "variant": "remote-button/vol_dec",
+    "category": null,
+    "device_class": null,
+    "enabled_default": true,
+    "has_entity_name": true,
+    "translation_key": "remote_key_vol_dec",
+    "unit": null
+  },
+  {
+    "class": "FreeboxPlayerRemoteButton",
+    "variant": "remote-button/vol_inc",
+    "category": null,
+    "device_class": null,
+    "enabled_default": true,
+    "has_entity_name": true,
+    "translation_key": "remote_key_vol_inc",
+    "unit": null
+  },
+  {
+    "class": "FreeboxPlayerRemoteButton",
+    "variant": "remote-button/yellow",
+    "category": null,
+    "device_class": null,
+    "enabled_default": false,
+    "has_entity_name": true,
+    "translation_key": "remote_key_yellow",
+    "unit": null
+  },
+  {
+    "class": "FreeboxRaidDegradedSensor",
+    "variant": "raid/raid_degraded",
+    "category": "diagnostic",
+    "device_class": "problem",
+    "enabled_default": true,
+    "has_entity_name": true,
+    "translation_key": "raid_degraded",
+    "unit": null
+  },
+  {
+    "class": "FreeboxRemote",
+    "variant": "remote",
+    "category": null,
+    "device_class": null,
+    "enabled_default": true,
+    "has_entity_name": true,
+    "translation_key": "remote",
+    "unit": null
+  },
+  {
+    "class": "FreeboxRepeaterCountSensor",
+    "variant": "repeater-count",
+    "category": null,
+    "device_class": null,
+    "enabled_default": true,
+    "has_entity_name": true,
+    "translation_key": "wifi_repeaters",
+    "unit": null
+  },
+  {
+    "class": "FreeboxSensor",
+    "variant": "connection/ipv4",
+    "category": "diagnostic",
+    "device_class": null,
+    "enabled_default": true,
+    "has_entity_name": false,
+    "translation_key": null,
+    "unit": null
+  },
+  {
+    "class": "FreeboxSensor",
+    "variant": "connection/rate_down",
+    "category": null,
+    "device_class": "data_rate",
+    "enabled_default": true,
+    "has_entity_name": false,
+    "translation_key": null,
+    "unit": "kB/s"
+  },
+  {
+    "class": "FreeboxSensor",
+    "variant": "connection/rate_up",
+    "category": null,
+    "device_class": "data_rate",
+    "enabled_default": true,
+    "has_entity_name": false,
+    "translation_key": null,
+    "unit": "kB/s"
+  },
+  {
+    "class": "FreeboxSensor",
+    "variant": "connection/uptime",
+    "category": "diagnostic",
+    "device_class": "duration",
+    "enabled_default": true,
+    "has_entity_name": false,
+    "translation_key": null,
+    "unit": "s"
+  },
+  {
+    "class": "FreeboxSensor",
+    "variant": "temperature",
+    "category": "diagnostic",
+    "device_class": "temperature",
+    "enabled_default": true,
+    "has_entity_name": false,
+    "translation_key": null,
+    "unit": "°C"
+  },
+  {
+    "class": "FreeboxShutter",
+    "variant": "cover/Synthetic garageopener",
+    "category": null,
+    "device_class": "garage",
+    "enabled_default": true,
+    "has_entity_name": false,
+    "translation_key": null,
+    "unit": null
+  },
+  {
+    "class": "FreeboxShutter",
+    "variant": "cover/Synthetic portailopener",
+    "category": null,
+    "device_class": "shutter",
+    "enabled_default": true,
+    "has_entity_name": false,
+    "translation_key": null,
+    "unit": null
+  },
+  {
+    "class": "FreeboxShutter",
+    "variant": "cover/Syntheticshutter",
+    "category": null,
+    "device_class": "shutter",
+    "enabled_default": true,
+    "has_entity_name": false,
+    "translation_key": null,
+    "unit": null
+  },
+  {
+    "class": "FreeboxShutterInvertSwitchEntity",
+    "variant": "inversion",
+    "category": "config",
+    "device_class": null,
+    "enabled_default": true,
+    "has_entity_name": true,
+    "translation_key": "invert_switch",
+    "unit": null
+  },
+  {
+    "class": "FreeboxSwitch",
+    "variant": "switch/wifi",
+    "category": "config",
+    "device_class": null,
+    "enabled_default": true,
+    "has_entity_name": false,
+    "translation_key": null,
+    "unit": null
+  },
+  {
+    "class": "FreeboxTvGuideCalendar",
+    "variant": "calendar",
+    "category": null,
+    "device_class": null,
+    "enabled_default": true,
+    "has_entity_name": true,
+    "translation_key": "tv_guide",
+    "unit": null
+  },
+  {
+    "class": "FreeboxWifiApSensor",
+    "variant": "ap/gateway",
+    "category": "diagnostic",
+    "device_class": "connectivity",
+    "enabled_default": true,
+    "has_entity_name": true,
+    "translation_key": "wifi_box",
+    "unit": null
+  },
+  {
+    "class": "FreeboxWifiApSensor",
+    "variant": "ap/repeater",
+    "category": "diagnostic",
+    "device_class": "connectivity",
+    "enabled_default": true,
+    "has_entity_name": true,
+    "translation_key": "repeater_online",
+    "unit": null
+  },
+  {
+    "class": "FreeboxWifiClientCountSensor",
+    "variant": "ap-count/gateway",
+    "category": null,
+    "device_class": null,
+    "enabled_default": true,
+    "has_entity_name": true,
+    "translation_key": "wifi_clients_box",
+    "unit": null
+  },
+  {
+    "class": "FreeboxWifiClientCountSensor",
+    "variant": "ap-count/repeater",
+    "category": null,
+    "device_class": null,
+    "enabled_default": true,
+    "has_entity_name": true,
+    "translation_key": "wifi_clients",
+    "unit": null
+  },
+  {
+    "class": "FreeboxWifiClientListSensor",
+    "variant": "ap-list/gateway",
+    "category": null,
+    "device_class": null,
+    "enabled_default": true,
+    "has_entity_name": true,
+    "translation_key": "wifi_client_list_box",
+    "unit": null
+  },
+  {
+    "class": "FreeboxWifiClientListSensor",
+    "variant": "ap-list/repeater",
+    "category": null,
+    "device_class": null,
+    "enabled_default": true,
+    "has_entity_name": true,
+    "translation_key": "wifi_client_list",
+    "unit": null
+  },
+  {
+    "class": "FreeboxWifiSignalSensor",
+    "variant": "wifi-signal/devices=False",
+    "category": "diagnostic",
+    "device_class": "signal_strength",
+    "enabled_default": true,
+    "has_entity_name": false,
+    "translation_key": null,
+    "unit": "dBm"
+  },
+  {
+    "class": "FreeboxWifiSignalSensor",
+    "variant": "wifi-signal/devices=True",
+    "category": "diagnostic",
+    "device_class": "signal_strength",
+    "enabled_default": true,
+    "has_entity_name": true,
+    "translation_key": "wifi_signal",
+    "unit": "dBm"
+  },
+  {
+    "class": "FreeboxWifiTotalClientSensor",
+    "variant": "total-wifi-clients",
+    "category": "diagnostic",
+    "device_class": null,
+    "enabled_default": true,
+    "has_entity_name": true,
+    "translation_key": "wifi_clients_total",
+    "unit": null
+  },
+  {
+    "class": "HomexaTntSensor",
+    "variant": "tnt",
+    "category": null,
+    "device_class": null,
+    "enabled_default": true,
+    "has_entity_name": false,
+    "translation_key": null,
+    "unit": null
+  }
+]

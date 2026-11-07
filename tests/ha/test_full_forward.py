@@ -11,7 +11,7 @@ from custom_components.freebox_homexa.const import DOMAIN, PLATFORMS
 from test_home_platforms import home_context
 
 
-@pytest.mark.parametrize("interrupt_forward,poll_index", [(False, 0), (False, 1), ("partial", 0), ("complete", 0)])
+@pytest.mark.parametrize("interrupt_forward,poll_index", [(False, 0), (False, 1), ("partial", 0), ("complete", 0)] + [(False, kind) for kind in ("media", "remote", "wifi", "alarm", "calendar", "calendar_programs")])
 async def test_real_forward_discovers_all_domains_then_unloads(hass, home_context, interrupt_forward, poll_index):
     router, node = home_context
     entry = hass.config_entries.async_get_entry(router.entry_id)
@@ -64,15 +64,31 @@ async def test_real_forward_discovers_all_domains_then_unloads(hass, home_contex
         assert set(PLATFORMS) <= domains
         assert all(hass.states.get(entity.entity_id) is not None for entity in owned if not entity.disabled)
         started, drained = asyncio.Event(), asyncio.Event()
-        async def blocked_read(_now=None):
+        async def blocked_read(*args, **kwargs):
             started.set()
             try:
                 await asyncio.Future()
             finally:
                 drained.set()
-        (router.update_all if poll_index == 0 else router.update_home_devices).side_effect = blocked_read
-        interval_callback = intervals.call_args_list[poll_index].args[1]
-        task = hass.async_create_background_task(interval_callback(None), "synthetic actual interval callback")
+        if isinstance(poll_index, int):
+            (router.update_all if poll_index == 0 else router.update_home_devices).side_effect = blocked_read
+            interval_callback = intervals.call_args_list[poll_index].args[1]
+            task = hass.async_create_background_task(interval_callback(None), "synthetic actual interval callback")
+        else:
+            domain, transport = {
+                "media": ("media_player", api.player._access.get),
+                "remote": ("remote", api.player.get_player_status),
+                "wifi": ("switch", api.wifi.get_global_config),
+                "alarm": ("alarm_control_panel", api.home.get_home_endpoint_value),
+                "calendar": ("calendar", api.tv.get_tv_channels),
+                "calendar_programs": ("calendar", api.tv.get_tv_programs_by_date),
+            }[poll_index]
+            platform = next(p for p in async_get_platforms(hass, DOMAIN) if p.domain == domain)
+            entity = next(e for e in platform.entities.values()
+                if domain != "switch" or getattr(getattr(e, "entity_description", None), "key", None) == "wifi")
+            transport.side_effect = blocked_read
+            task = entry.async_create_background_task(hass,
+                entity.async_update_ha_state(force_refresh=True), "synthetic entity read")
         await started.wait()
         async def close_after_drain():
             assert drained.is_set()
@@ -87,6 +103,7 @@ async def test_real_forward_discovers_all_domains_then_unloads(hass, home_contex
         api.close.assert_awaited_once()
         assert task.cancelled()
         assert not router.poll_tasks
+        assert not router.read_tasks
         rejected = AsyncMock()
         await router.async_poll(rejected)
         rejected.assert_not_called()

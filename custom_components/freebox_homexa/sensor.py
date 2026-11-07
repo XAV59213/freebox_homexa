@@ -61,11 +61,13 @@ CONNECTION_SENSORS: tuple[SensorEntityDescription, ...] = (
     ),
     SensorEntityDescription(
         key="ipv4",
+        entity_category=EntityCategory.DIAGNOSTIC,
         name="IP Externe Freebox",
         icon="mdi:ip-network",
     ),
     SensorEntityDescription(
         key="uptime",
+        entity_category=EntityCategory.DIAGNOSTIC,
         name="Temps de fonctionnement Freebox",
         device_class=SensorDeviceClass.DURATION,
         native_unit_of_measurement="s",
@@ -74,7 +76,7 @@ CONNECTION_SENSORS: tuple[SensorEntityDescription, ...] = (
 )
 
 CALL_SENSORS: tuple[SensorEntityDescription, ...] = (
-    SensorEntityDescription(key="missed", name="Appels manqués Freebox", icon="mdi:phone-missed"),
+    SensorEntityDescription(key="missed", entity_category=EntityCategory.DIAGNOSTIC, name="Appels manqués Freebox", icon="mdi:phone-missed"),
 )
 
 # Journal complet (entrants, sortants, manqués) pour la carte « Homexa Appels ».
@@ -84,6 +86,7 @@ CALL_LOG_SENSOR = SensorEntityDescription(
 DISK_PARTITION_SENSORS: tuple[SensorEntityDescription, ...] = (
     SensorEntityDescription(
         key="partition_free_space",
+        entity_category=EntityCategory.DIAGNOSTIC,
         name="espace libre",
         native_unit_of_measurement=PERCENTAGE,
         icon="mdi:harddisk",
@@ -124,6 +127,16 @@ def _async_remove_unselected_tnt_entities(
 PARALLEL_UPDATES = 0
 
 
+def temperature_sensor_description(sensor_name: str) -> SensorEntityDescription:
+    """Keep historical identity/name while classifying hardware telemetry."""
+    return SensorEntityDescription(
+        key=sensor_name, name=f"Freebox {sensor_name}",
+        native_unit_of_measurement=UnitOfTemperature.CELSIUS,
+        device_class=SensorDeviceClass.TEMPERATURE,
+        entity_category=EntityCategory.DIAGNOSTIC,
+    )
+
+
 async def async_setup_entry(
     hass: HomeAssistant, entry: FreeboxConfigEntry, async_add_entities: AddEntitiesCallback
 ) -> None:
@@ -139,12 +152,7 @@ async def async_setup_entry(
     entities.extend(
         FreeboxSensor(
             router,
-            SensorEntityDescription(
-                key=sensor_name,
-                name=f"Freebox {sensor_name}",
-                native_unit_of_measurement=UnitOfTemperature.CELSIUS,
-                device_class=SensorDeviceClass.TEMPERATURE,
-            ),
+            temperature_sensor_description(sensor_name),
         )
         for sensor_name in router.sensors_temperature
     )
@@ -316,6 +324,7 @@ class FreeboxDiskSensor(FreeboxSensor):
 
 class FreeboxBatterySensor(FreeboxHomeEntity, SensorEntity):
     _attr_device_class = SensorDeviceClass.BATTERY
+    _attr_entity_category = EntityCategory.DIAGNOSTIC
     _attr_native_unit_of_measurement = PERCENTAGE
 
     @property

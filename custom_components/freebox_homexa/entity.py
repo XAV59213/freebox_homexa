@@ -149,9 +149,11 @@ class FreeboxHomeEntity(Entity):
         if self._id is None or command_id is None:
             return None
         try:
-            node = await asyncio.wait_for(
-                self._router.home.get_home_endpoint_value(self._id, command_id),
-                timeout=8.0,
+            node = await self._router.async_read(
+                lambda: asyncio.wait_for(
+                    self._router.home.get_home_endpoint_value(self._id, command_id),
+                    timeout=8.0,
+                )
             )
             return node.get("value")
         except asyncio.TimeoutError:

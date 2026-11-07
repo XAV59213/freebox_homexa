@@ -123,7 +123,7 @@ class FreeboxRemote(FreeboxReachableMixin, RemoteEntity):
 
     async def async_update(self) -> None:
         try:
-            status = await self._router._api.player.get_player_status(self._player_id) or {}
+            status = await self._router.async_read(lambda: self._router._api.player.get_player_status(self._player_id)) or {}
             power = str(status.get("power_state") or "").lower()
             if power in {"running", "on"}:
                 self._attr_is_on = True

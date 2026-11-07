@@ -194,6 +194,7 @@ class FreeboxWifiApSensor(FreeboxReachableMixin, BinarySensorEntity):
     _attr_should_poll = False
     _attr_has_entity_name = True
     _attr_device_class = BinarySensorDeviceClass.CONNECTIVITY
+    _attr_entity_category = EntityCategory.DIAGNOSTIC
     _attr_icon = "mdi:wifi"
 
     def __init__(self, router: FreeboxRouter, ap_id: str, access_point: dict[str, Any]) -> None:

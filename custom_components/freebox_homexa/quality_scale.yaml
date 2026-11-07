@@ -33,7 +33,7 @@ rules:
       structurel, pas preuve de couverture du flow.
   config-flow-test-coverage:
     status: todo
-    comment: '356 tests HA au total ; config_flow.py : 437/438 lignes (99,77 %), 145/148 branches (97,97 %).
+    comment: '377 tests HA au total ; config_flow.py : 437/438 lignes (99,77 %), 145/148 branches (97,97 %).
       Les erreurs de link testées sont suivies de la correction de leur cause et de la finalisation du même
       flow avec unique_id vérifié. Options répéteurs (registre uniquement), conflits Alexa, doublons de libellés,
       defaults privés synthétiques et conservation des codes vérifiés. Reste ligne 369 et trois branches ;
@@ -181,8 +181,8 @@ rules:
       avant réauth. Lié au choix de migration unique ID host vers identité physique, non imposé ici.
   test-coverage:
     status: todo
-    comment: '356 tests HA 2026.10.4 ; 38 modules sans omit : lignes 3640/5869 (62,02 %), branches 698/1960
-      (35,61 %), combiné 55,41 %. Rapports JSON/XML CI ; seuil officiel non atteint. Certaines variantes sont
+    comment: '377 tests HA 2026.10.4 ; 38 modules sans omit : lignes 3810/5880 (64,80 %), branches 768/1960
+      (39,18 %), combiné 58,39 %. Rapports JSON/XML CI ; seuil officiel non atteint. Certaines variantes sont
       des inventaires explicitement distincts du runtime. Les tests ne valident pas le matériel.'
   devices:
     status: todo
@@ -250,8 +250,11 @@ rules:
     comment: Code de découverte LAN/Home/répéteurs présent ; découverte runtime après setup et couverture de
       tous périphériques sans reload non démontrées.
   entity-category:
-    status: todo
-    comment: Descriptions nombreuses dans sensor.py/button.py ; classement config/diagnostic non audité exhaustivement.
+    status: done
+    comment: 'Revue sémantique globale des 30 familles et 81 variantes : docs/quality-scale-entity-inventory.md.
+      Snapshot des constructeurs réels dans test_entity_inventory ; test_category_registry prouve
+      la conservation des IDs, noms et choix utilisateur avec le vrai EntityPlatform HA.
+      Classements diagnostic/config corrigés sans changer les activations ni les commandes.'
   entity-device-class:
     status: todo
     comment: Classes présentes dans media_player.py et descriptions capteurs ; unités/classes de chaque variante
@@ -304,7 +307,7 @@ rules:
   strict-typing:
     status: todo
     comment: 'Mypy 2.4.1 --strict réellement exécuté sur les 38 modules avec environnement HA/SDK épinglé :
-      baseline 268 erreurs/29 fichiers, puis 230/28 après retour Coroutine exact du décorateur. Aucun blanket
+      baseline 268 erreurs/29 fichiers, puis 230/28 après retour Coroutine exact du décorateur et 227/27 après typage des échantillons diagnostics. Aucun blanket
       ignore, exclusion opportuniste ou stub SDK inventé. SDK 1.3.1 possède bien freebox_api/py.typed : absence
       de session publique injectable est un problème distinct du typage. Détails et codes dans docs/quality-scale-typing-baseline.md
       ; seuil strict non atteint, règle todo.'

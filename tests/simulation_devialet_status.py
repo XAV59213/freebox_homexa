@@ -51,6 +51,20 @@ class Feature(IntFlag):
     PLAY_MEDIA = auto()
 
 
+class HomeAssistantError(Exception):
+    def __init__(self, message="", **kwargs):
+        self.translation_domain = kwargs.get("translation_domain")
+        self.translation_key = kwargs.get("translation_key")
+        self.translation_placeholders = kwargs.get("translation_placeholders")
+        super().__init__(message or self.translation_key)
+
+class ServiceValidationError(HomeAssistantError):
+    pass
+
+async def direct_read(factory):
+    return await factory()
+
+module('homeassistant.exceptions', HomeAssistantError=HomeAssistantError, ServiceValidationError=ServiceValidationError)
 module('homeassistant')
 module('homeassistant.components')
 module('homeassistant.components.media_player', MediaPlayerDeviceClass=types.SimpleNamespace(TV='tv'),
@@ -64,7 +78,7 @@ pkg = module('freebox_homexa')
 pkg.__path__ = [str(ROOT / 'custom_components/freebox_homexa')]
 module('freebox_homexa.const', DOMAIN='freebox_homexa', URL_BASE='/freebox_homexa', option_remote_code=lambda *a: None)
 module('freebox_homexa.availability', FreeboxReachableMixin=type('Mixin', (), {}))
-module('freebox_homexa.player_remote', async_schedule_player_api_retry=AsyncMock(), filter_ready_players=lambda *a: [])
+module('freebox_homexa.player_remote', async_schedule_player_api_retry=AsyncMock(), async_send_player_keys=AsyncMock(return_value=[]), filter_ready_players=lambda *a: [])
 module('freebox_homexa.router', FreeboxConfigEntry=object, FreeboxRouter=object)
 # Stub guide TNT : l'artwork est testé à part ; ici on contrôle le retour.
 _artwork = {'url': None}
@@ -81,7 +95,7 @@ FIXTURE = json.loads((ROOT / 'tests/fixtures/devialet_tv_status.json').read_text
 
 async def run():
     access = types.SimpleNamespace(get=AsyncMock())
-    router = types.SimpleNamespace(mac='00:00:00:00:00:00', player_identifiers=set(),
+    router = types.SimpleNamespace(async_read=direct_read, mac='00:00:00:00:00:00', player_identifiers=set(),
                                    _api=types.SimpleNamespace(player=types.SimpleNamespace(_access=access)))
     entity = mp.FreeboxPlayerMediaPlayer(router, {'id':17, 'device_model':'fbx7hd-delta', 'api_version':'11.0'}, object())
     entity.hass = object()  # suffisant pour déclencher le lookup artwork

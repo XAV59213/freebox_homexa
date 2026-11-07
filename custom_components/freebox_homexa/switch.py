@@ -85,7 +85,7 @@ class FreeboxSwitch(FreeboxReachableMixin, SwitchEntity):
 
     async def async_update(self) -> None:
         try:
-            data = await self._router.wifi.get_global_config()
+            data = await self._router.async_read(self._router.wifi.get_global_config)
             enabled = data.get("enabled")
             if not isinstance(enabled, bool):
                 raise ValueError("Invalid Wi-Fi state")
@@ -106,6 +106,7 @@ class FreeboxShutterInvertSwitchEntity(FreeboxHomeEntity, SwitchEntity):
     _attr_has_entity_name = True
     _attr_icon = "mdi:directions-fork"
     _attr_name = "Inversion Positionnement"
+    _attr_entity_category = EntityCategory.CONFIG
 
     def __init__(self, hass: HomeAssistant, router: FreeboxRouter, node: dict[str, Any]) -> None:
         super().__init__(hass, router, node)

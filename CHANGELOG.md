@@ -1,6 +1,7 @@
 # Changelog
 
 ## Non publié
+- 2026-11-07 — Audit documentaire Quality Scale : liste officielle complète, preuves/réserves par règle, autoévaluation sans certification HA. Aucun changement runtime ni version.
 - 2026-11-07 — Carte Player : correction de `volume_set` (`volume_level` 0–1 exigé par HA, et non `volume`). Le rejet de schéma empêchait tout appel à l’API Freebox. Muet conserve `is_volume_muted` ; conversion backend en volume entier 0–100 inchangée. Tests de contrat HA et SDK sans commande réelle.
 - Carte Player : curseur volume 0–100 % et bouton muet selon les capacités et valeurs disponibles. Envoi seulement à validation du curseur ; aucun appel automatique. Masqués à l’arrêt/indisponibilité ou si valeur inconnue.
 - 2026-11-07 — Carte Freebox Homexa : image de lecture du Player (`entity_picture`, sinon `media_image_url`) au-dessus des commandes. Affichage sans recadrage ni étirement ; masqué sans image, en veille ou sur erreur. Carte TNT inchangée.

@@ -1,0 +1,221 @@
+{
+  "source_commit": "49693fc6644b3555fdaaf9fe30a973517a0a9d4e",
+  "rules": [
+    {
+      "name": "action-setup",
+      "tier": "bronze"
+    },
+    {
+      "name": "appropriate-polling",
+      "tier": "bronze"
+    },
+    {
+      "name": "brands",
+      "tier": "bronze"
+    },
+    {
+      "name": "common-modules",
+      "tier": "bronze"
+    },
+    {
+      "name": "config-flow",
+      "tier": "bronze"
+    },
+    {
+      "name": "config-flow-test-coverage",
+      "tier": "bronze"
+    },
+    {
+      "name": "dependency-transparency",
+      "tier": "bronze"
+    },
+    {
+      "name": "docs-actions",
+      "tier": "bronze"
+    },
+    {
+      "name": "docs-conditions",
+      "tier": "bronze"
+    },
+    {
+      "name": "docs-high-level-description",
+      "tier": "bronze"
+    },
+    {
+      "name": "docs-installation-instructions",
+      "tier": "bronze"
+    },
+    {
+      "name": "docs-removal-instructions",
+      "tier": "bronze"
+    },
+    {
+      "name": "docs-triggers",
+      "tier": "bronze"
+    },
+    {
+      "name": "entity-event-setup",
+      "tier": "bronze"
+    },
+    {
+      "name": "entity-unique-id",
+      "tier": "bronze"
+    },
+    {
+      "name": "has-entity-name",
+      "tier": "bronze"
+    },
+    {
+      "name": "runtime-data",
+      "tier": "bronze"
+    },
+    {
+      "name": "test-before-configure",
+      "tier": "bronze"
+    },
+    {
+      "name": "test-before-setup",
+      "tier": "bronze"
+    },
+    {
+      "name": "unique-config-entry",
+      "tier": "bronze"
+    },
+    {
+      "name": "action-exceptions",
+      "tier": "silver"
+    },
+    {
+      "name": "config-entry-unloading",
+      "tier": "silver"
+    },
+    {
+      "name": "docs-configuration-parameters",
+      "tier": "silver"
+    },
+    {
+      "name": "docs-installation-parameters",
+      "tier": "silver"
+    },
+    {
+      "name": "entity-unavailable",
+      "tier": "silver"
+    },
+    {
+      "name": "integration-owner",
+      "tier": "silver"
+    },
+    {
+      "name": "log-when-unavailable",
+      "tier": "silver"
+    },
+    {
+      "name": "parallel-updates",
+      "tier": "silver"
+    },
+    {
+      "name": "reauthentication-flow",
+      "tier": "silver"
+    },
+    {
+      "name": "test-coverage",
+      "tier": "silver"
+    },
+    {
+      "name": "devices",
+      "tier": "gold"
+    },
+    {
+      "name": "diagnostics",
+      "tier": "gold"
+    },
+    {
+      "name": "discovery",
+      "tier": "gold"
+    },
+    {
+      "name": "discovery-update-info",
+      "tier": "gold"
+    },
+    {
+      "name": "docs-data-update",
+      "tier": "gold"
+    },
+    {
+      "name": "docs-examples",
+      "tier": "gold"
+    },
+    {
+      "name": "docs-known-limitations",
+      "tier": "gold"
+    },
+    {
+      "name": "docs-supported-devices",
+      "tier": "gold"
+    },
+    {
+      "name": "docs-supported-functions",
+      "tier": "gold"
+    },
+    {
+      "name": "docs-troubleshooting",
+      "tier": "gold"
+    },
+    {
+      "name": "docs-use-cases",
+      "tier": "gold"
+    },
+    {
+      "name": "dynamic-devices",
+      "tier": "gold"
+    },
+    {
+      "name": "entity-category",
+      "tier": "gold"
+    },
+    {
+      "name": "entity-device-class",
+      "tier": "gold"
+    },
+    {
+      "name": "entity-disabled-by-default",
+      "tier": "gold"
+    },
+    {
+      "name": "entity-translations",
+      "tier": "gold"
+    },
+    {
+      "name": "exception-translations",
+      "tier": "gold"
+    },
+    {
+      "name": "icon-translations",
+      "tier": "gold"
+    },
+    {
+      "name": "reconfiguration-flow",
+      "tier": "gold"
+    },
+    {
+      "name": "repair-issues",
+      "tier": "gold"
+    },
+    {
+      "name": "stale-devices",
+      "tier": "gold"
+    },
+    {
+      "name": "async-dependency",
+      "tier": "platinum"
+    },
+    {
+      "name": "inject-websession",
+      "tier": "platinum"
+    },
+    {
+      "name": "strict-typing",
+      "tier": "platinum"
+    }
+  ]
+}

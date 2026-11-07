@@ -1,101 +1,234 @@
-# Suivi honnête des règles de l'Integration Quality Scale de Home Assistant
-# (https://developers.home-assistant.io/docs/core/integration-quality-scale/).
-# Format identique à celui des intégrations du cœur : done / todo / exempt (+ comment).
-# Le niveau « silver » n'est PAS revendiqué dans manifest.json tant que des règles
-# bronze / silver restent « todo » ci-dessous.
+# Autoévaluation prudente, 2026-11-07, base runtime b6a2599 (28.8.89).
+# Custom HACS : aucune certification Bronze/Silver/Gold/Platinum officielle.
+# HACS accepté != Integration Quality Scale core. done = preuve locale limitée
+# à la règle ; todo inclut les preuves insuffisantes, pas seulement les défauts.
+# Liste et schéma HA core : 49693fc6644b3555fdaaf9fe30a973517a0a9d4e
+# script/hassfest/quality_scale.py ; 54 règles (20/10/21/3).
+# Détails, limites et commande de validation : docs/quality-scale-audit.md.
 rules:
-  # --- Bronze ---
   action-setup:
+    status: todo
+    comment: __init__.py:54-60 enregistre les services dans async_setup ; tnt_reminders aussi rappelé
+      au setup entry. Idempotence et cycle de vie multi-entrées à tester sous HA avant done.
+  appropriate-polling:
+    status: todo
+    comment: __init__.py:211 relève central, tnt_const.py:12 intervalle TNT 5 min. Audit des fréquences,
+      doublons et charge toutes plateformes non achevé.
+  brands:
+    status: todo
+    comment: Logos locaux présents ; ni acceptation HACS ni fichiers brand locaux ne prouvent la conformité
+      du domaine dans home-assistant/brands.
+  common-modules:
     status: done
-    comment: reboot / reload / remote et rappels TNT enregistrés une fois dans async_setup.
-  appropriate-polling: done
-  brands: done
-  common-modules: done
+    comment: const.py:1-68 centralise domaine, plateformes et constantes ; entity.py:1-225 et availability.py
+      regroupent les bases communes.
+  config-flow:
+    status: done
+    comment: manifest.json:12 config_flow=true ; config_flow.py:180-225 ConfigFlow avec formulaire user.
+      Constat structurel, pas preuve de couverture du flow.
   config-flow-test-coverage:
     status: todo
-    comment: Simulations hors HA dans tests/, pas encore de tests pytest du config flow.
-  config-flow: done
+    comment: 'tests/simulation_issue106_home_player.py et simulations hors HA : pas de mesure de couverture
+      complète du flow sous HA.'
   dependency-transparency:
-    status: done
-    comment: freebox-api>=1.3.1 (hassfest refuse un « == » sur un paquet épinglé par le cœur, 1.3.1 aujourd'hui).
+    status: todo
+    comment: manifest.json:22 requirements ; SDK freebox-api public. Vérification complète installation
+      propre, provenance et dépendances transitives non menée.
   docs-actions:
-    status: done
-    comment: README, section « Actions » (6 actions, champs et exemples de freebox_homexa.remote).
-  docs-high-level-description: done
-  docs-installation-instructions: done
+    status: todo
+    comment: 'README.md:130-171 actions et remote : documentation custom utile, mais conformité complète
+      à la règle de documentation officielle home-assistant.io non prouvée. Pas de classement core revendiqué.'
+  docs-conditions:
+    status: exempt
+    comment: 'Aucune plateforme condition/trigger spécifique, ni conditions.yaml/triggers.yaml : const.py:52-64
+      et inventaire du paquet. Les événements HA ordinaires ne constituent pas une plateforme de triggers
+      spécifique. Exception prévue par la règle officielle.'
+  docs-high-level-description:
+    status: todo
+    comment: 'README.md:22-48 description et fonctions : documentation custom utile, mais conformité complète
+      à la règle de documentation officielle home-assistant.io non prouvée. Pas de classement core revendiqué.'
+  docs-installation-instructions:
+    status: todo
+    comment: 'README.md:50-66 installation HACS : documentation custom utile, mais conformité complète
+      à la règle de documentation officielle home-assistant.io non prouvée. Pas de classement core revendiqué.'
   docs-removal-instructions:
-    status: done
-    comment: README, section « Suppression ».
-  entity-event-setup: done
-  entity-unique-id: done
+    status: todo
+    comment: 'README.md:255-261 suppression : documentation custom utile, mais conformité complète à la
+      règle de documentation officielle home-assistant.io non prouvée. Pas de classement core revendiqué.'
+  docs-triggers:
+    status: exempt
+    comment: 'Aucune plateforme condition/trigger spécifique, ni conditions.yaml/triggers.yaml : const.py:52-64
+      et inventaire du paquet. Les événements HA ordinaires ne constituent pas une plateforme de triggers
+      spécifique. Exception prévue par la règle officielle.'
+  entity-event-setup:
+    status: todo
+    comment: entity.py:214-225 ajoute/retire les listeners. Pas de preuve exhaustive absence de fuite
+      sur toutes les entités, notamment coordinateurs TNT et reload.
+  entity-unique-id:
+    status: todo
+    comment: sensor.py:217,285 et tnt_sensor.py:40 définissent des IDs. Pas de test exhaustif stabilité/collisions
+      multi-entrées, partitions, clients et tous modèles.
   has-entity-name:
     status: todo
-    comment: >-
-      Entités récentes en has_entity_name ; capteurs historiques (débit, IP, appels,
-      températures, Wi-Fi, TNT, partitions) gardent leur nom complet pour ne pas
-      changer les noms existants des utilisateurs.
+    comment: tnt_sensor.py:28 et sensor.py:371 mettent has_entity_name=False ; règle globale non satisfaite.
   runtime-data:
     status: done
-    comment: >-
-      Routeur dans entry.runtime_data (type FreeboxConfigEntry). hass.data[DOMAIN] ne garde
-      que l'état global (cache de configuration, carte Lovelace, coordinateurs TNT).
-  test-before-configure: done
-  test-before-setup: done
-  unique-config-entry: done
-
-  # --- Silver ---
+    comment: router.py:1199 type FreeboxConfigEntry = ConfigEntry[FreeboxRouter] ; __init__.py:220 affecte
+      entry.runtime_data. hass.data conserve les services/cache globaux, pas le routeur.
+  test-before-configure:
+    status: todo
+    comment: config_flow.py:250-327 réalise le lien ; tous échecs de connexion/auth et nettoyage à vérifier
+      par tests du flow sous HA.
+  test-before-setup:
+    status: todo
+    comment: __init__.py:118-129 convertit erreurs en NotReady/AuthFailed ; couverture des chemins de
+      validation incomplet.
+  unique-config-entry:
+    status: todo
+    comment: config_flow.py:222 unique ID basé sur host ; hostname/IP/URL du même Server peuvent différer.
+      Test de déduplication identité physique manquant.
   action-exceptions:
     status: todo
-    comment: >-
-      Erreurs de validation traduites (aucune entrée chargée, rappels, télécommande) ;
-      remote lève une erreur traduite si une touche n'est pas envoyée ; les échecs de
-      l'API Freebox pendant reboot sont encore seulement journalisés.
-  config-entry-unloading: done
-  docs-configuration-parameters: done
-  docs-installation-parameters: done
+    comment: media_player.py:217-221,389-390 journalise/absorbe certains échecs au lieu de lever une erreur
+      utilisateur ; tous services à auditer.
+  config-entry-unloading:
+    status: todo
+    comment: __init__.py:270-289 décharge plateformes/coordinateur puis ferme routeur. Pas de tests HA
+      reload multi-entrées/rappels/services en vol.
+  docs-configuration-parameters:
+    status: todo
+    comment: 'README.md:79-119 options LAN et appareils : documentation custom utile, mais conformité
+      complète à la règle de documentation officielle home-assistant.io non prouvée. Pas de classement
+      core revendiqué.'
+  docs-installation-parameters:
+    status: todo
+    comment: 'README.md:68-77 configuration initiale : documentation custom utile, mais conformité complète
+      à la règle de documentation officielle home-assistant.io non prouvée. Pas de classement core revendiqué.'
   entity-unavailable:
-    status: done
-    comment: >-
-      Entités indisponibles quand la Freebox est injoignable (router.reachable) ; nœuds
-      Freebox Home aussi quand l'API les signale « unreachable » (sauf RTS, sans retour
-      d'état). Choix assumé : les device_tracker gardent leur dernier état (présence),
-      l'inversion des volets (réglage local) et les capteurs TNT (source Internet) restent
-      disponibles.
-  integration-owner: done
+    status: todo
+    comment: availability.py et router.py:511-534 gèrent la joignabilité. Exceptions tracker/TNT et indisponibilité
+      fine par source non validées globalement.
+  integration-owner:
+    status: todo
+    comment: manifest.json codeowners présent ; ne prouve pas le rôle officiel de mainteneur core ni son
+      acceptation. Projet custom HACS.
   log-when-unavailable:
-    status: done
-    comment: >-
-      Relevé du routeur : « Freebox injoignable » une seule fois (info), puis « Freebox de
-      nouveau joignable » ; entre les deux, les échecs des entités passent en debug.
+    status: todo
+    comment: router.py:511-534 journalise perte/retour. Pas de preuve de suppression des répétitions pour
+      tous chemins Home/Player/TNT et erreurs auth.
   parallel-updates:
     status: done
-    comment: >-
-      PARALLEL_UPDATES = 0 pour les plateformes alimentées par le relevé central (sensor,
-      binary_sensor, device_tracker, calendar) ; 1 pour les plateformes d'action (button,
-      switch, cover, camera, alarm_control_panel, remote, media_player).
-  reauthentication-flow: done
+    comment: 'PARALLEL_UPDATES explicite sur les 11 plateformes : media_player.py:120, button.py:108,
+      remote.py:31, switch.py:42, cover.py:24, camera.py:33, alarm_control_panel.py:38 = 1 ; sensor.py:124,
+      binary_sensor.py:62, calendar.py:24, device_tracker.py:36 = 0.'
+  reauthentication-flow:
+    status: todo
+    comment: config_flow.py:227-240 et lien commun existent ; tests HA renouvellement token, identité
+      et récupération manquants.
   test-coverage:
     status: todo
-    comment: Simulations hors HA uniquement.
-
-  # --- Gold (partiel) ---
+    comment: Simulations et tests JS présents ; couverture runtime HA >95 % non mesurée. CI syntax/hassfest/HACS
+      ne mesure pas cette couverture.
   devices:
-    status: done
-    comment: >-
-      Appareils pour le matériel Free (Server, Player, répéteurs, nœuds Home, disques).
-      Clients réseau : appareil seulement si l'option « Créer des appareils pour les
-      clients réseau » est cochée (décochée par défaut depuis la migration 1.2) ; sinon
-      les device_tracker suivent le comportement ScannerEntity de Home Assistant.
-  diagnostics: done
-  discovery: done
+    status: todo
+    comment: media_player.py:90-103 et tnt_sensor.py:14-29 DeviceInfo ; cohérence des associations/subdevices
+      et de toutes plateformes non vérifiée sur plusieurs modèles.
+  diagnostics:
+    status: todo
+    comment: diagnostics.py:55-117 utilise schémas et timings allowlistés ; tests/simulation_player_diagnostics.py
+      partiels. Revue exhaustive secrets et métadonnées de toutes branches non établie ; aucune nouvelle
+      donnée exportée.
+  discovery:
+    status: todo
+    comment: manifest.json zeroconf et config_flow.py:390-405 ; découverte sans interaction et tous cas
+      réseau non testés sous HA.
+  discovery-update-info:
+    status: todo
+    comment: config_flow.py:390-405 découvre le host ; aucun test prouvant mise à jour sûre des entrées
+      existantes après changement adresse.
+  docs-data-update:
+    status: todo
+    comment: 'README.md:173-191 disponibilité/journal ; intervalle de toutes sources non inventorié :
+      documentation custom utile, mais conformité complète à la règle de documentation officielle home-assistant.io
+      non prouvée. Pas de classement core revendiqué.'
+  docs-examples:
+    status: todo
+    comment: 'README.md:193-249 et examples/lovelace/ exemples de cartes : documentation custom utile,
+      mais conformité complète à la règle de documentation officielle home-assistant.io non prouvée. Pas
+      de classement core revendiqué.'
+  docs-known-limitations:
+    status: todo
+    comment: 'README.md:120-129 Player et 263-287 dépannage ; matrice modèles/apps incomplète : documentation
+      custom utile, mais conformité complète à la règle de documentation officielle home-assistant.io
+      non prouvée. Pas de classement core revendiqué.'
+  docs-supported-devices:
+    status: todo
+    comment: 'README.md:34-48 fonctions ; liste précise modèles/firmwares supportés non validée : documentation
+      custom utile, mais conformité complète à la règle de documentation officielle home-assistant.io
+      non prouvée. Pas de classement core revendiqué.'
+  docs-supported-functions:
+    status: todo
+    comment: 'README.md:34-48 et 130-171 ; matrice fonctions par modèle manquante : documentation custom
+      utile, mais conformité complète à la règle de documentation officielle home-assistant.io non prouvée.
+      Pas de classement core revendiqué.'
+  docs-troubleshooting:
+    status: todo
+    comment: 'README.md:263-287 dépannage : documentation custom utile, mais conformité complète à la
+      règle de documentation officielle home-assistant.io non prouvée. Pas de classement core revendiqué.'
+  docs-use-cases:
+    status: todo
+    comment: 'examples/lovelace/ et README.md:193-249 ; scénarios utilisateurs complets non vérifiés :
+      documentation custom utile, mais conformité complète à la règle de documentation officielle home-assistant.io
+      non prouvée. Pas de classement core revendiqué.'
+  dynamic-devices:
+    status: todo
+    comment: Code de découverte LAN/Home/répéteurs présent ; découverte runtime après setup et couverture
+      de tous périphériques sans reload non démontrées.
+  entity-category:
+    status: todo
+    comment: Descriptions nombreuses dans sensor.py/button.py ; classement config/diagnostic non audité
+      exhaustivement.
+  entity-device-class:
+    status: todo
+    comment: Classes présentes dans media_player.py et descriptions capteurs ; unités/classes de chaque
+      variante de périphérique non validées.
+  entity-disabled-by-default:
+    status: todo
+    comment: button.py pavé numérique désactivé par défaut ; pas de revue exhaustive de tous capteurs
+      bruyants/secondaires.
   entity-translations:
     status: todo
-    comment: >-
-      Boutons, signal Wi-Fi, RAID, capteurs Wi-Fi / groupes traduits ; noms historiques
-      sans has_entity_name et noms d'appareils de groupe encore en dur (français).
+    comment: sensor.py:371 et tnt_sensor.py:28 noms historiques sans has_entity_name ; traductions globales
+      incomplètes.
   exception-translations:
-    status: done
-    comment: Erreurs de configuration et d'actions via translation_key (fr / en).
-  reconfiguration-flow: todo
-  repair-issues: todo
-  stale-devices: done
+    status: todo
+    comment: translations/fr.json et en.json existent ; media_player.py:390 erreurs seulement journalisées.
+      Pas de preuve traduction de toutes erreurs utilisateur.
+  icon-translations:
+    status: todo
+    comment: icons.json existe ; tnt_sensor.py:27 et autres plateformes gardent des icônes statiques ;
+      inventaire complet non effectué.
+  reconfiguration-flow:
+    status: todo
+    comment: config_flow.py:351-388 implémente reconfigure (ancien todo devenu partiellement implémenté)
+      ; tests HA identité et rollback encore nécessaires.
+  repair-issues:
+    status: todo
+    comment: Pas de preuve de Repairs pour tous états actionnables nécessitant intervention ; logs et
+      ConfigEntryAuthFailed ne suffisent pas.
+  stale-devices:
+    status: todo
+    comment: router.py:941-994,1112-1123 nettoie certains registres ; stale sensor/client/disque/Home
+      et garanties multi-intégrations non démontrées globalement. Aucun changement repeater/.
+  async-dependency:
+    status: todo
+    comment: routeur utilise Freepybox ; appels async visibles, mais audit complet des dépendances transitives
+      et I/O bloquantes non réalisé.
+  inject-websession:
+    status: todo
+    comment: tnt_coordinator.py:154 et tnt_tmdb.py:179 injectent session HA ; router.py:188 construit
+      Freepybox sans preuve de session HA injectée au SDK.
+  strict-typing:
+    status: todo
+    comment: router.py:1199 alias typé mais aucun résultat mypy strict/py.typed de toutes dépendances
+      ni pipeline strict global.

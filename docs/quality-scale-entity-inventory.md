@@ -58,18 +58,68 @@ les mêmes descriptions/attributs de classe et sont vérifiées par le snapshot.
 
 ## Autres règles : pas de validation par association
 
-- Naming : plusieurs familles restent sans has_entity_name ; todo. Une
-  modernisation doit démontrer la conservation des noms/IDs et des noms personnalisés.
+- Naming (lot 8) : has_entity_name=True sans condition dans les 30 familles,
+  noms relatifs de production revus, features principales Home et Player à None.
+  Le tracker sans appareil reste nommé ; lié à un appareil, il reprend son nom.
+  Le vrai HA suit le renommage appareil, conserve name_by_user et le nom custom
+  d’une entité. Les 81 variantes passent le vrai registre en gardant IDs et
+  préférences. Les nouvelles entités peuvent recevoir un nouvel entity_id par
+  génération standard HA ; aucun entity_id déjà enregistré n’est régénéré.
 - Device class : heuristique opener garage/portail non exhaustive ; todo, ne pas
   inventer un type matériel à partir du seul nom.
-- Defaults : valeurs contextuelles observées (LAN avec/sans devices, registry HA) ;
-  il reste à justifier entièrement l’utilité par défaut de chaque variante et les
-  dépendances des cartes. Snapshot ≠ preuve suffisante pour passer done.
+- Defaults (lot 8) : revue complète ci-dessous ; nouveau RSSI désactivé par défaut,
+  préférences existantes conservées par le vrai HA. Pas de désactivation en masse.
 - Availability : champs globaux présents ne démontrent pas toutes les pertes/retours
   des sous-systèmes ; todo. Les tests réseau sont mockés.
 - Entity unique IDs : non vides dans l’inventaire, mais cela ne démontre pas
   toutes les collisions entre équipements/options ; todo.
 
-`entity-category` seule est démontrée par cette revue et les tests associés.
+`entity-category`, `has-entity-name` et `entity-disabled-by-default` sont démontrées
+localement par la revue et les tests associés (pas certification officielle).
 Le snapshot est un contrat de régression après revue, pas un validateur sémantique
 automatique ; toute nouvelle famille/catégorie exige une nouvelle revue.
+
+## Revue des activations par défaut (lot 8)
+
+Référence relue : [entity-disabled-by-default](https://contributors.home-assistant.io/core/quality-scale/entity-disabled-by-default/).
+C’est une décision de rôle/utilité revue, pas une statistique d’usage mesurée ni
+l’affirmation que tous les diagnostics doivent être désactivés. Valeurs exactes
+par variante dans le snapshot :
+
+- RSSI Wi-Fi individuel : bruit fréquent de diagnostic secondaire, désormais **off
+  à la première création**. Le capteur reste proposé ; activation dans les paramètres
+  de l’entité. L’option de création ne signifie pas activation du nouvel RSSI.
+- Trackers réseau : opt-in du ScannerEntity HA conservé, pas de nouvelle activation
+  automatique. Deux modes appareils LAN inventoriés, gestion native du registre.
+- Autoprotection Home : diagnostic secondaire opt-in existant conservé.
+- Boutons : pavé numérique/couleurs/commandes avancées et apps secondaires opt-in
+  selon tableaux de production ; navigation principale et raccourcis usuels gardés.
+- Alarme, caméra, volets, Player/remote, capteurs porte/mouvement, configuration Wi-Fi
+  et inversion : fonctionnalités principales immédiatement utilisables.
+- Débits, compteurs/listes réseau par borne/groupe et inventaire répéteurs : cœur
+  de la supervision réseau et données des cartes. Les supprimer par défaut pour
+  le score retirerait une fonctionnalité principale. Débits variables intentionnels.
+- Températures, uptime, IPv4, batterie, RAID et disque : supervision de santé du
+  Server/Home, décisions de revue conservées ; pas de création d’une nouvelle
+  désactivation de toute la surveillance de maintenance.
+- Compteur/journal appels et acquittement, calendrier et TNT : contenu principal,
+  restent utilisables ; les réglages de sélection TNT existants restent prioritaires.
+
+Le vrai EntityPlatform prouve : nouveau RSSI disabled_by INTEGRATION, ancien RSSI
+activé reste activé, désactivation USER reste USER. Les noms/IDs/hidden/disabled USER
+sont aussi préservés pour les 81 variantes. Ce classement ne supprime aucun état
+ni donnée de production existant. Le panneau RSSI facultatif d’une carte est vide
+jusqu’à activation sur une nouvelle installation ; les anciens RSSI activés restent
+visibles. Pas de modification du dashboard de l’utilisateur.
+
+## Lacunes de disponibilité restant réellement traitables
+
+Les 81 variantes sont vérifiées sous perte du routeur puis récupération et sous
+fermeture. TNT dépend de son coordinateur XMLTV, pas de Freebox OS ; l’inversion
+édite un fichier local et reste accessible hors ligne. Le tracker suit maintenant
+la perte Freebox, sans prétendre « absent du domicile » quand le routeur est perdu.
+Ces gardes globales ne suffisent pas à démontrer entity-unavailable : La source capteurs possède maintenant un flag de succès : HttpRequestError rend
+les états indisponibles (logs uniques), puis le vrai HA retrouve unknown pour une
+valeur manquante et une valeur valide pour zéro réel. Stockage/Home et cache XMLTV ont des
+chemins d’échec/récupération à qualifier séparément. Il faut des états par source
+avec tests de récupération, pas une migration d’identité ni un test sur appareil.

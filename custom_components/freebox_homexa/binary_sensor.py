@@ -166,6 +166,7 @@ class FreeboxDwsSensor(FreeboxHomeBinarySensor):
 
 
 class FreeboxCoverSensor(FreeboxHomeBinarySensor):
+    _home_entity_name = "Autoprotection"
     _attr_device_class = BinarySensorDeviceClass.SAFETY
     _attr_entity_category = EntityCategory.DIAGNOSTIC
     _attr_entity_registry_enabled_default = False

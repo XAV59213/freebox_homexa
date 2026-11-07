@@ -217,12 +217,20 @@ async def async_setup_entry(
 
 
 class FreeboxSensor(FreeboxReachableMixin, SensorEntity):
+    _attr_has_entity_name = True
     _attr_should_poll = False
+
+    @property
+    def available(self) -> bool:
+        return super().available and getattr(self._router, "sensors_available", True) is not False
 
     def __init__(self, router: FreeboxRouter, description: SensorEntityDescription) -> None:
         self.entity_description = description
         self._router = router
         self._attr_unique_id = f"{router.mac} {description.name}"
+        # Keep the historical description (and unique ID), change display only.
+        if isinstance(description.name, str):
+            self._attr_name = description.name.removesuffix(" Freebox").removeprefix("Freebox ")
         self._attr_device_info = router.device_info
 
     @callback
@@ -335,7 +343,12 @@ class FreeboxBatterySensor(FreeboxHomeEntity, SensorEntity):
 class FreeboxWifiSignalSensor(FreeboxReachableMixin, SensorEntity):
     """Force du signal Wi-Fi (RSSI) d'un client vu par la Freebox."""
 
+    # Noisy per-client diagnostic; core client inventory remains available.
+    # Registry defaults apply only to newly discovered entities.
+    _attr_entity_registry_enabled_default = False
+
     _attr_should_poll = False
+    _attr_has_entity_name = True
     _attr_device_class = SensorDeviceClass.SIGNAL_STRENGTH
     _attr_state_class = SensorStateClass.MEASUREMENT
     _attr_native_unit_of_measurement = SIGNAL_STRENGTH_DECIBELS_MILLIWATT
@@ -356,7 +369,6 @@ class FreeboxWifiSignalSensor(FreeboxReachableMixin, SensorEntity):
 
     def _apply_device_info(self, device: dict[str, Any], name: str) -> None:
         if self._router.is_repeater_host(device):
-            self._attr_has_entity_name = True
             self._attr_translation_key = "wifi_signal"
             self._attr_device_info = self._router.repeater_device_info(
                 self._mac, name, device.get("model"), device.get("vendor_name")
@@ -364,7 +376,6 @@ class FreeboxWifiSignalSensor(FreeboxReachableMixin, SensorEntity):
             return
 
         if self._create_lan_devices:
-            self._attr_has_entity_name = True
             self._attr_translation_key = "wifi_signal"
             device_info: dict[str, Any] = {
                 "connections": {(CONNECTION_NETWORK_MAC, self._mac)},
@@ -377,7 +388,6 @@ class FreeboxWifiSignalSensor(FreeboxReachableMixin, SensorEntity):
             self._attr_device_info = DeviceInfo(**device_info)
             return
 
-        self._attr_has_entity_name = False
         self._attr_name = f"{name} Signal Wi-Fi"
         self._attr_device_info = None
 

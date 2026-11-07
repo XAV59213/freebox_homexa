@@ -8,6 +8,8 @@ from homeassistant.exceptions import ConfigEntryAuthFailed, ConfigEntryNotReady
 from freebox_api.exceptions import AuthorizationError, HttpRequestError, InvalidTokenError, InsufficientPermissionsError
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
+from test_home_platforms import home_context
+
 from custom_components.freebox_homexa import async_setup_entry, async_unload_entry, async_migrate_entry
 
 DOMAIN = 'freebox_homexa'
@@ -53,9 +55,10 @@ async def test_cancelled_probe_closes_sdk(hass):
 
 
 @pytest.mark.parametrize('success', [True, False])
-async def test_unload_retains_resources_on_platform_failure(hass, success):
-    entry = entry_for(hass)
-    router = MagicMock(close=AsyncMock(), closing=False)
+async def test_unload_retains_resources_on_platform_failure(hass, home_context, success):
+    router, _ = home_context
+    entry = hass.config_entries.async_get_entry(router.entry_id)
+    entry.runtime_data = router
     entry.runtime_data = router
     store = MagicMock(async_save=AsyncMock(), async_load=AsyncMock(return_value={"synthetic": True}))
     hass.data[DOMAIN] = {'store': store, 'config': {'synthetic': True}}
@@ -63,7 +66,7 @@ async def test_unload_retains_resources_on_platform_failure(hass, success):
          patch('custom_components.freebox_homexa.async_unload_bundled_tnt') as tnt:
         assert await async_unload_entry(hass, entry) is success
     assert router.closing is success
-    assert router.close.await_count == int(success)
+    assert router._api.close.await_count == int(success)
     assert store.async_save.await_count == 1
     assert tnt.call_count == int(success)
 
@@ -146,3 +149,77 @@ async def test_real_ha_manager_cleans_failure_after_successful_probe(hass, stage
     api.open.assert_awaited_once()
     api.system.get_config.assert_awaited_once()
     api.close.assert_awaited_once()
+
+
+@pytest.mark.parametrize("cancel", [False, True])
+async def test_failed_unload_restores_read_admission_and_preserves_failure(hass, home_context, cancel):
+    router, _ = home_context
+    entry = hass.config_entries.async_get_entry(router.entry_id)
+    entry.runtime_data = router
+    store = MagicMock(async_save=AsyncMock(), async_load=AsyncMock(return_value={"synthetic": True}))
+    hass.data[DOMAIN] = {"store": store, "config": {"synthetic": True}}
+    started = asyncio.Event()
+    failure = RuntimeError("synthetic unload failure")
+    async def unload(*args):
+        assert router.closing
+        started.set()
+        if cancel:
+            await asyncio.Future()
+        raise failure
+    with patch.object(hass.config_entries, "async_unload_platforms", side_effect=unload), \
+         patch("custom_components.freebox_homexa.async_unload_bundled_tnt") as tnt:
+        task = hass.async_create_background_task(async_unload_entry(hass, entry), "synthetic failing unload")
+        await asyncio.wait_for(started.wait(), timeout=5)
+        if cancel:
+            task.cancel()
+        with pytest.raises(asyncio.CancelledError if cancel else RuntimeError) as exc:
+            await task
+        if not cancel:
+            assert exc.value is failure
+        assert router.closing is False
+        router._api.close.assert_not_called()
+        tnt.assert_not_called()
+        read = AsyncMock(return_value="synthetic read")
+        assert await router.async_read(read) == "synthetic read"
+        read.assert_awaited_once()
+
+
+@pytest.mark.parametrize("raises", [False, True])
+async def test_failed_unload_does_not_reopen_reads_during_another_close(hass, home_context, raises):
+    from freebox_api.exceptions import NotOpenError
+    router, _ = home_context
+    entry = hass.config_entries.async_get_entry(router.entry_id)
+    entry.runtime_data = router
+    store = MagicMock(async_save=AsyncMock(), async_load=AsyncMock(return_value={"synthetic": True}))
+    hass.data[DOMAIN] = {"store": store, "config": {"synthetic": True}}
+    closing, release = asyncio.Event(), asyncio.Event()
+    async def close_sdk():
+        closing.set()
+        await release.wait()
+    router._api.close.side_effect = close_sdk
+    close_task = None
+    async def unload(*args):
+        nonlocal close_task
+        close_task = hass.async_create_background_task(router.close(), "synthetic concurrent close")
+        await asyncio.wait_for(closing.wait(), timeout=5)
+        if raises:
+            raise RuntimeError("synthetic unload failure")
+        return False
+    try:
+        with patch.object(hass.config_entries, "async_unload_platforms", side_effect=unload):
+            if raises:
+                with pytest.raises(RuntimeError):
+                    await async_unload_entry(hass, entry)
+            else:
+                assert await async_unload_entry(hass, entry) is False
+        assert router.closing
+        read = AsyncMock()
+        with pytest.raises(NotOpenError):
+            await router.async_read(read)
+        read.assert_not_called()
+    finally:
+        release.set()
+        if close_task is not None:
+            await close_task
+    router.resume_reads_after_failed_unload()
+    assert router.closing  # a completed SDK close cannot be "resumed" either

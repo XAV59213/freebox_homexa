@@ -277,6 +277,7 @@ class FreeboxRouter:
         self.closing: bool = False
         # Journalisation unique de l'indisponibilité (règle log-when-unavailable).
         self.reachable: bool = True
+        self.sensors_available: bool = True
         # nœuds Home dont les entités vivent sur un appareil de groupe (module d'alarme)
         self.merged_node_ids: set[Any] = set()
         self.player_identifiers: set[str] = set()
@@ -305,7 +306,7 @@ class FreeboxRouter:
         self.supports_raid = True
         self.raids: dict[int, dict[str, Any]] = {}
         self.sensors_temperature: dict[str, int] = {}
-        self.sensors_connection: dict[str, float] = {}
+        self.sensors_connection: dict[str, float | None] = {}
         self.call_list: list[dict[str, Any]] = []
         self.home_granted = True
         self.home_devices: dict[str, Any] = {}
@@ -597,7 +598,8 @@ class FreeboxRouter:
 
             connection_datas: dict[str, Any] = await self._api.connection.get_status()
             for sensor_key in CONNECTION_SENSORS_KEYS:
-                self.sensors_connection[sensor_key] = connection_datas.get(sensor_key, 0.0)
+                value = connection_datas.get(sensor_key)
+                self.sensors_connection[sensor_key] = value if isinstance(value, (int, float)) and not isinstance(value, bool) else None
 
             uptime_seconds = syst_datas.get("uptime_val", 0)
             self.sensors_connection["uptime"] = uptime_seconds
@@ -617,10 +619,18 @@ class FreeboxRouter:
             await self._update_disks_sensors()
             await self._update_raids_sensors()
 
+            if not self.sensors_available:
+                _LOGGER.info("Capteurs Freebox de nouveau disponibles")
+            self.sensors_available = True
             async_dispatcher_send(self.hass, self.signal_sensor_update)
             _LOGGER.debug("Mise à jour des capteurs terminée")
-        except HttpRequestError as err:
-            _LOGGER.error("Erreur lors de la mise à jour des capteurs : %s", err)
+        except HttpRequestError:
+            # The global router may still answer LAN requests. Do not leave
+            # sensor snapshots looking fresh after a separate sensor API error.
+            if self.sensors_available:
+                _LOGGER.info("Capteurs Freebox indisponibles")
+            self.sensors_available = False
+            async_dispatcher_send(self.hass, self.signal_sensor_update)
 
     async def _update_disks_sensors(self) -> None:
         try:
@@ -728,6 +738,11 @@ class FreeboxRouter:
         finally:
             if task is not None:
                 self.poll_tasks.discard(task)
+
+    def resume_reads_after_failed_unload(self) -> None:
+        """Do not reopen admission while another owner is closing the SDK."""
+        if not self._closed and not self._close_lock.locked():
+            self.closing = False
 
     async def close(self) -> None:
         async with self._close_lock:

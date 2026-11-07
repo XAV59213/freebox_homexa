@@ -6,6 +6,7 @@ from typing import Any
 import logging
 
 from homeassistant.components.device_tracker import ScannerEntity
+from .availability import FreeboxReachableMixin
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.dispatcher import async_dispatcher_connect
@@ -79,11 +80,11 @@ def add_entities(
         async_add_entities(new_tracked, True)
 
 
-class FreeboxDevice(ScannerEntity):
+class FreeboxDevice(FreeboxReachableMixin, ScannerEntity):
     """Représentation d'un appareil Freebox dans Home Assistant."""
 
     _attr_should_poll = False
-    _attr_has_entity_name = False
+    _attr_has_entity_name = True
 
     def __init__(
         self, router: FreeboxRouter, device: dict[str, Any], create_lan_devices: bool
@@ -162,7 +163,11 @@ class FreeboxDevice(ScannerEntity):
         return self._mac
 
     @property
-    def name(self) -> str:
+    def name(self) -> str | None:
+        # ScannerEntity can be unattached, or linked to a device owned by another
+        # integration. Use that device's name only when it is actually linked.
+        if self.registry_entry is not None and self.registry_entry.device_id:
+            return None
         return self._name
 
     @property

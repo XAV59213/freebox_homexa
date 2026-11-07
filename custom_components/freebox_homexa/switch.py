@@ -63,6 +63,8 @@ async def async_setup_entry(
 class FreeboxSwitch(FreeboxReachableMixin, SwitchEntity):
     """Interrupteur WiFi de la Freebox."""
 
+    _attr_has_entity_name = True
+
     def __init__(
         self, router: FreeboxRouter, entity_description: FreeboxSwitchEntityDescription
     ) -> None:
@@ -70,6 +72,7 @@ class FreeboxSwitch(FreeboxReachableMixin, SwitchEntity):
         self._router = router
         self._attr_device_info = router.device_info
         self._attr_unique_id = f"{router.mac} {entity_description.name}"
+        self._attr_name = "WiFi"
 
     async def _async_set_state(self, enabled: bool) -> None:
         await self._router.wifi.set_global_config({"enabled": enabled})
@@ -106,6 +109,7 @@ class FreeboxShutterInvertSwitchEntity(FreeboxHomeEntity, SwitchEntity):
     _attr_has_entity_name = True
     _attr_icon = "mdi:directions-fork"
     _attr_name = "Inversion Positionnement"
+    _home_entity_name = "Inversion Positionnement"
     _attr_entity_category = EntityCategory.CONFIG
 
     def __init__(self, hass: HomeAssistant, router: FreeboxRouter, node: dict[str, Any]) -> None:

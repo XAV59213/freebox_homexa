@@ -304,4 +304,4 @@ MIT · Merci à [@gvigroux](https://github.com/gvigroux) (projet d’origine) et
 
 ### Autoévaluation qualité
 
-[Audit Integration Quality Scale](docs/quality-scale-audit.md) : suivi prudent des règles, sans certification officielle HA. L’acceptation HACS n’attribue pas un niveau Quality Scale.
+[Audit Integration Quality Scale](docs/quality-scale-audit.md) : suivi prudent des règles, sans certification officielle HA. L’acceptation HACS n’attribue pas un niveau Quality Scale. [Revue globale des entités et activations](docs/quality-scale-entity-inventory.md) : noms/IDs existants préservés et nouveaux RSSI facultatifs.

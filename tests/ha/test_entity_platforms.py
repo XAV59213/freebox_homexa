@@ -74,6 +74,11 @@ async def test_real_platform_dispatch_and_removal(hass, router, kind):
                               platform_name='freebox_homexa', platform=None,
                               scan_interval=timedelta(seconds=30), entity_namespace=None)
     try:
+        if kind == 'wifi_signal':
+            # Existing user-enabled diagnostic remains enabled after default change.
+            from homeassistant.helpers import entity_registry as er
+            er.async_get(hass).async_get_or_create('sensor', 'freebox_homexa', entity.unique_id,
+                config_entry=platform.config_entry, suggested_object_id='existing_signal', disabled_by=None)
         await platform.async_add_entities([entity])
         await hass.async_block_till_done()
         assert entity.entity_id
@@ -154,7 +159,7 @@ async def test_home_entity_subscribes_only_when_added_and_removes(hass, router):
     node = {'id': 42, 'label': 'Test detector', 'category': 'pir', 'type': {},
             'show_endpoints': [{'name': 'battery', 'ep_type': 'signal', 'value': 80}]}
     router.home_devices[42] = node
-    entity = FreeboxBatterySensor(hass, router, node)
+    entity = FreeboxBatterySensor(hass, router, node, {'name': 'battery', 'label': 'Batterie'})
     signal = router.signal_home_device_update
     assert not hass.data.get('dispatcher', {}).get(signal)
     platform = EntityPlatform(hass=hass, logger=logging.getLogger(__name__), domain='sensor',
@@ -166,7 +171,7 @@ async def test_home_entity_subscribes_only_when_added_and_removes(hass, router):
         router.home_devices[42] = {**node, 'label': 'Updated test detector'}
         async_dispatcher_send(hass, signal)
         await hass.async_block_till_done()
-        assert entity.name == 'Updated test detector'
+        assert entity.name == 'Batterie'
         await platform.async_reset()
         assert not hass.data['dispatcher'].get(signal)
     finally:

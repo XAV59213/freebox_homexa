@@ -25,7 +25,7 @@ TNT_DEVICE_INFO = DeviceInfo(
 
 class HomexaTntSensor(CoordinatorEntity[ProgrammeTntFrCoordinator], SensorEntity):
     _attr_icon = "mdi:television-classic"
-    _attr_has_entity_name = False
+    _attr_has_entity_name = True
     _attr_device_info = TNT_DEVICE_INFO
 
     def __init__(

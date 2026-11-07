@@ -11,7 +11,7 @@ from custom_components.freebox_homexa.const import DOMAIN, PLATFORMS
 from test_home_platforms import home_context
 
 
-@pytest.mark.parametrize("interrupt_forward,poll_index", [(False, 0), (False, 1), ("partial", 0), ("complete", 0)] + [(False, kind) for kind in ("media", "remote", "wifi", "alarm", "calendar", "calendar_programs")])
+@pytest.mark.parametrize("interrupt_forward,poll_index", [(False, 0), (False, 1), ("partial", 0), ("complete", 0), ("rollback_refused", 0), ("rollback_raises", 0)] + [(False, kind) for kind in ("media", "remote", "wifi", "alarm", "calendar", "calendar_programs")])
 async def test_real_forward_discovers_all_domains_then_unloads(hass, home_context, interrupt_forward, poll_index):
     router, node = home_context
     entry = hass.config_entries.async_get_entry(router.entry_id)
@@ -28,15 +28,23 @@ async def test_real_forward_discovers_all_domains_then_unloads(hass, home_contex
     api.player._access.get.return_value = {"power_state": "standby"}
     api.tv.get_tv_channels.return_value = {}
     api.tv.get_tv_programs_by_date.return_value = {}
+    real_unload = hass.config_entries.async_unload_platforms
+    async def unload(owner, domains):
+        if interrupt_forward == "rollback_refused":
+            return False
+        if interrupt_forward == "rollback_raises":
+            raise RuntimeError("synthetic rollback failure")
+        return await real_unload(owner, domains)
     real_forward = hass.config_entries.async_forward_entry_setups
     async def forward(owner, domains):
         if interrupt_forward:
-            await real_forward(owner, domains if interrupt_forward == "complete" else ["camera", "switch", "sensor"])
+            await real_forward(owner, domains if interrupt_forward in ("complete", "rollback_refused", "rollback_raises") else ["camera", "switch", "sensor"])
             await hass.async_block_till_done()
             raise RuntimeError("synthetic interrupted forward")
         await real_forward(owner, domains)
     with patch("custom_components.freebox_homexa.async_track_time_interval", wraps=async_track_time_interval) as intervals, \
          patch.object(hass.config_entries, "async_forward_entry_setups", side_effect=forward), \
+         patch.object(hass.config_entries, "async_unload_platforms", side_effect=unload), \
          patch("custom_components.freebox_homexa.async_setup", new=AsyncMock(return_value=True)), \
          patch("custom_components.freebox_homexa.JSModuleRegistration.async_register", new=AsyncMock()), \
          patch("custom_components.freebox_homexa.get_api", return_value=api), \
@@ -53,6 +61,12 @@ async def test_real_forward_discovers_all_domains_then_unloads(hass, home_contex
         api.home.set_home_endpoint_value.assert_not_called()
         if interrupt_forward:
             assert entry.state is ConfigEntryState.SETUP_ERROR
+            if interrupt_forward in ("rollback_refused", "rollback_raises"):
+                assert any(platform.entities for platform in async_get_platforms(hass, DOMAIN))
+                assert router.closing
+                # Characterization: no fictitious atomic rollback. Framework
+                # platforms survive a refused cleanup, even though SDK is closed.
+                assert await real_unload(entry, PLATFORMS)
             assert all(not platform.entities for platform in async_get_platforms(hass, DOMAIN))
             assert not hass.data.get("dispatcher", {}).get(router.signal_home_device_new)
             assert entry.entry_id not in hass.data[DOMAIN].get("tnt_coordinators", {})

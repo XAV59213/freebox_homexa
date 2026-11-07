@@ -3,11 +3,11 @@
 from __future__ import annotations
 import asyncio
 import logging
-from collections.abc import Callable
+from collections.abc import Callable, Sequence, Mapping
 from typing import Any
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import HomeAssistantError
-from homeassistant.helpers.device_registry import DeviceInfo
+from homeassistant.helpers.device_registry import DeviceInfo, async_get as async_get_device_registry
 from homeassistant.helpers.dispatcher import async_dispatcher_connect
 from homeassistant.helpers.entity import Entity
 from freebox_api.exceptions import HttpRequestError
@@ -16,7 +16,7 @@ from .device_groups import GROUP_HOME, group_identifier, home_node_group, home_n
 from .availability import home_node_reachable, router_reachable
 from .errors import is_shutdown_error, poll_log_level
 from .router import FreeboxRouter
-from .registry_compat import as_version
+from .registry_compat import as_version, get_device_by_identifier
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -30,6 +30,19 @@ def _home_endpoint_payload(value: Any | None) -> dict[str, Any]:
 
 class FreeboxHomeEntity(Entity):
     """Représentation de base d'une entité Freebox Home dans Home Assistant."""
+
+    _attr_has_entity_name = True
+    _home_entity_name: str | None = None
+
+    @property
+    def name(self) -> str | None:
+        """Keep device labels out of relative names, without altering legacy IDs."""
+        if self._sub_node is not None:
+            return str(self._sub_node["label"]).strip()
+        if self._node.get("category") == FreeboxHomeCategory.ALARM:
+            # Alarm entities share the Home group device, not a dedicated node.
+            return self._attr_name
+        return self._home_entity_name
 
     def __init__(
         self,
@@ -71,7 +84,7 @@ class FreeboxHomeEntity(Entity):
                 " " + sub_node["label"].strip() if sub_node is not None else ""
             )
 
-        device_info: dict[str, Any] = {
+        device_info: DeviceInfo = {
             "identifiers": {(DOMAIN, self._id)},
             "manufacturer": self._manufacturer,
             "model": self._model,
@@ -89,7 +102,7 @@ class FreeboxHomeEntity(Entity):
         parent_id = router.parent_for(f"node:{self._id}", self._device_name, home_node_group(node))
         if parent_id:
             device_info["via_device_id"] = parent_id
-        self._attr_device_info = DeviceInfo(**device_info)
+        self._attr_device_info = device_info
 
     def _alarm_group_device_info(self, hass: HomeAssistant, router: FreeboxRouter) -> DeviceInfo:
         """DeviceInfo du groupe « Maison connectée et alarme » ; retire l'ancien appareil alarme."""
@@ -176,16 +189,17 @@ class FreeboxHomeEntity(Entity):
             )
             return None
 
-    def get_command_id(self, nodes: list, ep_type: str, name: str) -> int | None:
+    def get_command_id(self, nodes: Sequence[Mapping[str, object]], ep_type: str, name: str) -> int | None:
         node = next(
             (x for x in nodes if x.get("name") == name and x.get("ep_type") == ep_type), None
         )
         if not node:
             _LOGGER.warning("Commande manquante : %s/%s", name, ep_type)
             return None
-        return node.get("id")
+        command_id = node.get("id")
+        return command_id if isinstance(command_id, int) and not isinstance(command_id, bool) else None
 
-    def get_node_value(self, nodes: list, ep_type: str, name: str) -> Any | None:
+    def get_node_value(self, nodes: Sequence[Mapping[str, object]], ep_type: str, name: str) -> Any | None:
         node = next(
             (x for x in nodes if x.get("name") == name and x.get("ep_type") == ep_type), None
         )
@@ -224,6 +238,13 @@ class FreeboxHomeEntity(Entity):
                 self._attr_name = self._node["label"].strip()
             else:
                 self._attr_name = f"{self._node['label'].strip()} {self._sub_node['label'].strip()}"
+            if self._node.get("category") != FreeboxHomeCategory.ALARM:
+                # Update the device's source name, retaining name_by_user and IDs.
+                device_name = (self._node.get("label") or "").strip() or home_node_name(self._node, self._model)
+                registry = async_get_device_registry(self._hass)
+                device = get_device_by_identifier(registry, (DOMAIN, self._id), self._router.entry_id)
+                if device is not None and device.name != device_name:
+                    registry.async_update_device(device.id, name=device_name)
             self.async_write_ha_state()
         except Exception as err:  # noqa: BLE001
             if is_shutdown_error(err, self._router):

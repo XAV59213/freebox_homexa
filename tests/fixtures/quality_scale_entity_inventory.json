@@ -5,7 +5,7 @@
     "category": null,
     "device_class": null,
     "enabled_default": true,
-    "has_entity_name": false,
+    "has_entity_name": true,
     "translation_key": null,
     "unit": null
   },
@@ -15,7 +15,7 @@
     "category": null,
     "device_class": "shutter",
     "enabled_default": true,
-    "has_entity_name": false,
+    "has_entity_name": true,
     "translation_key": null,
     "unit": null
   },
@@ -25,7 +25,7 @@
     "category": "diagnostic",
     "device_class": "battery",
     "enabled_default": true,
-    "has_entity_name": false,
+    "has_entity_name": true,
     "translation_key": null,
     "unit": "%"
   },
@@ -55,7 +55,7 @@
     "category": null,
     "device_class": null,
     "enabled_default": true,
-    "has_entity_name": false,
+    "has_entity_name": true,
     "translation_key": null,
     "unit": null
   },
@@ -65,7 +65,7 @@
     "category": "diagnostic",
     "device_class": null,
     "enabled_default": true,
-    "has_entity_name": false,
+    "has_entity_name": true,
     "translation_key": null,
     "unit": null
   },
@@ -75,7 +75,7 @@
     "category": null,
     "device_class": null,
     "enabled_default": true,
-    "has_entity_name": false,
+    "has_entity_name": true,
     "translation_key": null,
     "unit": null
   },
@@ -85,7 +85,7 @@
     "category": "diagnostic",
     "device_class": "safety",
     "enabled_default": false,
-    "has_entity_name": false,
+    "has_entity_name": true,
     "translation_key": null,
     "unit": null
   },
@@ -95,7 +95,7 @@
     "category": "diagnostic",
     "device_class": null,
     "enabled_default": false,
-    "has_entity_name": false,
+    "has_entity_name": true,
     "translation_key": null,
     "unit": null
   },
@@ -105,7 +105,7 @@
     "category": "diagnostic",
     "device_class": null,
     "enabled_default": false,
-    "has_entity_name": false,
+    "has_entity_name": true,
     "translation_key": null,
     "unit": null
   },
@@ -115,7 +115,7 @@
     "category": "diagnostic",
     "device_class": null,
     "enabled_default": true,
-    "has_entity_name": false,
+    "has_entity_name": true,
     "translation_key": null,
     "unit": "%"
   },
@@ -125,7 +125,7 @@
     "category": null,
     "device_class": "door",
     "enabled_default": true,
-    "has_entity_name": false,
+    "has_entity_name": true,
     "translation_key": null,
     "unit": null
   },
@@ -145,7 +145,7 @@
     "category": null,
     "device_class": "motion",
     "enabled_default": true,
-    "has_entity_name": false,
+    "has_entity_name": true,
     "translation_key": null,
     "unit": null
   },
@@ -605,7 +605,7 @@
     "category": "diagnostic",
     "device_class": null,
     "enabled_default": true,
-    "has_entity_name": false,
+    "has_entity_name": true,
     "translation_key": null,
     "unit": null
   },
@@ -615,7 +615,7 @@
     "category": null,
     "device_class": "data_rate",
     "enabled_default": true,
-    "has_entity_name": false,
+    "has_entity_name": true,
     "translation_key": null,
     "unit": "kB/s"
   },
@@ -625,7 +625,7 @@
     "category": null,
     "device_class": "data_rate",
     "enabled_default": true,
-    "has_entity_name": false,
+    "has_entity_name": true,
     "translation_key": null,
     "unit": "kB/s"
   },
@@ -635,7 +635,7 @@
     "category": "diagnostic",
     "device_class": "duration",
     "enabled_default": true,
-    "has_entity_name": false,
+    "has_entity_name": true,
     "translation_key": null,
     "unit": "s"
   },
@@ -645,7 +645,7 @@
     "category": "diagnostic",
     "device_class": "temperature",
     "enabled_default": true,
-    "has_entity_name": false,
+    "has_entity_name": true,
     "translation_key": null,
     "unit": "°C"
   },
@@ -655,7 +655,7 @@
     "category": null,
     "device_class": "garage",
     "enabled_default": true,
-    "has_entity_name": false,
+    "has_entity_name": true,
     "translation_key": null,
     "unit": null
   },
@@ -665,7 +665,7 @@
     "category": null,
     "device_class": "shutter",
     "enabled_default": true,
-    "has_entity_name": false,
+    "has_entity_name": true,
     "translation_key": null,
     "unit": null
   },
@@ -675,7 +675,7 @@
     "category": null,
     "device_class": "shutter",
     "enabled_default": true,
-    "has_entity_name": false,
+    "has_entity_name": true,
     "translation_key": null,
     "unit": null
   },
@@ -695,7 +695,7 @@
     "category": "config",
     "device_class": null,
     "enabled_default": true,
-    "has_entity_name": false,
+    "has_entity_name": true,
     "translation_key": null,
     "unit": null
   },
@@ -774,8 +774,8 @@
     "variant": "wifi-signal/devices=False",
     "category": "diagnostic",
     "device_class": "signal_strength",
-    "enabled_default": true,
-    "has_entity_name": false,
+    "enabled_default": false,
+    "has_entity_name": true,
     "translation_key": null,
     "unit": "dBm"
   },
@@ -784,7 +784,7 @@
     "variant": "wifi-signal/devices=True",
     "category": "diagnostic",
     "device_class": "signal_strength",
-    "enabled_default": true,
+    "enabled_default": false,
     "has_entity_name": true,
     "translation_key": "wifi_signal",
     "unit": "dBm"
@@ -805,7 +805,7 @@
     "category": null,
     "device_class": null,
     "enabled_default": true,
-    "has_entity_name": false,
+    "has_entity_name": true,
     "translation_key": null,
     "unit": null
   }

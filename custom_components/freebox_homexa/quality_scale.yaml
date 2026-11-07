@@ -33,7 +33,7 @@ rules:
       structurel, pas preuve de couverture du flow.
   config-flow-test-coverage:
     status: todo
-    comment: '377 tests HA au total ; config_flow.py : 437/438 lignes (99,77 %), 145/148 branches (97,97 %).
+    comment: '407 tests HA au total ; config_flow.py : 437/438 lignes (99,77 %), 145/148 branches (97,97 %).
       Les erreurs de link testées sont suivies de la correction de leur cause et de la finalisation du même
       flow avec unique_id vérifié. Options répéteurs (registre uniquement), conflits Alexa, doublons de libellés,
       defaults privés synthétiques et conservation des codes vérifiés. Reste ligne 369 et trois branches ;
@@ -94,8 +94,15 @@ rules:
       utilise le nom). ScannerEntity fournit MAC client. Audit collisions/partitions et proposition de migration
       réversible restent nécessaires ; aucune migration imposée.
   has-entity-name:
-    status: todo
-    comment: tnt_sensor.py:28 et sensor.py:371 mettent has_entity_name=False ; règle globale non satisfaite.
+    status: done
+    comment: >-
+      Lot 8 : has_entity_name=True inconditionnel pour les 30 familles/81 variantes. Noms relatifs
+      et features principales Home/Player à None ; noms sources conservés séparément des noms
+      affichés. test_entity_naming_defaults : vrai HA, renommage appareil, name_by_user et nom
+      personnalisé entité préservés ; inputs unique_id historiques vérifiés. test_category_registry
+      : les 81 variantes passent le vrai EntityPlatform en conservant entity_id, unique_id, nom et
+      hidden/disabled USER. Nouveaux entity_id générés normalement par HA ; aucune régénération des
+      IDs existants. Revue dans docs/quality-scale-entity-inventory.md.
   runtime-data:
     status: done
     comment: router.py:1199 type FreeboxConfigEntry = ConfigEntry[FreeboxRouter] ; __init__.py:220 affecte
@@ -131,14 +138,17 @@ rules:
       dans la carte (plus de catch silencieux), tests JS sans appel HA.'
   config-entry-unloading:
     status: todo
-    comment: 'Lot 6 : vrai ConfigEntriesManager et vrais discovery/forward des onze plateformes depuis snapshots
-      routeur synthétiques (lectures initiales mockées), coordinateur TNT réel avec fetch mocké. Échecs injectés
-      après forward partiel (camera/switch/sensor) ou complet : rollback public et suppression carte coordinateur
-      avant close. Listener discovery caméra désormais possédé par entrée. Deux vrais callbacks intervalle
-      testés en lecture bloquée : annulation/drain avant close SDK ; fermeture concurrente sérialisée, succès
-      mémorisé, échec explicitement retentable, NotOpen non pris pour preuve de fermeture. Restent lectures
-      d’entités en vol (tâches framework distinctes), variantes/échec de rollback et SDK close sans finally/session
-      injectable publique. Pas de garantie universelle de cleanup, donc todo.'
+    comment: >-
+      Lots 6-8 : vrai ConfigEntriesManager/discovery/forward des onze domaines et rollback
+      partiel/complet ; six lectures SDK entités et deux intervalles drainés avant close, fermeture
+      sérialisée. Refus/exception de rollback désormais caractérisés : des plateformes HA peuvent
+      rester après erreur du setup, pas de faux rollback atomique ; nettoyage réel explicite du
+      test. Unload normal refusé/échoué/annulé restaure admission des lectures sauf si un autre
+      propriétaire ferme déjà le SDK ou si close est terminé, courses testées par Events. FFmpeg
+      hérité testé sans processus/réseau : snapshot, source, fermeture après erreur
+      lecteur/proxy/annulation ; ouverture en dehors du try/finally amont, fermeture sur échec
+      d'ouverture non garantie. Limite SDK close/session publique inchangée. Pas garantie
+      universelle donc todo.
   docs-configuration-parameters:
     status: todo
     comment: 'docs/guide-utilisateur.md (lié README) : Table des options général/groupes/types/répéteurs/TNT/profils,
@@ -153,10 +163,15 @@ rules:
       custom revendiquée.'
   entity-unavailable:
     status: todo
-    comment: Vraies plateformes couvrent perte/retour centraux, TNT, Player, télécommande, caméra, volets et
-      Wi-Fi. Caméra remplace son node au signal, disparaît/récupère sans nouvelle identité ; Wi-Fi invalide
-      devient indisponible ; inversion disque illisible inconnue, position incertaine sans commande ambiguë.
-      Reste vérifier toutes variantes, événements/autorisation et erreurs partielles avant règle globale done.
+    comment: >-
+      Lot 8 : inventaire des 30 familles/81 variantes testé sous perte routeur, fermeture et retour
+      ; tracker désormais indisponible quand Freebox est perdue. Exceptions réelles : TNT dépend de
+      XMLTV, inversion fichier local. Échec HttpRequestError de la source capteurs ne conserve plus
+      de cache affiché disponible : flag dédié, signal HA, récupération et logs uniques testés.
+      Débit manquant/invalide = unknown, zéro réel conservé. Restent les sources stockage/RAID/Home
+      et cache XMLTV : pertes partielles et récupération non entièrement démontrées, dont
+      invalidation de droits/support sur erreurs. Pas done par association aux seules gardes
+      globales.
   integration-owner:
     status: done
     comment: 'manifest.json déclare @gvigroux, @XAV59213 et @Steph73HB ; .github/CODEOWNERS reprend exactement
@@ -181,8 +196,8 @@ rules:
       avant réauth. Lié au choix de migration unique ID host vers identité physique, non imposé ici.
   test-coverage:
     status: todo
-    comment: '377 tests HA 2026.10.4 ; 38 modules sans omit : lignes 3810/5880 (64,80 %), branches 768/1960
-      (39,18 %), combiné 58,39 %. Rapports JSON/XML CI ; seuil officiel non atteint. Certaines variantes sont
+    comment: '407 tests HA 2026.10.4 ; 38 modules sans omit : lignes 3997/5936 (67,33 %), branches 841/1980
+      (42,47 %), combiné 61,12 %. Rapports JSON/XML CI ; seuil officiel non atteint. Certaines variantes sont
       des inventaires explicitement distincts du runtime. Les tests ne valident pas le matériel.'
   devices:
     status: todo
@@ -257,11 +272,23 @@ rules:
       Classements diagnostic/config corrigés sans changer les activations ni les commandes.'
   entity-device-class:
     status: todo
-    comment: Classes présentes dans media_player.py et descriptions capteurs ; unités/classes de chaque variante
-      de périphérique non validées.
+    comment: >-
+      Inventaire global classes/unités des 30 familles et 81 variantes disponible et stable ; ne
+      suffit pas à une validation sémantique. L'opener conserve une heuristique garage basée sur le
+      libellé et un repli shutter non démontré pour tous matériels ; contrat matériel/subtype et
+      effet des changements sur exposition vocale à revoir sans migration d'ID. Conversions et
+      unités de toutes les sources doivent aussi être vérifiées sur contrat public, pas seulement
+      sur fixtures choisies.
   entity-disabled-by-default:
-    status: todo
-    comment: button.py pavé numérique désactivé par défaut ; pas de revue exhaustive de tous capteurs bruyants/secondaires.
+    status: done
+    comment: >-
+      Lot 8 : revue des 81 variantes dans docs/quality-scale-entity-inventory.md. RSSI individuel
+      bruyant off à la première création ; tracker, autoprotection et contrôles avancés opt-in
+      conservés. Fonctions principales et supervision Server/Home/réseau gardées selon rôle, pas
+      désactivation administrative des données des cartes. Vrai EntityPlatform : RSSI neuf
+      disabled_by INTEGRATION, ancien activé reste activé, choix USER conservé. Les 81 variantes
+      préservent préférences et IDs ; aucun dashboard modifié. Valeurs contextualisées du
+      ScannerEntity HA explicitement distinguées des flags déclarés.
   entity-translations:
     status: todo
     comment: sensor.py:371 et tnt_sensor.py:28 noms historiques sans has_entity_name ; traductions globales
@@ -306,8 +333,12 @@ rules:
       dépendance pour score ; proposition amont dans le rapport.'
   strict-typing:
     status: todo
-    comment: 'Mypy 2.4.1 --strict réellement exécuté sur les 38 modules avec environnement HA/SDK épinglé :
-      baseline 268 erreurs/29 fichiers, puis 230/28 après retour Coroutine exact du décorateur et 227/27 après typage des échantillons diagnostics. Aucun blanket
-      ignore, exclusion opportuniste ou stub SDK inventé. SDK 1.3.1 possède bien freebox_api/py.typed : absence
-      de session publique injectable est un problème distinct du typage. Détails et codes dans docs/quality-scale-typing-baseline.md
-      ; seuil strict non atteint, règle todo.'
+    comment: >-
+      Mypy 2.4.1 --strict réel sur 38 modules HA/SDK épinglés : 268 erreurs initiales, 227 au lot 7,
+      186 dans 25 fichiers au lot 8. XMLTV/Programme/metadata/parser temporel typés et module
+      tnt_coordinator sans erreur ; événements XML validés/narrowed, dicts de valeurs object, aucune
+      injection de Any/cast/ignore. Base disponibilité hérite du vrai Entity, DeviceInfo et IDs
+      d'endpoint narrowés. Les nouveaux contrats révèlent aussi des appels SDK non annotés et
+      incompatibilité d'annotation name FFmpeg str vs nom principal None ; ne pas les masquer. SDK
+      1.3.1 possède py.typed mais pas session publique injectable, question distincte. Détails
+      docs/quality-scale-typing-baseline.md ; strict global non atteint.

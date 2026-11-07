@@ -68,3 +68,24 @@ des types génériques diagnostics sont corrigées : TimingSample TypedDict,
 listes d’observations typées, dictionnaire d’entrée arbitraire explicitement
 object et sortie list[dict[str, object]]. Aucun cast/ignore ajouté. Le contenu
 filtré et les tests privacy restent identiques ; strict-typing reste todo.
+
+## Lot 8
+
+**186 erreurs / 25 fichiers / 38 analysés**, contre 227 au lot 7. Aucun Any,
+cast ou ignore ajouté pour masquer un contrat : metadata XMLTV TypedDict,
+Programme annoté, datetime/time/Iterator précis, retours dict[str, object],
+overloads d’entrée non vide, validation/narrowing des événements XMLPullParser
+selon les événements start/end demandés. Module tnt_coordinator : zéro erreur
+strict, sans exclusion. DeviceInfo directement typé ; IDs de commande acceptés
+uniquement comme int non bool ; valeurs de débit optionnelles numériques.
+
+La base disponibilité est un vrai Entity HA avec routeur typé, pas un super Any
+ignoré. Cela expose aussi des appels SDK auparavant masqués par Any implicite.
+Le contrat FFmpegCamera.name -> str hérité est plus étroit que le nom principal
+None légitime côté Entity ; conflit de bases signalé, pas casté. Des imports
+canoniques, API de registre, structures et fonctions restantes doivent encore
+être typés. py.typed du SDK présent ne signifie pas que chaque méthode est annotée.
+
+Coverage.py exclut automatiquement 8 lignes purement typing (TYPE_CHECKING et
+surcharges ellipsis) ; aucun omit/paramètre d’exclusion ajouté, aucun seuil abaissé.
+Ce n’est pas une prétention à la conformité strict-typing globale.

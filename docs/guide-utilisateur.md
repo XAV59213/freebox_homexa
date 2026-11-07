@@ -298,3 +298,29 @@ succès physique de chaque écriture. Si les mêmes valeurs étaient déjà enre
 le seul contrat public de HA Store ne distingue pas une écriture identique échouée
 d’une valeur déjà correcte ; HA peut la journaliser. Aucun acquittement durable
 universel n’est revendiqué.
+
+
+### Noms, signal Wi-Fi et valeurs indisponibles (préparation 28.8.90)
+
+Les noms des entités sont relatifs à leur appareil : le volet/capteur principal
+reprend son nom, une batterie affiche un suffixe. Renommer l’appareil dans HA
+actualise les noms non personnalisés ; votre nom personnalisé d’entité reste
+prioritaire. Les unique_id et entity_id déjà enregistrés sont conservés, sans
+suppression/récréation ni perte des préférences de visibilité/activation.
+La génération HA peut donner un autre entity_id à une nouvelle entité ; utilisez
+celui réellement créé, ne recopiez pas un ID supposé d’une capture d’écran.
+
+Un **nouveau** capteur RSSI Wi-Fi individuel est créé désactivé par défaut pour
+éviter un historique bruyant. Pour l’utiliser : Paramètres → Appareils et services
+→ Entités, afficher les entités désactivées, ouvrir le capteur concerné et l’activer.
+L’option `create_wifi_sensors` détermine sa création, pas son activation automatique.
+Vos capteurs déjà activés restent activés ; un choix de désactivation utilisateur
+reste désactivé. Un panneau RSSI facultatif peut être absent tant que le capteur
+n’est pas activé sur une nouvelle installation. Aucun dashboard n’est modifié.
+
+Une erreur de lecture de la source capteurs rend ces états indisponibles même
+si l’API LAN répond encore ; ils reviennent après une lecture réussie. Un débit
+manquant ou non numérique est inconnu, pas zéro. Un vrai zéro numérique reste
+zéro. Cela ne garantit pas encore tous les scénarios partiels stockage/Home/XMLTV.
+Un unload refusé ou annulé garde l’erreur visible et n’affirme pas que toutes les
+plateformes ont été retirées ; aucune reconnexion ou commande appareil automatique.

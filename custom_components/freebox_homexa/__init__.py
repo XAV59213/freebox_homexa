@@ -323,10 +323,17 @@ async def async_unload_entry(hass: HomeAssistant, entry: FreeboxConfigEntry) -> 
         # Déchargement / rechargement : les relevés encore en vol ne journalisent plus
         # « Connector is closed » comme une erreur.
         router.closing = True
-    unload_ok = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
+    try:
+        unload_ok = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
+    except BaseException:
+        # HA keeps an entry loaded when teardown fails or is cancelled. Restore
+        # read admission for its surviving platforms; never claim atomic rollback.
+        if router is not None:
+            router.resume_reads_after_failed_unload()
+        raise
     if not unload_ok:
         if router is not None:
-            router.closing = False
+            router.resume_reads_after_failed_unload()
         return False
     async_unload_bundled_tnt(hass, entry)
     if router is not None:

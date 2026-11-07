@@ -3,7 +3,10 @@ from __future__ import annotations
 
 import logging
 import xml.etree.ElementTree as ET
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, time
+from collections.abc import Iterator
+from typing import TypedDict, overload
+from aiohttp import ClientTimeout
 
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
@@ -27,7 +30,7 @@ from .tnt_const import (
 _LOGGER = logging.getLogger(__name__)
 
 
-def _parse_xmltv_datetime(value: str | None):
+def _parse_xmltv_datetime(value: str | None) -> datetime | None:
     if not value:
         return None
     try:
@@ -36,7 +39,12 @@ def _parse_xmltv_datetime(value: str | None):
         return None
 
 
-def _parse_xmltv(xml_data: bytes, channels: list[str]) -> tuple[dict, dict]:
+class ChannelMetadata(TypedDict):
+    name: str
+    icon: str | None
+
+
+def _parse_xmltv(xml_data: bytes, channels: list[str]) -> tuple[dict[str, list[Programme]], dict[str, ChannelMetadata]]:
     """Parse XMLTV off the event loop, incrementally.
 
     ET.fromstring() on the ~78 MB xmltv_fr.xml holds the GIL for the whole
@@ -45,21 +53,26 @@ def _parse_xmltv(xml_data: bytes, channels: list[str]) -> tuple[dict, dict]:
     GIL between chunks, and clearing nodes keeps memory low.
     """
     wanted = set(channels)
-    meta: dict[str, dict] = {}
+    meta: dict[str, ChannelMetadata] = {}
     programmes: dict[str, list[Programme]] = {cid: [] for cid in wanted}
-    parser = ET.XMLPullParser(events=("start", "end"))
+    parser: ET.XMLPullParser[ET.Element] = ET.XMLPullParser(events=("start", "end"))
     root = None
     chunk = 64 * 1024
     for offset in range(0, len(xml_data), chunk):
         parser.feed(xml_data[offset : offset + chunk])
-        for event, node in parser.read_events():
+        for item in parser.read_events():
+            # Only start/end events were requested; namespace events have other
+            # shapes in the generic stdlib annotation. Validate that contract.
+            assert len(item) == 2
+            event, node = item
+            assert isinstance(node, ET.Element)
             if event == "start":
                 if root is None:
                     root = node
                 continue
             if node.tag == "channel":
                 cid = node.get("id")
-                if cid in wanted:
+                if cid is not None and cid in wanted:
                     icon_el = node.find("icon")
                     meta[cid] = {
                         "name": node.findtext("display-name") or cid,
@@ -67,7 +80,7 @@ def _parse_xmltv(xml_data: bytes, channels: list[str]) -> tuple[dict, dict]:
                     }
             elif node.tag == "programme":
                 cid = node.get("channel")
-                if cid in wanted:
+                if cid is not None and cid in wanted:
                     _append_programme(programmes[cid], node)
             else:
                 continue
@@ -80,7 +93,7 @@ def _parse_xmltv(xml_data: bytes, channels: list[str]) -> tuple[dict, dict]:
     return programmes, meta
 
 
-def _append_programme(target: list, node) -> None:
+def _append_programme(target: list[Programme], node: ET.Element) -> None:
     start = _parse_xmltv_datetime(node.get("start"))
     stop = _parse_xmltv_datetime(node.get("stop"))
     title = node.findtext("title")
@@ -105,7 +118,9 @@ def _append_programme(target: list, node) -> None:
 
 class Programme:
     def __init__(
-        self, start, stop, title, subtitle, desc, category, icon, rating, date=None
+        self, start: datetime, stop: datetime, title: str, subtitle: str | None,
+        desc: str | None, category: str | None, icon: str | None,
+        rating: str | None, date: str | None = None
     ) -> None:
         self.start = start
         self.stop = stop
@@ -117,7 +132,7 @@ class Programme:
         self.rating = rating
         self.date = date
 
-    def as_dict(self, match: TmdbMatch | None = None) -> dict:
+    def as_dict(self, match: TmdbMatch | None = None) -> dict[str, object]:
         return {
             "title": self.title,
             "subtitle": self.subtitle,
@@ -158,10 +173,10 @@ class ProgrammeTntFrCoordinator(DataUpdateCoordinator):
         )
         self._session = async_get_clientsession(hass)
         self._programmes_by_channel: dict[str, list[Programme]] = {}
-        self._channels_meta: dict[str, dict] = {}
-        self._last_fetch = None
+        self._channels_meta: dict[str, ChannelMetadata] = {}
+        self._last_fetch: datetime | None = None
 
-    async def _async_update_data(self) -> dict:
+    async def _async_update_data(self) -> dict[str, dict[str, object]]:
         now = dt_util.now()
         need_fetch = self._last_fetch is None or (now - self._last_fetch) >= timedelta(
             minutes=FETCH_MIN_INTERVAL_MINUTES
@@ -184,10 +199,10 @@ class ProgrammeTntFrCoordinator(DataUpdateCoordinator):
         if self._tmdb is not None:
             self._tmdb.schedule(self._all_programmes(), now)
 
-        result: dict[str, dict] = {}
+        result: dict[str, dict[str, object]] = {}
         for channel_id in self._channels:
             current, next_prog, prime_time, second_part = self._pick_slots(channel_id, now)
-            meta = self._channels_meta.get(channel_id, {})
+            meta: ChannelMetadata = self._channels_meta.get(channel_id, {"name": ALL_CHANNELS.get(channel_id, channel_id), "icon": None})
             result[channel_id] = {
                 "channel_id": channel_id,
                 "channel_name": meta.get("name", ALL_CHANNELS.get(channel_id, channel_id)),
@@ -199,18 +214,24 @@ class ProgrammeTntFrCoordinator(DataUpdateCoordinator):
             }
         return result
 
-    def _all_programmes(self):
+    def _all_programmes(self) -> Iterator[Programme]:
         for channel_id in self._channels:
             yield from self._programmes_by_channel.get(channel_id, [])
 
-    def _programme_dict(self, programme: Programme | None) -> dict | None:
+    @overload
+    def _programme_dict(self, programme: Programme) -> dict[str, object]: ...
+
+    @overload
+    def _programme_dict(self, programme: None) -> None: ...
+
+    def _programme_dict(self, programme: Programme | None) -> dict[str, object] | None:
         if programme is None:
             return None
         match = self._tmdb.get(programme) if self._tmdb is not None else None
         return programme.as_dict(match)
 
     async def _fetch_and_parse(self) -> None:
-        async with self._session.get(XMLTV_URL, timeout=60) as resp:
+        async with self._session.get(XMLTV_URL, timeout=ClientTimeout(total=60)) as resp:
             resp.raise_for_status()
             # bytes, pas de decode/charset-detection de 78 Mo sur le loop
             xml_data = await resp.read()
@@ -222,7 +243,7 @@ class ProgrammeTntFrCoordinator(DataUpdateCoordinator):
 
     # _pick_slots / get_programmes_for_day : adapted from cyclope205/programme-tnt-fr v3.0.8 (MIT)
     def _pick_slots(
-        self, channel_id: str, now
+        self, channel_id: str, now: datetime
     ) -> tuple[Programme | None, Programme | None, Programme | None, Programme | None]:
         progs = self._programmes_by_channel.get(channel_id, [])
 
@@ -236,7 +257,7 @@ class ProgrammeTntFrCoordinator(DataUpdateCoordinator):
 
         # Programme suivant
         next = None
-        if current_index is not None:
+        if current_index is not None and current is not None:
             for programme in progs[current_index + 1 :]:
                 if programme.start >= current.stop:
                     next = programme
@@ -247,7 +268,7 @@ class ProgrammeTntFrCoordinator(DataUpdateCoordinator):
         else:
             broadcast_day = now.date()
 
-        def _programme_at(reference_time):
+        def _programme_at(reference_time: time) -> Programme | None:
             """Programme airing at reference_time, or the next one if none covers it."""
             threshold = datetime.combine(broadcast_day, reference_time, tzinfo=now.tzinfo)
             for programme in progs:
@@ -271,7 +292,7 @@ class ProgrammeTntFrCoordinator(DataUpdateCoordinator):
 
     def get_programmes_for_day(
         self, channel_id: str, date_str: str | None = None
-    ) -> list[dict] | None:
+    ) -> list[dict[str, object]] | None:
         """Retourne tous les programmes en cache pour channel_id sur une
         journee de diffusion (de DAY_RESET a DAY_RESET le lendemain), pour
         alimenter la carte "Guide TV". Utilise la meme frontiere que le

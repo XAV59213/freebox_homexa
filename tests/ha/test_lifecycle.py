@@ -57,14 +57,14 @@ async def test_unload_retains_resources_on_platform_failure(hass, success):
     entry = entry_for(hass)
     router = MagicMock(close=AsyncMock(), closing=False)
     entry.runtime_data = router
-    store = MagicMock(async_save=AsyncMock())
+    store = MagicMock(async_save=AsyncMock(), async_load=AsyncMock(return_value={"synthetic": True}))
     hass.data[DOMAIN] = {'store': store, 'config': {'synthetic': True}}
     with patch.object(hass.config_entries, 'async_unload_platforms', return_value=success), \
          patch('custom_components.freebox_homexa.async_unload_bundled_tnt') as tnt:
         assert await async_unload_entry(hass, entry) is success
     assert router.closing is success
     assert router.close.await_count == int(success)
-    assert store.async_save.await_count == int(success)
+    assert store.async_save.await_count == 1
     assert tnt.call_count == int(success)
 
 

@@ -37,7 +37,7 @@ async def test_schedule_status_cancel_mock_storage_no_notification(hass):
     manager = _ReminderManager(hass, store)
     payload = {**BASE, 'start_time': '2030-01-01T20:00:00+01:00'}
     with patch.object(manager, '_resolve_targets', return_value=(['test_notify'], [], None, None)), \
-         patch.object(manager, '_schedule') as schedule:
+         patch.object(manager, '_schedule', wraps=manager._schedule) as schedule:
         await manager.async_handle_schedule(ServiceCall(hass, DOMAIN, 'schedule_reminder', payload))
         schedule.assert_called_once()
     status = await manager.async_handle_status(ServiceCall(hass, DOMAIN, 'get_reminder_status', payload))

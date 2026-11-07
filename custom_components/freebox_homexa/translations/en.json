@@ -540,6 +540,12 @@
     },
     "reminder_storage_failed": {
       "message": "The reminder save could not be confirmed. Check Home Assistant storage before retrying."
+    },
+    "storage_write_failed": {
+      "message": "Configuration persistence could not be confirmed. Check Home Assistant storage before retrying."
+    },
+    "reminder_state_unconfirmed": {
+      "message": "Reminder storage and timer state do not agree. Check Home Assistant storage, then explicitly schedule or cancel this reminder."
     }
   }
 }

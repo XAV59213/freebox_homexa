@@ -33,7 +33,7 @@ rules:
       structurel, pas preuve de couverture du flow.
   config-flow-test-coverage:
     status: todo
-    comment: '342 tests HA au total ; config_flow.py : 437/438 lignes (99,77 %), 145/148 branches (97,97 %).
+    comment: '356 tests HA au total ; config_flow.py : 437/438 lignes (99,77 %), 145/148 branches (97,97 %).
       Les erreurs de link testées sont suivies de la correction de leur cause et de la finalisation du même
       flow avec unique_id vérifié. Options répéteurs (registre uniquement), conflits Alexa, doublons de libellés,
       defaults privés synthétiques et conservation des codes vérifiés. Reste ligne 369 et trois branches ;
@@ -84,7 +84,9 @@ rules:
       enregistre puis retire de vraies plateformes HA (sensor, binary_sensor, tracker, alarme), vérifie les
       listeners dispatcher et ceux du vrai coordinateur TNT, et isole deux entrées. Home appelle super ; watcher
       alarme remplacé sans fuite sur armement répété et annulé au retrait. Les abonnements de setup plateforme
-      sont rattachés à entry.async_on_unload.'
+      sont rattachés à entry.async_on_unload. Lot 6 : test de vrai discovery/forward a révélé puis corrigé
+      un listener discovery caméra hors ownership d’entrée ; rollback et retrait du listener maintenant vérifiés
+      par le manager HA, pas seulement par constructeur.'
   entity-unique-id:
     status: todo
     comment: IDs historiques conservés ; plateformes multientrées, retour/disparition et variantes boutons
@@ -122,17 +124,21 @@ rules:
       et Store publics. False du SDK remote = commande non confirmée (elle peut avoir été exécutée), erreur
       distincte sans retry automatique. Écriture rappel relue via API publique et sérialisée ; annulation ne
       supprime pas le timer si persistance échoue. Tests camera/cover/local inversion du lot 4 conservés ;
-      aucune preuve de réussite physique revendiquée.'
+      aucune preuve de réussite physique revendiquée. Lot 6 : mêmes contrôles de persistance réelle sur cache
+      partagé avant reboot/reload/unload ; échec Store détecté avant commande/teardown. Rappels : écriture
+      réussie mais relecture échouée reste erreur utilisateur ; status refuse désaccord stockage/minuteur.
+      Remplacement annule ancien minuteur, restauration préserve champs non concernés. Erreur de status visible
+      dans la carte (plus de catch silencieux), tests JS sans appel HA.'
   config-entry-unloading:
     status: todo
-    comment: 'Les 11 domaines ont maintenant au moins une vraie EntityPlatform ajoutée/retirée (incluant boutons/camera/cover/switch),
-      hooks coopératifs et listeners vérifiés ; isolement deux entrées et shutdown coordinator propriétaire
-      testés. Restent discovery/forward complet, rollback partiel et tâches en vol. SDK close peut échouer
-      avant fermeture session : limitation source démontrée, pas contournée. Lot 5 : fermeture publique aussi
-      tentée après probe réussi si registre/relevé initial échoue, via callback possédé par HA (quatre tests
-      du vrai ConfigEntriesManager, dont close en échec). Onze EntityPlatforms simultanées possédées par entrée
-      + TNT : retrait états/listeners/watcher et close vérifiés ; dispatcher forward/unload substitué, pas
-      une preuve de setup complet transactionnel. Limite SDK amont reste ouverte.'
+    comment: 'Lot 6 : vrai ConfigEntriesManager et vrais discovery/forward des onze plateformes depuis snapshots
+      routeur synthétiques (lectures initiales mockées), coordinateur TNT réel avec fetch mocké. Échecs injectés
+      après forward partiel (camera/switch/sensor) ou complet : rollback public et suppression carte coordinateur
+      avant close. Listener discovery caméra désormais possédé par entrée. Deux vrais callbacks intervalle
+      testés en lecture bloquée : annulation/drain avant close SDK ; fermeture concurrente sérialisée, succès
+      mémorisé, échec explicitement retentable, NotOpen non pris pour preuve de fermeture. Restent lectures
+      d’entités en vol (tâches framework distinctes), variantes/échec de rollback et SDK close sans finally/session
+      injectable publique. Pas de garantie universelle de cleanup, donc todo.'
   docs-configuration-parameters:
     status: todo
     comment: 'docs/guide-utilisateur.md (lié README) : Table des options général/groupes/types/répéteurs/TNT/profils,
@@ -175,8 +181,8 @@ rules:
       avant réauth. Lié au choix de migration unique ID host vers identité physique, non imposé ici.
   test-coverage:
     status: todo
-    comment: '342 tests HA 2026.10.4 ; 38 modules sans omit : lignes 3372/5812 (58,02 %), branches 590/1938
-      (30,44 %), combiné 51,12 %. Rapports JSON/XML CI ; seuil officiel non atteint. Certaines variantes sont
+    comment: '356 tests HA 2026.10.4 ; 38 modules sans omit : lignes 3640/5869 (62,02 %), branches 698/1960
+      (35,61 %), combiné 55,41 %. Rapports JSON/XML CI ; seuil officiel non atteint. Certaines variantes sont
       des inventaires explicitement distincts du runtime. Les tests ne valident pas le matériel.'
   devices:
     status: todo
@@ -259,7 +265,7 @@ rules:
       incomplètes.
   exception-translations:
     status: done
-    comment: Toutes les 32 levées custom de HomeAssistantError/sous-classes (dont UpdateFailed TNT) ont domaine,
+    comment: Toutes les 35 levées custom de HomeAssistantError/sous-classes (dont UpdateFailed TNT) ont domaine,
       clé sans message dur, et placeholders cohérents. tests/ha/test_translations_services.py vérifie source
       AST et strings/FR/EN, puis charge la traduction française via le vrai moteur HA. Unauthorized est une
       exception du framework, pas un message custom. Nouveau command_failed sans placeholder privé ; échecs
@@ -297,5 +303,8 @@ rules:
       dépendance pour score ; proposition amont dans le rapport.'
   strict-typing:
     status: todo
-    comment: router.py:1199 alias typé mais aucun résultat mypy strict/py.typed de toutes dépendances ni pipeline
-      strict global.
+    comment: 'Mypy 2.4.1 --strict réellement exécuté sur les 38 modules avec environnement HA/SDK épinglé :
+      baseline 268 erreurs/29 fichiers, puis 230/28 après retour Coroutine exact du décorateur. Aucun blanket
+      ignore, exclusion opportuniste ou stub SDK inventé. SDK 1.3.1 possède bien freebox_api/py.typed : absence
+      de session publique injectable est un problème distinct du typage. Détails et codes dans docs/quality-scale-typing-baseline.md
+      ; seuil strict non atteint, règle todo.'

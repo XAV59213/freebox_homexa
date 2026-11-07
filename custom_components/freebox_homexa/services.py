@@ -7,6 +7,7 @@ Chaque appel retrouve l'entrée chargée concernée : `config_entry_id` ou `devi
 from __future__ import annotations
 
 import logging
+from copy import deepcopy
 from typing import Any
 
 from homeassistant.config_entries import ConfigEntry, ConfigEntryState
@@ -123,7 +124,12 @@ async def _save_config(hass: HomeAssistant) -> None:
     data = hass.data.get(DOMAIN, {})
     store = data.get("store")
     if store is not None and "config" in data:
-        await store.async_save(data["config"])
+        snapshot = deepcopy(data["config"])
+        await store.async_save(snapshot)
+        if await store.async_load() != snapshot:
+            raise HomeAssistantError(
+                translation_domain=DOMAIN, translation_key="storage_write_failed"
+            )
 
 
 @callback
@@ -132,9 +138,10 @@ def async_setup_services(hass: HomeAssistant) -> None:
 
     @async_action_errors
     async def async_reboot(call: ServiceCall) -> None:
-        for entry in async_resolve_entries(hass, call):
-            await _router(hass, entry).reboot()
+        entries = async_resolve_entries(hass, call)
         await _save_config(hass)
+        for entry in entries:
+            await _router(hass, entry).reboot()
 
     @async_action_errors
     async def async_reload_config(call: ServiceCall) -> None:
@@ -154,6 +161,7 @@ def async_setup_services(hass: HomeAssistant) -> None:
                 translation_key="entry_not_loaded" if wanted else "no_loaded_entry",
                 translation_placeholders={"service": call.service},
             )
+        await _save_config(hass)
         for entry in entries:
             if not await hass.config_entries.async_reload(entry.entry_id):
                 raise HomeAssistantError(

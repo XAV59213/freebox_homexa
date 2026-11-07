@@ -11,6 +11,7 @@ from pathlib import Path
 from contextlib import suppress
 from datetime import datetime, timedelta
 from typing import Any, Mapping
+from collections.abc import Awaitable, Callable
 
 from freebox_api import Freepybox
 from freebox_api.api.call import Call
@@ -307,6 +308,9 @@ class FreeboxRouter:
         self.home_granted = True
         self.home_devices: dict[str, Any] = {}
         self.listeners: list = []
+        self.poll_tasks: set[asyncio.Task[None]] = set()
+        self._close_lock = asyncio.Lock()
+        self._closed = False
 
         _LOGGER.debug("Routeur Freebox %s initialisé", self.name)
 
@@ -696,12 +700,39 @@ class FreeboxRouter:
         await self._api.system.reboot()
         _LOGGER.info("Redémarrage de la Freebox effectué")
 
+    async def async_poll(self, update: Callable[[], Awaitable[None]]) -> None:
+        """Own only integration interval jobs, not initial reads or entity actions."""
+        if self.closing:
+            return
+        task = asyncio.current_task()
+        if task is not None:
+            self.poll_tasks.add(task)
+        try:
+            await update()
+        finally:
+            if task is not None:
+                self.poll_tasks.discard(task)
+
     async def close(self) -> None:
-        # Les relevés / mises à jour en vol ne journalisent plus d'erreur à partir d'ici.
-        self.closing = True
-        with suppress(NotOpenError):
-            await self._api.close()
+        async with self._close_lock:
+            if self._closed:
+                return
+            # Stop new interval reads, drain current ones, then close the public SDK.
+            self.closing = True
+            pending = self.poll_tasks - {asyncio.current_task()}
+            for task in pending:
+                task.cancel()
+            if pending:
+                await asyncio.gather(*pending, return_exceptions=True)
+            try:
+                await self._api.close()
+            except NotOpenError:
+                # Preserve historical suppression, but do not treat a missing
+                # access object as proof that the SDK session was closed.
+                return
             _LOGGER.debug("Connexion à la Freebox fermée")
+            # Failed close remains retryable; only memoize a normal SDK return.
+            self._closed = True
 
     @property
     def device_info(self) -> DeviceInfo:

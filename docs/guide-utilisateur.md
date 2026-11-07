@@ -275,3 +275,26 @@ Pour les rappels, l’écriture est relue par l’API publique de stockage HA. S
 persistance échoue, le service remonte une erreur ; une annulation n’enlève pas le
 timer existant tant que l’enregistrement de sa suppression n’est pas confirmé.
 Ce contrôle ne garantit pas une transaction contre une coupure de courant.
+
+
+### Confirmation du stockage et état ambigu (préparation 28.8.90)
+
+Si une écriture réussit mais que sa vérification échoue, une erreur ne prouve pas
+que rien n’a été enregistré. Le statut refuse de confirmer un rappel lorsque
+l’enregistrement et le minuteur actif ne concordent pas ; la carte affiche cette
+erreur. Après correction du stockage, programmez ou annulez explicitement le rappel
+souhaité. Aucun retry automatique n’est effectué ; une reprogrammation remplace
+l’ancien minuteur. Les rappels futurs restaurés restent actifs si seule la purge
+d’anciens enregistrements échoue.
+
+Le cache partagé est vérifié avant une action Homexa reboot/reload et avant le
+teardown d’une entrée. Un échec initial de ce contrôle empêche la commande/le
+teardown ; aucune confirmation de persistance n’est inventée. Les effets réseau
+et les fichiers ne constituent pas une transaction atomique.
+
+
+Cette relecture confirme les valeurs persistées observées, pas un `fsync` ni le
+succès physique de chaque écriture. Si les mêmes valeurs étaient déjà enregistrées,
+le seul contrat public de HA Store ne distingue pas une écriture identique échouée
+d’une valeur déjà correcte ; HA peut la journaliser. Aucun acquittement durable
+universel n’est revendiqué.

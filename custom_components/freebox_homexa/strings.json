@@ -553,6 +553,12 @@
     },
     "reminder_storage_failed": {
       "message": "The reminder save could not be confirmed. Check Home Assistant storage before retrying."
+    },
+    "storage_write_failed": {
+      "message": "L’enregistrement de la configuration n’a pas pu être confirmé. Vérifiez le stockage Home Assistant avant de réessayer."
+    },
+    "reminder_state_unconfirmed": {
+      "message": "L’état du rappel n’est pas confirmé entre le stockage et le minuteur. Vérifiez le stockage Home Assistant puis programmez ou annulez explicitement ce rappel."
     }
   }
 }

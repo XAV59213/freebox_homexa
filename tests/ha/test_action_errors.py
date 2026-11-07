@@ -261,7 +261,7 @@ async def test_reminder_services_storage_error_then_recovery(hass, home_context,
         with pytest.raises(HomeAssistantError) as exc:
             await hass.services.async_call("freebox_homexa", service, data, blocking=True,
                 return_response=service == "get_reminder_status")
-        assert exc.value.translation_key == "command_failed"
+        assert exc.value.translation_key == ("reminder_storage_failed" if service == "schedule_reminder" else "command_failed")
         if service == "cancel_reminder":
             assert hass.data[_UNSUB_KEY][reminder_id] is timer
             timer.assert_not_called()
@@ -417,8 +417,9 @@ async def test_status_waits_for_inflight_persistence_not_speculative_cache(hass)
         started.set()
         await release.wait()
         await original_save(data)
-    with patch.object(store, "async_save", side_effect=delayed_save):
-        save_task = asyncio.create_task(manager._async_save({"id": rid}))
+    with patch.object(store, "async_save", side_effect=delayed_save), \
+         patch.object(manager, "_resolve_targets", return_value=(["synthetic_notify"], [], None, None)):
+        save_task = asyncio.create_task(manager.async_handle_schedule(ServiceCall(hass, "freebox_homexa", "schedule_reminder", {**payload, "minutes_before": 5})))
         await started.wait()
         read_task = asyncio.create_task(manager.async_handle_status(ServiceCall(hass, "freebox_homexa", "get_reminder_status", payload)))
         try:
@@ -428,6 +429,7 @@ async def test_status_waits_for_inflight_persistence_not_speculative_cache(hass)
             release.set()
             await save_task
         assert await read_task == {"scheduled_minutes": [5]}
+        await manager.async_handle_cancel(ServiceCall(hass, "freebox_homexa", "cancel_reminder", {**payload, "minutes_before": 5}))
 
 
 @pytest.mark.parametrize("failure", [OSError("private SDK response"), TimeoutError()])

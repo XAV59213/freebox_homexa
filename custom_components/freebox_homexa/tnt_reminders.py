@@ -118,10 +118,9 @@ async def async_setup_reminders(hass: HomeAssistant) -> None:
     try:
         await manager.async_restore_pending()
     except Exception:  # noqa: BLE001
-        _LOGGER.exception(
-            "Impossible de recharger les rappels TNT Freebox Homexa en attente "
-            "(les rappels deja programmes avant ce redemarrage sont perdus, "
-            "le reste de l'integration n'est pas affecte)"
+        _LOGGER.error(
+            "Restauration des rappels TNT non entièrement confirmée ; vérifiez le "
+            "stockage et le statut des rappels. Les minuteurs déjà restaurés sont conservés."
         )
 
 class _ReminderManager:
@@ -261,6 +260,13 @@ class _ReminderManager:
         async with self._storage_lock:
             data = await self._store.async_load() or {"reminders": []}
         existing_ids = {r["id"] for r in data.get("reminders", [])}
+        active_ids = self._hass.data.get(_UNSUB_KEY, {})
+        queried = {_reminder_id(channel_name, program_title, start_time, minutes, profile_name)
+                   for minutes in (5, 10, 15)}
+        if any((rid in existing_ids) != (rid in active_ids) for rid in queried):
+            raise HomeAssistantError(
+                translation_domain=DOMAIN, translation_key="reminder_state_unconfirmed"
+            )
         scheduled = [
             minutes
             for minutes in (5, 10, 15)
@@ -270,19 +276,22 @@ class _ReminderManager:
         return {"scheduled_minutes": scheduled}
 
     async def async_restore_pending(self) -> None:
-        data = await self._store.async_load()
-        if not data:
-            return
-        now = dt_util.now()
-        kept = []
-        for reminder in data.get("reminders", []):
-            fire_time = dt_util.parse_datetime(reminder.get("fire_time", ""))
-            if fire_time is None or fire_time <= now:
-                continue
-            kept.append(reminder)
-            self._schedule(reminder)
-        if len(kept) != len(data.get("reminders", [])):
-            await self._store.async_save({"reminders": kept})
+        async with self._storage_lock:
+            data = await self._store.async_load()
+            if not data:
+                return
+            now = dt_util.now()
+            kept = []
+            for reminder in data.get("reminders", []):
+                fire_time = dt_util.parse_datetime(reminder.get("fire_time", ""))
+                if fire_time is None or fire_time <= now:
+                    continue
+                kept.append(reminder)
+                self._schedule(reminder)
+            if len(kept) != len(data.get("reminders", [])):
+                snapshot = dict(data)
+                snapshot["reminders"] = kept
+                await self._async_store_checked(snapshot)
 
     def _schedule(self, reminder: dict) -> None:
         fire_time = dt_util.parse_datetime(reminder["fire_time"])
@@ -293,7 +302,11 @@ class _ReminderManager:
             await self._async_notify(reminder)
 
         unsub = async_track_point_in_time(self._hass, _fire, fire_time)
-        self._hass.data.setdefault(_UNSUB_KEY, {})[reminder["id"]] = unsub
+        timers = self._hass.data.setdefault(_UNSUB_KEY, {})
+        previous = timers.get(reminder["id"])
+        if previous is not None:
+            previous()
+        timers[reminder["id"]] = unsub
 
     def _alexa_notify_slug(self, entity_id: str) -> str | None:
         """notify.alexa_media_<slug> service name for this entity, if any.
@@ -443,8 +456,14 @@ class _ReminderManager:
     async def _async_store_checked(self, data: dict) -> None:
         # HA Store logs and swallows WriteError. A normal return alone is NOT a
         # persistence acknowledgement. Verify using only its public API.
-        await self._store.async_save(data)
-        if await self._store.async_load() != data:
+        try:
+            await self._store.async_save(data)
+            persisted = await self._store.async_load()
+        except Exception as err:
+            raise HomeAssistantError(
+                translation_domain=DOMAIN, translation_key="reminder_storage_failed"
+            ) from err
+        if persisted != data:
             raise HomeAssistantError(
                 translation_domain=DOMAIN, translation_key="reminder_storage_failed"
             )

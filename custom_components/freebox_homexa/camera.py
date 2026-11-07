@@ -56,7 +56,7 @@ async def async_setup_entry(
         add_entities(hass, router, async_add_entities, tracked)
 
     # Écoute les nouveaux appareils domestiques et déclenche la mise à jour
-    router.listeners.append(
+    entry.async_on_unload(
         async_dispatcher_connect(hass, router.signal_home_device_new, update_callback)
     )
     update_callback()

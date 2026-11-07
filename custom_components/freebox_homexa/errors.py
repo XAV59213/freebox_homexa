@@ -6,7 +6,7 @@ import json
 import logging
 import re
 from typing import Any, ParamSpec, TypeVar
-from collections.abc import Awaitable, Callable
+from collections.abc import Awaitable, Callable, Coroutine
 from functools import wraps
 
 from homeassistant.exceptions import HomeAssistantError
@@ -92,7 +92,7 @@ _T = TypeVar("_T")
 
 def async_action_errors(
     action: Callable[_P, Awaitable[_T]],
-) -> Callable[_P, Awaitable[_T]]:
+) -> Callable[_P, Coroutine[Any, Any, _T]]:
     """Normalize unexpected action failures without exposing SDK payloads.
 
     Preserve HA validation/translated errors and cancellation. Polling and cleanup

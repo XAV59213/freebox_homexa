@@ -225,12 +225,18 @@ class FreeboxHomeEntity(Entity):
         """Indisponible si la Freebox est injoignable ou si elle signale le nœud « unreachable »."""
         if not router_reachable(self._router):
             return False
+        if getattr(self._router, "home_available", True) is False:
+            return False
+        if (getattr(self._router, "home_snapshot_known", False) is True
+                and self._id not in self._router.home_devices):
+            return False
         if not home_node_reachable(self._node):
             return False
         return super().available
 
     async def async_update_signal(self) -> None:
         if self._id not in self._router.home_devices:
+            self.async_write_ha_state()
             return
         try:
             self._node = self._router.home_devices[self._id]

@@ -17,7 +17,7 @@ async def test_xmltv_failure_is_translated_without_fake_program(hass):
                 await coordinator._async_update_data()
         assert exc.value.translation_domain == 'freebox_homexa'
         assert exc.value.translation_key == 'cannot_fetch_tnt'
-        assert exc.value.translation_placeholders == {'error': 'synthetic offline'}
+        assert exc.value.translation_placeholders == {'error': 'OSError'}
         assert not coordinator.data
     finally:
         await coordinator.async_shutdown()

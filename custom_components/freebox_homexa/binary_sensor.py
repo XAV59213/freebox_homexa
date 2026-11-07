@@ -264,13 +264,19 @@ class FreeboxRaidDegradedSensor(FreeboxReachableMixin, BinarySensorEntity):
         self._attr_translation_placeholders = {"raid_id": str(raid["id"])}
         self._attr_unique_id = f"{router.mac}_{description.key}_{raid['name']}_{raid['id']}"
 
+    @property
+    def available(self) -> bool:
+        return (super().available and self._router.raids_available
+                and self._raid_id in self._router.raids)
+
     @callback
     def async_update_state(self) -> None:
         self._raid = self._router.raids.get(self._raid_id)
         if self._raid is None:
             self._attr_is_on = None
         else:
-            self._attr_is_on = self._raid.get("degraded", False)
+            degraded = self._raid.get("degraded")
+            self._attr_is_on = degraded if isinstance(degraded, bool) else None
 
     @property
     def is_on(self) -> bool | None:

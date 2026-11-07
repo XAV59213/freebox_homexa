@@ -17,6 +17,7 @@ from freebox_api import Freepybox
 from freebox_api.api.call import Call
 from freebox_api.api.home import Home
 from freebox_api.api.wifi import Wifi
+from aiohttp import ClientError
 from freebox_api.exceptions import HttpRequestError, NotOpenError
 
 from homeassistant.config_entries import ConfigEntry
@@ -278,6 +279,10 @@ class FreeboxRouter:
         # Journalisation unique de l'indisponibilité (règle log-when-unavailable).
         self.reachable: bool = True
         self.sensors_available: bool = True
+        self.disks_available = True
+        self.raids_available = True
+        self.home_available = True
+        self.home_snapshot_known = False
         # nœuds Home dont les entités vivent sur un appareil de groupe (module d'alarme)
         self.merged_node_ids: set[Any] = set()
         self.player_identifiers: set[str] = set()
@@ -527,7 +532,7 @@ class FreeboxRouter:
             await self.update_device_trackers()
             await self.update_sensors()
         except Exception as err:
-            if is_shutdown_error(err, self):
+            if self.closing and is_shutdown_error(err, self):
                 _LOGGER.debug("Relevé interrompu (connexion fermée, rechargement) : %s", err)
                 return
             if now is None:
@@ -601,7 +606,9 @@ class FreeboxRouter:
                 value = connection_datas.get(sensor_key)
                 self.sensors_connection[sensor_key] = value if isinstance(value, (int, float)) and not isinstance(value, bool) else None
 
-            uptime_seconds = syst_datas.get("uptime_val", 0)
+            raw_uptime = syst_datas.get("uptime_val")
+            uptime_seconds = (raw_uptime if isinstance(raw_uptime, (int, float))
+                              and not isinstance(raw_uptime, bool) and raw_uptime >= 0 else None)
             self.sensors_connection["uptime"] = uptime_seconds
 
             self._attrs = {
@@ -610,7 +617,7 @@ class FreeboxRouter:
                 "connection_type": connection_datas.get("media"),
                 "uptime": datetime.fromtimestamp(
                     round(datetime.now().timestamp()) - uptime_seconds
-                ),
+                ) if uptime_seconds is not None else None,
                 "firmware_version": self._sw_v,
                 "serial": syst_datas["serial"],
             }
@@ -634,29 +641,40 @@ class FreeboxRouter:
 
     async def _update_disks_sensors(self) -> None:
         try:
-            fbx_disks: list[dict[str, Any]] = await self._api.storage.get_disks() or []
+            fbx_disks = await self._api.storage.get_disks()
+            if not isinstance(fbx_disks, list):
+                raise ValueError("Invalid disks collection")
+            disks: dict[int, dict[str, Any]] = {}
             for fbx_disk in fbx_disks:
-                disk: dict[str, Any] = {**fbx_disk}
-                disk_part: dict[int, dict[str, Any]] = {}
-                for fbx_disk_part in fbx_disk.get("partitions", []):
-                    disk_part[fbx_disk_part["id"]] = fbx_disk_part
-                disk["partitions"] = disk_part
-                self.disks[fbx_disk["id"]] = disk
-            _LOGGER.debug("Mise à jour des disques terminée")
-        except HttpRequestError as err:
-            _LOGGER.error("Erreur lors de la mise à jour des disques : %s", err)
+                disk = {**fbx_disk}
+                disk["partitions"] = {part["id"]: part for part in fbx_disk.get("partitions", [])}
+                disks[fbx_disk["id"]] = disk
+            self.disks = disks
+            if not self.disks_available:
+                _LOGGER.info("Source disques Freebox de nouveau disponible")
+            self.disks_available = True
+        except (HttpRequestError, NotOpenError, TimeoutError, ClientError, OSError, ValueError, TypeError, KeyError):
+            if self.disks_available:
+                _LOGGER.info("Source disques Freebox indisponible")
+            self.disks_available = False
 
     async def _update_raids_sensors(self) -> None:
         if not self.supports_raid:
             return
         try:
-            fbx_raids: list[dict[str, Any]] = await self._api.storage.get_raids() or []
-            for fbx_raid in fbx_raids:
-                self.raids[fbx_raid["id"]] = fbx_raid
-            _LOGGER.debug("Mise à jour des RAID terminée")
-        except HttpRequestError:
-            self.supports_raid = False
-            _LOGGER.warning("L'API du routeur %s ne supporte pas les RAID", self.name)
+            fbx_raids = await self._api.storage.get_raids()
+            if not isinstance(fbx_raids, list):
+                raise ValueError("Invalid RAID collection")
+            raids = {raid["id"]: raid for raid in fbx_raids}
+            self.raids = raids
+            if not self.raids_available:
+                _LOGGER.info("Source RAID Freebox de nouveau disponible")
+            self.raids_available = True
+        except (HttpRequestError, NotOpenError, TimeoutError, ClientError, OSError, ValueError, TypeError, KeyError):
+            # An API error is not proof of permanent hardware incapability.
+            if self.raids_available:
+                _LOGGER.info("Source RAID Freebox indisponible")
+            self.raids_available = False
 
     async def update_home_devices(self, now: datetime | None = None) -> None:
         if not self.home_granted or self.closing:
@@ -666,47 +684,40 @@ class FreeboxRouter:
             return
         async with self._home_update_lock:
             try:
-                home_nodes: list[dict[str, Any]] = await self.home.get_home_nodes() or []
+                home_nodes = await self.home.get_home_nodes()
+                if not isinstance(home_nodes, list):
+                    raise ValueError("Invalid Home collection")
+                devices: dict[str, Any] = {}
                 new_device = False
                 for home_node in home_nodes:
                     if home_node["category"] in HOME_COMPATIBLE_CATEGORIES:
                         node_id = home_node["id"]
                         if node_id not in self.home_devices:
                             new_device = True
-                        self.home_devices[node_id] = home_node
+                        devices[node_id] = home_node
 
+                self.home_devices = devices
+                self.home_snapshot_known = True
+                if not self.home_available:
+                    _LOGGER.info("Source Freebox Home de nouveau disponible")
+                self.home_available = True
                 async_dispatcher_send(self.hass, self.signal_home_device_update)
                 if new_device:
                     async_dispatcher_send(self.hass, self.signal_home_device_new)
                 _LOGGER.debug("Mise à jour des appareils domestiques terminée")
-            except TimeoutError:
-                _LOGGER.debug("Timeout API home/nodes — prochain poll dans 15 s")
-            except HttpRequestError as err:
-                if is_shutdown_error(err, self):
-                    _LOGGER.debug("Poll Home interrompu (rechargement) : %s", err)
+            except (HttpRequestError, NotOpenError, TimeoutError, ClientError, OSError, ValueError, TypeError, KeyError) as err:
+                if self.closing and is_shutdown_error(err, self):
                     return
-                # Ne pas confondre un endpoint absent / une erreur réseau avec un refus
-                # de droit : sur Freebox v8 (api 16.x) il n'y a souvent aucune case
-                # « maison connectée » à cocher.
-                if is_permission_denied(err):
+                if self.home_available:
+                    _LOGGER.info("Source Freebox Home indisponible")
+                self.home_available = False
+                async_dispatcher_send(self.hass, self.signal_home_device_update)
+                if isinstance(err, HttpRequestError) and is_permission_denied(err):
+                    # Reload after granting rights rechecks the explicit gate.
+                    # Transient failures must not permanently disable polling.
                     self.home_granted = False
-                    _LOGGER.warning(
-                        "L'accès aux appareils domestiques n'est pas autorisé (%s). "
-                        "Dans Freebox OS → Paramètres → Gestion des accès → Applications, "
-                        "vérifiez les droits de l'application Homexa (alarme / maison "
-                        "connectée s'ils existent sur votre modèle).",
-                        err,
-                    )
-                    return
-                self.home_granted = False
-                _LOGGER.warning(
-                    "Impossible de lire les appareils Freebox Home (home/nodes) : %s. "
-                    "Ce n'est pas forcément un refus de droit — l'API peut être absente "
-                    "sur certains modèles (ex. Freebox v8 sans objets Home) ou temporairement "
-                    "indisponible. Si vous n'avez pas d'alarme / PIR / volets Freebox Home, "
-                    "ignorez ce message.",
-                    err,
-                )
+                    _LOGGER.warning("L'accès aux appareils domestiques n'est pas autorisé ; "
+                        "dans Freebox OS → Gestion des accès → Applications, vérifiez les droits Homexa")
 
     @async_action_errors
     async def reboot(self) -> None:

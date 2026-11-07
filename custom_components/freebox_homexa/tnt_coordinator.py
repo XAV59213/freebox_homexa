@@ -186,13 +186,12 @@ class ProgrammeTntFrCoordinator(DataUpdateCoordinator):
                 await self._fetch_and_parse()
                 self._last_fetch = now
             except Exception as err:
-                if not self._programmes_by_channel:
-                    raise UpdateFailed(
-                        translation_domain=DOMAIN,
-                        translation_key="cannot_fetch_tnt",
-                        translation_placeholders={"error": str(err)},
-                    ) from err
-                _LOGGER.warning("XMLTV en cache : %s", err)
+                # Retain coordinator data, but do not present a failed refresh as fresh.
+                raise UpdateFailed(
+                    translation_domain=DOMAIN,
+                    translation_key="cannot_fetch_tnt",
+                    translation_placeholders={"error": type(err).__name__},
+                ) from err
             if self._tmdb is not None:
                 self._tmdb.prune(self._all_programmes())
 

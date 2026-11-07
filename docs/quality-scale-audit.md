@@ -81,7 +81,7 @@ pas tester toute version HA ≥2026.8 ; un job minimum supporté reste à établ
 Le plugin HA bloque sockets externes et DNS ; toutes les réponses appareil sont
 synthétiques/mocks. Aucun secret/token de production, aucun appareil connecté.
 
-**407 tests passent** (377 au lot 7, +30 au lot 8) : config initiale, réseau/auth, duplicate host, réauth avec
+**451 tests passent** (407 au lot 8, +44 au lot 9) : config initiale, réseau/auth, duplicate host, réauth avec
 reload de l'entrée existante, options général/groupes, conservation options,
 migration LAN, setup/unload succès/refus, erreurs close/annulation, confidentialité,
 bornes cache/timings, Entity HA et signaux dispatcher/perte-retour, logs centraux
@@ -94,7 +94,7 @@ Les tests SDK/reconfigure de caractérisation documentent une limite, ils ne la 
 
 | Périmètre (38 modules, aucun omit) | Lignes exécutées | Branches | Combiné |
 |---|---:|---:|---:|
-| Intégration entière | 3997/5936 = **67,33 %** | 841/1980 = **42,47 %** | **61,12 %** |
+| Intégration entière | 4090/5973 = **68,47 %** | 880/1994 = **44,13 %** | **62,38 %** |
 | config_flow.py | 437/438 = **99,77 %** | 145/148 = **97,97 %** | **99,32 %** |
 | diagnostics.py | **100 %** | **100 %** | **100 %** |
 | player_diagnostics.py | **100 %** | **100 %** | **100 %** |
@@ -102,7 +102,7 @@ Les tests SDK/reconfigure de caractérisation documentent une limite, ils ne la 
 
 `test-coverage` et `config-flow-test-coverage` restent **todo**, loin des exigences.
 Imports exécutés comptés dans les lignes ; ces chiffres ne signifient donc pas
-67 % des fonctionnalités validées. Pas de seuil abaissé pour déclarer un niveau.
+68 % des fonctionnalités validées. Pas de seuil abaissé pour déclarer un niveau.
 CI ajoutée `.github/workflows/ha-tests.yaml` : vrais tests HA + inventaire YAML,
 rapports coverage JSON/XML en artefact. Syntax/HACS/hassfest ne prouvent pas la
 couverture runtime. Les simulations historiques restent des régressions séparées.
@@ -114,6 +114,37 @@ PYTHONDONTWRITEBYTECODE=1 /tmp/homexa-ha-quality/bin/python -m pytest -q tests/h
   --cov=custom_components.freebox_homexa --cov-branch \
   --cov-report=term --cov-report=json:coverage.json --cov-report=xml:coverage.xml
 ```
+
+## Lot 9 — unités et disponibilité par source, sans faux succès
+
+**451 tests HA (+44)**, deux suites JS, **16 done / 36 todo / 2 exempt**.
+Pas de règle entière ajoutée : les pertes partielles restantes empêchent encore
+`entity-unavailable`, les sous-types opener empêchent `entity-device-class`.
+[Contrats, revue des 30 familles et minimum restant](quality-scale-source-contracts.md).
+
+- Débit : octets/s → kB/s corrigé /1000, pas /8000, source officielle HA lue.
+  IDs/unité conservés ; ancien historique non réécrit, prochains relevés corrigés.
+- Vrais SDK Storage/Home sur transport mocké : cache indisponible après panne,
+  réponses malformées distinctes d’un succès vide, disparition/retour sans migration.
+  RAID/Home ne désactivent plus définitivement leur poll sur erreur transitoire.
+- XMLTV en cache : UpdateFailed conserve les données mais rend les entités
+  indisponibles ; récupération réelle et erreur traduite sans payload brut.
+- Uptime/disque/RAID inconnus ne produisent plus de faux zéro/état sain.
+- SDK fermé hors unload : panne visible, pas fausse interruption normale.
+- Typage réel **186→167 erreurs**, 24 fichiers/38 analysés ; tnt_tmdb strict sans
+  erreur avec Programme, datetime, TypedDict et délai public aiohttp inchangé.
+- Couverture **4090/5973 lignes (68,47 %)**, **880/1994 branches (44,13 %)**,
+  combiné **62,38 %** ; dix lignes typing exclues automatiquement, aucun omit ou
+  exclusion personnalisée. Tests = contrats synthétiques, pas matériel validé.
+- Douze simulations historiques passent séparément. Le stub obsolète de
+  `simulation_clients_filaires_wifi.py` ne fournissait pas les exceptions HA :
+  fixture corrigée, aucune modification runtime pour ce harness. Ces simulations
+  ne sont pas incluses dans les 451 vrais tests HA ni dans leur couverture.
+
+Le mandat continue : Remote/Player/Wi-Fi, schémas WebSocket sous vrai HA,
+annotations SDK, couverture globale et chemins config restants sont encore
+traitables. Session SDK publique, rollback refusé, FFmpeg et migrations sensibles
+restent explicitement distingués ; aucun merge/release.
 
 ## Lot 8 — noms/defaults globaux, source capteurs et vrais contrats typés
 
@@ -487,10 +518,10 @@ listés dans le tableau suivant ; celui-ci reprend le YAML, il n'est pas un seco
 | config-entry-unloading | Lots 6-8 : vrai ConfigEntriesManager/discovery/forward des onze domaines et rollback partiel/complet ; six lectures SDK entités et deux intervalles drainés avant close, fermeture sérialisée. Refus/exception de rollback désormais caractérisés : des plateformes HA peuvent rester après erreur du setup, pas de faux rollback atomique ; nettoyage réel explicite du test. Unload normal refusé/échoué/annulé restaure admission des lectures sauf si un autre propriétaire ferme déjà le SDK ou si close est terminé, courses testées par Events. FFmpeg hérité testé sans processus/réseau : snapshot, source, fermeture après erreur lecteur/proxy/annulation ; ouverture en dehors du try/finally amont, fermeture sur échec d'ouverture non garantie. Limite SDK close/session publique inchangée. Pas garantie universelle donc todo. |
 | docs-configuration-parameters | docs/guide-utilisateur.md (lié README) : Table des options général/groupes/types/répéteurs/TNT/profils, valeurs, défauts, effets et données privées ; conservation des codes Player absents testée. Preuve documentaire locale renforcée ; reste todo au sens formel, la règle officielle visant une page/revue home-assistant.io non soumise. Aucune certification custom revendiquée. |
 | docs-installation-parameters | docs/guide-utilisateur.md (lié README) : Table host/port initiaux, Server plutôt que Player et appairage physique ; limite host/identité expliquée. Preuve documentaire locale renforcée ; reste todo au sens formel, la règle officielle visant une page/revue home-assistant.io non soumise. Aucune certification custom revendiquée. |
-| entity-unavailable | Lot 8 : inventaire des 30 familles/81 variantes testé sous perte routeur, fermeture et retour ; tracker désormais indisponible quand Freebox est perdue. Exceptions réelles : TNT dépend de XMLTV, inversion fichier local. Échec HttpRequestError de la source capteurs ne conserve plus de cache affiché disponible : flag dédié, signal HA, récupération et logs uniques testés. Débit manquant/invalide = unknown, zéro réel conservé. Restent les sources stockage/RAID/Home et cache XMLTV : pertes partielles et récupération non entièrement démontrées, dont invalidation de droits/support sur erreurs. Pas done par association aux seules gardes globales. |
+| entity-unavailable | Lot 9 : tests/ha/test_partial_sources.py, vrai SDK Storage/Home et vrais états HA : pertes HTTP/timeout/payload/malformed, cache conservé mais unavailable, disparition puis retour sans ID changé. Dix variantes Home gardées, inversion locale indépendante. RAID transitoire ne désactive plus le support ; droit Home explicite reste bloquant. XMLTV UpdateFailed même avec cache, puis récupération. Fermeture SDK hors unload reconnue comme panne. Restent Remote/boutons Player, Wi-Fi/LAN multi-sources et lectures individuelles : global todo, pas généralisation depuis quatre sources. Voir docs/quality-scale-source-contracts.md. |
 | log-when-unavailable | tests/ha/test_router_recovery.py prouve une seule annonce INFO de perte puis retour sur trois erreurs du relevé central. __init__.py ne double plus les logs avant NotReady/AuthFailed. Les chemins Home/Player/TNT peuvent encore répéter des logs ; pas de preuve globale. |
 | reauthentication-flow | tests/ha/test_config_flow.py prouve reauth_successful et reload unique de la même entrée sans doublon. Le serveur physique peut toutefois changer derrière le même host ; absence de contrôle MAC/identité avant réauth. Lié au choix de migration unique ID host vers identité physique, non imposé ici. |
-| test-coverage | 407 tests HA 2026.10.4 ; 38 modules sans omit : lignes 3997/5936 (67,33 %), branches 841/1980 (42,47 %), combiné 61,12 %. Rapports JSON/XML CI ; seuil officiel non atteint. Certaines variantes sont des inventaires explicitement distincts du runtime. Les tests ne valident pas le matériel. |
+| test-coverage | 451 tests HA 2026.10.4 (+44 au lot 9), 38 modules sans omit : 4090/5973 lignes (68,47 %), 880/1994 branches (44,13 %), combiné 62,38 %. Deux suites JS. Rapports JSON/XML CI ; seuil officiel non atteint. Dix lignes typing exclues automatiquement par coverage.py, aucune exclusion personnalisée. Pas validation du matériel. |
 | devices | media_player.py:90-103 et tnt_sensor.py:14-29 DeviceInfo ; cohérence des associations/subdevices et de toutes plateformes non vérifiée sur plusieurs modèles. |
 | discovery | tests/ha/test_config_flow.py teste le flow zeroconf réel : préremplissage api_domain/https_port, formulaire utilisateur et rejet du même host configuré. L’identité physique, alias d’adresse et découverte de tous modèles restent non démontrés ; pas un passage en done sur seul préremplissage. |
 | discovery-update-info | config_flow.py:390-405 découvre le host ; aucun test prouvant mise à jour sûre des entrées existantes après changement adresse. |
@@ -503,7 +534,7 @@ listés dans le tableau suivant ; celui-ci reprend le YAML, il n'est pas un seco
 | docs-use-cases | docs/guide-utilisateur.md (lié README) : Cas guide vs Player, disponibilité Home/retour réseau, lecture préalable des rappels et adaptation entity_id ; aucun exemple exécuté. Preuve documentaire locale renforcée ; reste todo au sens formel, la règle officielle visant une page/revue home-assistant.io non soumise. Aucune certification custom revendiquée. |
 | dynamic-devices | Code de découverte LAN/Home/répéteurs présent ; découverte runtime après setup et couverture de tous périphériques sans reload non démontrées. |
 | entity-category | Revue sémantique globale des 30 familles et 81 variantes : docs/quality-scale-entity-inventory.md. Snapshot des constructeurs réels dans test_entity_inventory ; test_category_registry prouve la conservation des IDs, noms et choix utilisateur avec le vrai EntityPlatform HA. Classements diagnostic/config corrigés sans changer les activations ni les commandes. |
-| entity-device-class | Inventaire global classes/unités des 30 familles et 81 variantes disponible et stable ; ne suffit pas à une validation sémantique. L'opener conserve une heuristique garage basée sur le libellé et un repli shutter non démontré pour tous matériels ; contrat matériel/subtype et effet des changements sur exposition vocale à revoir sans migration d'ID. Conversions et unités de toutes les sources doivent aussi être vérifiées sur contrat public, pas seulement sur fixtures choisies. |
+| entity-device-class | Revue des 30 familles/81 variantes dans docs/quality-scale-source-contracts.md et inventaire. Défaut démontré : rate_* Freebox = octets/s, conversion /8000 corrigée /1000 en kB/s comme source officielle HA ; IDs/unité/historique conservés, prochains échantillons corrigés huit fois plus grands. Pourcentage disque invalide, uptime absent et RAID absent deviennent unknown. Heuristique opener garage par libellé et replis RSSI non entièrement prouvés : todo, pas de changement silencieux de classe/exposition vocale. |
 | entity-disabled-by-default | Lot 8 : revue des 81 variantes dans docs/quality-scale-entity-inventory.md. RSSI individuel bruyant off à la première création ; tracker, autoprotection et contrôles avancés opt-in conservés. Fonctions principales et supervision Server/Home/réseau gardées selon rôle, pas désactivation administrative des données des cartes. Vrai EntityPlatform : RSSI neuf disabled_by INTEGRATION, ancien activé reste activé, choix USER conservé. Les 81 variantes préservent préférences et IDs ; aucun dashboard modifié. Valeurs contextualisées du ScannerEntity HA explicitement distinguées des flags déclarés. |
 | entity-translations | sensor.py:371 et tnt_sensor.py:28 noms historiques sans has_entity_name ; traductions globales incomplètes. |
 | icon-translations | icons.json existe ; tnt_sensor.py:27 et autres plateformes gardent des icônes statiques ; inventaire complet non effectué. |
@@ -511,7 +542,7 @@ listés dans le tableau suivant ; celui-ci reprend le YAML, il n'est pas un seco
 | repair-issues | Pas de preuve de Repairs pour tous états actionnables nécessitant intervention ; logs et ConfigEntryAuthFailed ne suffisent pas. |
 | stale-devices | router.py:941-994,1112-1123 nettoie certains registres ; stale sensor/client/disque/Home et garanties multi-intégrations non démontrées globalement. Aucun changement repeater/. |
 | inject-websession | Source SDK v1.3.1 vérifiée : constructeur sans session publique, open crée son ClientSession (aiofreepybox.py:126). Test signature réelle. Autre limite amont démontrée : après open échoué, close peut lever AttributeError _access avant session.close ; après logout échoué, close ne passe pas dans finally. Ne pas promettre une fermeture garantie sur erreur. Pas de monkeypatch/private session ni modification dépendance pour score ; proposition amont dans le rapport. |
-| strict-typing | Mypy 2.4.1 --strict réel sur 38 modules HA/SDK épinglés : 268 erreurs initiales, 227 au lot 7, 186 dans 25 fichiers au lot 8. XMLTV/Programme/metadata/parser temporel typés et module tnt_coordinator sans erreur ; événements XML validés/narrowed, dicts de valeurs object, aucune injection de Any/cast/ignore. Base disponibilité hérite du vrai Entity, DeviceInfo et IDs d'endpoint narrowés. Les nouveaux contrats révèlent aussi des appels SDK non annotés et incompatibilité d'annotation name FFmpeg str vs nom principal None ; ne pas les masquer. SDK 1.3.1 possède py.typed mais pas session publique injectable, question distincte. Détails docs/quality-scale-typing-baseline.md ; strict global non atteint. |
+| strict-typing | Mypy 2.4.1 strict : 167 erreurs dans 24 fichiers/38 analysés (186 au lot 8). Tables de classement tuple homogènes, Programme/datetime/retours callback, TmdbResult TypedDict, ClientTimeout public équivalent. tnt_coordinator et tnt_tmdb sans erreur stricte. Aucun cast/ignore/Any pour masquer une erreur, aucun omit. Restent SDK non annoté, schémas WebSocket HA et structures d’autres plateformes ; voir docs/quality-scale-typing-baseline.md. Aucun patch de dépendance/session privée. |
 
 ## Validation reproductible
 

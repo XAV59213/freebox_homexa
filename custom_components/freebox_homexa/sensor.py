@@ -244,7 +244,9 @@ class FreeboxSensor(FreeboxReachableMixin, SensorEntity):
         if state is None:
             self._attr_native_value = None
         elif self.native_unit_of_measurement == UnitOfDataRate.KILOBYTES_PER_SECOND:
-            self._attr_native_value = round(state / 8000, 2)
+            # Freebox OS connection.rate_* are bytes/s (not bandwidth_* bits/s).
+            # https://dev.freebox.fr/sdk/os/connection/
+            self._attr_native_value = round(state / 1000, 2)
         else:
             self._attr_native_value = state
 
@@ -310,6 +312,12 @@ class FreeboxDiskSensor(FreeboxSensor):
             device_info["via_device_id"] = parent_id
         self._attr_device_info = DeviceInfo(**device_info)
 
+    @property
+    def available(self) -> bool:
+        disk = self._router.disks.get(self._disk_id)
+        return (super().available and self._router.disks_available
+                and disk is not None and self._partition_id in disk.get("partitions", {}))
+
     @callback
     def async_update_state(self) -> None:
         disk = self._router.disks.get(self._disk_id)
@@ -322,9 +330,9 @@ class FreeboxDiskSensor(FreeboxSensor):
             return
         total_bytes = partition.get("total_bytes")
         free_bytes = partition.get("free_bytes")
-        if total_bytes is None or total_bytes <= 0:
-            self._attr_native_value = 0
-        elif free_bytes is None:
+        if (not isinstance(total_bytes, (int, float)) or isinstance(total_bytes, bool)
+                or total_bytes <= 0 or not isinstance(free_bytes, (int, float))
+                or isinstance(free_bytes, bool) or not 0 <= free_bytes <= total_bytes):
             self._attr_native_value = None
         else:
             self._attr_native_value = round((free_bytes / total_bytes) * 100, 2)

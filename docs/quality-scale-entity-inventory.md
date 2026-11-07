@@ -120,6 +120,12 @@ fermeture. TNT dépend de son coordinateur XMLTV, pas de Freebox OS ; l’invers
 la perte Freebox, sans prétendre « absent du domicile » quand le routeur est perdu.
 Ces gardes globales ne suffisent pas à démontrer entity-unavailable : La source capteurs possède maintenant un flag de succès : HttpRequestError rend
 les états indisponibles (logs uniques), puis le vrai HA retrouve unknown pour une
-valeur manquante et une valeur valide pour zéro réel. Stockage/Home et cache XMLTV ont des
-chemins d’échec/récupération à qualifier séparément. Il faut des états par source
-avec tests de récupération, pas une migration d’identité ni un test sur appareil.
+valeur manquante et une valeur valide pour zéro réel.
+
+Lot 9 : [contrats de source et unités](quality-scale-source-contracts.md),
+Storage/Home réels sur transport mocké, indisponibilité/récupération, collections
+malformées distinctes d’une disparition, cache XMLTV conservé mais unavailable.
+Restent Remote/boutons Player, Wi-Fi/LAN multi-sources et lectures individuelles
+d’endpoints. Les gardes d’inventaire et quatre sources ne suffisent donc toujours
+pas à valider la règle entière. Aucun changement de préférence, d’ID ou d’endpoint
+`repeater/` pour augmenter un score.

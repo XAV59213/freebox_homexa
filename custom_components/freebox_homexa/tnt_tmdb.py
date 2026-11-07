@@ -15,12 +15,26 @@ import re
 import unicodedata
 from collections.abc import Awaitable, Callable, Iterable
 from dataclasses import dataclass, replace
-from datetime import timedelta
-from typing import Any
+from datetime import datetime, timedelta
+from typing import TYPE_CHECKING, TypedDict
+
+from aiohttp import ClientTimeout
 
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.util import dt as dt_util
+
+if TYPE_CHECKING:
+    from .tnt_coordinator import Programme
+
+
+class TmdbResult(TypedDict, total=False):
+    """Fields consumed from a public TMDB search result."""
+    poster_path: str | None
+    id: int | None
+    vote_average: float | str | None
+    vote_count: int | str | None
+
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -171,7 +185,7 @@ class TmdbResolver:
         self,
         hass: HomeAssistant,
         api_key: str,
-        on_resolved: Callable[[], Awaitable[Any]],
+        on_resolved: Callable[[], Awaitable[None]],
     ) -> None:
         self.hass = hass
         self._tmdb_api_key = api_key
@@ -181,16 +195,16 @@ class TmdbResolver:
         self._tmdb_pending_titles: set[TmdbKey] = set()
         self._tmdb_auth_warned = False
         self._tmdb_failure_counts: dict[TmdbKey, int] = {}
-        self._tmdb_retry_after: dict[TmdbKey, Any] = {}
+        self._tmdb_retry_after: dict[TmdbKey, datetime] = {}
 
     @staticmethod
-    def key(programme: Any) -> TmdbKey:
+    def key(programme: Programme) -> TmdbKey:
         return (programme.title, programme.category, getattr(programme, "date", None))
 
-    def get(self, programme: Any) -> TmdbMatch | None:
+    def get(self, programme: Programme) -> TmdbMatch | None:
         return self._tmdb_poster_cache.get(self.key(programme))
 
-    def prune(self, programmes: Iterable[Any]) -> None:
+    def prune(self, programmes: Iterable[Programme]) -> None:
         """Oublie les titres qui ne sont plus dans le flux (évite une croissance mémoire sans fin)."""
         current_keys = {self.key(p) for p in programmes if p is not None and p.title}
         for key in self._tmdb_poster_cache.keys() - current_keys:
@@ -200,7 +214,7 @@ class TmdbResolver:
         for key in self._tmdb_retry_after.keys() - current_keys:
             del self._tmdb_retry_after[key]
 
-    def schedule(self, programmes: Iterable[Any], now) -> None:
+    def schedule(self, programmes: Iterable[Programme], now: datetime) -> None:
         """Lance en tâche de fond la résolution des nouveaux titres (J+2 d'abord)."""
         near: dict[TmdbKey, str | None] = {}
         far: dict[TmdbKey, str | None] = {}
@@ -336,7 +350,7 @@ class TmdbResolver:
             # le meme usage (distinguer un remake/reboot homonyme).
             year = self._extract_year_from_xmltv_date(date)
         if tv_format_only:
-            search_order = (TMDB_SEARCH_TV_URL,)
+            search_order: tuple[str, ...] = (TMDB_SEARCH_TV_URL,)
         elif self._is_movie_category(category):
             search_order = (TMDB_SEARCH_MOVIE_URL, TMDB_SEARCH_TV_URL)
         else:
@@ -445,7 +459,7 @@ class TmdbResolver:
                 params["first_air_date_year"] = year
             elif url == TMDB_SEARCH_MOVIE_URL:
                 params["primary_release_year"] = year
-        async with self._session.get(url, params=params, timeout=10) as resp:
+        async with self._session.get(url, params=params, timeout=ClientTimeout(total=10)) as resp:
             if resp.status in (401, 403):
                 if not self._tmdb_auth_warned:
                     self._tmdb_auth_warned = True
@@ -508,7 +522,7 @@ class TmdbResolver:
         return None
 
     @staticmethod
-    def _build_tmdb_match(result: dict, media_type: str) -> TmdbMatch:
+    def _build_tmdb_match(result: TmdbResult, media_type: str) -> TmdbMatch:
         """Construit un TmdbMatch a partir d'un resultat brut de l'API TMDB.
 
         Isole la conversion (valeurs par defaut, casts) du reste de

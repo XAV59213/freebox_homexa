@@ -35,6 +35,8 @@ def build_inventory(hass, router, node, entry):
     add("call-log", s.FreeboxCallLogSensor(router, s.CALL_LOG_SENSOR))
     disk = {"id": 1, "model": "Synthetic disk"}
     partition = {"id": 1, "label": "Synthetic", "total_bytes": 100, "free_bytes": 50}
+    router.disks[1] = {**disk, "partitions": {1: partition}}
+    router.raids[1] = {"id": 1, "name": "Synthetic", "degraded": False}
     for description in s.DISK_PARTITION_SENSORS:
         add("disk/" + description.key, s.FreeboxDiskSensor(router, disk, partition, description))
     battery = {"id": 10, "name": "battery", "label": "Battery", "value": 90, "ep_type": "signal"}

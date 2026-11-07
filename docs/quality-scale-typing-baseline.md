@@ -89,3 +89,13 @@ canoniques, API de registre, structures et fonctions restantes doivent encore
 Coverage.py exclut automatiquement 8 lignes purement typing (TYPE_CHECKING et
 surcharges ellipsis) ; aucun omit/paramètre d’exclusion ajouté, aucun seuil abaissé.
 Ce n’est pas une prétention à la conformité strict-typing globale.
+
+## Lot 9 — 167 erreurs / 24 fichiers / 38 analysés
+
+186→167 erreurs strictes réelles : tables de classement tuple homogènes,
+Programme/datetime/Callable Awaitable[None], TmdbResult TypedDict, timeout
+ClientTimeout(total=10) équivalent à la conversion aiohttp précédente.
+tnt_tmdb et tnt_coordinator : aucune erreur stricte. Pas de casts/ignores ajoutés,
+pas de Any de confort ni d’omit ; appels SDK non annotés encore visibles.
+Le pipeline WebSocket HA et ses schémas voluptuous/probatio doivent être testés
+avant changement de compatibilité, pas masqués par un type Any.

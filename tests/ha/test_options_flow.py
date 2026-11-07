@@ -283,3 +283,37 @@ async def test_general_shared_code_and_tnt_key_defaults_preserve_private_setting
         assert result["data_schema"]({})["tnt_tmdb_api_key"] == "synthetic-key"
         hass.config_entries.options.async_abort(result["flow_id"])
     assert entry.options["tnt_tmdb_api_key"] == "synthetic-key"
+
+
+async def test_profile_edit_retains_unknown_metadata_and_other_profiles(hass):
+    original = {"name": "Saved", "announce_volume": 0.4,
+                "future_setting": {"stable_id": "unchanged", "history": ["old"]}}
+    entry = MockConfigEntry(domain=DOMAIN, data={"host": "freebox.test"}, options={
+        "reminder_profiles": [original, {"name": "Other", "legacy_preference": True}],
+        "home_poll_interval": 20, "remote_codes": {"player1": "synthetic"}})
+    entry.add_to_hass(hass)
+    with patch.object(hass.config_entries, "async_reload", new=AsyncMock(return_value=True)):
+        result = await hass.config_entries.options.async_init(entry.entry_id)
+        result = await hass.config_entries.options.async_configure(result["flow_id"], {"next_step_id": "profiles"})
+        result = await hass.config_entries.options.async_configure(result["flow_id"], {"action": "edit:Saved"})
+        assert entry.options["reminder_profiles"][0] == original
+        result = await hass.config_entries.options.async_configure(result["flow_id"], {"name": "Saved", "announce_volume": 0.6})
+        result = await hass.config_entries.options.async_configure(result["flow_id"], {"action": "done"})
+        await hass.async_block_till_done()
+    assert entry.options["reminder_profiles"] == [{**original, "announce_volume": 0.6},
+        {"name": "Other", "legacy_preference": True}]
+    assert entry.options["remote_codes"] == {"player1": "synthetic"}
+    assert entry.options["home_poll_interval"] == 20
+
+
+@pytest.mark.parametrize("profiles", [{"not": "a list"}, [42], [{"name": 42}], [{"name": "Saved", 42: "bad key"}]])
+async def test_invalid_saved_profiles_fail_closed_without_erasing_preferences(hass, profiles):
+    import voluptuous as vol
+    entry = MockConfigEntry(domain=DOMAIN, data={"host": "freebox.test"}, options={
+        "reminder_profiles": profiles, "remote_codes": {"player1": "synthetic"}})
+    entry.add_to_hass(hass)
+    before = dict(entry.options)
+    result = await hass.config_entries.options.async_init(entry.entry_id)
+    with pytest.raises(vol.Invalid, match="Invalid saved reminder profile"):
+        await hass.config_entries.options.async_configure(result["flow_id"], {"next_step_id": "profiles"})
+    assert entry.options == before

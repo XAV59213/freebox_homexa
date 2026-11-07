@@ -30,7 +30,7 @@ homeassistant.helpers.entity_platform homeassistant.helpers.entity_registry home
 homeassistant.helpers.service_info homeassistant.helpers.service_info.zeroconf
 homeassistant.helpers.storage homeassistant.helpers.typing homeassistant.helpers.update_coordinator
 homeassistant.helpers.selector homeassistant.data_entry_flow homeassistant.util homeassistant.util.dt
-homeassistant.components.websocket_api voluptuous""".split()
+homeassistant.components.websocket_api homeassistant.components.websocket_api.connection homeassistant.components.websocket_api.decorators homeassistant.components.websocket_api.const voluptuous""".split()
 for m in MODS:
     sys.modules[m] = MagicMock()
 sys.modules["aiohttp"].ClientError = type("ClientError", (Exception,), {})

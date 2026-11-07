@@ -2,7 +2,8 @@
 
 import logging
 from contextlib import suppress
-from typing import Any
+from typing import Any, TypeVar
+from collections.abc import Callable
 
 import aiohttp
 import voluptuous as vol
@@ -24,6 +25,7 @@ from homeassistant.config_entries import (
 from homeassistant.const import CONF_HOST, CONF_PORT
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers import entity_registry as er
+from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers import selector
 from homeassistant.helpers.service_info.zeroconf import ZeroconfServiceInfo
 from homeassistant.helpers.storage import Store
@@ -59,6 +61,7 @@ from .device_groups import (
     type_choices,
 )
 from .router import get_api, get_hosts_list_if_supported, resolve_token_file
+from .sdk_contracts import SystemConfiguration
 from .tnt_const import (
     CONF_ANNOUNCE_VOLUME,
     CONF_MEDIA_PLAYER_TARGETS,
@@ -75,6 +78,10 @@ from .tnt_const import (
 )
 
 _LOGGER = logging.getLogger(__name__)
+
+# HA chooses its validator engine at bootstrap. Build with the class of its
+# public platform schema, preserving both the runtime engine and inferred type.
+_SchemaT = TypeVar("_SchemaT")
 
 STORAGE_KEY_CONFIG = f"{DOMAIN}_config"
 
@@ -107,12 +114,13 @@ def _player_label(player: dict[str, Any]) -> str:
 
 
 def _options_schema(
+    schema_factory: Callable[[object], _SchemaT],
     defaults: dict[str, Any] | None = None,
     players: list[dict[str, Any]] | None = None,
-) -> vol.Schema:
+) -> _SchemaT:
     defaults = defaults or {}
     players = players or []
-    fields: dict[Any, Any] = {
+    fields: dict[object, object] = {
         vol.Required(
             CONF_TRACK_LAN_CLIENTS,
             default=defaults.get(CONF_TRACK_LAN_CLIENTS, DEFAULT_TRACK_LAN_CLIENTS),
@@ -136,7 +144,8 @@ def _options_schema(
             default=_coerce_remote_code(defaults.get(CONF_REMOTE_CODE)),
         ): str,
     }
-    codes = defaults.get(CONF_REMOTE_CODES) if isinstance(defaults.get(CONF_REMOTE_CODES), dict) else {}
+    raw_codes = defaults.get(CONF_REMOTE_CODES)
+    codes = raw_codes if isinstance(raw_codes, dict) else {}
     for player in players:
         pid = player.get("id")
         if pid is None:
@@ -146,7 +155,7 @@ def _options_schema(
             defaults.get(key) or codes.get(str(pid)) or codes.get(pid)
         )
         fields[vol.Optional(key, default=default)] = str
-    return vol.Schema(fields)
+    return schema_factory(fields)
 
 
 def _options_from_input(
@@ -200,13 +209,13 @@ class FreeboxFlowHandler(ConfigFlow, domain=DOMAIN):
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
         if user_input is None:
-            store = Store(self.hass, STORAGE_VERSION, STORAGE_KEY_CONFIG)
+            store: Store[dict[str, object]] = Store(self.hass, STORAGE_VERSION, STORAGE_KEY_CONFIG)
             stored_data = await store.async_load() or {}
             suggested_host = self._suggested_host or stored_data.get(CONF_HOST, "")
             suggested_port = self._suggested_port if self._suggested_port is not None else stored_data.get(CONF_PORT, 80)
             return self.async_show_form(
                 step_id="user",
-                data_schema=vol.Schema(
+                data_schema=type(cv.PLATFORM_SCHEMA)(
                     {
                         vol.Required(CONF_HOST, default=suggested_host): str,
                         vol.Required(CONF_PORT, default=suggested_port): int,
@@ -265,7 +274,8 @@ class FreeboxFlowHandler(ConfigFlow, domain=DOMAIN):
                     self._data.get(CONF_PORT, 80),
                 )
 
-                await fbx.system.get_config()
+                system: SystemConfiguration = fbx.system
+                await system.get_config()
                 await get_hosts_list_if_supported(fbx)
                 try:
                     self._players = await fbx.player.get_players() or []
@@ -273,7 +283,7 @@ class FreeboxFlowHandler(ConfigFlow, domain=DOMAIN):
                     _LOGGER.debug("Liste Player indisponible pendant l'appairage : %s", err)
                     self._players = []
 
-                store = Store(self.hass, STORAGE_VERSION, STORAGE_KEY_CONFIG)
+                store: Store[dict[str, object]] = Store(self.hass, STORAGE_VERSION, STORAGE_KEY_CONFIG)
                 await store.async_save(self._data)
 
                 if self.source == SOURCE_REAUTH:
@@ -335,7 +345,7 @@ class FreeboxFlowHandler(ConfigFlow, domain=DOMAIN):
             names = ", ".join(_player_label(p) for p in players) or "aucun Player détecté"
             return self.async_show_form(
                 step_id="lan_options",
-                data_schema=_options_schema({}, players),
+                data_schema=_options_schema(type(cv.PLATFORM_SCHEMA), {}, players),
                 description_placeholders={"players": names},
             )
 
@@ -377,7 +387,7 @@ class FreeboxFlowHandler(ConfigFlow, domain=DOMAIN):
 
         return self.async_show_form(
             step_id="reconfigure",
-            data_schema=vol.Schema(
+            data_schema=type(cv.PLATFORM_SCHEMA)(
                 {
                     vol.Required(CONF_HOST, default=entry.data.get(CONF_HOST, "")): str,
                     vol.Required(CONF_PORT, default=entry.data.get(CONF_PORT, 80)): int,
@@ -405,7 +415,7 @@ class FreeboxFlowHandler(ConfigFlow, domain=DOMAIN):
         return await self.async_step_user()
 
 
-def _tnt_schema(channels_default: list[str], tmdb_api_key_default: str | None) -> vol.Schema:
+def _tnt_schema(schema_factory: Callable[[object], _SchemaT], channels_default: list[str], tmdb_api_key_default: str | None) -> _SchemaT:
     """Formulaire « Guide TNT » (adapted from cyclope205/programme-tnt-fr, MIT)."""
     france_options = [
         selector.SelectOptionDict(value=channel_id, label=name)
@@ -418,7 +428,7 @@ def _tnt_schema(channels_default: list[str], tmdb_api_key_default: str | None) -
     france_default = [c for c in channels_default if c in FRANCE_CHANNELS]
     belgique_default = [c for c in channels_default if c in RTBF_CHANNELS]
     tmdb_selector = selector.selector({"text": {"type": "password"}})
-    fields: dict[Any, Any] = {}
+    fields: dict[object, object] = {}
     fields[vol.Optional(CONF_TNT_CHANNELS_FRANCE, default=france_default)] = selector.selector(
         {"select": {"options": france_options, "multiple": True, "mode": "list"}}
     )
@@ -431,7 +441,7 @@ def _tnt_schema(channels_default: list[str], tmdb_api_key_default: str | None) -
         fields[vol.Optional(CONF_TMDB_API_KEY, default=tmdb_api_key_default)] = tmdb_selector
     else:
         fields[vol.Optional(CONF_TMDB_API_KEY)] = tmdb_selector
-    return vol.Schema(fields)
+    return schema_factory(fields)
 
 
 # --- Profils de rappel : adapted from cyclope205/programme-tnt-fr v3.0.8 (MIT) ---
@@ -494,14 +504,32 @@ def _notify_media_player_conflict(
     return False
 
 
+def _profile_name(profile: dict[str, object]) -> str:
+    """Saved profile names are identities: never invent or coerce one."""
+    name = profile.get("name")
+    if not isinstance(name, str):
+        raise vol.Invalid("Invalid saved reminder profile name")
+    return name
+
+
+def _profile_targets(value: object) -> list[str]:
+    """Validate submitted multiple selectors without rewriting saved defaults."""
+    if value is None:
+        return []
+    if not isinstance(value, list) or not all(isinstance(item, str) for item in value):
+        raise vol.Invalid("Invalid reminder target list")
+    return value
+
+
 def _profile_schema(
+    schema_factory: Callable[[object], _SchemaT],
     hass: HomeAssistant,
-    name_default: str | None = None,
-    notify_default: list[str] | None = None,
-    media_player_default: list[str] | None = None,
-    tts_default: str | None = None,
-    announce_volume_default: float | None = None,
-) -> vol.Schema:
+    name_default: object = None,
+    notify_default: object = None,
+    media_player_default: object = None,
+    tts_default: object = None,
+    announce_volume_default: object = None,
+) -> _SchemaT:
     """Form to create or edit one named reminder profile (a person -> their devices).
 
     Mirrors the notify/media_player/tts fields of the general settings
@@ -527,7 +555,7 @@ def _profile_schema(
     volume_selector = selector.selector(
         {"number": {"min": 0, "max": 1, "step": 0.05, "mode": "slider"}}
     )
-    fields: dict = {}
+    fields: dict[object, object] = {}
     if name_default is not None:
         fields[vol.Required("name", default=name_default)] = selector.selector({"text": {}})
     else:
@@ -550,7 +578,7 @@ def _profile_schema(
         fields[vol.Optional(CONF_ANNOUNCE_VOLUME, default=announce_volume_default)] = volume_selector
     else:
         fields[vol.Optional(CONF_ANNOUNCE_VOLUME)] = volume_selector
-    return vol.Schema(fields)
+    return schema_factory(fields)
 
 
 class FreeboxOptionsFlowHandler(OptionsFlowWithReload):
@@ -559,7 +587,7 @@ class FreeboxOptionsFlowHandler(OptionsFlowWithReload):
     def __init__(self) -> None:
         self._players: list[dict[str, Any]] = []
         # État des écrans « Profils de rappel » (initialisé à la première ouverture)
-        self._profiles: list[dict] | None = None
+        self._profiles: list[dict[str, object]] | None = None
         self._editing_profile: str | None = None
 
     async def _list_players(self) -> list[dict[str, Any]]:
@@ -619,7 +647,7 @@ class FreeboxOptionsFlowHandler(OptionsFlowWithReload):
                 }
             }
         )
-        schema = vol.Schema(
+        schema = type(cv.PLATFORM_SCHEMA)(
             {
                 vol.Optional(label, default=overrides.get(key, GROUP_AUTO)): choice
                 for label, key in fields.items()
@@ -673,7 +701,7 @@ class FreeboxOptionsFlowHandler(OptionsFlowWithReload):
                 }
             }
         )
-        schema = vol.Schema(
+        schema = type(cv.PLATFORM_SCHEMA)(
             {
                 vol.Optional(label, default=overrides.get(key, GROUP_AUTO)): choice
                 for label, key in fields.items()
@@ -703,20 +731,40 @@ class FreeboxOptionsFlowHandler(OptionsFlowWithReload):
         return self.async_show_form(
             step_id="tnt",
             data_schema=_tnt_schema(
+                type(cv.PLATFORM_SCHEMA),
                 selected_channels(current), current.get(CONF_TMDB_API_KEY) or None
             ),
             errors=errors,
         )
 
-    async def async_step_profiles(self, user_input: dict | None = None):
+    def _get_profiles(self) -> list[dict[str, object]]:
+        """Load lazily without dropping unknown preferences or malformed records."""
         if self._profiles is None:
-            self._profiles = [
-                dict(p) for p in self.config_entry.options.get(CONF_REMINDER_PROFILES, [])
-            ]
+            raw_profiles = self.config_entry.options.get(CONF_REMINDER_PROFILES, [])
+            if not isinstance(raw_profiles, list):
+                raise vol.Invalid("Invalid saved reminder profiles")
+            profiles: list[dict[str, object]] = []
+            for raw_profile in raw_profiles:
+                if not isinstance(raw_profile, dict):
+                    raise vol.Invalid("Invalid saved reminder profile")
+                profile: dict[str, object] = {}
+                for key, value in raw_profile.items():
+                    if not isinstance(key, str):
+                        raise vol.Invalid("Invalid saved reminder profile key")
+                    profile[key] = value
+                _profile_name(profile)
+                profiles.append(profile)
+            self._profiles = profiles
+        return self._profiles
+
+    async def async_step_profiles(
+        self, user_input: dict[str, object] | None = None
+    ) -> ConfigFlowResult:
+        profiles = self._get_profiles()
         actions = [
             selector.SelectOptionDict(value="add", label="Ajouter un profil"),
         ]
-        for profile in self._profiles:
+        for profile in profiles:
             actions.append(
                 selector.SelectOptionDict(
                     value=f"edit:{profile['name']}",
@@ -736,19 +784,19 @@ class FreeboxOptionsFlowHandler(OptionsFlowWithReload):
             if action == "add":
                 self._editing_profile = None
                 return await self.async_step_add_profile()
-            if action and action.startswith("edit:"):
+            if isinstance(action, str) and action.startswith("edit:"):
                 self._editing_profile = action[len("edit:") :]
                 return await self.async_step_add_profile()
-            if action and action.startswith("remove:"):
+            if isinstance(action, str) and action.startswith("remove:"):
                 name = action[len("remove:") :]
-                self._profiles = [p for p in self._profiles if p["name"] != name]
+                self._profiles = [p for p in profiles if p["name"] != name]
                 return await self.async_step_profiles()
             return self._save_profiles()
 
-        names = ", ".join(p["name"] for p in self._profiles) or "aucun profil configuré"
+        names = ", ".join(_profile_name(p) for p in profiles) or "aucun profil configuré"
         return self.async_show_form(
             step_id="profiles",
-            data_schema=vol.Schema(
+            data_schema=type(cv.PLATFORM_SCHEMA)(
                 {
                     vol.Required("action", default="done"): selector.selector(
                         {"select": {"options": actions, "mode": "list"}}
@@ -758,27 +806,31 @@ class FreeboxOptionsFlowHandler(OptionsFlowWithReload):
             description_placeholders={"profiles": names},
         )
 
-    async def async_step_add_profile(self, user_input: dict | None = None):
+    async def async_step_add_profile(
+        self, user_input: dict[str, object] | None = None
+    ) -> ConfigFlowResult:
+        profiles = self._get_profiles()
         errors: dict[str, str] = {}
         editing_name = self._editing_profile
         if user_input is not None:
-            name = (user_input.get("name") or "").strip()
+            raw_name = user_input.get("name")
+            name = raw_name.strip() if isinstance(raw_name, str) else ""
             if not name:
                 errors["base"] = "no_name"
             elif any(
                 p["name"] == name
-                for p in self._profiles
+                for p in profiles
                 if editing_name is None or p["name"] != editing_name
             ):
                 errors["base"] = "duplicate_name"
             elif _notify_media_player_conflict(
                 self.hass,
-                user_input.get(CONF_NOTIFY_TARGET) or [],
-                user_input.get(CONF_MEDIA_PLAYER_TARGETS) or [],
+                _profile_targets(user_input.get(CONF_NOTIFY_TARGET)),
+                _profile_targets(user_input.get(CONF_MEDIA_PLAYER_TARGETS)),
             ):
                 errors["base"] = "device_conflict"
             else:
-                profile: dict = {"name": name}
+                profile: dict[str, object] = {"name": name}
                 if user_input.get(CONF_NOTIFY_TARGET):
                     profile[CONF_NOTIFY_TARGET] = user_input[CONF_NOTIFY_TARGET]
                 if user_input.get(CONF_MEDIA_PLAYER_TARGETS):
@@ -788,19 +840,27 @@ class FreeboxOptionsFlowHandler(OptionsFlowWithReload):
                 if user_input.get(CONF_ANNOUNCE_VOLUME) is not None:
                     profile[CONF_ANNOUNCE_VOLUME] = user_input[CONF_ANNOUNCE_VOLUME]
                 if editing_name is not None:
-                    self._profiles = [
-                        profile if p["name"] == editing_name else p
-                        for p in self._profiles
-                    ]
+                    updated = []
+                    for saved in profiles:
+                        if saved["name"] != editing_name:
+                            updated.append(saved)
+                            continue
+                        preserved = dict(saved)
+                        for field in (CONF_NOTIFY_TARGET, CONF_MEDIA_PLAYER_TARGETS,
+                                      CONF_TTS_ENGINE, CONF_ANNOUNCE_VOLUME):
+                            preserved.pop(field, None)
+                        preserved.update(profile)
+                        updated.append(preserved)
+                    self._profiles = updated
                 else:
-                    self._profiles.append(profile)
+                    profiles.append(profile)
                 self._editing_profile = None
                 return await self.async_step_profiles()
 
         existing = None
         if editing_name is not None:
             existing = next(
-                (p for p in self._profiles if p["name"] == editing_name), None
+                (p for p in profiles if p["name"] == editing_name), None
             )
 
         if errors and user_input is not None:
@@ -823,6 +883,7 @@ class FreeboxOptionsFlowHandler(OptionsFlowWithReload):
         return self.async_show_form(
             step_id="add_profile",
             data_schema=_profile_schema(
+                type(cv.PLATFORM_SCHEMA),
                 self.hass,
                 name_default=name_default,
                 notify_default=notify_default,
@@ -878,7 +939,7 @@ class FreeboxOptionsFlowHandler(OptionsFlowWithReload):
         names = ", ".join(_player_label(p) for p in players) or "aucun Player détecté"
         return self.async_show_form(
             step_id="general",
-            data_schema=_options_schema(defaults, players),
+            data_schema=_options_schema(type(cv.PLATFORM_SCHEMA), defaults, players),
             description_placeholders={"players": names},
         )
 
@@ -913,7 +974,7 @@ class FreeboxOptionsFlowHandler(OptionsFlowWithReload):
         if not choices and not merges:
             return self.async_abort(reason="no_devices")
         pick = selector.selector({"select": {"options": choices, "mode": "dropdown"}})
-        schema = vol.Schema(
+        schema = type(cv.PLATFORM_SCHEMA)(
             {
                 vol.Optional("duplicate"): pick,
                 vol.Optional("target"): pick,

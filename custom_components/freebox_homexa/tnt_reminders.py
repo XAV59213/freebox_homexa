@@ -9,7 +9,8 @@ from __future__ import annotations
 import asyncio
 import hashlib
 import logging
-from datetime import timedelta
+from datetime import datetime, timedelta
+from typing import TYPE_CHECKING, NotRequired, TypedDict
 
 import voluptuous as vol
 
@@ -20,6 +21,8 @@ from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.event import async_track_point_in_time
 from homeassistant.helpers.storage import Store
 from homeassistant.util import dt as dt_util
+if TYPE_CHECKING:
+    from homeassistant.util.json import JsonArrayType
 
 from .const import DOMAIN
 from .tnt_const import (
@@ -44,7 +47,7 @@ _REMINDERS_SETUP_KEY = f"{DOMAIN}_tnt_reminders_setup"
 _UNSUB_KEY = f"{DOMAIN}_tnt_reminder_unsubs"
 REMINDER_SERVICES = ("schedule_reminder", "cancel_reminder", "get_reminder_status")
 
-_REMINDER_FIELDS = {
+_REMINDER_FIELDS: dict[object, object] = {
     vol.Required("channel_name"): cv.string,
     vol.Required("program_title"): cv.string,
     vol.Required("start_time"): cv.string,
@@ -55,11 +58,11 @@ _REMINDER_FIELDS = {
 # own notify_target/media_player_targets/tts_engine, configured in the
 # integration's options) this reminder is for. Omitted or unknown -> falls
 # back to the integration-wide defaults, exactly as before this field existed.
-_PROFILE_FIELD = {vol.Optional("profile_name"): cv.string}
+_PROFILE_FIELD: dict[object, object] = {vol.Optional("profile_name"): cv.string}
 
-SCHEDULE_SCHEMA = vol.Schema({**_REMINDER_FIELDS, **_PROFILE_FIELD})
-CANCEL_SCHEMA = vol.Schema({**_REMINDER_FIELDS, **_PROFILE_FIELD})
-STATUS_SCHEMA = vol.Schema(
+SCHEDULE_SCHEMA = type(cv.PLATFORM_SCHEMA)({**_REMINDER_FIELDS, **_PROFILE_FIELD})
+CANCEL_SCHEMA = type(cv.PLATFORM_SCHEMA)({**_REMINDER_FIELDS, **_PROFILE_FIELD})
+STATUS_SCHEMA = type(cv.PLATFORM_SCHEMA)(
     {
         vol.Required("channel_name"): cv.string,
         vol.Required("program_title"): cv.string,
@@ -67,6 +70,43 @@ STATUS_SCHEMA = vol.Schema(
         **_PROFILE_FIELD,
     }
 )
+
+class ReminderNotification(TypedDict):
+    """Fields consumed by notification routing, including old stored records."""
+
+    channel_name: str
+    program_title: str
+    minutes_before: int
+    targets: NotRequired[list[str]]
+    media_player_targets: NotRequired[list[str]]
+    tts_engine: NotRequired[str | None]
+    announce_volume: NotRequired[float | None]
+    profile_name: NotRequired[str | None]
+
+
+class Reminder(ReminderNotification):
+    """The integration's persisted timer format; identifiers stay unchanged."""
+
+    id: str
+    fire_time: str
+
+
+class ReminderStorage(TypedDict, total=False):
+    """Version-one store. Copies retain unrelated existing root metadata."""
+
+    reminders: list[Reminder]
+
+
+def _profile_targets(value: object) -> list[str]:
+    """Accept both historical singleton targets and current multiple selectors."""
+    if value is None:
+        return []
+    if isinstance(value, str):
+        return [value]
+    if isinstance(value, list) and all(isinstance(item, str) for item in value):
+        return value
+    raise ServiceValidationError(translation_domain=DOMAIN, translation_key="no_reminder_profile")
+
 
 def _reminder_id(
     channel_name: str,
@@ -98,7 +138,7 @@ async def async_setup_reminders(hass: HomeAssistant) -> None:
     hass.data[_REMINDERS_SETUP_KEY] = True
     hass.data.setdefault(_UNSUB_KEY, {})
 
-    store: Store = Store(hass, STORAGE_VERSION, STORAGE_KEY)
+    store: Store[ReminderStorage] = Store(hass, STORAGE_VERSION, STORAGE_KEY)
     manager = _ReminderManager(hass, store)
 
     hass.services.async_register(
@@ -124,7 +164,7 @@ async def async_setup_reminders(hass: HomeAssistant) -> None:
         )
 
 class _ReminderManager:
-    def __init__(self, hass: HomeAssistant, store: Store) -> None:
+    def __init__(self, hass: HomeAssistant, store: Store[ReminderStorage]) -> None:
         self._hass = hass
         self._store = store
         self._storage_lock = asyncio.Lock()
@@ -136,13 +176,22 @@ class _ReminderManager:
     def _resolve_tts_engine(self) -> str | None:
         return None
 
-    def _find_profile(self, profile_name: str | None) -> dict | None:
+    def _find_profile(self, profile_name: str | None) -> dict[str, object] | None:
         """Named reminder profile matching profile_name, if configured and found."""
-        profiles = [
-            profile
-            for entry in self._hass.config_entries.async_entries(DOMAIN)
-            for profile in entry.options.get(CONF_REMINDER_PROFILES, [])
-        ]
+        profiles: list[dict[str, object]] = []
+        for entry in self._hass.config_entries.async_entries(DOMAIN):
+            saved = entry.options.get(CONF_REMINDER_PROFILES, [])
+            if not isinstance(saved, list):
+                raise ServiceValidationError(translation_domain=DOMAIN, translation_key="no_reminder_profile")
+            for raw_profile in saved:
+                if not isinstance(raw_profile, dict) or not isinstance(raw_profile.get("name"), str):
+                    raise ServiceValidationError(translation_domain=DOMAIN, translation_key="no_reminder_profile")
+                profile: dict[str, object] = {}
+                for key, value in raw_profile.items():
+                    if not isinstance(key, str):
+                        raise ServiceValidationError(translation_domain=DOMAIN, translation_key="no_reminder_profile")
+                    profile[key] = value
+                profiles.append(profile)
         if not profile_name:
             # Sans nom : le profil unique s'il n'y en a qu'un.
             return profiles[0] if len(profiles) == 1 else None
@@ -159,19 +208,23 @@ class _ReminderManager:
         """
         profile = self._find_profile(profile_name)
         if profile is not None:
-            raw_targets = profile.get(CONF_NOTIFY_TARGET) or []
-            raw_targets = raw_targets if isinstance(raw_targets, list) else [raw_targets]
+            raw_targets = _profile_targets(profile.get(CONF_NOTIFY_TARGET))
             targets = [
                 slug[len("notify.") :] if slug.startswith("notify.") else slug
                 for slug in raw_targets
             ]
-            media_targets = profile.get(CONF_MEDIA_PLAYER_TARGETS) or []
-            media_targets = media_targets if isinstance(media_targets, list) else [media_targets]
+            media_targets = _profile_targets(profile.get(CONF_MEDIA_PLAYER_TARGETS))
+            tts_engine = profile.get(CONF_TTS_ENGINE)
+            volume = profile.get(CONF_ANNOUNCE_VOLUME)
+            if tts_engine is not None and not isinstance(tts_engine, str):
+                raise ServiceValidationError(translation_domain=DOMAIN, translation_key="no_reminder_profile")
+            if volume is not None and not isinstance(volume, (int, float)):
+                raise ServiceValidationError(translation_domain=DOMAIN, translation_key="no_reminder_profile")
             return (
                 targets,
                 media_targets,
-                profile.get(CONF_TTS_ENGINE),
-                profile.get(CONF_ANNOUNCE_VOLUME),
+                tts_engine,
+                volume,
             )
         return ([], [], None, None)
 
@@ -219,7 +272,7 @@ class _ReminderManager:
         reminder_id = _reminder_id(
             channel_name, program_title, start_time_raw, minutes_before, profile_name
         )
-        reminder = {
+        reminder: Reminder = {
             "id": reminder_id,
             "channel_name": channel_name,
             "program_title": program_title,
@@ -267,7 +320,7 @@ class _ReminderManager:
             raise HomeAssistantError(
                 translation_domain=DOMAIN, translation_key="reminder_state_unconfirmed"
             )
-        scheduled = [
+        scheduled: JsonArrayType = [
             minutes
             for minutes in (5, 10, 15)
             if _reminder_id(channel_name, program_title, start_time, minutes, profile_name)
@@ -289,14 +342,17 @@ class _ReminderManager:
                 kept.append(reminder)
                 self._schedule(reminder)
             if len(kept) != len(data.get("reminders", [])):
-                snapshot = dict(data)
+                snapshot = data.copy()
                 snapshot["reminders"] = kept
                 await self._async_store_checked(snapshot)
 
-    def _schedule(self, reminder: dict) -> None:
+    def _schedule(self, reminder: Reminder) -> None:
         fire_time = dt_util.parse_datetime(reminder["fire_time"])
 
-        async def _fire(_now) -> None:
+        if fire_time is None or fire_time.tzinfo is None or fire_time.utcoffset() is None:
+            raise ServiceValidationError(translation_domain=DOMAIN, translation_key="invalid_start_time")
+
+        async def _fire(_now: datetime) -> None:
             self._hass.data.setdefault(_UNSUB_KEY, {}).pop(reminder["id"], None)
             await self._async_remove(reminder["id"])
             await self._async_notify(reminder)
@@ -331,7 +387,7 @@ class _ReminderManager:
             return slug
         return None
 
-    async def _async_notify(self, reminder: dict) -> None:
+    async def _async_notify(self, reminder: ReminderNotification) -> None:
         targets = reminder.get("targets") or self._resolve_notify_targets()
         media_player_targets_early = reminder.get("media_player_targets") or []
         if not targets and not media_player_targets_early:
@@ -347,7 +403,7 @@ class _ReminderManager:
         )
         for slug in targets:
             try:
-                service_data = {"title": "Guide TNT Freebox Homexa", "message": message}
+                service_data: dict[str, object] = {"title": "Guide TNT Freebox Homexa", "message": message}
                 if slug.startswith("alexa_media"):
                     # Ask Alexa to speak the message in its own voice
                     # instead of posting a silent notification to the
@@ -453,7 +509,7 @@ class _ReminderManager:
                 player,
             )
 
-    async def _async_store_checked(self, data: dict) -> None:
+    async def _async_store_checked(self, data: ReminderStorage) -> None:
         # HA Store logs and swallows WriteError. A normal return alone is NOT a
         # persistence acknowledgement. Verify using only its public API.
         try:
@@ -468,9 +524,9 @@ class _ReminderManager:
                 translation_domain=DOMAIN, translation_key="reminder_storage_failed"
             )
 
-    async def _async_save(self, reminder: dict) -> None:
+    async def _async_save(self, reminder: Reminder) -> None:
         async with self._storage_lock:
-            data = dict(await self._store.async_load() or {"reminders": []})
+            data = (await self._store.async_load() or {"reminders": []}).copy()
             reminders = [r for r in data.get("reminders", []) if r["id"] != reminder["id"]]
             reminders.append(reminder)
             data["reminders"] = reminders
@@ -478,7 +534,7 @@ class _ReminderManager:
 
     async def _async_remove(self, reminder_id: str) -> None:
         async with self._storage_lock:
-            data = dict(await self._store.async_load() or {"reminders": []})
+            data = (await self._store.async_load() or {"reminders": []}).copy()
             data["reminders"] = [r for r in data.get("reminders", []) if r["id"] != reminder_id]
             await self._async_store_checked(data)
 

@@ -45,3 +45,34 @@ async def test_schedule_status_cancel_mock_storage_no_notification(hass):
     await manager.async_handle_cancel(ServiceCall(hass, DOMAIN, 'cancel_reminder', payload))
     status = await manager.async_handle_status(ServiceCall(hass, DOMAIN, 'get_reminder_status', payload))
     assert status == {'scheduled_minutes': []}
+
+
+@pytest.mark.parametrize("fire_time", ["not-a-date", "2026-11-07T19:00:00"])
+async def test_invalid_restored_timer_never_replaces_existing_timer(hass, fire_time):
+    from unittest.mock import Mock
+    from custom_components.freebox_homexa.tnt_reminders import _UNSUB_KEY
+    store = AsyncMock()
+    manager = _ReminderManager(hass, store)
+    existing = Mock()
+    hass.data[_UNSUB_KEY] = {"stable": existing}
+    with pytest.raises(ServiceValidationError):
+        manager._schedule({"id": "stable", "fire_time": fire_time})
+    assert hass.data[_UNSUB_KEY]["stable"] is existing
+    existing.assert_not_called()
+    store.async_save.assert_not_called()
+
+
+@pytest.mark.parametrize("profile", [
+    {"name": "Saved", "notify_target": [42]},
+    {"name": "Saved", "media_player_targets": {"bad": "shape"}},
+    {"name": "Saved", "tts_engine": 42},
+    {"name": "Saved", "announce_volume": "loud"},
+])
+async def test_malformed_profile_contract_rejected_without_mutating_options(hass, profile):
+    from pytest_homeassistant_custom_component.common import MockConfigEntry
+    entry = MockConfigEntry(domain=DOMAIN, data={}, options={"reminder_profiles": [profile]})
+    entry.add_to_hass(hass)
+    manager = _ReminderManager(hass, AsyncMock())
+    with pytest.raises(ServiceValidationError):
+        manager._resolve_targets("Saved")
+    assert entry.options["reminder_profiles"] == [profile]

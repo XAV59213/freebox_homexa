@@ -197,3 +197,11 @@ propriétaire local. Tests des données du vrai registre, façades legacy décla
 comme telles. Frontières Any historiques encore présentes, pas de promesse
 Any-free.85 diagnostics globaux restent ; next config_flow/TNT/websocket,
 schémas multiversions, base_class/DUMMY/IDs, conflits FFmpeg expliqués.
+
+## Jalon18 —18 erreurs /3 fichiers /42 modules
+
+Jalon18 : mypy strict18 erreurs/3fichiers/42modules, contre85/7/42 au jalon17 (-67). config_flow25, tnt_reminders17, tnt_ws16 et calls_ws9 clôturés par annotations, contrôles de contrats et moteur public de schéma HA réel. Websocket authentifié natif, limite30, permissions et multi-entrées testés ; profils et métadonnées inconnues préservés. Stockage v1 typé ne signifie pas validation exhaustive de toute corruption ancienne. Aucun Any/cast/ignore ajouté ; frontières Any historiques non prétendues disparues. Restent base_class16 (module legacy DUMMY absent, callbacks non typés et DeviceInfo identités entières), sensor1 (constructeur disque/identité), camera1 (contrat name optionnel contre FFmpeg str). Pas de migration ni de nom fictif pour score ; anciennes versions HA non exécutées ici.
+
+Tests :645 natifs, deux passages complets ;12 simulations et2JS distincts.
+92 lignes exclues automatiquement par coverage, dont4 nouvelles lignes imports
+TYPE_CHECKING ; aucun omit/exclude personnalisé. Aucun nouveau Any/cast/ignore.

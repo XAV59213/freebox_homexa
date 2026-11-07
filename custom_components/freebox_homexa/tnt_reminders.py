@@ -200,7 +200,7 @@ class _ReminderManager:
             )
 
         start_time = dt_util.parse_datetime(start_time_raw)
-        if start_time is None:
+        if start_time is None or start_time.tzinfo is None or start_time.utcoffset() is None:
             raise ServiceValidationError(
                 translation_domain=DOMAIN,
                 translation_key="invalid_start_time",

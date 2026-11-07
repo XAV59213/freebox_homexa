@@ -170,6 +170,10 @@ Erreurs affichées (au lieu d’un échec silencieux) : aucun Player détecté, 
 
 ---
 
+## Documentation détaillée
+
+[Guide utilisateur : installation, options, six actions, fréquences, modèles/limites, dépannage et suppression](docs/guide-utilisateur.md). Il documente le projet custom, sans certification officielle HA.
+
 ## Disponibilité et journal
 
 - **Freebox injoignable** : le journal affiche **une seule fois** « Freebox injoignable » (niveau info), puis « Freebox de nouveau joignable » à son retour, sans erreur répétée à chaque relevé. Entre les deux, les entités Homexa passent **indisponibles** (capteurs, Wi-Fi, boutons, Player, Guide TV, entités Freebox Home…).

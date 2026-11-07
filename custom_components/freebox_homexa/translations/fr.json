@@ -157,11 +157,31 @@
   "services": {
     "reboot": {
       "name": "Redémarrer",
-      "description": "Redémarre la Freebox."
+      "description": "Redémarre la Freebox.",
+      "fields": {
+        "config_entry_id": {
+          "name": "Entrée de l’intégration",
+          "description": "ID facultatif de l’entrée Homexa. Permet de choisir la bonne Freebox s’il y a plusieurs entrées ; device_id est une autre possibilité."
+        },
+        "device_id": {
+          "name": "Appareil Homexa",
+          "description": "Appareil Homexa permettant de choisir l’entrée de l’intégration."
+        }
+      }
     },
     "reload": {
       "name": "Recharger",
-      "description": "Recharge Freebox Homexa, reconnecte la box et redécouvre les appareils."
+      "description": "Recharge Freebox Homexa, reconnecte la box et redécouvre les appareils.",
+      "fields": {
+        "config_entry_id": {
+          "name": "Entrée de l’intégration",
+          "description": "ID facultatif de l’entrée Homexa. Permet de choisir la bonne Freebox s’il y a plusieurs entrées ; device_id est une autre possibilité."
+        },
+        "device_id": {
+          "name": "Appareil Homexa",
+          "description": "Appareil Homexa permettant de choisir l’entrée de l’intégration."
+        }
+      }
     },
     "remote": {
       "name": "Envoyer une commande",
@@ -178,6 +198,10 @@
         "device_id": {
           "name": "Appareil Player",
           "description": "Appareil Player Homexa à piloter (à la place de player_id)."
+        },
+        "config_entry_id": {
+          "name": "Entrée de l’intégration",
+          "description": "ID facultatif de l’entrée Homexa. Permet de choisir la bonne Freebox s’il y a plusieurs entrées ; device_id est une autre possibilité."
         }
       }
     },
@@ -195,7 +219,7 @@
         },
         "start_time": {
           "name": "Heure de début",
-          "description": "Heure de début du programme (ISO 8601)."
+          "description": "Heure de début du programme au format ISO 8601 avec fuseau horaire."
         },
         "minutes_before": {
           "name": "Minutes avant",
@@ -221,7 +245,7 @@
         },
         "start_time": {
           "name": "Heure de début",
-          "description": "Heure de début du programme (ISO 8601)."
+          "description": "Heure de début du programme au format ISO 8601 avec fuseau horaire."
         },
         "minutes_before": {
           "name": "Minutes avant",
@@ -247,7 +271,7 @@
         },
         "start_time": {
           "name": "Heure de début",
-          "description": "Heure de début du programme (ISO 8601)."
+          "description": "Heure de début du programme au format ISO 8601 avec fuseau horaire."
         },
         "profile_name": {
           "name": "Nom du profil",
@@ -483,7 +507,7 @@
       "message": "Aucun profil de rappel correspondant : crée-en un dans Freebox Homexa → Configurer → Profils de rappel (indique profile_name s'il y en a plusieurs)."
     },
     "invalid_start_time": {
-      "message": "Heure de debut de programme invalide."
+      "message": "Date de début invalide : utilisez une date ISO 8601 avec fuseau horaire."
     },
     "reminder_too_late": {
       "message": "Trop tard pour programmer ce rappel : il ne reste plus assez de temps avant le debut du programme."
@@ -505,6 +529,9 @@
     },
     "remote_failed": {
       "message": "La touche {key} n'a pas pu être envoyée au Player : {error}"
+    },
+    "cannot_fetch_tnt": {
+      "message": "Impossible de récupérer le guide TNT : {error}"
     }
   }
 }

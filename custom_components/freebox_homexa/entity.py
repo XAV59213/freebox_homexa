@@ -212,6 +212,7 @@ class FreeboxHomeEntity(Entity):
             _LOGGER.log(poll_log_level(self._router), "Échec mise à jour entité %s : %s", self._attr_name, err)
 
     async def async_added_to_hass(self) -> None:
+        await super().async_added_to_hass()
         self._remove_signal_update = async_dispatcher_connect(
             self._hass,
             self._router.signal_home_device_update,
@@ -222,3 +223,4 @@ class FreeboxHomeEntity(Entity):
         if self._remove_signal_update is not None:
             self._remove_signal_update()
             self._remove_signal_update = None
+        await super().async_will_remove_from_hass()

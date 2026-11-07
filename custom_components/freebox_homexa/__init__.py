@@ -124,8 +124,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: FreeboxConfigEntry) -> b
             connected = True
         finally:
             if not connected:
-                # A failed (or cancelled) initial probe must not leak the SDK session.
-                # Keep the original failure even if closing also fails.
+                # Always attempt the public SDK cleanup, also on cancellation.
+                # The SDK may itself fail to close after a failed open; preserve
+                # the original error rather than touching its private session.
                 with suppress(Exception):
                     await api.close()
         _LOGGER.debug("Connexion Freebox établie %s:%s", host, port)

@@ -116,3 +116,37 @@ async def test_failed_probe_no_entry(hass, api):
     assert result['errors'] == {'base': 'cannot_connect'}
     assert not hass.config_entries.async_entries(DOMAIN)
     api.close.assert_awaited_once()
+
+
+from types import SimpleNamespace
+from homeassistant.config_entries import SOURCE_ZEROCONF, SOURCE_RECONFIGURE
+
+
+async def test_discovery_suggests_host_and_duplicate_aborts(hass):
+    info = SimpleNamespace(properties={'api_domain': 'freebox.test', 'https_port': '443'}, host='local.test', port=80)
+    with patch('custom_components.freebox_homexa.config_flow.Store.async_load', return_value=None):
+        result = await hass.config_entries.flow.async_init(DOMAIN, context={'source': SOURCE_ZEROCONF}, data=info)
+    assert result['step_id'] == 'user'
+    defaults = result['data_schema']({})
+    assert defaults['host'] == 'freebox.test'
+    assert defaults['port'] == 443
+    hass.config_entries.flow.async_abort(result['flow_id'])
+    entry = MockConfigEntry(domain=DOMAIN, unique_id='freebox.test', data={'host': 'freebox.test'})
+    entry.add_to_hass(hass)
+    result = await hass.config_entries.flow.async_init(DOMAIN, context={'source': SOURCE_ZEROCONF}, data=info)
+    assert result['type'] == FlowResultType.ABORT
+    assert result['reason'] == 'already_configured'
+
+
+async def test_characterize_reconfigure_identity_boundary_without_migration(hass):
+    """Current host identity rejects a host change; not an endorsement of the limitation."""
+    entry = MockConfigEntry(domain=DOMAIN, unique_id=HOST, data={'host': HOST, 'port': 80})
+    entry.add_to_hass(hass)
+    with patch('custom_components.freebox_homexa.config_flow.get_api') as api:
+        result = await hass.config_entries.flow.async_init(DOMAIN, context={'source': SOURCE_RECONFIGURE, 'entry_id': entry.entry_id})
+        assert result['step_id'] == 'reconfigure'
+        result = await hass.config_entries.flow.async_configure(result['flow_id'], {'host': 'new.test', 'port': 80})
+        assert result['type'] == FlowResultType.ABORT
+        assert result['reason'] == 'wrong_account'
+        assert entry.data['host'] == HOST
+        api.assert_not_called()

@@ -103,14 +103,18 @@ class FreeboxAlarm(FreeboxHomeEntity, AlarmControlPanelEntity):
         """Send arm away command (Absent)."""
         await self.set_home_endpoint_value(self._command_arm_away)
         await asyncio.sleep(1)
-        self._unsub_watcher = async_track_time_interval(
-            self.hass, self.async_update_during_arming, timedelta(seconds=1)
-        )
+        self._start_arming_watcher()
 
     async def async_alarm_arm_home(self, code: str | None = None) -> None:
         """Send arm home command (Présent)."""
         await self.set_home_endpoint_value(self._command_arm_home)
         await asyncio.sleep(1)
+        self._start_arming_watcher()
+
+    def _start_arming_watcher(self) -> None:
+        """Replace the previous watcher instead of leaking one on repeated arming."""
+        if self._unsub_watcher is not None:
+            self._unsub_watcher()
         self._unsub_watcher = async_track_time_interval(
             self.hass, self.async_update_during_arming, timedelta(seconds=1)
         )
@@ -152,6 +156,7 @@ class FreeboxAlarm(FreeboxHomeEntity, AlarmControlPanelEntity):
         """Cleanup when entity is removed."""
         if self._unsub_watcher is not None:
             self._unsub_watcher()
+            self._unsub_watcher = None
         await super().async_will_remove_from_hass()
 
     @property

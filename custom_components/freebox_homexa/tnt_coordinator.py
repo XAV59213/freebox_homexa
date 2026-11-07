@@ -11,6 +11,9 @@ from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, Upda
 from homeassistant.util import dt as dt_util
 
 from .tnt_tmdb import TmdbMatch, TmdbResolver
+from homeassistant.config_entries import ConfigEntry
+
+from .const import DOMAIN
 from .tnt_const import (
     DAY_RESET,
     FETCH_MIN_INTERVAL_MINUTES,
@@ -135,11 +138,13 @@ class Programme:
 
 class ProgrammeTntFrCoordinator(DataUpdateCoordinator):
     def __init__(
-        self, hass: HomeAssistant, channels: list[str], tmdb_api_key: str | None = None
+        self, hass: HomeAssistant, channels: list[str], tmdb_api_key: str | None = None,
+        *, config_entry: ConfigEntry | None = None,
     ) -> None:
         super().__init__(
             hass,
             _LOGGER,
+            config_entry=config_entry,
             name="freebox_homexa_tnt",
             update_interval=timedelta(minutes=UPDATE_INTERVAL_MINUTES),
         )
@@ -167,7 +172,11 @@ class ProgrammeTntFrCoordinator(DataUpdateCoordinator):
                 self._last_fetch = now
             except Exception as err:
                 if not self._programmes_by_channel:
-                    raise UpdateFailed(f"Impossible de recuperer le flux XMLTV: {err}") from err
+                    raise UpdateFailed(
+                        translation_domain=DOMAIN,
+                        translation_key="cannot_fetch_tnt",
+                        translation_placeholders={"error": str(err)},
+                    ) from err
                 _LOGGER.warning("XMLTV en cache : %s", err)
             if self._tmdb is not None:
                 self._tmdb.prune(self._all_programmes())

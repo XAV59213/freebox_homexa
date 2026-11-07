@@ -157,11 +157,31 @@
   "services": {
     "reboot": {
       "name": "Reboot",
-      "description": "Reboots the Freebox."
+      "description": "Reboots the Freebox.",
+      "fields": {
+        "config_entry_id": {
+          "name": "Integration entry",
+          "description": "Optional Homexa config entry ID. Selects the Freebox when several entries exist; device_id is an alternative."
+        },
+        "device_id": {
+          "name": "Homexa device",
+          "description": "Homexa device used to select the integration entry."
+        }
+      }
     },
     "reload": {
       "name": "Reload",
-      "description": "Reload Freebox Homexa, reconnect and rediscover devices."
+      "description": "Reload Freebox Homexa, reconnect and rediscover devices.",
+      "fields": {
+        "config_entry_id": {
+          "name": "Integration entry",
+          "description": "Optional Homexa config entry ID. Selects the Freebox when several entries exist; device_id is an alternative."
+        },
+        "device_id": {
+          "name": "Homexa device",
+          "description": "Homexa device used to select the integration entry."
+        }
+      }
     },
     "remote": {
       "name": "Send remote command",
@@ -178,6 +198,10 @@
         "device_id": {
           "name": "Player device",
           "description": "Homexa Player device to control (alternative to player_id)."
+        },
+        "config_entry_id": {
+          "name": "Integration entry",
+          "description": "Optional Homexa config entry ID. Selects the Freebox when several entries exist; device_id is an alternative."
         }
       }
     },
@@ -195,7 +219,7 @@
         },
         "start_time": {
           "name": "Start time",
-          "description": "Programme start time (ISO 8601)."
+          "description": "Programme start time in ISO 8601 format with a timezone."
         },
         "minutes_before": {
           "name": "Minutes before",
@@ -221,7 +245,7 @@
         },
         "start_time": {
           "name": "Start time",
-          "description": "Programme start time (ISO 8601)."
+          "description": "Programme start time in ISO 8601 format with a timezone."
         },
         "minutes_before": {
           "name": "Minutes before",
@@ -247,7 +271,7 @@
         },
         "start_time": {
           "name": "Start time",
-          "description": "Programme start time (ISO 8601)."
+          "description": "Programme start time in ISO 8601 format with a timezone."
         },
         "profile_name": {
           "name": "Profile name",
@@ -483,7 +507,7 @@
       "message": "No matching reminder profile: create one in Freebox Homexa → Configure → Reminder profiles (set profile_name if there are several)."
     },
     "invalid_start_time": {
-      "message": "Invalid programme start time."
+      "message": "Invalid start time: use an ISO 8601 date with a timezone."
     },
     "reminder_too_late": {
       "message": "Too late to schedule this reminder: not enough time left before the programme starts."
@@ -505,6 +529,9 @@
     },
     "remote_failed": {
       "message": "Remote key {key} could not be sent to the Player: {error}"
+    },
+    "cannot_fetch_tnt": {
+      "message": "Could not retrieve the TNT guide: {error}"
     }
   }
 }

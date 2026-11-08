@@ -174,6 +174,9 @@ rules:
       Home via HA. Définir projection compatible état vidéo/contrôles et reprise UI sans polling
       FFmpeg lourd ; ne pas compter cette observation comme conformité entière. API image publique
       contrôle is_on et ne bloque pas intrinsèquement sur available ; ne pas inventer ce blocage.
+      Jalon20 : cycle image FFmpeg public couvert (exception, octets vides, None, reprise, pas d'écriture
+      après arrêt de l'observateur ou closing) et erreur de mise à jour Home distincte d'un rechargement.
+      La projection globale unavailable reste non modifiée.
   integration-owner:
     status: done
     comment: 'manifest.json déclare @gvigroux, @XAV59313 et @Steph73HB ; .github/CODEOWNERS reprend exactement
@@ -202,15 +205,17 @@ rules:
       avant réauth. Lié au choix de migration unique ID host vers identité physique, non imposé ici.
   test-coverage:
     status: todo
-    comment: 'Jalon19 : 667 tests HA2026.10.4, 42modules sans omit : 5439/6653 lignes (81,75 %), 1455/2248
-      branches (64,72 %), combiné77,45 %. 92lignes automatiquement exclues, aucune exclusion personnalisée.
-      Deux passages locaux et artefact CI complet doivent concorder avant rapport livré. Seuil officiel
-      plus de95% dans chaque module :22/42 au-dessus en lignes ; base_class94/94lignes et28/28branches100%,
-      caméra93,60%, disque/sensor92,31%. Règle globale todo ; aucune validation matérielle.'
+    comment: 'Jalon20 : 681 tests HA2026.10.4, 42modules sans omit : 5644/6653 lignes (84,83 %), 1568/2248
+      branches (69,75 %), combiné81,02 %. 92lignes automatiquement exclues, aucune exclusion personnalisée.
+      Deux passages locaux concordants sur totaux et fichiers ; artefact CI du SHA poussé encore à comparer.
+      Seuil officiel plus de95% dans chaque module :33/42 au-dessus en lignes. Restent 9 modules : __init__87,02,
+      router85,12, tnt_reminders70,61, wifi_ap68,18, device_groups62,30, tv_guide56,45, player_remote53,33,
+      frontend33,65, tnt_tmdb26,57. Caméra125/125 lignes et16/16 branches. Règle globale todo ; aucune
+      validation matérielle.'
   devices:
     status: todo
     comment: >-
-      Jalon17 : registre HA natif, identité/propriétaire/connexion, nom utilisateur conservé sur lookup moderne et façades legacy, parent router =id natif et jamais identité convertie ; retrait public testé seulement sur registre éphémère de test. Les façades ne valent pas ancien runtime HA installé. IDs invalides bloqués avant cache/reparentage et propriétaire inconnu protégé. Associations multi-modèles, sous-appareils et toutes plateformes pas encore démontrées globalement : règle reste todo.
+      Jalon20 : le parent Player n'est affirmé qu'après enregistrement du device Player. Identifiant disque entier, name_by_user et options préexistantes sont conservés, y compris sensor.suggested_display_precision ajouté par HA. Une MAC déjà portée par une autre intégration n'est pas déplacée. Les associations des trente familles et le multi-Servers ne sont pas encore démontrés : règle reste todo. Aucune migration d'identité.
   diagnostics:
     status: done
     comment: diagnostics.py:async_get_config_entry_diagnostics limite les données au schéma typé et observations
@@ -336,8 +341,11 @@ rules:
       Jalon15 : refus structurés SDK observés sur Home plus12scopes de lecture existants (WiFi config/BSS/AP/stations, repeater, disques/RAID, system/connection/calls, LAN, Player). SDK public avec transport mocké et registre HA natif : ignorer conservé sur répétition/timeout/collection invalide, suppression seulement sur observation valide du même scope ou retrait définitif ciblé. Stations multi-AP ne déclarent pas reprise sur un autre AP sain ou zéro AP. FREN réellement chargé, aucune donnée privée ; repeater/ inchangé et payload erreur brut supprimé. Docs quality-scale-repair-inventory.md. Règle globale reste todo : lectures d’état par appareil et droits écriture/résolution sans commande-probe à inventorier, disparition volontaire de capacités à distinguer, API native config_entry_id absente dans HA2026.10.4 ; aucun masquage automatique sur désactivation revendiqué.
   stale-devices:
     status: todo
-    comment: router.py:941-994,1112-1123 nettoie certains registres ; stale sensor/client/disque/Home et garanties
-      multi-intégrations non démontrées globalement. Aucun changement repeater/.
+    comment: 'Jalon20 : un groupe virtuel vide est retiré ; un groupe qui a une entité ou un enfant, son
+      name_by_user et l''identifiant disque entier restent. Le helper existant retire un client MAC exclusif
+      de cette entrée et laisse intact un appareil d''une autre intégration. Pas de nouveau nettoyage
+      automatique des capteurs, clients ou disques disparus, ni preuve multi-intégrations globale.
+      repeater/ inchangé. Règle reste todo.'
   async-dependency:
     status: done
     comment: 'SDK freebox-api 1.3.1 : open/close/permissions et Access get/post/put/delete sont des coroutines

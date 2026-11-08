@@ -60,7 +60,7 @@ pas autorisé par ce mandat. Pas de demande cosmétique bloquante.
 | entity-unique-id | IDs RAID/disques liés à libellés et collisions multientrées à caractériser ; migration réversible préservant registre/historique/automatisations, aucun renommage forcé. |
 | unique-config-entry | Dédupliquer même Server via host/IP/URL par identité physique vérifiée, pas host ; migration doit conserver chemin des jetons et entrées existantes. |
 | reauthentication-flow | Vérifier même matériel derrière le host avant changer credentials ; conserver codes remote/entrée/IDs et refuser autre appareil. Dépend du plan d’identité stable. |
-| devices | Jalon23 ajoute le numéro de série déjà lu au routeur, identifiant MAC inchangé. Reste : DeviceInfo complet des trente familles, parent Home non préfixé, multi-Servers, dict caméra vers FFmpeg. Pas de fusion d'appareils ni de migration d'identité. |
+| devices | Jalon24 prouve l'isolation de deux serveurs pour le nœud entier, le disque entier, player_3 et le service TNT, sans réécrire les identifiants. Le dict FFmpeg est le flux, pas le registre. Reste la revue des familles d'entités non réexécutées. Pas de série ni de version matérielle inventées. Pas de migration. |
 | discovery | Vérifier annonces réellement supportées et parcours complet, pas seulement formulaire prérempli ; dédupliquer alias d’un même matériel sans inventer propriétés zeroconf absentes. |
 | discovery-update-info | Même matériel à nouvelle adresse met à jour endpoint sans doublon/perte de token ; identité stable et migration compatibles requises. |
 | reconfiguration-flow | Probe du nouveau host/port puis validation même matériel ; caractérisation actuelle wrong_account ou port sans probe n’est pas conformité. Dépend du même plan identité/jeton. |

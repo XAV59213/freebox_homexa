@@ -419,6 +419,9 @@ class FreeboxWifiSignalSensor(FreeboxLanReachableMixin, SensorEntity):
                 "manufacturer": device.get("vendor_name") or "Inconnu",
                 "name": name,
             }
+            model = device.get("model")
+            if isinstance(model, str) and model.strip():
+                device_info["model"] = model.strip()
             parent_id = self._router.lan_client_parent(self._mac, name)
             if parent_id:
                 device_info["via_device_id"] = parent_id

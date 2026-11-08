@@ -19,6 +19,34 @@ Platinum absent). Le snapshot JSON documente noms et tiers ; il ne crée pas
 un second fichier de statut. Le seul checklist est
 `custom_components/freebox_homexa/quality_scale.yaml`, placement conventionnel.
 
+## Jalon24 — deux serveurs, mêmes identifiants, appareils distincts
+
+**22 done / 30 todo / 2 exempt**, inchangé. `devices` reste todo.
+
+Deux entrées réelles sur HA 2026 enregistrent chacune son propre appareil pour le
+même nœud entier 42, le même disque entier 7, le même `player_3` et le même
+identifiant de service TNT. Le nom choisi sur le premier n'est pas copié. Aucun
+appareil n'est supprimé. Les identifiants entiers ne sont pas réécrits.
+
+Le dictionnaire passé à `FFmpegCamera` est la configuration de flux exigée par
+le constructeur public (`CONF_NAME`, `CONF_INPUT`, `CONF_EXTRA_ARGUMENTS`). Ce
+n'est pas le `DeviceInfo` du registre. La caméra reste rattachée au nœud Home.
+La version logicielle n'est inscrite que si `props.FwVersion` est déjà présent.
+Le modèle d'un client LAN n'est recopié que s'il est déjà une chaîne dans
+l'hôte. Aucun numéro de série ni version matérielle n'est inventé pour le
+disque, le Player ou la caméra. Le numéro de série du routeur, déjà lu, reste
+reporté et l'identifiant MAC ne change pas. Le fabricant « Inconnu » reste le
+repli historique quand l'hôte n'a pas de fabricant.
+
+Les trente familles d'entités ne sont pas toutes réexécutées dans ce lot. Les
+familles qui créent un appareil distinct (nœud Home, disque, Player, service
+TNT, client LAN) le sont. La règle n'est pas close.
+
+698 tests. Deux passages locaux concordent : 6616/6738 lignes (98,19 %),
+2133/2300 branches (92,74 %), combiné 96,80 %. Les 42 modules restent
+au-dessus de 95 % de lignes. L'artefact CI de ce commit n'est pas encore
+comparé. 6611/6735 est la mesure de `39043cb`.
+
 ## Jalon23 — suppression utilisateur d'un appareil prouvé absent, exemptions revérifiées
 
 **22 done / 30 todo / 2 exempt**, inchangé. `devices` et `stale-devices` restent todo.
@@ -881,7 +909,7 @@ listés dans le tableau suivant ; celui-ci reprend le YAML, il n'est pas un seco
 | log-when-unavailable | Lot 11 : router.note_source mémorise transitions par source, INFO perte puis retour une seule fois ; labels fixes sans host/ID/payload. Tests vrais HA/SDK test_source_ownership_logs : trois échecs successifs et récupération Root/LAN, Wi-Fi config/BSS/AP/stations/interrupteur, Home/endpoints/nœuds/caméra, Remote/Player, capteurs/disques/RAID ; aucun secret synthétique dans logs. TNT utilise réellement DataUpdateCoordinator/UpdateFailed, une perte puis récupération testée. Canal image FFmpeg public conserve exception/None sans retry et annonce ses transitions. Pas de prétention de succès physique ni de nettoyage SDK garanti. |
 | reauthentication-flow | tests/ha/test_config_flow.py prouve reauth_successful et reload unique de la même entrée sans doublon. Le serveur physique peut toutefois changer derrière le même host ; absence de contrôle MAC/identité avant réauth. Lié au choix de migration unique ID host vers identité physique, non imposé ici. |
 | test-coverage | Jalon22 : 695 tests HA 2026.10.4, 42 modules sans omit : 6530/6653 lignes (98,15 %), 2078/2248 branches (92,44 %), combiné 96,71 %. 92 lignes automatiquement exclues, aucun omit ajouté. Texte officiel relu le 2026-11-08 : plus de 95 % du code dans chaque module. L'exemple pytest publié est --cov-report term-missing, sans --cov-branch et sans second seuil de branches. 42/42 modules dépassent 95 % de lignes. Le plus bas est const.py 79/83 (95,18 %). device_groups 596/618 (96,44 %) et 289/310 branches (93,23 %), wifi_ap 296/308 (96,10 %) et 143/158 (90,51 %), router 979/988 (99,09 %) et 359/388 (92,53 %), tnt_tmdb 258/271 (95,20 %) et 89/112 (79,46 %). Caméra 125/125 et 16/16. Deux passages locaux JSON et XML identiques. Artefact CI run 42431543845 sur c8f5d76 identique aux deux JSON et XML locaux. Règle done sur le seuil de lignes. Plusieurs modules restent sous 95 % de branches, publiées à part. |
-| devices | Jalon23 : le numéro de série déjà lu dans la configuration système est reporté sur le DeviceInfo du routeur ; l'identifiant reste la MAC. Le parent Player, l'identifiant disque entier, name_by_user et les options préexistantes restent. Une MAC d'une autre intégration n'est pas déplacée. La règle reste todo : les trente familles et le multi-Servers ne sont pas démontrés, la caméra passe encore un dict à FFmpeg, et plusieurs appareils n'ont pas de numéro de série ni de version matérielle dans les données déjà lues. Aucune migration d'identité.
+| devices | Jalon24 : deux entrées réelles HA 2026 gardent des appareils distincts pour le même nœud entier 42, le même disque entier 7, le même player_3 et le même service TNT. name_by_user du premier n'est pas copié. Le dict passé à FFmpegCamera est la configuration de flux du helper public, pas le DeviceInfo du registre : la caméra reste sur le nœud Home, version logicielle seulement si props.FwVersion est déjà présent. Le modèle d'un client LAN est recopié seulement s'il est déjà une chaîne dans l'hôte. Aucun numéro de série ni version matérielle n'est inventé. Le numéro de série du routeur déjà lu reste reporté, identifiant MAC inchangé. La règle reste todo : les trente familles d'entités ne sont pas toutes réexécutées, et le fabricant Inconnu reste le repli historique sans fabricant. Aucune migration d'identité.
 | discovery | tests/ha/test_config_flow.py teste le flow zeroconf réel : préremplissage api_domain/https_port, formulaire utilisateur et rejet du même host configuré. L’identité physique, alias d’adresse et découverte de tous modèles restent non démontrés ; pas un passage en done sur seul préremplissage. |
 | discovery-update-info | config_flow.py:390-405 découvre le host ; aucun test prouvant mise à jour sûre des entrées existantes après changement adresse. |
 | docs-data-update | docs/guide-utilisateur.md (lié README) : Table code réel : timer central 40 s, Home 15 s/choix, TNT 5 min/fetch >=60 min, polling plateformes et watcher alarme 1 s avec réserve de charge. Preuve documentaire locale renforcée ; reste todo au sens formel, la règle officielle visant une page/revue home-assistant.io non soumise. Aucune certification custom revendiquée. |

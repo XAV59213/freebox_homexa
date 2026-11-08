@@ -7,7 +7,9 @@ dans chaque module. L'exemple pytest est la couverture de lignes, pas un second
 seuil de branches. Les 42 modules dépassent 95 % de lignes. `test-coverage` passe
 done sur ce seuil. Les branches restent publiées : tnt_tmdb est à 79,46 %, wifi_ap
 à 90,51 %, device_groups à 93,23 %, router à 92,53 %. Deux passages locaux
-concordent. L'artefact CI de ce commit n'est pas encore comparé. Les chiffres
+concordent avec l'artefact CI
+[42431543845](https://github.com/XAV59213/freebox_homexa/actions/runs/42431543845)
+du SHA c8f5d76 : 6530/6653 lignes et 2078/2248 branches. Les chiffres
 5928/6653 et 1699/2248 sont ceux de 09b1782 / 43c0323, pas de ce jalon.
 Une ligne par todo, pas une liste infinie de tests. La règle A est du
 travail local indépendant ; B mêle travail local et réserve de compatibilité ou
@@ -93,7 +95,7 @@ modifier artificiellement le sens du YAML. Aucune soumission amont ici.
 
 | Règle | Minimum restant |
 |---|---|
-| test-coverage | Done au jalon22 : 695 tests, 6530/6653 lignes (98,15 %), 2078/2248 branches (92,44 %), 42/42 modules au-dessus de 95 % de lignes. Branches publiées à part, plusieurs sous 95 %. Artefact CI de ce commit encore à comparer. |
+| test-coverage | Done au jalon22 : 695 tests, 6530/6653 lignes (98,15 %), 2078/2248 branches (92,44 %), 42/42 modules au-dessus de 95 % de lignes. Branches publiées à part, plusieurs sous 95 %. Artefact CI 42431543845 identique aux deux passages locaux. |
 | strict-typing | Deux erreurs réelles/2fichiers/42modules : contrat HA identifiants str contre entiers historiques et parent legacy nullable. Caméra/DUMMY/callbacks résolus. Choix explicite décrit séparément ; pas de migration, cast, stub élargi ou Any implicite pour fabriquer un done. |
 
 ## Exemptions inchangées : deux, pas une façon de masquer des défauts

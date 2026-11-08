@@ -1,5 +1,8 @@
 # Changelog
 
+## 28.8.90 — 2026-11-08
+- 23 critères Quality Scale démontrés, 29 todo, 2 exempt. Pas de certification Home Assistant officielle. Tout n'est pas résolu.
+
 ## Non publié
 - 2026-11-08 — Quality Scale, jalon 25 : devices passe done. Sept contrats d'appareil couvrent les familles actives, testés une fois. Inconnu et les identifiants entiers restent. Mypy 2.4.1 confirme les deux mêmes erreurs (base_class.py:86 et sensor.py:333) ; le nom de caméra n'en fait pas partie. 699 tests, 98,19 % lignes / 92,74 % branches, 23/29/2, préparation 28.8.90 sans merge/release.
 - 2026-11-08 — Quality Scale, jalon 24 : deux serveurs gardent des appareils distincts pour les mêmes identifiants entiers, player_3 et le service TNT. Le dict FFmpeg est la configuration de flux, pas le DeviceInfo. Le modèle LAN n'est recopié que s'il est déjà dans l'hôte. devices reste todo. 698 tests, 98,19 % lignes / 92,74 % branches, 42/42 modules au-dessus de 95 % de lignes. 22/30/2, préparation 28.8.90 sans merge/release.

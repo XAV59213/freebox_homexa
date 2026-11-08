@@ -52,8 +52,13 @@ Ces deux erreurs ne se corrigent pas sans migration ou masquage. Elles restent.
 
 699 tests. Deux passages locaux : 6616/6738 lignes (98,19 %), 2133/2300
 branches (92,74 %), combiné 96,80 %. Mêmes totaux que `3defb4f`. Les 42 modules
-restent au-dessus de 95 % de lignes. L'artefact CI de ce commit n'est pas
-encore comparé.
+restent au-dessus de 95 % de lignes. L'artefact
+[42434523137](https://github.com/XAV59213/freebox_homexa/actions/runs/42434523137)
+de `01f0090` est identique à ces deux JSON et aux taux XML 0,9819 / 0,9274.
+Checks : [HA](https://github.com/XAV59213/freebox_homexa/actions/runs/42434523137),
+[syntaxe](https://github.com/XAV59213/freebox_homexa/actions/runs/42434523167),
+[HACS](https://github.com/XAV59213/freebox_homexa/actions/runs/42434523134),
+[hassfest](https://github.com/XAV59213/freebox_homexa/actions/runs/42434523421).
 
 ## Jalon24 — deux serveurs, mêmes identifiants, appareils distincts
 

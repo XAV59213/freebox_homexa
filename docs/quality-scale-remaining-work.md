@@ -1,9 +1,12 @@
 # Inventaire fini des travaux restants — jalon20
 
 **21 done / 31 todo / 2 exempt, préparation 28.8.90 ; aucune certification HA.**
-Jalon20 mesuré : 681 tests, 5644/6653 lignes (84,83 %), 1568/2248 branches (69,75 %),
-combiné 81,02 %. 33/42 modules dépassent 95 % de lignes. Neuf restent sous le seuil.
-Deux passages locaux concordent ; l'artefact CI du SHA poussé reste à comparer.
+Jalon21 mesuré : 687 tests, 5928/6653 lignes (89,10 %), 1699/2248 branches (75,58 %),
+combiné 85,69 %. Le critère officiel est plus de 95 % du code dans chaque module ;
+l'exemple publié mesure les lignes, pas un second seuil de branches. 38/42 modules
+dépassent 95 % de lignes. Quatre restent sous ce seuil : device_groups, wifi_ap,
+router, tnt_tmdb. Deux passages locaux concordent. L'artefact CI de 133d11c
+concordait déjà ; celui du SHA suivant reste à comparer.
 Une ligne par todo, pas une liste infinie de tests. La règle A est du
 travail local indépendant ; B mêle travail local et réserve de compatibilité ou
 dépendance ; C exige proposition compatible ou action amont avant conformité.
@@ -17,10 +20,10 @@ historique/source/SDK/branches sandbox démontrés ; base_class100% lignes/branc
 Ne pas proposer à nouveau des annotations ordinaires pour ces deux résidus : voir
 [choix finis et conséquences](quality-scale-lot19-contract-decisions.md).
 
-La priorité utilisateur reste la couverture par module (>95% officiel, sans exception).
-Neuf modules sont encore sous ce seuil. Le typage strict reste à deux erreurs
-d'identité, non masquées. Repairs et la projection caméra unavailable ne sont pas
-étendus pour fabriquer un done.
+La priorité utilisateur reste la couverture par module (>95% de lignes, critère
+officiel relu). Quatre modules sont encore sous ce seuil. Le typage strict reste
+à deux erreurs d'identité, non masquées. Repairs et la projection caméra
+unavailable ne sont pas étendus pour fabriquer un done.
 La partition complète et les réserves exactes sont dans
 [convergence jalon16](quality-scale-lot16-convergence.md). Le contenu documentaire
 local n’est pas confondu avec une publication officielle hors périmètre.
@@ -88,7 +91,7 @@ modifier artificiellement le sens du YAML. Aucune soumission amont ici.
 
 | Règle | Minimum restant |
 |---|---|
-| test-coverage | 681tests,42modules,84,83% lignes/69,75% branches,combiné81,02%. Seuil officiel >95% dans CHAQUE module :33/42 le dépassent. Restent __init__, router, tnt_reminders, wifi_ap, device_groups, tv_guide, player_remote, frontend, tnt_tmdb. Gardes de schéma websocket encore non exécutées parce que le schéma public les rejette avant. Deux locaux concordants ; artefact CI du SHA poussé à comparer. |
+| test-coverage | 687tests,42modules,89,10% lignes/75,58% branches,combiné85,69%. Seuil officiel relu : >95% du code dans chaque module, exemple pytest en lignes, pas de seuil de branches publié. 38/42 modules >95% lignes. Restent device_groups65,37, wifi_ap68,18, router85,12, tnt_tmdb26,57. Branches de ces quatre : 46,45, 53,16, 70,36 et 0. Deux locaux concordants. |
 | strict-typing | Deux erreurs réelles/2fichiers/42modules : contrat HA identifiants str contre entiers historiques et parent legacy nullable. Caméra/DUMMY/callbacks résolus. Choix explicite décrit séparément ; pas de migration, cast, stub élargi ou Any implicite pour fabriquer un done. |
 
 ## Exemptions inchangées : deux, pas une façon de masquer des défauts

@@ -205,13 +205,13 @@ rules:
       avant réauth. Lié au choix de migration unique ID host vers identité physique, non imposé ici.
   test-coverage:
     status: todo
-    comment: 'Jalon20 : 681 tests HA2026.10.4, 42modules sans omit : 5644/6653 lignes (84,83 %), 1568/2248
-      branches (69,75 %), combiné81,02 %. 92lignes automatiquement exclues, aucune exclusion personnalisée.
-      Deux passages locaux concordants sur totaux et fichiers ; artefact CI du SHA poussé encore à comparer.
-      Seuil officiel plus de95% dans chaque module :33/42 au-dessus en lignes. Restent 9 modules : __init__87,02,
-      router85,12, tnt_reminders70,61, wifi_ap68,18, device_groups62,30, tv_guide56,45, player_remote53,33,
-      frontend33,65, tnt_tmdb26,57. Caméra125/125 lignes et16/16 branches. Règle globale todo ; aucune
-      validation matérielle.'
+    comment: 'Jalon21 : 687 tests HA2026.10.4, 42modules sans omit : 5928/6653 lignes (89,10 %), 1699/2248
+      branches (75,58 %), combiné85,69 %. 92lignes automatiquement exclues. Le texte officiel demande plus
+      de95% du code dans chaque module ; l''exemple pytest publié est la couverture de lignes, sans seuil
+      de branches. Branches mesurées à part, pas un second seuil inventé. 38/42 modules >95% lignes.
+      Restent device_groups65,37/46,45 branches, wifi_ap68,18/53,16, router85,12/70,36, tnt_tmdb26,57/0.
+      __init__208/208, caméra125/125 et16/16, guide99,19, player_remote98,10, rappels96,77, frontend96,15.
+      Deux passages locaux concordants. Artefact CI de ce SHA encore à comparer. Règle globale todo.'
   devices:
     status: todo
     comment: >-

@@ -46,8 +46,18 @@ de série ni de version matérielle dans les données déjà lues.
 
 697 tests. Deux passages locaux concordent : 6611/6735 lignes (98,16 %),
 2129/2298 branches (92,65 %), combiné 96,76 %. Les 42 modules restent au-dessus
-de 95 % de lignes. L'artefact CI de ce commit n'est pas encore comparé. Les
-chiffres 6530/6653 et 2078/2248 sont ceux de `f4adcad`, pas de ce jalon.
+de 95 % de lignes. L'artefact CI
+[42432792610](https://github.com/XAV59213/freebox_homexa/actions/runs/42432792610)
+de `39043cb` est identique à ces deux JSON et aux taux XML 0,9816 / 0,9265.
+Les chiffres 6530/6653 et 2078/2248 sont ceux de `f4adcad`, pas de ce jalon.
+Les quatre checks de `39043cb` sont verts : HA
+[42432792610](https://github.com/XAV59213/freebox_homexa/actions/runs/42432792610),
+syntaxe
+[42432792592](https://github.com/XAV59213/freebox_homexa/actions/runs/42432792592),
+HACS
+[42432792642](https://github.com/XAV59213/freebox_homexa/actions/runs/42432792642),
+hassfest
+[42432792640](https://github.com/XAV59213/freebox_homexa/actions/runs/42432792640).
 
 ## Jalon22 — les 42 modules dépassent 95 % de lignes
 

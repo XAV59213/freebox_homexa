@@ -5,7 +5,8 @@ from datetime import datetime
 from typing import Any
 import logging
 
-from homeassistant.components.device_tracker import ScannerEntity
+from homeassistant.components.device_tracker.entity import ScannerEntity
+from .availability import FreeboxReachableMixin
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.dispatcher import async_dispatcher_connect
@@ -65,6 +66,8 @@ def add_entities(
     track_lan: bool,
     create_devices: bool,
 ) -> None:
+    if router.closing:
+        return
     new_tracked = []
 
     for mac, device in router.devices.items():
@@ -79,21 +82,25 @@ def add_entities(
         async_add_entities(new_tracked, True)
 
 
-class FreeboxDevice(ScannerEntity):
+class FreeboxDevice(FreeboxReachableMixin, ScannerEntity):
     """Représentation d'un appareil Freebox dans Home Assistant."""
 
     _attr_should_poll = False
-    _attr_has_entity_name = False
+    _attr_has_entity_name = True
 
     def __init__(
         self, router: FreeboxRouter, device: dict[str, Any], create_lan_devices: bool
     ) -> None:
         self._router = router
         self._create_lan_devices = create_lan_devices
+        mac: object = device["l2ident"]["id"]
+        if not isinstance(mac, str):
+            raise ValueError("Invalid LAN MAC identifier")
+        self._mac = mac
         self._name = lan_client_name(device)
-        self._mac = device["l2ident"]["id"]
         self._manufacturer = device.get("vendor_name", "Inconnu")
-        self._attr_icon = icon_for_freebox_device(device)
+        kind = device.get("host_type", "")
+        self._attr_translation_key = f"device_{kind if kind in DEVICE_ICONS else 'unknown'}"
         self._attr_unique_id = f"{router.mac}_{self._mac}"
         self._active = False
         self._attr_extra_state_attributes: dict[str, Any] = {}
@@ -126,6 +133,11 @@ class FreeboxDevice(ScannerEntity):
             self.registry_entry = er.async_get(self.hass).async_update_entity(
                 self.entity_id, device_id=device_id
             )
+
+    @property
+    def available(self) -> bool:
+        return (super().available and
+                (self._mac == self._router.mac or self._router.lan_available))
 
     @callback
     def async_update_state(self) -> None:
@@ -162,7 +174,11 @@ class FreeboxDevice(ScannerEntity):
         return self._mac
 
     @property
-    def name(self) -> str:
+    def name(self) -> str | None:
+        # ScannerEntity can be unattached, or linked to a device owned by another
+        # integration. Use that device's name only when it is actually linked.
+        if self.registry_entry is not None and self.registry_entry.device_id:
+            return None
         return self._name
 
     @property

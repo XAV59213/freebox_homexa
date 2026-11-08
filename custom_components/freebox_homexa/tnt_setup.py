@@ -30,7 +30,7 @@ async def async_setup_bundled_tnt(
 
     channels = selected_channels(entry.options)
     tmdb_api_key = (entry.options.get(CONF_TMDB_API_KEY) or "").strip() or None
-    coordinator = ProgrammeTntFrCoordinator(hass, channels, tmdb_api_key)
+    coordinator = ProgrammeTntFrCoordinator(hass, channels, tmdb_api_key, config_entry=entry)
     try:
         await coordinator.async_config_entry_first_refresh()
     except Exception as err:  # noqa: BLE001

@@ -144,11 +144,31 @@
   "services": {
     "reboot": {
       "name": "Reboot",
-      "description": "Reboots the Freebox."
+      "description": "Reboots the Freebox.",
+      "fields": {
+        "config_entry_id": {
+          "name": "Integration entry",
+          "description": "Optional Homexa config entry ID. Selects the Freebox when several entries exist; device_id is an alternative."
+        },
+        "device_id": {
+          "name": "Homexa device",
+          "description": "Homexa device used to select the integration entry."
+        }
+      }
     },
     "reload": {
       "name": "Reload",
-      "description": "Reload Freebox Homexa, reconnect and rediscover devices."
+      "description": "Reload Freebox Homexa, reconnect and rediscover devices.",
+      "fields": {
+        "config_entry_id": {
+          "name": "Integration entry",
+          "description": "Optional Homexa config entry ID. Selects the Freebox when several entries exist; device_id is an alternative."
+        },
+        "device_id": {
+          "name": "Homexa device",
+          "description": "Homexa device used to select the integration entry."
+        }
+      }
     },
     "remote": {
       "name": "Send remote command",
@@ -165,6 +185,10 @@
         "device_id": {
           "name": "Player device",
           "description": "Homexa Player device to control (alternative to player_id)."
+        },
+        "config_entry_id": {
+          "name": "Integration entry",
+          "description": "Optional Homexa config entry ID. Selects the Freebox when several entries exist; device_id is an alternative."
         }
       }
     },
@@ -182,7 +206,7 @@
         },
         "start_time": {
           "name": "Start time",
-          "description": "Programme start time (ISO 8601)."
+          "description": "Programme start time in ISO 8601 format with a timezone."
         },
         "minutes_before": {
           "name": "Minutes before",
@@ -208,7 +232,7 @@
         },
         "start_time": {
           "name": "Start time",
-          "description": "Programme start time (ISO 8601)."
+          "description": "Programme start time in ISO 8601 format with a timezone."
         },
         "minutes_before": {
           "name": "Minutes before",
@@ -234,7 +258,7 @@
         },
         "start_time": {
           "name": "Start time",
-          "description": "Programme start time (ISO 8601)."
+          "description": "Programme start time in ISO 8601 format with a timezone."
         },
         "profile_name": {
           "name": "Profile name",
@@ -283,6 +307,9 @@
       },
       "raid_degraded": {
         "name": "RAID array {raid_id} degraded"
+      },
+      "tamper": {
+        "name": "Tamper"
       }
     },
     "calendar": {
@@ -319,6 +346,33 @@
       },
       "wifi_signal": {
         "name": "Wi-Fi signal"
+      },
+      "tnt_channel": {
+        "name": "{channel}"
+      },
+      "rate_down": {
+        "name": "Download speed"
+      },
+      "rate_up": {
+        "name": "Upload speed"
+      },
+      "ipv4": {
+        "name": "External IP"
+      },
+      "uptime": {
+        "name": "Uptime"
+      },
+      "missed": {
+        "name": "Missed calls"
+      },
+      "calls_log": {
+        "name": "Recent calls"
+      },
+      "partition_free_space": {
+        "name": "{partition} free space"
+      },
+      "wifi_signal_named": {
+        "name": "{name} Wi-Fi signal"
       }
     },
     "button": {
@@ -445,6 +499,14 @@
       "player_app_appletv": {
         "name": "Apple TV"
       }
+    },
+    "switch": {
+      "wifi": {
+        "name": "Wi-Fi"
+      },
+      "invert_switch": {
+        "name": "Invert positioning"
+      }
     }
   },
   "exceptions": {
@@ -470,7 +532,7 @@
       "message": "No matching reminder profile: create one in Freebox Homexa → Configure → Reminder profiles (set profile_name if there are several)."
     },
     "invalid_start_time": {
-      "message": "Invalid programme start time."
+      "message": "Invalid start time: use an ISO 8601 date with a timezone."
     },
     "reminder_too_late": {
       "message": "Too late to schedule this reminder: not enough time left before the programme starts."
@@ -492,6 +554,46 @@
     },
     "remote_failed": {
       "message": "Remote key {key} could not be sent to the Player: {error}"
+    },
+    "cannot_fetch_tnt": {
+      "message": "Could not retrieve the TNT guide: {error}"
+    },
+    "command_failed": {
+      "message": "The action could not be completed. Check the Freebox connection and permissions."
+    },
+    "inversion_unavailable": {
+      "message": "The inversion setting is unavailable. Check that switch before moving the cover."
+    },
+    "remote_empty_command": {
+      "message": "Specify at least one remote key."
+    },
+    "invalid_action_value": {
+      "message": "The requested value is invalid."
+    },
+    "invalid_source": {
+      "message": "This source is not supported by the Player."
+    },
+    "command_unconfirmed": {
+      "message": "The Player response did not confirm the command. Check its state before retrying."
+    },
+    "reminder_storage_failed": {
+      "message": "The reminder save could not be confirmed. Check Home Assistant storage before retrying."
+    },
+    "storage_write_failed": {
+      "message": "Configuration persistence could not be confirmed. Check Home Assistant storage before retrying."
+    },
+    "reminder_state_unconfirmed": {
+      "message": "Reminder storage and timer state do not agree. Check Home Assistant storage, then explicitly schedule or cancel this reminder."
+    }
+  },
+  "issues": {
+    "home_permissions": {
+      "title": "Home access needs attention",
+      "description": "Freebox OS denied this integration access to Home devices. In Freebox OS, open Settings > Access management > Applications, select Homexa and grant the Home access permission. Then reload this integration entry in Home Assistant. Existing entity IDs and settings are preserved. This issue clears after a successful Home read."
+    },
+    "source_permissions": {
+      "title": "Freebox access permission needs attention",
+      "description": "Freebox OS explicitly denied access to source {source}. In Access management > Applications > Homexa, check the application's granted permissions, then reload this entry. This issue clears only after a successful read of this source; existing settings and identifiers are preserved."
     }
   }
 }

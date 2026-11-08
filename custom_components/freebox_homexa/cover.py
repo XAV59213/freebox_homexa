@@ -2,17 +2,23 @@
 # DESCRIPTION: Gestion des volets (covers) Freebox, incluant les volets basiques et les volets avec position.
 # OBJECTIF: Permettre le contrôle des volets (ouverture, fermeture, arrêt) et la gestion de leur position.
 
+from collections.abc import Iterable
+from functools import partial
 import logging
 from typing import Any
 from datetime import timedelta
 from homeassistant.core import HomeAssistant
+from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
 from homeassistant.components.cover import CoverEntity, CoverDeviceClass, CoverState
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.entity_registry import async_get
-from .const import FreeboxHomeCategory
+from .discovery import DiscoveryCandidate, async_setup_discovery
+from .const import DOMAIN, FreeboxHomeCategory
 from .entity import FreeboxHomeEntity
 from .errors import is_shutdown_error, poll_log_level
 from .router import FreeboxConfigEntry, FreeboxRouter
+
+from .errors import async_action_errors
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -37,17 +43,16 @@ async def async_setup_entry(
         async_add_entities: Fonction pour ajouter des entités à Home Assistant.
     """
     router: FreeboxRouter = entry.runtime_data
-    entities = []
+    def candidates() -> Iterable[DiscoveryCandidate]:
+        for nodeid, node in router.home_devices.items():
+            if node["category"] == FreeboxHomeCategory.BASIC_SHUTTER:
+                yield str(nodeid), partial(FreeboxBasicShutter, hass, router, node)
+            elif node["category"] in {FreeboxHomeCategory.SHUTTER, FreeboxHomeCategory.OPENER}:
+                yield str(nodeid), partial(FreeboxShutter, hass, router, node)
 
-    for nodeid, node in router.home_devices.items():
-        if node["category"] == FreeboxHomeCategory.BASIC_SHUTTER:
-            entities.append(FreeboxBasicShutter(hass, router, node))
-        elif node["category"] in {FreeboxHomeCategory.SHUTTER, FreeboxHomeCategory.OPENER}:
-            entities.append(FreeboxShutter(hass, router, node))
+    async_setup_discovery(hass, entry, router,
+        [router.signal_home_device_new, router.signal_home_device_update], candidates, async_add_entities)
 
-    if entities:
-        async_add_entities(entities, update_before_add=True)
-        _LOGGER.debug("%s entités de volets ajoutées pour %s", len(entities), router.name)
 
 # SECTION: Classe pour les volets basiques
 class FreeboxBasicShutter(FreeboxHomeEntity, CoverEntity):
@@ -74,10 +79,10 @@ class FreeboxBasicShutter(FreeboxHomeEntity, CoverEntity):
         self._command_state = self.get_command_id(node['show_endpoints'], "signal", "state")
         raw_state = self.get_node_value(node['show_endpoints'], "signal", "state")
         self._state = self.convert_state(raw_state)
-        _LOGGER.debug("Volet basique %s initialisé avec état brut %s converti en %s", self._attr_name, raw_state, self._state)
+        _LOGGER.debug("Volet basique %s initialisé avec état brut %s converti en %s", self._source_name, raw_state, self._state)
 
     @property
-    def device_class(self) -> str:
+    def device_class(self) -> CoverDeviceClass:
         """Retourne la classe de l'appareil (volet)."""
         return CoverDeviceClass.SHUTTER
 
@@ -104,41 +109,35 @@ class FreeboxBasicShutter(FreeboxHomeEntity, CoverEntity):
             return True
         return None
 
-    async def async_open_cover(self, **kwargs) -> None:
+    @async_action_errors
+    async def async_open_cover(self, **kwargs: object) -> None:
         """Ouvre le volet.
 
         Envoie la commande d'ouverture via l'API Freebox.
         """
-        if self._command_up is None:
-            _LOGGER.error("Commande d'ouverture non disponible pour %s", self._attr_unique_id)
-            return
-        await self.set_home_endpoint_value(self._command_up, {"value": None})
+        await self.async_execute_home_command(self._command_up, {"value": None})
         self._state = CoverState.OPEN
-        _LOGGER.info("Volet %s ouvert", self._attr_name)
+        _LOGGER.info("Volet %s ouvert", self._source_name)
 
-    async def async_close_cover(self, **kwargs) -> None:
+    @async_action_errors
+    async def async_close_cover(self, **kwargs: object) -> None:
         """Ferme le volet.
 
         Envoie la commande de fermeture via l'API Freebox.
         """
-        if self._command_down is None:
-            _LOGGER.error("Commande de fermeture non disponible pour %s", self._attr_unique_id)
-            return
-        await self.set_home_endpoint_value(self._command_down, {"value": None})
+        await self.async_execute_home_command(self._command_down, {"value": None})
         self._state = CoverState.CLOSED
-        _LOGGER.info("Volet %s fermé", self._attr_name)
+        _LOGGER.info("Volet %s fermé", self._source_name)
 
-    async def async_stop_cover(self, **kwargs) -> None:
+    @async_action_errors
+    async def async_stop_cover(self, **kwargs: object) -> None:
         """Arrête le volet.
 
         Envoie la commande d'arrêt via l'API Freebox.
         """
-        if self._command_stop is None:
-            _LOGGER.error("Commande d'arrêt non disponible pour %s", self._attr_unique_id)
-            return
-        await self.set_home_endpoint_value(self._command_stop, {"value": None})
+        await self.async_execute_home_command(self._command_stop, {"value": None})
         self._state = None
-        _LOGGER.info("Volet %s arrêté", self._attr_name)
+        _LOGGER.info("Volet %s arrêté", self._source_name)
 
     async def async_update(self) -> None:
         """Met à jour l'état du volet.
@@ -146,13 +145,13 @@ class FreeboxBasicShutter(FreeboxHomeEntity, CoverEntity):
         Récupère l'état actuel via l'API Freebox.
         """
         if self._command_state is None:
-            _LOGGER.error("Commande d'état non disponible pour %s", self._attr_unique_id)
+            _LOGGER.debug("Endpoint d'état du volet absent")
             self._state = None
             return
         try:
             raw_state = await self.get_home_endpoint_value(self._command_state)
             self._state = self.convert_state(raw_state)
-            _LOGGER.debug("État du volet %s mis à jour : brut %s converti en %s", self._attr_name, raw_state, self._state)
+            _LOGGER.debug("État du volet %s mis à jour : brut %s converti en %s", self._source_name, raw_state, self._state)
         except Exception as err:  # noqa: BLE001
             if is_shutdown_error(err, self._router):
                 _LOGGER.debug("État de %s non lu (rechargement) : %s", self._attr_unique_id, err)
@@ -199,20 +198,9 @@ class FreeboxShutter(FreeboxHomeEntity, CoverEntity):
         self._command_stop = self.get_command_id(node['show_endpoints'], "slot", "stop")
         self._current_cover_position = self.get_value("signal", "position_set")
         self._state = None
-        self._invert_entity_id = None
+        self._invert_entity_id: str | None = None
 
-        # Recherche de l'entité "invert switch" dans le registre
-        entity_registry = async_get(hass)
-        unique_id_invert = self._attr_unique_id + "_InvertSwitch"
-        for entity in entity_registry.entities.values():
-            if entity.unique_id == unique_id_invert:
-                self._invert_entity_id = entity.entity_id
-                _LOGGER.debug("Entité invert_switch trouvée pour %s: %s", self._attr_name, self._invert_entity_id)
-                break
-        else:
-            _LOGGER.warning("Entité invert_switch non trouvée pour %s avec ID %s", self._attr_name, unique_id_invert)
-
-    def _get_corrected_position(self, position: int) -> int:
+    def _get_corrected_position(self, position: int | None) -> int | None:
         """Retourne la position corrigée en fonction de l'état d'inversion.
 
         Args:
@@ -221,17 +209,26 @@ class FreeboxShutter(FreeboxHomeEntity, CoverEntity):
         Returns:
             int: Position corrigée.
         """
+        if position is None:
+            return None
+        # Resolve by the existing unique ID at use time: HA forwards switch and
+        # cover concurrently, and registry entity IDs may later be renamed.
+        self._invert_entity_id = async_get(self._hass).async_get_entity_id(
+            "switch", DOMAIN, f"{self.unique_id}_InvertSwitch"
+        )
         if self._invert_entity_id:
-            invert_state = self.hass.states.get(self._invert_entity_id)
-            if invert_state and invert_state.state == "on":
-                _LOGGER.info("Inversion activée pour %s, position %s corrigée à %s", self._attr_name, position, 100 - position)
+            invert_state = self._hass.states.get(self._invert_entity_id)
+            if invert_state is None or invert_state.state not in {"on", "off"}:
+                return None
+            if invert_state.state == "on":
+                _LOGGER.info("Inversion activée pour %s, position %s corrigée à %s", self._source_name, position, 100 - position)
                 return 100 - position
         return position
 
     @property
-    def device_class(self) -> str:
+    def device_class(self) -> CoverDeviceClass:
         """Retourne la classe de l'appareil (volet ou garage)."""
-        if "garage" in self._attr_name.lower():
+        if "garage" in self._source_name.lower():
             return CoverDeviceClass.GARAGE
         return CoverDeviceClass.SHUTTER
 
@@ -246,50 +243,56 @@ class FreeboxShutter(FreeboxHomeEntity, CoverEntity):
         return None
 
     @property
-    def is_closed(self) -> bool:
+    def is_closed(self) -> bool | None:
         """Retourne si le volet est fermé.
 
         Returns:
             bool: True si position corrigée à 0, False sinon.
         """
         if self._current_cover_position is None:
-            return False
+            return None
         corrected_position = self._get_corrected_position(self._current_cover_position)
-        return corrected_position == 0
+        return corrected_position == 0 if corrected_position is not None else None
 
-    async def async_set_cover_position(self, position: int, **kwargs) -> None:
+    @async_action_errors
+    async def async_set_cover_position(self, position: int | None = None, **kwargs: object) -> None:
         """Définit la position du volet.
 
         Args:
             position: Position cible (0-100).
         """
+        if isinstance(position, bool) or not isinstance(position, int) or not 0 <= position <= 100:
+            raise ServiceValidationError(
+                translation_domain=DOMAIN, translation_key="invalid_action_value"
+            )
         corrected_position = self._get_corrected_position(position)
-        if self._command_position is None:
-            _LOGGER.error("Commande de position non disponible pour %s", self._attr_unique_id)
-            return
-        await self.set_home_endpoint_value(self._command_position, {"value": corrected_position})
-        self._current_cover_position = position  # Stocke la position demandée
-        _LOGGER.info("Position du volet %s définie à %s (corrigée à %s)", self._attr_name, position, corrected_position)
+        if corrected_position is None:
+            raise HomeAssistantError(
+                translation_domain=DOMAIN, translation_key="inversion_unavailable"
+            )
+        await self.async_execute_home_command(self._command_position, {"value": corrected_position})
+        self._current_cover_position = corrected_position  # Même repère brut que le relevé API.
+        _LOGGER.info("Position du volet %s définie à %s (corrigée à %s)", self._source_name, position, corrected_position)
 
-    async def async_open_cover(self, **kwargs) -> None:
+    @async_action_errors
+    async def async_open_cover(self, **kwargs: object) -> None:
         """Ouvre complètement le volet (position 100)."""
         await self.async_set_cover_position(100)
 
-    async def async_close_cover(self, **kwargs) -> None:
+    @async_action_errors
+    async def async_close_cover(self, **kwargs: object) -> None:
         """Ferme complètement le volet (position 0)."""
         await self.async_set_cover_position(0)
 
-    async def async_stop_cover(self, **kwargs) -> None:
+    @async_action_errors
+    async def async_stop_cover(self, **kwargs: object) -> None:
         """Arrête le volet.
 
         Envoie la commande d'arrêt et met à jour la position.
         """
-        if self._command_stop is None:
-            _LOGGER.error("Commande d'arrêt non disponible pour %s", self._attr_unique_id)
-            return
-        await self.set_home_endpoint_value(self._command_stop, {"value": None})
+        await self.async_execute_home_command(self._command_stop, {"value": None})
         await self.async_update()
-        _LOGGER.info("Volet %s arrêté", self._attr_name)
+        _LOGGER.info("Volet %s arrêté", self._source_name)
 
     async def async_update(self) -> None:
         """Met à jour la position actuelle du volet.
@@ -300,9 +303,10 @@ class FreeboxShutter(FreeboxHomeEntity, CoverEntity):
             position = self.get_value("signal", "position_set")
             if position is not None:
                 self._current_cover_position = position
-                _LOGGER.debug("Position du volet %s mise à jour: %s", self._attr_name, position)
+                _LOGGER.debug("Position du volet %s mise à jour: %s", self._source_name, position)
             else:
-                _LOGGER.warning("Position non valide reçue pour %s", self._attr_name)
+                self._current_cover_position = None
+                _LOGGER.debug("Position de volet inconnue dans une réponse valide")
         except Exception as err:  # noqa: BLE001
             if is_shutdown_error(err, self._router):
                 _LOGGER.debug("Position de %s non lue (rechargement) : %s", self._attr_unique_id, err)

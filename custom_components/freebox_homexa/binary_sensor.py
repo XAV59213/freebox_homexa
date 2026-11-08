@@ -2,19 +2,26 @@
 
 from __future__ import annotations
 
+from collections.abc import Iterable
+from functools import partial
+
 import logging
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from homeassistant.components.binary_sensor import (
-    BinarySensorDeviceClass,
     BinarySensorEntity,
     BinarySensorEntityDescription,
 )
+if TYPE_CHECKING:
+    from homeassistant.components.binary_sensor.const import BinarySensorDeviceClass
+else:
+    from homeassistant.components.binary_sensor import BinarySensorDeviceClass
 from homeassistant.const import EntityCategory
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.dispatcher import async_dispatcher_connect
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
+from .discovery import DiscoveryCandidate, async_setup_discovery
 from .const import REPEATER_MODEL, FreeboxHomeCategory
 from .entity import FreeboxHomeEntity
 from .errors import is_shutdown_error
@@ -68,32 +75,30 @@ async def async_setup_entry(
     """Configure les entités de capteurs binaires Freebox."""
     router: FreeboxRouter = entry.runtime_data
 
-    binary_entities: list[BinarySensorEntity] = [
-        FreeboxRaidDegradedSensor(router, raid, description)
-        for raid in router.raids.values()
-        for description in RAID_SENSORS
-    ]
+    def candidates() -> Iterable[DiscoveryCandidate]:
+        for raid in router.raids.values():
+            for description in RAID_SENSORS:
+                # Keep the already-created historical name-based UID on a live rename.
+                yield f"raid:{raid['id']}:{description.key}", partial(FreeboxRaidDegradedSensor, router, raid, description)
+        for node in router.home_devices.values():
+            if node["category"] == FreeboxHomeCategory.PIR:
+                yield f"node:{node['id']}", partial(FreeboxPirSensor, hass, router, node)
+            elif node["category"] == FreeboxHomeCategory.DWS:
+                yield f"node:{node['id']}", partial(FreeboxDwsSensor, hass, router, node)
+            if any(endpoint["name"] == "cover" and endpoint["ep_type"] == "signal"
+                   and endpoint.get("value") is not None for endpoint in node["show_endpoints"]):
+                yield f"tamper:{node['id']}", partial(FreeboxCoverSensor, hass, router, node)
 
-    for node in router.home_devices.values():
-        if node["category"] == FreeboxHomeCategory.PIR:
-            binary_entities.append(FreeboxPirSensor(hass, router, node))
-        elif node["category"] == FreeboxHomeCategory.DWS:
-            binary_entities.append(FreeboxDwsSensor(hass, router, node))
-
-        binary_entities.extend(
-            FreeboxCoverSensor(hass, router, node)
-            for endpoint in node["show_endpoints"]
-            if (
-                endpoint["name"] == "cover"
-                and endpoint["ep_type"] == "signal"
-                and endpoint.get("value") is not None
-            )
-        )
+    async_setup_discovery(hass, entry, router,
+        [router.signal_sensor_update, router.signal_home_device_new, router.signal_home_device_update],
+        candidates, async_add_entities)
 
     tracked_aps: set[str] = set()
 
     @callback
     def add_wifi_aps() -> None:
+        if router.closing:
+            return
         new_entities: list[FreeboxWifiApSensor] = []
         for ap_id, access_point in router.wifi_aps.items():
             if ap_id in tracked_aps:
@@ -112,8 +117,6 @@ async def async_setup_entry(
     )
     add_wifi_aps()
 
-    if binary_entities:
-        async_add_entities(binary_entities, True)
 
 
 class FreeboxHomeBinarySensor(FreeboxHomeEntity, BinarySensorEntity):
@@ -166,6 +169,8 @@ class FreeboxDwsSensor(FreeboxHomeBinarySensor):
 
 
 class FreeboxCoverSensor(FreeboxHomeBinarySensor):
+    _attr_translation_key = "tamper"
+    _home_entity_name = "Autoprotection"
     _attr_device_class = BinarySensorDeviceClass.SAFETY
     _attr_entity_category = EntityCategory.DIAGNOSTIC
     _attr_entity_registry_enabled_default = False
@@ -194,7 +199,7 @@ class FreeboxWifiApSensor(FreeboxReachableMixin, BinarySensorEntity):
     _attr_should_poll = False
     _attr_has_entity_name = True
     _attr_device_class = BinarySensorDeviceClass.CONNECTIVITY
-    _attr_icon = "mdi:wifi"
+    _attr_entity_category = EntityCategory.DIAGNOSTIC
 
     def __init__(self, router: FreeboxRouter, ap_id: str, access_point: dict[str, Any]) -> None:
         self._router = router
@@ -212,9 +217,19 @@ class FreeboxWifiApSensor(FreeboxReachableMixin, BinarySensorEntity):
             )
             self._attr_translation_key = "repeater_online"
             self._attr_unique_id = f"{router.mac}_repeater_{mac}"
-            self._attr_icon = "mdi:wifi-sync"
         self._attr_is_on = _ap_online(access_point)
         self._attr_extra_state_attributes = _ap_attributes(access_point)
+
+    @property
+    def available(self) -> bool:
+        access_point = self._router.wifi_aps.get(self._ap_id)
+        if access_point is None:
+            return False
+        if access_point.get("kind") == "gateway" and _ap_online(access_point) is None:
+            # Unknown with a successful source is valid; all reads failing is not.
+            if {"config", "ap", "bss"} <= self._router.wifi_api_errors.keys():
+                return False
+        return super().available
 
     @callback
     def async_update_state(self) -> None:
@@ -256,18 +271,24 @@ class FreeboxRaidDegradedSensor(FreeboxReachableMixin, BinarySensorEntity):
         self.entity_description = description
         self._router = router
         self._attr_device_info = router.device_info
-        self._raid = raid
+        self._raid_id = raid["id"]
         self._attr_translation_key = "raid_degraded"
         self._attr_translation_placeholders = {"raid_id": str(raid["id"])}
         self._attr_unique_id = f"{router.mac}_{description.key}_{raid['name']}_{raid['id']}"
 
+    @property
+    def available(self) -> bool:
+        return (super().available and self._router.raids_available
+                and self._raid_id in self._router.raids)
+
     @callback
     def async_update_state(self) -> None:
-        self._raid = self._router.raids.get(self._raid["id"])
-        if self._raid is None:
+        raid = self._router.raids.get(self._raid_id)
+        if raid is None:
             self._attr_is_on = None
         else:
-            self._attr_is_on = self._raid.get("degraded", False)
+            degraded = raid.get("degraded")
+            self._attr_is_on = degraded if isinstance(degraded, bool) else None
 
     @property
     def is_on(self) -> bool | None:

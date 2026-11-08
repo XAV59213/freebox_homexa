@@ -33,7 +33,7 @@ flats = {name: flat(data) for name, data in files.items()}
 errors = []
 ref = flats["strings.json"]
 for name, f in flats.items():
-    for section in ("entity", "exceptions"):
+    for section in ("entity", "exceptions", "issues"):
         a = {k for k in ref if k.startswith(section + ".")}
         b = {k for k in f if k.startswith(section + ".")}
         for k in sorted(a - b):
@@ -48,9 +48,10 @@ for name, f in flats.items():
 src = {p.name: p.read_text() for p in ROOT.glob("*.py")}
 entity_keys = {k.split(".")[2] for k in ref if k.startswith("entity.")}
 exc_keys = {k.split(".")[1] for k in ref if k.startswith("exceptions.")}
+issue_keys = {k.split(".")[1] for k in ref if k.startswith("issues.")}
 for fname, text in src.items():
     for key in re.findall(r'translation_key\s*=\s*"([a-z0-9_]+)"', text):
-        if key not in entity_keys and key not in exc_keys:
+        if key not in entity_keys and key not in exc_keys and key not in issue_keys:
             errors.append(f"{fname}: translation_key « {key} » absente de strings.json")
 # Clés construites (boutons Player) : remote_key_<touche>, player_app_<app>.
 button = src["button.py"]
@@ -92,6 +93,6 @@ if errors:
     sys.exit(1)
 print(
     f"{len(files)} fichiers, {len(entity_keys)} clés d'entité, {len(exc_keys)} exceptions, "
-    f"{len(registered)} actions : cohérents"
+    f"{len(registered)} actions, {len(issue_keys)} Repairs : cohérents"
 )
 print("CHECK_TRANSLATIONS_OK")

@@ -29,7 +29,7 @@ homeassistant.helpers.entity_platform homeassistant.helpers.entity_registry home
 homeassistant.helpers.service_info homeassistant.helpers.service_info.zeroconf
 homeassistant.helpers.storage homeassistant.helpers.typing homeassistant.helpers.update_coordinator
 homeassistant.helpers.selector homeassistant.data_entry_flow homeassistant.util homeassistant.util.dt
-homeassistant.components.websocket_api voluptuous""".split()
+homeassistant.components.websocket_api homeassistant.components.websocket_api.connection homeassistant.components.websocket_api.decorators homeassistant.components.websocket_api.const voluptuous""".split()
 for m in MODS:
     sys.modules[m] = MagicMock()
 
@@ -141,7 +141,9 @@ class _Lock:
 
 def _router():
     r = R.FreeboxRouter.__new__(R.FreeboxRouter)
+    r.entry_id = "synthetic-entry"
     r.home_granted = True
+    r.home_available = True
     r.closing = False
     r._home_update_lock = _Lock()
     r.home_devices = {}
@@ -171,8 +173,8 @@ assert not any("pas forcément un refus" in m for _, m in msgs)
 print("OK : refus de droit -> message permission (pas le faux négatif générique)")
 
 r, msgs = asyncio.run(_run_home(other))
-assert r.home_granted is False
-assert any("pas forcément un refus" in m or "home/nodes" in m for _, m in msgs)
+assert r.home_granted is True and r.home_available is False
+assert any("Source Freebox Home indisponible" in m for _, m in msgs)
 assert not any(m == "L'accès aux appareils domestiques n'est pas autorisé" for _, m in msgs)
 print("OK : autre erreur home/nodes -> message neutre (pas « maison connectée »)")
 

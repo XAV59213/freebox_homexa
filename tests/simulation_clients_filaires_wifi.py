@@ -16,10 +16,13 @@ import sys, types, itertools
 # --- Bouchons Home Assistant / freebox_api ------------------------------------
 for m in ["homeassistant", "homeassistant.config_entries", "homeassistant.core", "homeassistant.const",
           "homeassistant.helpers", "homeassistant.helpers.dispatcher", "homeassistant.util",
-          "homeassistant.helpers.entity_registry", "freebox_api", "freebox_api.api", "freebox_api.api.call",
+          "homeassistant.helpers.entity_registry", "homeassistant.exceptions", "freebox_api", "freebox_api.api", "freebox_api.api.call",
           "freebox_api.api.home", "freebox_api.api.wifi", "freebox_api.exceptions"]:
     sys.modules[m] = types.ModuleType(m)
 ha = sys.modules
+ha["homeassistant.exceptions"].HomeAssistantError = type("HomeAssistantError", (Exception,), {})
+ha["homeassistant.exceptions"].ServiceValidationError = type(
+    "ServiceValidationError", (ha["homeassistant.exceptions"].HomeAssistantError,), {})
 ha["homeassistant.config_entries"].ConfigEntry = object
 ha["homeassistant.core"].HomeAssistant = object
 ha["homeassistant.const"].CONF_HOST = "host"; ha["homeassistant.const"].CONF_PORT = "port"
@@ -107,7 +110,7 @@ def load(name):
     return m
 
 
-load("registry_compat"); er_mod = load("errors"); dg = load("device_groups"); wa = load("wifi_ap"); rt = load("router")
+load("sdk_contracts"); load("registry_compat"); er_mod = load("errors"); dg = load("device_groups"); wa = load("wifi_ap"); rt = load("router")
 
 RM = "34:27:92:D9:E0:30"
 TRUTH = {"Grange": ("20:66:CF:4A:05:93", "192.168.1.165", ["22:66:CF:C9:A0:52", "22:66:CF:C9:A0:56"]),

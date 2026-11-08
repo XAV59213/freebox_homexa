@@ -1,4 +1,5 @@
 """Constants adapted from cyclope205/programme-tnt-fr (MIT)."""
+from collections.abc import Iterable, Mapping
 from datetime import time
 
 XMLTV_URL = "https://xmltvfr.fr/xmltv/xmltv_fr.xml"
@@ -142,12 +143,14 @@ CONF_TNT_CHANNELS_BELGIQUE = "tnt_channels_belgique"
 CONF_TMDB_API_KEY = "tnt_tmdb_api_key"
 
 
-def selected_channels(options) -> list[str]:
+def selected_channels(options: Mapping[str, object]) -> list[str]:
     """Chaînes suivies d'après les options de l'entrée (30 TNT par défaut)."""
     channels = options.get(CONF_TNT_CHANNELS)
     if not channels:
         return list(DEFAULT_CHANNELS)
-    return [c for c in channels if c in ALL_CHANNELS]
+    if not isinstance(channels, Iterable):
+        raise TypeError("Invalid TNT channel collection")
+    return [c for c in channels if c in ALL_CHANNELS and isinstance(c, str)]
 
 
 # Numéros Freebox OS (LCN) pour zap Player via tv:?channel=N.

@@ -1888,7 +1888,11 @@ if (progDate) metaParts.push(progDate);
           self._activeReminders[key] = minutes;
           self._applyReminderState(minutes);
         })
-        .catch(function () {});
+        .catch(function (err) {
+          if (self._reminderKey() !== key) return;
+          self._els.modalNotifyStatus.textContent =
+            (err && err.message) || "État du rappel non confirmé. Vérifiez le stockage Home Assistant.";
+        });
     }
 
     _scheduleReminder(minutes) {

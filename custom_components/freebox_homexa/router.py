@@ -286,6 +286,10 @@ class FreeboxRouter:
         self.raids_available = True
         self.home_available = True
         self.home_snapshot_known = False
+        # Vrai seulement après une liste complète réussie. L'état initial et un échec
+        # ne prouvent pas qu'un appareil a disparu.
+        self.disks_snapshot_known = False
+        self.lan_snapshot_known = False
         self.lan_available = True
         self.wifi_stations_available = True
         self.player_status_available: dict[str, bool] = {}
@@ -707,6 +711,7 @@ class FreeboxRouter:
         except Exception as err:
             self.note_permission("lan", err)
             self.lan_available = False
+            self.lan_snapshot_known = False
             self.note_source("lan", False, "Source LAN")
             raise
         self.note_source("lan", self.supports_hosts, "Source LAN")
@@ -714,6 +719,7 @@ class FreeboxRouter:
         if self.supports_hosts:
             self.note_permission("lan")
         self.lan_available = self.supports_hosts
+        self.lan_snapshot_known = bool(self.supports_hosts)
         seen_macs = {device["l2ident"]["id"] for device in fbx_devices}
         if self.lan_available:
             for mac, previous in self.devices.items():
@@ -826,11 +832,13 @@ class FreeboxRouter:
                 disks[fbx_disk["id"]] = disk
             self.note_permission("disks")
             self.disks = disks
+            self.disks_snapshot_known = True
             if not self.disks_available:
                 _LOGGER.info("Source disques Freebox de nouveau disponible")
             self.disks_available = True
         except Exception as err:  # An unsuccessful read
             self.note_permission("disks", err)
+            self.disks_snapshot_known = False
             if self.disks_available:
                 _LOGGER.info("Source disques Freebox indisponible")
             self.disks_available = False
@@ -972,7 +980,7 @@ class FreeboxRouter:
 
     @property
     def device_info(self) -> DeviceInfo:
-        return DeviceInfo(
+        info = DeviceInfo(
             configuration_url=f"https://{self._host}:{self._port}/",
             connections={(CONNECTION_NETWORK_MAC, self.mac)},
             identifiers={(DOMAIN, self.mac)},
@@ -981,6 +989,10 @@ class FreeboxRouter:
             model=self.model,
             sw_version=as_version(self._sw_v),
         )
+        serial = self._attrs.get("serial") if isinstance(self._attrs, dict) else None
+        if isinstance(serial, str) and serial.strip():
+            info["serial_number"] = serial.strip()
+        return info
 
     def via_device_id_for(self, identifier: str | None = None) -> str | None:
         """device_id du parent (via_device_id), à la place de via_device=(DOMAIN, …) déprécié.

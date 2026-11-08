@@ -55,9 +55,7 @@ rules:
       home-assistant.io non soumise. Aucune certification custom revendiquée.'
   docs-conditions:
     status: exempt
-    comment: 'Aucune plateforme condition/trigger spécifique, ni conditions.yaml/triggers.yaml : const.py:52-64
-      et inventaire du paquet. Les événements HA ordinaires ne constituent pas une plateforme de triggers spécifique.
-      Exception prévue par la règle officielle.'
+    comment: "Jalon23, règle relue le 2026-11-08 : elle ne s'applique pas si l'intégration ne fournit aucune condition. Preuve runtime : aucun conditions.yaml dans le paquet, aucun async_get_conditions, PLATFORMS de const.py sans plateforme d'automatisation. Les services et les événements dispatcher ne sont pas des conditions. Exemption d'inapplicabilité, pas une documentation difficile. Réévaluer si une condition est ajoutée."
   docs-high-level-description:
     status: todo
     comment: 'docs/guide-utilisateur.md (lié README) : Description Server/Player, usage réseau/Home/guide et
@@ -77,9 +75,7 @@ rules:
       certification custom revendiquée.'
   docs-triggers:
     status: exempt
-    comment: 'Aucune plateforme condition/trigger spécifique, ni conditions.yaml/triggers.yaml : const.py:52-64
-      et inventaire du paquet. Les événements HA ordinaires ne constituent pas une plateforme de triggers spécifique.
-      Exception prévue par la règle officielle.'
+    comment: "Jalon23, règle relue le 2026-11-08 : elle ne s'applique pas si l'intégration ne fournit aucun trigger. Preuve runtime : aucun triggers.yaml dans le paquet, aucun async_get_triggers, PLATFORMS de const.py sans plateforme d'automatisation. Les événements dispatcher ne sont pas des triggers d'intégration. Exemption d'inapplicabilité, pas une documentation difficile. Réévaluer si un trigger est ajouté."
   entity-event-setup:
     status: done
     comment: 'Inventaire AST complet : aucune souscription en constructeur. tests/ha/test_entity_platforms.py
@@ -205,11 +201,10 @@ rules:
       avant réauth. Lié au choix de migration unique ID host vers identité physique, non imposé ici.
   test-coverage:
     status: done
-    comment: "Jalon22 : 695 tests HA 2026.10.4, 42 modules sans omit : 6530/6653 lignes (98,15 %), 2078/2248 branches (92,44 %), combiné 96,71 %. 92 lignes automatiquement exclues, aucun omit ajouté. Texte officiel relu le 2026-11-08 : plus de 95 % du code dans chaque module. L'exemple pytest publié est --cov-report term-missing, sans --cov-branch et sans second seuil de branches. 42/42 modules dépassent 95 % de lignes. Le plus bas est const.py 79/83 (95,18 %). device_groups 596/618 (96,44 %) et 289/310 branches (93,23 %), wifi_ap 296/308 (96,10 %) et 143/158 (90,51 %), router 979/988 (99,09 %) et 359/388 (92,53 %), tnt_tmdb 258/271 (95,20 %) et 89/112 (79,46 %). Caméra 125/125 et 16/16. Deux passages locaux JSON et XML identiques. Artefact CI run 42431543845 sur c8f5d76 identique aux deux JSON et XML locaux. Règle done sur le seuil de lignes. Plusieurs modules restent sous 95 % de branches, publiées à part."
+    comment: "Jalon23 : 697 tests HA 2026.10.4, 42 modules sans omit : 6611/6735 lignes (98,16 %), 2129/2298 branches (92,65 %), combiné 96,76 %. Le jalon f4adcad reste la preuve précédente, 6530/6653 lignes et 2078/2248 branches. Texte officiel inchangé : plus de 95 % du code dans chaque module, exemple pytest en lignes, sans seuil de branches. 42/42 modules dépassent encore 95 % de lignes. Le plus bas reste const.py 79/83 (95,18 %). Deux passages locaux JSON et XML identiques. Artefact CI de ce commit pas encore comparé. Règle done sur le seuil de lignes. Plusieurs modules restent sous 95 % de branches."
   devices:
     status: todo
-    comment: >-
-      Jalon20 : le parent Player n'est affirmé qu'après enregistrement du device Player. Identifiant disque entier, name_by_user et options préexistantes sont conservés, y compris sensor.suggested_display_precision ajouté par HA. Une MAC déjà portée par une autre intégration n'est pas déplacée. Les associations des trente familles et le multi-Servers ne sont pas encore démontrés : règle reste todo. Aucune migration d'identité.
+    comment: "Jalon23 : le numéro de série déjà lu dans la configuration système est reporté sur le DeviceInfo du routeur ; l'identifiant reste la MAC. Le parent Player, l'identifiant disque entier, name_by_user et les options préexistantes restent. Une MAC d'une autre intégration n'est pas déplacée. La règle reste todo : les trente familles et le multi-Servers ne sont pas démontrés, la caméra passe encore un dict à FFmpeg, et plusieurs appareils n'ont pas de numéro de série ni de version matérielle dans les données déjà lues. Aucune migration d'identité."
   diagnostics:
     status: done
     comment: diagnostics.py:async_get_config_entry_diagnostics limite les données au schéma typé et observations
@@ -335,11 +330,7 @@ rules:
       Jalon15 : refus structurés SDK observés sur Home plus12scopes de lecture existants (WiFi config/BSS/AP/stations, repeater, disques/RAID, system/connection/calls, LAN, Player). SDK public avec transport mocké et registre HA natif : ignorer conservé sur répétition/timeout/collection invalide, suppression seulement sur observation valide du même scope ou retrait définitif ciblé. Stations multi-AP ne déclarent pas reprise sur un autre AP sain ou zéro AP. FREN réellement chargé, aucune donnée privée ; repeater/ inchangé et payload erreur brut supprimé. Docs quality-scale-repair-inventory.md. Règle globale reste todo : lectures d’état par appareil et droits écriture/résolution sans commande-probe à inventorier, disparition volontaire de capacités à distinguer, API native config_entry_id absente dans HA2026.10.4 ; aucun masquage automatique sur désactivation revendiqué.
   stale-devices:
     status: todo
-    comment: 'Jalon20 : un groupe virtuel vide est retiré ; un groupe qui a une entité ou un enfant, son
-      name_by_user et l''identifiant disque entier restent. Le helper existant retire un client MAC exclusif
-      de cette entrée et laisse intact un appareil d''une autre intégration. Pas de nouveau nettoyage
-      automatique des capteurs, clients ou disques disparus, ni preuve multi-intégrations globale.
-      repeater/ inchangé. Règle reste todo.'
+    comment: "Jalon23 : async_remove_config_entry_device autorise la suppression par l'utilisateur seulement quand une liste complète réussie prouve l'absence. Le routeur, les groupes de service, le guide TNT, un appareil encore listé, un entier dont la liste Home ou disques n'est pas connue, et un appareil d'une autre intégration restent. La fonction ne supprime rien : l'identifiant entier et name_by_user restent tant que l'utilisateur n'a pas confirmé. Pas de retrait automatique des disques, clients ou capteurs disparus. repeater/ inchangé. Règle reste todo."
   async-dependency:
     status: done
     comment: 'SDK freebox-api 1.3.1 : open/close/permissions et Access get/post/put/delete sont des coroutines

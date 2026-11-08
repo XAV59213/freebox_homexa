@@ -1270,3 +1270,110 @@ def repeater_registry_devices(hass: HomeAssistant, entry: ConfigEntry) -> list[d
             }
         )
     return result
+
+
+def config_entry_device_removable(router: Any, device: Any) -> bool:
+    """True seulement si une liste complète réussie prouve que l'appareil n'est plus là.
+
+    Ne supprime rien. Sans liste fiable, pour le routeur, un groupe de service, le guide
+    TNT ou un appareil d'une autre intégration, la réponse reste False.
+    """
+    if router is None or device is None or getattr(router, "closing", False):
+        return False
+    entry_id = getattr(router, "entry_id", None)
+    if not isinstance(entry_id, str) or shared_with_other_entries(device, entry_id):
+        return False
+    identifiers = [
+        ident[1]
+        for ident in getattr(device, "identifiers", ()) or ()
+        if isinstance(ident, tuple) and len(ident) >= 2 and ident[0] == DOMAIN
+    ]
+    macs = [
+        conn[1]
+        for conn in getattr(device, "connections", ()) or ()
+        if isinstance(conn, tuple) and len(conn) >= 2 and conn[0] == dr.CONNECTION_NETWORK_MAC
+    ]
+    if not identifiers and not macs:
+        return False
+    verdicts = [_identifier_presence(router, value) for value in identifiers]
+    verdicts.extend(_mac_presence(router, mac) for mac in macs)
+    return bool(verdicts) and all(item == "absent" for item in verdicts)
+
+
+def _identifier_presence(router: Any, value: Any) -> str:
+    """present, absent ou unknown pour un identifiant Homexa."""
+    if isinstance(value, str) and (
+        value == getattr(router, "mac", None)
+        or value == "programme_tnt_fr"
+        or "_group_" in value
+    ):
+        return "present"
+    if isinstance(value, str) and value.startswith("player_"):
+        if not getattr(router, "players_initialized", False):
+            return "unknown"
+        wanted = value.removeprefix("player_")
+        players = getattr(router, "players", ()) or ()
+        return (
+            "present"
+            if any(str(player.get("id")) == wanted for player in players if isinstance(player, dict))
+            else "absent"
+        )
+    if isinstance(value, str) and value.startswith("repeater_"):
+        if not getattr(router, "lan_snapshot_known", False):
+            return "unknown"
+        norm = _norm_mac(value.removeprefix("repeater_"))
+        return "present" if norm and _repeater_known(router, norm) else "absent"
+    if isinstance(value, bool) or not isinstance(value, int):
+        return "unknown"
+    if _mapping_has_id(getattr(router, "home_devices", {}), value) or _mapping_has_id(
+        getattr(router, "disks", {}), value
+    ):
+        return "present"
+    if getattr(router, "home_snapshot_known", False) and getattr(router, "disks_snapshot_known", False):
+        return "absent"
+    return "unknown"
+
+
+def _mac_presence(router: Any, mac: Any) -> str:
+    norm = _norm_mac(str(mac) if mac is not None else None)
+    if not norm:
+        return "unknown"
+    if norm == _norm_mac(getattr(router, "mac", None)):
+        return "present"
+    if _player_has_mac(router, norm) or _repeater_known(router, norm):
+        return "present"
+    if not getattr(router, "lan_snapshot_known", False):
+        return "unknown"
+    devices = getattr(router, "devices", {}) or {}
+    if any(_norm_mac(str(key)) == norm for key in devices):
+        return "present"
+    return "absent"
+
+
+def _player_has_mac(router: Any, norm: str) -> bool:
+    if not getattr(router, "players_initialized", False):
+        return False
+    for player in getattr(router, "players", ()) or ():
+        if isinstance(player, dict) and _norm_mac(str(player.get("mac") or "")) == norm:
+            return True
+    return False
+
+
+def _repeater_known(router: Any, norm: str) -> bool:
+    aliases = getattr(router, "repeater_aliases", {}) or {}
+    if norm in aliases or any(_norm_mac(str(key)) == norm for key in aliases):
+        return True
+    for key, payload in (getattr(router, "repeaters", {}) or {}).items():
+        if _norm_mac(str(key)) == norm:
+            return True
+        if isinstance(payload, dict) and any(
+            _norm_mac(str(item)) == norm for item in payload.get("macs") or []
+        ):
+            return True
+    return False
+
+
+def _mapping_has_id(mapping: Any, value: int) -> bool:
+    if not isinstance(mapping, dict):
+        return False
+    return value in mapping or str(value) in mapping

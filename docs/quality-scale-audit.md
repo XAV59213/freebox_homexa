@@ -19,6 +19,36 @@ Platinum absent). Le snapshot JSON documente noms et tiers ; il ne crée pas
 un second fichier de statut. Le seul checklist est
 `custom_components/freebox_homexa/quality_scale.yaml`, placement conventionnel.
 
+## Jalon23 — suppression utilisateur d'un appareil prouvé absent, exemptions revérifiées
+
+**22 done / 30 todo / 2 exempt**, inchangé. `devices` et `stale-devices` restent todo.
+`docs-conditions` et `docs-triggers` restent exempt : les textes officiels relus le
+2026-11-08 disent que la règle ne s'applique pas quand l'intégration ne fournit
+aucune condition, ou aucun trigger. Le paquet n'a ni `conditions.yaml` ni
+`triggers.yaml`, ni `async_get_conditions`, ni `async_get_triggers`. `PLATFORMS`
+ne contient pas de plateforme d'automatisation. Les services et les événements
+dispatcher ne créent pas ces plateformes. Ce n'est pas une exemption de difficulté.
+
+`async_remove_config_entry_device` répond True seulement lorsqu'une liste complète
+réussie prouve l'absence. Elle répond False pour le routeur, un groupe de service,
+le guide TNT, un appareil encore présent, un identifiant entier tant que la liste
+Home ou la liste des disques n'est pas connue, et un appareil d'une autre
+intégration. Elle ne retire rien elle-même : l'identifiant entier et `name_by_user`
+restent. Il n'y a pas de suppression automatique des disques, clients ou capteurs
+disparus, parce qu'une panne ou une liste partielle ne prouve pas la disparition.
+`repeater/` n'est pas modifié.
+
+Le numéro de série déjà obtenu par la configuration système est recopié sur le
+`DeviceInfo` du routeur. L'identifiant reste la MAC. La règle `devices` n'est pas
+close : les trente familles et le multi-Servers ne sont pas démontrés, la caméra
+passe encore un dictionnaire à FFmpeg, et plusieurs appareils n'ont pas de numéro
+de série ni de version matérielle dans les données déjà lues.
+
+697 tests. Deux passages locaux concordent : 6611/6735 lignes (98,16 %),
+2129/2298 branches (92,65 %), combiné 96,76 %. Les 42 modules restent au-dessus
+de 95 % de lignes. L'artefact CI de ce commit n'est pas encore comparé. Les
+chiffres 6530/6653 et 2078/2248 sont ceux de `f4adcad`, pas de ce jalon.
+
 ## Jalon22 — les 42 modules dépassent 95 % de lignes
 
 **22 done / 30 todo / 2 exempt**. **695 tests**, **6530/6653 lignes (98,15 %)**,
@@ -841,7 +871,7 @@ listés dans le tableau suivant ; celui-ci reprend le YAML, il n'est pas un seco
 | log-when-unavailable | Lot 11 : router.note_source mémorise transitions par source, INFO perte puis retour une seule fois ; labels fixes sans host/ID/payload. Tests vrais HA/SDK test_source_ownership_logs : trois échecs successifs et récupération Root/LAN, Wi-Fi config/BSS/AP/stations/interrupteur, Home/endpoints/nœuds/caméra, Remote/Player, capteurs/disques/RAID ; aucun secret synthétique dans logs. TNT utilise réellement DataUpdateCoordinator/UpdateFailed, une perte puis récupération testée. Canal image FFmpeg public conserve exception/None sans retry et annonce ses transitions. Pas de prétention de succès physique ni de nettoyage SDK garanti. |
 | reauthentication-flow | tests/ha/test_config_flow.py prouve reauth_successful et reload unique de la même entrée sans doublon. Le serveur physique peut toutefois changer derrière le même host ; absence de contrôle MAC/identité avant réauth. Lié au choix de migration unique ID host vers identité physique, non imposé ici. |
 | test-coverage | Jalon22 : 695 tests HA 2026.10.4, 42 modules sans omit : 6530/6653 lignes (98,15 %), 2078/2248 branches (92,44 %), combiné 96,71 %. 92 lignes automatiquement exclues, aucun omit ajouté. Texte officiel relu le 2026-11-08 : plus de 95 % du code dans chaque module. L'exemple pytest publié est --cov-report term-missing, sans --cov-branch et sans second seuil de branches. 42/42 modules dépassent 95 % de lignes. Le plus bas est const.py 79/83 (95,18 %). device_groups 596/618 (96,44 %) et 289/310 branches (93,23 %), wifi_ap 296/308 (96,10 %) et 143/158 (90,51 %), router 979/988 (99,09 %) et 359/388 (92,53 %), tnt_tmdb 258/271 (95,20 %) et 89/112 (79,46 %). Caméra 125/125 et 16/16. Deux passages locaux JSON et XML identiques. Artefact CI run 42431543845 sur c8f5d76 identique aux deux JSON et XML locaux. Règle done sur le seuil de lignes. Plusieurs modules restent sous 95 % de branches, publiées à part. |
-| devices | Jalon20 : le parent Player n'est affirmé qu'après enregistrement du device Player. Identifiant disque entier, name_by_user et options préexistantes sont conservés, y compris sensor.suggested_display_precision ajouté par HA. Une MAC déjà portée par une autre intégration n'est pas déplacée. Les associations des trente familles et le multi-Servers ne sont pas encore démontrés : règle reste todo. Aucune migration d'identité.
+| devices | Jalon23 : le numéro de série déjà lu dans la configuration système est reporté sur le DeviceInfo du routeur ; l'identifiant reste la MAC. Le parent Player, l'identifiant disque entier, name_by_user et les options préexistantes restent. Une MAC d'une autre intégration n'est pas déplacée. La règle reste todo : les trente familles et le multi-Servers ne sont pas démontrés, la caméra passe encore un dict à FFmpeg, et plusieurs appareils n'ont pas de numéro de série ni de version matérielle dans les données déjà lues. Aucune migration d'identité.
 | discovery | tests/ha/test_config_flow.py teste le flow zeroconf réel : préremplissage api_domain/https_port, formulaire utilisateur et rejet du même host configuré. L’identité physique, alias d’adresse et découverte de tous modèles restent non démontrés ; pas un passage en done sur seul préremplissage. |
 | discovery-update-info | config_flow.py:390-405 découvre le host ; aucun test prouvant mise à jour sûre des entrées existantes après changement adresse. |
 | docs-data-update | docs/guide-utilisateur.md (lié README) : Table code réel : timer central 40 s, Home 15 s/choix, TNT 5 min/fetch >=60 min, polling plateformes et watcher alarme 1 s avec réserve de charge. Preuve documentaire locale renforcée ; reste todo au sens formel, la règle officielle visant une page/revue home-assistant.io non soumise. Aucune certification custom revendiquée. |
@@ -859,7 +889,7 @@ listés dans le tableau suivant ; celui-ci reprend le YAML, il n'est pas un seco
 | icon-translations | Lot 11 : icônes fixes des 30 familles/81 variantes auditées et déplacées dans icons.json : boutons, capteurs réseau/appels/disques, AP/LAN/RSSI, calendrier/TNT, inversion, types trackers. Descripteurs clonés avec icon=None, IDs/noms sources/préférences inchangés ; vrai chargeur HA async_get_icons et registre (icône/nom personnalisés) testés. Classes natives gardent icône HA. Reste icône principale Player dépendant de source YouTube/Netflix, pas du state on/off : comportement utilisateur conservé en Python. Étudier métadonnée dynamique via API publique du registre et cache/lifecycle avant done, pas supprimer fonctionnalité pour score. |
 | reconfiguration-flow | Test HA de caractérisation confirme : nouveau host -> wrong_account, données inchangées, aucun appel SDK. Le changement de port seul manque aussi de probe. Corriger exige plan compatible identité physique/host/jeton ; aucune migration ni changement IDs imposé. |
 | repair-issues | Jalon15 : refus structurés SDK observés sur Home plus12scopes de lecture existants (WiFi config/BSS/AP/stations, repeater, disques/RAID, system/connection/calls, LAN, Player). SDK public avec transport mocké et registre HA natif : ignorer conservé sur répétition/timeout/collection invalide, suppression seulement sur observation valide du même scope ou retrait définitif ciblé. Stations multi-AP ne déclarent pas reprise sur un autre AP sain ou zéro AP. FREN réellement chargé, aucune donnée privée ; repeater/ inchangé et payload erreur brut supprimé. Docs quality-scale-repair-inventory.md. Règle globale reste todo : lectures d’état par appareil et droits écriture/résolution sans commande-probe à inventorier, disparition volontaire de capacités à distinguer, API native config_entry_id absente dans HA2026.10.4 ; aucun masquage automatique sur désactivation revendiqué. |
-| stale-devices | Jalon20 : un groupe virtuel vide est retiré ; un groupe qui a une entité ou un enfant, son name_by_user et l'identifiant disque entier restent. Le helper existant retire un client MAC exclusif de cette entrée et laisse intact un appareil d'une autre intégration. Pas de nouveau nettoyage automatique des capteurs, clients ou disques disparus, ni preuve multi-intégrations globale. repeater/ inchangé. Règle reste todo.
+| stale-devices | Jalon23 : async_remove_config_entry_device autorise la suppression par l'utilisateur seulement quand une liste complète réussie prouve l'absence. Le routeur, les groupes de service, le guide TNT, un appareil encore listé, un entier dont la liste Home ou disques n'est pas connue, et un appareil d'une autre intégration restent. La fonction ne supprime rien : l'identifiant entier et name_by_user restent tant que l'utilisateur n'a pas confirmé. Pas de retrait automatique des disques, clients ou capteurs disparus. repeater/ inchangé. Règle reste todo.
 | inject-websession | Source SDK v1.3.1 vérifiée : constructeur sans session publique, open crée son ClientSession (aiofreepybox.py:126). Test signature réelle. Autre limite amont démontrée : après open échoué, close peut lever AttributeError _access avant session.close ; après logout échoué, close ne passe pas dans finally. Ne pas promettre une fermeture garantie sur erreur. Pas de monkeypatch/private session ni modification dépendance pour score ; proposition amont dans le rapport. |
 | strict-typing | Jalon19 : mypy strict2 erreurs/2fichiers/42modules, contre18/3/42 (-16). DUMMY=False restauré selon source historique5e42e63 et suppression7cf0c60, branches sandbox et vrais appels SDK/transport mocké testés. Contrats legacy et callbacks annotés sans Any/cast/ignore ; caméra compose FFmpeg public sans falsifier son nom relatif optionnel, snapshots/stream/cleanup et préférences HA préservés. Restent seulement incompatibilité LegacyDeviceInfo avec HA (IDentier et parent nullable) et identifiant disque entier contre str ; Native HA prouve que convertir crée une identité distincte. Pas de cast ni migration pour score : décision de contrat HA/amont ou migration explicite requise, pas blocage SDK. Global strict reste rouge. |
 

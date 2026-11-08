@@ -365,3 +365,19 @@ async def async_remove_entry(hass: HomeAssistant, entry: FreeboxConfigEntry) -> 
     from .repairs import async_clear_entry_permission_issues
 
     async_clear_entry_permission_issues(hass, entry.entry_id)
+
+
+async def async_remove_config_entry_device(
+    hass: HomeAssistant,
+    entry: FreeboxConfigEntry,
+    device_entry: dr.DeviceEntry,
+) -> bool:
+    """Let the user delete a device only when a full snapshot proves it is gone.
+
+    Home Assistant calls this from the device page. Returning True does not scan
+    or delete anything by itself. Integer identifiers, names and options stay
+    until the user confirms a device that is actually absent.
+    """
+    from .device_groups import config_entry_device_removable
+
+    return config_entry_device_removable(getattr(entry, "runtime_data", None), device_entry)

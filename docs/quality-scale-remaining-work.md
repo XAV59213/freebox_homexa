@@ -60,11 +60,11 @@ pas autorisé par ce mandat. Pas de demande cosmétique bloquante.
 | entity-unique-id | IDs RAID/disques liés à libellés et collisions multientrées à caractériser ; migration réversible préservant registre/historique/automatisations, aucun renommage forcé. |
 | unique-config-entry | Dédupliquer même Server via host/IP/URL par identité physique vérifiée, pas host ; migration doit conserver chemin des jetons et entrées existantes. |
 | reauthentication-flow | Vérifier même matériel derrière le host avant changer credentials ; conserver codes remote/entrée/IDs et refuser autre appareil. Dépend du plan d’identité stable. |
-| devices | Associations/parents des trente familles, Home non préfixé et multi-Servers à vérifier ; pas fusion arbitraire de devices ni perte des choix utilisateur. |
+| devices | Jalon23 ajoute le numéro de série déjà lu au routeur, identifiant MAC inchangé. Reste : DeviceInfo complet des trente familles, parent Home non préfixé, multi-Servers, dict caméra vers FFmpeg. Pas de fusion d'appareils ni de migration d'identité. |
 | discovery | Vérifier annonces réellement supportées et parcours complet, pas seulement formulaire prérempli ; dédupliquer alias d’un même matériel sans inventer propriétés zeroconf absentes. |
 | discovery-update-info | Même matériel à nouvelle adresse met à jour endpoint sans doublon/perte de token ; identité stable et migration compatibles requises. |
 | reconfiguration-flow | Probe du nouveau host/port puis validation même matériel ; caractérisation actuelle wrong_account ou port sans probe n’est pas conformité. Dépend du même plan identité/jeton. |
-| stale-devices | Distinguer disparition durable/panne transitoire ; offrir retrait utilisateur et préserver registres/automatisations/multi-intégrations. Pas de nettoyage destructif automatique pour faire passer le critère. |
+| stale-devices | Jalon23 : la page appareil peut supprimer un appareil seulement après une liste complète réussie. Refus si la liste manque, si l'appareil est encore là, s'il s'agit du routeur, d'un groupe, du guide TNT ou d'une autre intégration. Reste le retrait automatique sûr des disques, clients et capteurs vraiment disparus, sans confondre une panne avec une absence. Pas de nettoyage destructif pour le score. |
 | inject-websession | Signature publique SDK 1.3.1 sans session injectable ; open crée sa ClientSession. SDK amont doit proposer ownership/session publics. Pas de session privée, patch externe ou contournement ; problème close distinct prouvé par tests réels. |
 
 ## D — treize réserves formelles documentaires, contenu local disponible

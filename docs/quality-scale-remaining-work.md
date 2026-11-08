@@ -1,13 +1,14 @@
-# Inventaire fini des travaux restants — jalon20
+# Inventaire fini des travaux restants — jalon22
 
-**21 done / 31 todo / 2 exempt, préparation 28.8.90 ; aucune certification HA.**
-Jalon21 mesuré : 687 tests, 5928/6653 lignes (89,10 %), 1699/2248 branches (75,58 %),
-combiné 85,69 %. Le critère officiel est plus de 95 % du code dans chaque module ;
-l'exemple publié mesure les lignes, pas un second seuil de branches. 38/42 modules
-dépassent 95 % de lignes. Quatre restent sous ce seuil : device_groups, wifi_ap,
-router, tnt_tmdb. Deux passages locaux concordent avec l'artefact CI
-[42429962744](https://github.com/XAV59213/freebox_homexa/actions/runs/42429962744)
-du SHA 09b1782 : 5928/6653 lignes et 1699/2248 branches.
+**22 done / 30 todo / 2 exempt, préparation 28.8.90 ; aucune certification HA.**
+Jalon22 mesuré : 695 tests, 6530/6653 lignes (98,15 %), 2078/2248 branches (92,44 %),
+combiné 96,71 %. Le critère officiel, relu le 2026-11-08, est plus de 95 % du code
+dans chaque module. L'exemple pytest est la couverture de lignes, pas un second
+seuil de branches. Les 42 modules dépassent 95 % de lignes. `test-coverage` passe
+done sur ce seuil. Les branches restent publiées : tnt_tmdb est à 79,46 %, wifi_ap
+à 90,51 %, device_groups à 93,23 %, router à 92,53 %. Deux passages locaux
+concordent. L'artefact CI de ce commit n'est pas encore comparé. Les chiffres
+5928/6653 et 1699/2248 sont ceux de 09b1782 / 43c0323, pas de ce jalon.
 Une ligne par todo, pas une liste infinie de tests. La règle A est du
 travail local indépendant ; B mêle travail local et réserve de compatibilité ou
 dépendance ; C exige proposition compatible ou action amont avant conformité.
@@ -21,10 +22,10 @@ historique/source/SDK/branches sandbox démontrés ; base_class100% lignes/branc
 Ne pas proposer à nouveau des annotations ordinaires pour ces deux résidus : voir
 [choix finis et conséquences](quality-scale-lot19-contract-decisions.md).
 
-La priorité utilisateur reste la couverture par module (>95% de lignes, critère
-officiel relu). Quatre modules sont encore sous ce seuil. Le typage strict reste
+Le seuil officiel de lignes est atteint sur les 42 modules. Le typage strict reste
 à deux erreurs d'identité, non masquées. Repairs et la projection caméra
-unavailable ne sont pas étendus pour fabriquer un done.
+unavailable ne sont pas étendus pour fabriquer un done. Les branches sous 95 %
+restent visibles et ne sont pas un second seuil officiel.
 La partition complète et les réserves exactes sont dans
 [convergence jalon16](quality-scale-lot16-convergence.md). Le contenu documentaire
 local n’est pas confondu avec une publication officielle hors périmètre.
@@ -92,7 +93,7 @@ modifier artificiellement le sens du YAML. Aucune soumission amont ici.
 
 | Règle | Minimum restant |
 |---|---|
-| test-coverage | 687tests,42modules,89,10% lignes/75,58% branches,combiné85,69%. Seuil officiel relu : >95% du code dans chaque module, exemple pytest en lignes, pas de seuil de branches publié. 38/42 modules >95% lignes. Restent device_groups65,37, wifi_ap68,18, router85,12, tnt_tmdb26,57. Branches de ces quatre : 46,45, 53,16, 70,36 et 0. Deux locaux concordants. |
+| test-coverage | Done au jalon22 : 695 tests, 6530/6653 lignes (98,15 %), 2078/2248 branches (92,44 %), 42/42 modules au-dessus de 95 % de lignes. Branches publiées à part, plusieurs sous 95 %. Artefact CI de ce commit encore à comparer. |
 | strict-typing | Deux erreurs réelles/2fichiers/42modules : contrat HA identifiants str contre entiers historiques et parent legacy nullable. Caméra/DUMMY/callbacks résolus. Choix explicite décrit séparément ; pas de migration, cast, stub élargi ou Any implicite pour fabriquer un done. |
 
 ## Exemptions inchangées : deux, pas une façon de masquer des défauts

@@ -204,14 +204,8 @@ rules:
       doublon. Le serveur physique peut toutefois changer derrière le même host ; absence de contrôle MAC/identité
       avant réauth. Lié au choix de migration unique ID host vers identité physique, non imposé ici.
   test-coverage:
-    status: todo
-    comment: 'Jalon21 : 687 tests HA2026.10.4, 42modules sans omit : 5928/6653 lignes (89,10 %), 1699/2248
-      branches (75,58 %), combiné85,69 %. 92lignes automatiquement exclues. Le texte officiel demande plus
-      de95% du code dans chaque module ; l''exemple pytest publié est la couverture de lignes, sans seuil
-      de branches. Branches mesurées à part, pas un second seuil inventé. 38/42 modules >95% lignes.
-      Restent device_groups65,37/46,45 branches, wifi_ap68,18/53,16, router85,12/70,36, tnt_tmdb26,57/0.
-      __init__208/208, caméra125/125 et16/16, guide99,19, player_remote98,10, rappels96,77, frontend96,15.
-      Deux passages locaux concordants. Artefact CI run 42429962744 sur 09b1782 identique aux deux JSON et XML locaux. Règle globale todo.'
+    status: done
+    comment: "Jalon22 : 695 tests HA 2026.10.4, 42 modules sans omit : 6530/6653 lignes (98,15 %), 2078/2248 branches (92,44 %), combiné 96,71 %. 92 lignes automatiquement exclues, aucun omit ajouté. Texte officiel relu le 2026-11-08 : plus de 95 % du code dans chaque module. L'exemple pytest publié est --cov-report term-missing, sans --cov-branch et sans second seuil de branches. 42/42 modules dépassent 95 % de lignes. Le plus bas est const.py 79/83 (95,18 %). device_groups 596/618 (96,44 %) et 289/310 branches (93,23 %), wifi_ap 296/308 (96,10 %) et 143/158 (90,51 %), router 979/988 (99,09 %) et 359/388 (92,53 %), tnt_tmdb 258/271 (95,20 %) et 89/112 (79,46 %). Caméra 125/125 et 16/16. Deux passages locaux JSON et XML identiques. Artefact CI de ce commit pas encore comparé. Règle done sur le seuil de lignes. Plusieurs modules restent sous 95 % de branches, publiées à part."
   devices:
     status: todo
     comment: >-

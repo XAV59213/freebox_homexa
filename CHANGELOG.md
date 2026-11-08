@@ -1,6 +1,7 @@
 # Changelog
 
 ## Non publié
+- 2026-11-08 — Quality Scale, jalon 22 : 695 tests HA, 98,15 % lignes / 92,44 % branches, 42/42 modules au-dessus de 95 % de lignes. device_groups, wifi_ap, router et tnt_tmdb franchissent le seuil de lignes. test-coverage passe done sur ce seul seuil. Branches publiées à part, plusieurs sous 95 %. 22/30/2, mypy 2 erreurs inchangées, préparation 28.8.90 sans merge/release.
 - 2026-11-08 — Quality Scale, jalon 21 : 687 tests HA, 89,10 % lignes / 75,58 % branches, 38/42 modules au-dessus de 95 % de lignes. Setup, guide, Player, rappels et frontend franchissent le seuil de lignes. Quatre modules restent en dessous. 21/31/2 inchangé, préparation 28.8.90 sans merge/release.
 - 2026-11-08 — Quality Scale, jalon 20 : 681 tests HA, 84,83 % lignes / 69,75 % branches, 33/42 modules au-dessus de 95 % de lignes. Associations Player/disque/MAC étrangère et cycle d'erreur FFmpeg prouvés sans migration d'identité. 21/31/2 inchangé, mypy 2 erreurs, préparation 28.8.90 sans merge/release.
 - 2026-11-07 — Quality Scale, jalon17 : router strict105→85 diagnostics globaux,7fichiers/42modules ; contrats SDK object et validations sans Any/cast/ignore ajouté. IDs/propriétaires NativeRegistry bornés sans conversion, propriétaires inconnus protégés, cache/reparentage LAN gardés. Registry compat100% lignes/96,67% branches ;617tests HA,79,63% lignes/61,49% branches,20/42modules >95%,21/31/2 inchangé. Vrai SDK/HA transports mockés, aucun polling/commande réelle/migration ; préparation28.8.90 sans publication.

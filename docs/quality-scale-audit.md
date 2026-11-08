@@ -19,6 +19,33 @@ Platinum absent). Le snapshot JSON documente noms et tiers ; il ne crée pas
 un second fichier de statut. Le seul checklist est
 `custom_components/freebox_homexa/quality_scale.yaml`, placement conventionnel.
 
+## Jalon22 — les 42 modules dépassent 95 % de lignes
+
+**22 done / 30 todo / 2 exempt**. **695 tests**, **6530/6653 lignes (98,15 %)**,
+**2078/2248 branches (92,44 %)**, combiné 96,71 %. Le texte officiel, relu le
+2026-11-08, demande plus de 95 % du code dans chaque module. L'exemple pytest
+est `--cov-report term-missing`, sans `--cov-branch` et sans second seuil de
+branches. Les 42 modules dépassent 95 % de lignes. Le plus bas est `const.py`,
+79/83 (95,18 %). Aucun omit ajouté ; 92 lignes restent exclues automatiquement.
+Deux passages locaux ont les mêmes JSON et les mêmes taux XML (0,9815 / 0,9244).
+L'artefact CI de ce commit n'est pas encore comparé. Les artefacts de `43c0323`
+et `09b1782` restent ceux du jalon 21 (5928/6653, 1699/2248) et ne prouvent pas
+celui-ci.
+
+| Module | Lignes | Branches |
+|---|---|---|
+| device_groups.py | 596/618, 96,44 % | 289/310, 93,23 % |
+| wifi_ap.py | 296/308, 96,10 % | 143/158, 90,51 % |
+| router.py | 979/988, 99,09 % | 359/388, 92,53 % |
+| tnt_tmdb.py | 258/271, 95,20 % | 89/112, 79,46 % |
+
+Caméra reste 125/125 et 16/16. Les tests gardent les identifiants, les noms
+choisis, les options, l'endpoint `repeater/` et la vie privée : une MAC
+étrangère n'est pas déplacée, un groupe qui a un enfant ou une entité reste,
+un groupe vide part. Mypy n'a pas été relancé : le code de production n'a pas
+changé de types, les 2 erreurs d'identité restent. Plusieurs modules restent
+sous 95 % de branches. Ce n'est pas le seuil officiel, et ce n'est pas masqué.
+
 ## Jalon21 — cinq des neuf modules sous le seuil de lignes le franchissent
 
 **21done /31todo /2exempt**, inchangé. **687tests**,
@@ -805,7 +832,7 @@ listés dans le tableau suivant ; celui-ci reprend le YAML, il n'est pas un seco
 | entity-unavailable | Lot 12 : disponibilité des sources d’état Home/Player/réseau/stockage/XMLTV et boutons seuls prouvée. Caméra expose séparément video_available : dernier résultat d’image FFmpeg (None non observé, False None/octets vides/exception, True frame obtenue), sans image périmée, sonde ni timer nouveau. Un poll Home sain ne prouve pas récupération vidéo ; seules prochaines images la prouvent. Pas de write/log de frame tardive après retrait/closing, concurrence Events testée. Les contrôles Home restent disponibles si leur source fonctionne. Réserve formelle : panne RTSP isolée ne met pas toute caméra unavailable ; le faire bloquerait aussi ses services Home via HA. Définir projection compatible état vidéo/contrôles et reprise UI sans polling FFmpeg lourd ; ne pas compter cette observation comme conformité entière. API image publique contrôle is_on et ne bloque pas intrinsèquement sur available ; ne pas inventer ce blocage. Jalon20 : cycle image FFmpeg public couvert (exception, octets vides, None, reprise, pas d'écriture après arrêt de l'observateur ou closing) et erreur de mise à jour Home distincte d'un rechargement. La projection globale unavailable reste non modifiée.
 | log-when-unavailable | Lot 11 : router.note_source mémorise transitions par source, INFO perte puis retour une seule fois ; labels fixes sans host/ID/payload. Tests vrais HA/SDK test_source_ownership_logs : trois échecs successifs et récupération Root/LAN, Wi-Fi config/BSS/AP/stations/interrupteur, Home/endpoints/nœuds/caméra, Remote/Player, capteurs/disques/RAID ; aucun secret synthétique dans logs. TNT utilise réellement DataUpdateCoordinator/UpdateFailed, une perte puis récupération testée. Canal image FFmpeg public conserve exception/None sans retry et annonce ses transitions. Pas de prétention de succès physique ni de nettoyage SDK garanti. |
 | reauthentication-flow | tests/ha/test_config_flow.py prouve reauth_successful et reload unique de la même entrée sans doublon. Le serveur physique peut toutefois changer derrière le même host ; absence de contrôle MAC/identité avant réauth. Lié au choix de migration unique ID host vers identité physique, non imposé ici. |
-| test-coverage | Jalon21 : 687 tests HA2026.10.4, 42modules sans omit : 5928/6653 lignes (89,10 %), 1699/2248 branches (75,58 %), combiné85,69 %. 92lignes automatiquement exclues. Le texte officiel demande plus de95% du code dans chaque module ; l'exemple pytest publié est la couverture de lignes, sans seuil de branches. Branches mesurées à part, pas un second seuil inventé. 38/42 modules >95% lignes. Restent device_groups65,37/46,45 branches, wifi_ap68,18/53,16, router85,12/70,36, tnt_tmdb26,57/0. __init__208/208, caméra125/125 et16/16, guide99,19, player_remote98,10, rappels96,77, frontend96,15. Deux passages locaux concordants. Artefact CI run 42429962744 sur 09b1782 identique aux deux JSON et XML locaux. Règle globale todo.
+| test-coverage | Jalon22 : 695 tests HA 2026.10.4, 42 modules sans omit : 6530/6653 lignes (98,15 %), 2078/2248 branches (92,44 %), combiné 96,71 %. 92 lignes automatiquement exclues, aucun omit ajouté. Texte officiel relu le 2026-11-08 : plus de 95 % du code dans chaque module. L'exemple pytest publié est --cov-report term-missing, sans --cov-branch et sans second seuil de branches. 42/42 modules dépassent 95 % de lignes. Le plus bas est const.py 79/83 (95,18 %). device_groups 596/618 (96,44 %) et 289/310 branches (93,23 %), wifi_ap 296/308 (96,10 %) et 143/158 (90,51 %), router 979/988 (99,09 %) et 359/388 (92,53 %), tnt_tmdb 258/271 (95,20 %) et 89/112 (79,46 %). Caméra 125/125 et 16/16. Deux passages locaux JSON et XML identiques. Artefact CI de ce commit pas encore comparé. Règle done sur le seuil de lignes. Plusieurs modules restent sous 95 % de branches, publiées à part. |
 | devices | Jalon20 : le parent Player n'est affirmé qu'après enregistrement du device Player. Identifiant disque entier, name_by_user et options préexistantes sont conservés, y compris sensor.suggested_display_precision ajouté par HA. Une MAC déjà portée par une autre intégration n'est pas déplacée. Les associations des trente familles et le multi-Servers ne sont pas encore démontrés : règle reste todo. Aucune migration d'identité.
 | discovery | tests/ha/test_config_flow.py teste le flow zeroconf réel : préremplissage api_domain/https_port, formulaire utilisateur et rejet du même host configuré. L’identité physique, alias d’adresse et découverte de tous modèles restent non démontrés ; pas un passage en done sur seul préremplissage. |
 | discovery-update-info | config_flow.py:390-405 découvre le host ; aucun test prouvant mise à jour sûre des entrées existantes après changement adresse. |

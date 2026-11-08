@@ -19,6 +19,42 @@ Platinum absent). Le snapshot JSON documente noms et tiers ; il ne crée pas
 un second fichier de statut. Le seul checklist est
 `custom_components/freebox_homexa/quality_scale.yaml`, placement conventionnel.
 
+## Jalon25 — sept contrats d'appareil pour toutes les familles actives
+
+**23 done / 29 todo / 2 exempt.** `devices` passe done. Ce n'est pas une
+certification.
+
+La règle officielle demande qu'une entité soit rattachée à un appareil physique
+ou à un service, avec un `DeviceInfo`, un parent quand l'appareil est derrière
+la box, et le type service pour un service. Elle ne demande pas un test par
+classe quand plusieurs classes appellent le même constructeur. Elle ne demande
+pas non plus une série ou une version matérielle que le payload ne contient pas.
+
+Un seul test de registre HA couvre les sept contrats :
+
+- Serveur : capteurs, boutons, interrupteur, RAID, Wi-Fi de la box.
+- Nœud Home, identifiant entier, parent groupe service : volet, caméra, PIR, inversion.
+- Alarme : le groupe Maison, type service.
+- Disque : identifiant entier, parent serveur. Pas de série inventée.
+- Player : média, télécommande et touche, sans parent.
+- Répéteur : sous le groupe Wi-Fi, type service.
+- Client LAN : connexion MAC, fabricant « Inconnu » conservé s'il n'y a pas de fabricant. Le tracker `ScannerEntity` n'a pas de `device_info` et utilise cet appareil.
+- Guide TNT et capteur de groupe LAN : type service.
+
+Le dictionnaire FFmpeg reste la configuration de flux. `base_class` n'est pas
+une plateforme active. Les noms choisis du serveur et du disque restent.
+
+Mypy 2.4.1, 42 fichiers, **2 erreurs**, les mêmes qu'au jalon 19 :
+`base_class.py:86` override `LegacyDeviceInfo | None` contre
+`DeviceInfo | ChildDeviceInfo | None`, et `sensor.py:333` `tuple[str, int]`
+contre `tuple[str, str]`. Le nom de la caméra n'est pas un diagnostic actuel.
+Ces deux erreurs ne se corrigent pas sans migration ou masquage. Elles restent.
+
+699 tests. Deux passages locaux : 6616/6738 lignes (98,19 %), 2133/2300
+branches (92,74 %), combiné 96,80 %. Mêmes totaux que `3defb4f`. Les 42 modules
+restent au-dessus de 95 % de lignes. L'artefact CI de ce commit n'est pas
+encore comparé.
+
 ## Jalon24 — deux serveurs, mêmes identifiants, appareils distincts
 
 **22 done / 30 todo / 2 exempt**, inchangé. `devices` reste todo.

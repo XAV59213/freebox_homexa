@@ -151,3 +151,23 @@ pas du texte à traduire. TNT reçoit un placeholder channel identique FR/EN, sa
 inventer de titre. Les entités principales Home/Player restent sans suffixe et les
 états standards relèvent des classes HA. Les clés présentes mais masquées par
 _attr_name/name ne suffisent pas à déclarer une traduction fonctionnelle.
+
+## Appareils — jalon25
+
+La règle devices se juge par contrat d'appareil, pas par un test pour chacune
+des trente classes. Les classes actives se répartissent ainsi :
+
+| Contrat | Classes |
+|---|---|
+| Serveur physique | FreeboxSensor et sous-classes d'appels, FreeboxButton, FreeboxSwitch, FreeboxRaidDegradedSensor, FreeboxRepeaterCountSensor, FreeboxWifiTotalClientSensor, Wi-Fi gateway |
+| Nœud Home, identifiant entier, parent groupe service | FreeboxBasicShutter, FreeboxShutter, FreeboxCamera, FreeboxPirSensor, FreeboxDwsSensor, FreeboxCoverSensor, FreeboxBatterySensor, FreeboxShutterInvertSwitchEntity |
+| Groupe Maison, type service | FreeboxAlarm |
+| Disque, identifiant entier, parent serveur | FreeboxDiskSensor |
+| Player, sans parent | FreeboxPlayerMediaPlayer, FreeboxRemote, FreeboxPlayerRemoteButton, FreeboxPlayerAppButton |
+| Répéteur, parent groupe Wi-Fi service | FreeboxWifiApSensor répéteur, capteurs clients de répéteur, RSSI d'un hôte répéteur |
+| Client LAN, MAC, fabricant Inconnu si absent | FreeboxWifiSignalSensor ; FreeboxDevice n'a pas de device_info (ScannerEntity) et utilise cet appareil |
+| Service TNT | HomexaTntSensor, FreeboxTvGuideCalendar |
+| Groupe LAN, type service | FreeboxLanGroupClientsSensor |
+
+`base_class` n'alimente aucune plateforme. Le dict FFmpeg est le flux. Une
+série ou une version matérielle absente du payload n'est pas un trou.

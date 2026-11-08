@@ -44,8 +44,18 @@ TNT, client LAN) le sont. La règle n'est pas close.
 
 698 tests. Deux passages locaux concordent : 6616/6738 lignes (98,19 %),
 2133/2300 branches (92,74 %), combiné 96,80 %. Les 42 modules restent
-au-dessus de 95 % de lignes. L'artefact CI de ce commit n'est pas encore
-comparé. 6611/6735 est la mesure de `39043cb`.
+au-dessus de 95 % de lignes. L'artefact CI
+[42433665552](https://github.com/XAV59213/freebox_homexa/actions/runs/42433665552)
+de `3defb4f` est identique à ces deux JSON et aux taux XML 0,9819 / 0,9274.
+Les quatre checks de ce commit sont verts : HA
+[42433665552](https://github.com/XAV59213/freebox_homexa/actions/runs/42433665552),
+syntaxe
+[42433665559](https://github.com/XAV59213/freebox_homexa/actions/runs/42433665559),
+HACS
+[42433665566](https://github.com/XAV59213/freebox_homexa/actions/runs/42433665566),
+hassfest
+[42433665587](https://github.com/XAV59213/freebox_homexa/actions/runs/42433665587).
+6611/6735 est la mesure de `39043cb`.
 
 ## Jalon23 — suppression utilisateur d'un appareil prouvé absent, exemptions revérifiées
 

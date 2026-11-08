@@ -211,7 +211,7 @@ rules:
       de branches. Branches mesurées à part, pas un second seuil inventé. 38/42 modules >95% lignes.
       Restent device_groups65,37/46,45 branches, wifi_ap68,18/53,16, router85,12/70,36, tnt_tmdb26,57/0.
       __init__208/208, caméra125/125 et16/16, guide99,19, player_remote98,10, rappels96,77, frontend96,15.
-      Deux passages locaux concordants. Artefact CI de ce SHA encore à comparer. Règle globale todo.'
+      Deux passages locaux concordants. Artefact CI run 42429962744 sur 09b1782 identique aux deux JSON et XML locaux. Règle globale todo.'
   devices:
     status: todo
     comment: >-

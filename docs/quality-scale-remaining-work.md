@@ -5,8 +5,9 @@ Jalon21 mesuré : 687 tests, 5928/6653 lignes (89,10 %), 1699/2248 branches (75,
 combiné 85,69 %. Le critère officiel est plus de 95 % du code dans chaque module ;
 l'exemple publié mesure les lignes, pas un second seuil de branches. 38/42 modules
 dépassent 95 % de lignes. Quatre restent sous ce seuil : device_groups, wifi_ap,
-router, tnt_tmdb. Deux passages locaux concordent. L'artefact CI de 133d11c
-concordait déjà ; celui du SHA suivant reste à comparer.
+router, tnt_tmdb. Deux passages locaux concordent avec l'artefact CI
+[42429962744](https://github.com/XAV59213/freebox_homexa/actions/runs/42429962744)
+du SHA 09b1782 : 5928/6653 lignes et 1699/2248 branches.
 Une ligne par todo, pas une liste infinie de tests. La règle A est du
 travail local indépendant ; B mêle travail local et réserve de compatibilité ou
 dépendance ; C exige proposition compatible ou action amont avant conformité.

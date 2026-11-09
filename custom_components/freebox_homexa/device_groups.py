@@ -1323,6 +1323,8 @@ def _identifier_presence(router: Any, value: Any) -> str:
             return "unknown"
         norm = _norm_mac(value.removeprefix("repeater_"))
         return "present" if norm and _repeater_known(router, norm) else "absent"
+    if isinstance(value, str) and value.isdigit():
+        value = int(value)
     if isinstance(value, bool) or not isinstance(value, int):
         return "unknown"
     if _mapping_has_id(getattr(router, "home_devices", {}), value) or _mapping_has_id(

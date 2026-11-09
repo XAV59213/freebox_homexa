@@ -393,7 +393,7 @@ async def test_sensor_disk_absence_wifi_parent_and_user_precision(hass, home_con
         key="partition_free_space", name="espace libre", entity_category=EntityCategory.DIAGNOSTIC,
     )
     disk_sensor = FreeboxDiskSensor(router, disk, disk["partitions"][3], description)
-    assert disk_sensor.device_info["identifiers"] == {(DOMAIN, 7)}
+    assert disk_sensor.device_info["identifiers"] == {(DOMAIN, "7")}
     platform = make_platform(hass, "sensor")
     platform.config_entry = entry
     registry = er.async_get(hass)
@@ -401,7 +401,7 @@ async def test_sensor_disk_absence_wifi_parent_and_user_precision(hass, home_con
         await platform.async_add_entities([disk_sensor])
         device = devices.async_get(disk_sensor.registry_entry.device_id)
         assert device is not None
-        assert any(ident == (DOMAIN, 7) for ident in device.identifiers)
+        assert any(ident == (DOMAIN, "7") for ident in device.identifiers)
         devices.async_update_device(device.id, name_by_user="Mon disque")
         registry.async_update_entity_options(disk_sensor.entity_id, "conversation", {"should_expose": False})
         registry.async_update_entity_options(disk_sensor.entity_id, "sensor", {"suggested_display_precision": 2})
@@ -417,7 +417,7 @@ async def test_sensor_disk_absence_wifi_parent_and_user_precision(hass, home_con
         again = devices.async_get(device.id)
         assert again.id == device.id
         assert again.name_by_user == "Mon disque"
-        assert any(ident == (DOMAIN, 7) for ident in again.identifiers)
+        assert any(ident == (DOMAIN, "7") for ident in again.identifiers)
         plain = FreeboxSensor(router, SensorEntityDescription(key="custom_plain", name="Debit salon"))
         assert isinstance(plain.name, str)
         unnamed = FreeboxSensor(router, SensorEntityDescription(key="custom_none", name=None))

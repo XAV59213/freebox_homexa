@@ -133,12 +133,6 @@ def _options_schema(
             CONF_CREATE_LAN_DEVICES,
             default=defaults.get(CONF_CREATE_LAN_DEVICES, DEFAULT_CREATE_LAN_DEVICES),
         ): bool,
-        vol.Required(
-            CONF_HOME_POLL_INTERVAL,
-            default=_coerce_home_poll_interval(
-                defaults.get(CONF_HOME_POLL_INTERVAL, DEFAULT_HOME_POLL_INTERVAL)
-            ),
-        ): vol.In(HOME_POLL_INTERVAL_OPTIONS),
         vol.Optional(
             CONF_REMOTE_CODE,
             default=_coerce_remote_code(defaults.get(CONF_REMOTE_CODE)),
@@ -186,6 +180,43 @@ def _options_from_input(
     }
 
 
+def hardware_unique_id(config: object) -> str | None:
+    """MAC matérielle stable. L'hôte et l'adresse ne sont pas un identifiant."""
+    if not isinstance(config, dict):
+        return None
+    mac = config.get("mac")
+    if not isinstance(mac, str) or not mac.strip():
+        return None
+    from homeassistant.helpers.device_registry import format_mac
+
+    formatted = format_mac(mac.strip())
+    if formatted.count(":") != 5:
+        return None
+    return formatted
+
+
+def same_freebox(entry: ConfigEntry, unique_id: str) -> bool:
+    """Vrai si l'entrée porte déjà cette MAC, ou encore son hôte historique."""
+    current = entry.unique_id
+    if current == unique_id:
+        return True
+    host = entry.data.get(CONF_HOST)
+    return isinstance(host, str) and current == host
+
+
+def adopt_hardware_unique_id(hass: HomeAssistant, entry: ConfigEntry, mac: str) -> None:
+    """Passe l'identifiant d'entrée de l'hôte à la MAC. Entités et options inchangées."""
+    unique_id = hardware_unique_id({"mac": mac})
+    if unique_id is None or entry.unique_id == unique_id or not same_freebox(entry, unique_id):
+        return
+    if any(
+        other.entry_id != entry.entry_id and other.unique_id == unique_id
+        for other in hass.config_entries.async_entries(DOMAIN)
+    ):
+        return
+    hass.config_entries.async_update_entry(entry, unique_id=unique_id)
+
+
 class FreeboxFlowHandler(ConfigFlow, domain=DOMAIN):
     """Gère le flux de configuration pour l'intégration Freebox."""
 
@@ -228,9 +259,9 @@ class FreeboxFlowHandler(ConfigFlow, domain=DOMAIN):
             CONF_HOST: user_input.get(CONF_HOST),
             CONF_PORT: user_input.get(CONF_PORT, 80),
         }
-        await self.async_set_unique_id(self._data[CONF_HOST])
-        # Reauth enters reauth_confirm -> link, never the user/discovery step.
-        self._abort_if_unique_id_configured()
+        # Même adresse saisie deux fois : refus avant l'appairage. L'identité
+        # matérielle (MAC) est posée après la lecture de configuration.
+        self._async_abort_entries_match({CONF_HOST: self._data[CONF_HOST]})
         return await self.async_step_link()
 
     async def async_step_reauth(self, entry_data: dict[str, Any]) -> ConfigFlowResult:
@@ -275,7 +306,12 @@ class FreeboxFlowHandler(ConfigFlow, domain=DOMAIN):
                 )
 
                 system: SystemConfiguration = fbx.system
-                await system.get_config()
+                system_config = await system.get_config()
+                unique_id = hardware_unique_id(system_config)
+                if unique_id is None:
+                    raise ValueError("Invalid Freebox hardware identity")
+                if self.source == SOURCE_REAUTH and not same_freebox(self._get_reauth_entry(), unique_id):
+                    return self.async_abort(reason="wrong_account")
                 await get_hosts_list_if_supported(fbx)
                 try:
                     self._players = await fbx.player.get_players() or []
@@ -287,11 +323,15 @@ class FreeboxFlowHandler(ConfigFlow, domain=DOMAIN):
                 await store.async_save(self._data)
 
                 if self.source == SOURCE_REAUTH:
+                    entry = self._get_reauth_entry()
                     return self.async_update_reload_and_abort(
-                        self._get_reauth_entry(),
+                        entry,
                         data=self._data,
+                        unique_id=unique_id,
                     )
 
+                await self.async_set_unique_id(unique_id)
+                self._abort_if_unique_id_configured()
                 return await self.async_step_lan_options()
 
             finally:
@@ -358,32 +398,69 @@ class FreeboxFlowHandler(ConfigFlow, domain=DOMAIN):
             options=self._options,
         )
 
+    async def _probe_hardware_id(self, host: str, port: int) -> str | None:
+        """Lit la MAC sans journaliser le jeton. None si la Freebox ne répond pas."""
+        fbx = await get_api(self.hass, host)
+        try:
+            await fbx.open(host, str(port))
+            system: SystemConfiguration = fbx.system
+            return hardware_unique_id(await system.get_config())
+        except Exception:
+            _LOGGER.debug("Identification Freebox impossible pendant la découverte")
+            return None
+        finally:
+            with suppress(Exception):
+                await fbx.close()
+
+    async def _copy_token(self, old_host: str, new_host: str) -> None:
+        """Duplique le jeton vers le nouvel hôte. L'ancien fichier reste en place."""
+        if old_host == new_host:
+            return
+        source = resolve_token_file(self.hass, old_host)
+        destination = resolve_token_file(self.hass, new_host)
+
+        def _copy() -> None:
+            if not source.is_file() or destination.exists():
+                return
+            destination.parent.mkdir(parents=True, exist_ok=True)
+            destination.write_bytes(source.read_bytes())
+
+        await self.hass.async_add_executor_job(_copy)
+
     async def async_step_reconfigure(
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
-        """Permet de changer l'hôte/port d'une entrée existante (ex. URL publique → locale)."""
+        """Change l'hôte ou le port après avoir vérifié que c'est la même Freebox."""
         entry = self._get_reconfigure_entry()
         errors: dict[str, str] = {}
 
         if user_input is not None:
             new_host = user_input[CONF_HOST].strip()
             new_port = int(user_input.get(CONF_PORT, 80))
-            # Vérifie que le nouvel hôte n'est pas déjà utilisé par une autre entrée
-            await self.async_set_unique_id(new_host)
-            self._abort_if_unique_id_mismatch(reason="wrong_account")
             for existing in self._async_current_entries():
                 if (
-                    existing.unique_id == new_host
-                    and existing.entry_id != entry.entry_id
+                    existing.entry_id != entry.entry_id
+                    and existing.unique_id == entry.unique_id
+                    and existing.data.get(CONF_HOST) == new_host
                 ):
                     return self.async_abort(reason="already_configured")
-
-            new_data = {**entry.data, CONF_HOST: new_host, CONF_PORT: new_port}
-            return self.async_update_reload_and_abort(
-                entry,
-                data_updates=new_data,
-                unique_id=new_host,
-            )
+            unique_id = await self._probe_hardware_id(new_host, new_port)
+            if unique_id is None:
+                errors["base"] = "cannot_connect"
+            elif not same_freebox(entry, unique_id):
+                return self.async_abort(reason="wrong_account")
+            else:
+                for existing in self._async_current_entries():
+                    if existing.entry_id != entry.entry_id and existing.unique_id == unique_id:
+                        return self.async_abort(reason="already_configured")
+                old_host = entry.data.get(CONF_HOST)
+                if isinstance(old_host, str):
+                    await self._copy_token(old_host, new_host)
+                return self.async_update_reload_and_abort(
+                    entry,
+                    data_updates={**entry.data, CONF_HOST: new_host, CONF_PORT: new_port},
+                    unique_id=unique_id,
+                )
 
         return self.async_show_form(
             step_id="reconfigure",
@@ -400,18 +477,38 @@ class FreeboxFlowHandler(ConfigFlow, domain=DOMAIN):
     async def async_step_zeroconf(
         self, discovery_info: ZeroconfServiceInfo
     ) -> ConfigFlowResult:
-        """Découverte zeroconf : pré-remplit l'hôte mais laisse toujours l'utilisateur le modifier.
+        """Découverte zeroconf. Met à jour l'adresse d'une Freebox déjà connue.
 
-        Utile quand l'accès distant est désactivé (URL *.fbxos.fr injoignable)
-        et que l'on veut utiliser mafreebox.freebox.fr ou une IP locale.
+        Si l'identification échoue, le formulaire reste modifiable : l'accès
+        distant peut être injoignable alors qu'un nom local fonctionne.
         """
-        self._suggested_host = discovery_info.properties.get("api_domain") or discovery_info.host
-        self._suggested_port = int(
-            discovery_info.properties.get("https_port") or discovery_info.port or 80
-        )
-        # Unique ID posé ici pour que HA affiche « Ignorer » sur la carte de découverte
-        await self.async_set_unique_id(self._suggested_host)
-        self._abort_if_unique_id_configured()
+        host = discovery_info.properties.get("api_domain") or discovery_info.host
+        port = int(discovery_info.properties.get("https_port") or discovery_info.port or 80)
+        if isinstance(host, str) and host:
+            unique_id = await self._probe_hardware_id(host, port)
+            if unique_id is not None:
+                known = next(
+                    (item for item in self._async_current_entries() if item.unique_id == unique_id),
+                    None,
+                )
+                if known is None:
+                    legacy = [
+                        item
+                        for item in self._async_current_entries()
+                        if item.data.get(CONF_HOST) == host and item.unique_id == host
+                    ]
+                    known = legacy[0] if len(legacy) == 1 else None
+                if known is not None:
+                    old_host = known.data.get(CONF_HOST)
+                    if isinstance(old_host, str):
+                        await self._copy_token(old_host, host)
+                    self.hass.config_entries.async_update_entry(known, unique_id=unique_id)
+                    await self.async_set_unique_id(unique_id)
+                    self._abort_if_unique_id_configured(
+                        updates={CONF_HOST: host, CONF_PORT: port}
+                    )
+        self._suggested_host = host if isinstance(host, str) else discovery_info.host
+        self._suggested_port = port
         return await self.async_step_user()
 
 
@@ -918,6 +1015,8 @@ class FreeboxOptionsFlowHandler(OptionsFlowWithReload):
 
         if user_input is not None:
             options = _options_from_input(user_input, players)
+            if CONF_HOME_POLL_INTERVAL in self.config_entry.options:
+                options[CONF_HOME_POLL_INTERVAL] = self.config_entry.options[CONF_HOME_POLL_INTERVAL]
             new_data = dict(self.config_entry.data)
             shared = options.get(CONF_REMOTE_CODE)
             if shared:

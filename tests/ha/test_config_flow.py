@@ -9,6 +9,7 @@ from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 DOMAIN = 'freebox_homexa'
 HOST = 'freebox.test'
+MAC = '00:00:00:00:00:01'
 pytestmark = pytest.mark.usefixtures('enable_custom')
 
 
@@ -44,7 +45,7 @@ async def finish_recovered_flow(hass, api, result):
         result = await hass.config_entries.flow.async_configure(result["flow_id"], {})
         await hass.async_block_till_done()
     assert result["type"] == FlowResultType.CREATE_ENTRY
-    assert result["result"].unique_id == HOST
+    assert result["result"].unique_id == MAC
     return result
 
 
@@ -60,7 +61,7 @@ async def test_success(hass, api):
         result = await hass.config_entries.flow.async_configure(result['flow_id'], {})
         assert result['type'] == FlowResultType.CREATE_ENTRY
         assert result['data']['host'] == HOST
-        assert result['result'].unique_id == HOST
+        assert result['result'].unique_id == MAC
         await hass.async_block_till_done()
 
 
@@ -123,6 +124,8 @@ async def test_reauth_success_reloads_existing_entry(hass, api):
         assert result['type'] == FlowResultType.ABORT
         assert result['reason'] == 'reauth_successful'
         reload.assert_awaited_once_with(entry.entry_id)
+    assert entry.unique_id == MAC
+    assert entry.data['host'] == HOST
     assert len(hass.config_entries.async_entries(DOMAIN)) == 1
     api.close.assert_awaited_once()
 
@@ -141,34 +144,80 @@ from types import SimpleNamespace
 from homeassistant.config_entries import SOURCE_ZEROCONF, SOURCE_RECONFIGURE
 
 
-async def test_discovery_suggests_host_and_duplicate_aborts(hass):
+async def test_discovery_suggests_host_and_duplicate_aborts(hass, api):
     info = SimpleNamespace(properties={'api_domain': 'freebox.test', 'https_port': '443'}, host='local.test', port=80)
-    with patch('custom_components.freebox_homexa.config_flow.Store.async_load', return_value=None):
+    api.open.side_effect = TimeoutError()
+    with patch('custom_components.freebox_homexa.config_flow.get_api', return_value=api), \
+         patch('custom_components.freebox_homexa.config_flow.Store.async_load', return_value=None):
         result = await hass.config_entries.flow.async_init(DOMAIN, context={'source': SOURCE_ZEROCONF}, data=info)
     assert result['step_id'] == 'user'
     defaults = result['data_schema']({})
     assert defaults['host'] == 'freebox.test'
     assert defaults['port'] == 443
     hass.config_entries.flow.async_abort(result['flow_id'])
-    entry = MockConfigEntry(domain=DOMAIN, unique_id='freebox.test', data={'host': 'freebox.test'})
+    entry = MockConfigEntry(domain=DOMAIN, unique_id='freebox.test', data={'host': 'freebox.test'},
+                            options={'home_poll_interval': 15})
     entry.add_to_hass(hass)
-    result = await hass.config_entries.flow.async_init(DOMAIN, context={'source': SOURCE_ZEROCONF}, data=info)
+    api.open.side_effect = None
+    with patch('custom_components.freebox_homexa.config_flow.get_api', return_value=api):
+        result = await hass.config_entries.flow.async_init(DOMAIN, context={'source': SOURCE_ZEROCONF}, data=info)
     assert result['type'] == FlowResultType.ABORT
     assert result['reason'] == 'already_configured'
+    assert entry.unique_id == MAC
+    assert entry.data['host'] == 'freebox.test'
+    assert entry.options['home_poll_interval'] == 15
 
 
-async def test_characterize_reconfigure_identity_boundary_without_migration(hass):
-    """Current host identity rejects a host change; not an endorsement of the limitation."""
-    entry = MockConfigEntry(domain=DOMAIN, unique_id=HOST, data={'host': HOST, 'port': 80})
+async def test_discovery_updates_address_of_known_freebox(hass, api):
+    entry = MockConfigEntry(
+        domain=DOMAIN, unique_id=MAC,
+        data={'host': 'old.test', 'port': 80, 'remote_code': 'synthetic'},
+        options={'home_poll_interval': 15},
+    )
     entry.add_to_hass(hass)
-    with patch('custom_components.freebox_homexa.config_flow.get_api') as api:
+    info = SimpleNamespace(properties={'api_domain': 'new.freebox.test', 'https_port': '80'}, host='192.0.2.10', port=80)
+    with patch('custom_components.freebox_homexa.config_flow.get_api', return_value=api), \
+         patch('custom_components.freebox_homexa.async_setup_entry', return_value=True):
+        result = await hass.config_entries.flow.async_init(DOMAIN, context={'source': SOURCE_ZEROCONF}, data=info)
+        await hass.async_block_till_done()
+    assert result['type'] == FlowResultType.ABORT
+    assert result['reason'] == 'already_configured'
+    assert entry.unique_id == MAC
+    assert entry.data['host'] == 'new.freebox.test'
+    assert entry.data['remote_code'] == 'synthetic'
+    assert entry.options['home_poll_interval'] == 15
+
+
+async def test_reauth_rejects_a_different_freebox(hass, api):
+    entry = MockConfigEntry(domain=DOMAIN, unique_id=MAC, data={'host': HOST, 'port': 80, 'remote_code': 'synthetic'})
+    entry.add_to_hass(hass)
+    api.system.get_config.return_value = {'mac': 'aa:bb:cc:dd:ee:ff'}
+    with patch('custom_components.freebox_homexa.config_flow.get_api', return_value=api):
+        result = await hass.config_entries.flow.async_init(DOMAIN, context={
+            'source': SOURCE_REAUTH, 'entry_id': entry.entry_id,
+        }, data=entry.data)
+        result = await hass.config_entries.flow.async_configure(result['flow_id'], {})
+    assert result['type'] == FlowResultType.ABORT
+    assert result['reason'] == 'wrong_account'
+    assert entry.unique_id == MAC
+    assert entry.data['remote_code'] == 'synthetic'
+    assert entry.data['host'] == HOST
+
+
+async def test_reconfigure_rejects_a_different_freebox(hass, api):
+    entry = MockConfigEntry(domain=DOMAIN, unique_id=MAC, data={'host': HOST, 'port': 80, 'remote_code': 'synthetic'})
+    entry.add_to_hass(hass)
+    api.system.get_config.return_value = {'mac': '00:00:00:00:00:02'}
+    with patch('custom_components.freebox_homexa.config_flow.get_api', return_value=api):
         result = await hass.config_entries.flow.async_init(DOMAIN, context={'source': SOURCE_RECONFIGURE, 'entry_id': entry.entry_id})
         assert result['step_id'] == 'reconfigure'
         result = await hass.config_entries.flow.async_configure(result['flow_id'], {'host': 'new.test', 'port': 80})
-        assert result['type'] == FlowResultType.ABORT
-        assert result['reason'] == 'wrong_account'
-        assert entry.data['host'] == HOST
-        api.assert_not_called()
+    assert result['type'] == FlowResultType.ABORT
+    assert result['reason'] == 'wrong_account'
+    assert entry.data['host'] == HOST
+    assert entry.data['remote_code'] == 'synthetic'
+    assert entry.unique_id == MAC
+    api.close.assert_awaited()
 
 
 @pytest.mark.parametrize("cannot_unlink", [False, True])
@@ -218,23 +267,28 @@ async def test_initial_codes_and_player_without_id(hass, api):
             "remote_code": " synthetic-shared ", "remote_code_1": " synthetic-player "})
         await hass.async_block_till_done()
     assert result["type"] == FlowResultType.CREATE_ENTRY
-    assert result["result"].unique_id == HOST
+    assert result["result"].unique_id == MAC
     assert result["data"]["remote_code"] == "synthetic-shared"
     assert result["options"]["remote_codes"] == {"1": "synthetic-player"}
 
 
-async def test_characterize_same_host_port_change_preserves_identity(hass):
-    entry = MockConfigEntry(domain=DOMAIN, unique_id=HOST, data={"host": HOST, "port": 80, "remote_code": "synthetic"})
+async def test_reconfigure_same_freebox_updates_port_and_adopts_mac(hass, api):
+    entry = MockConfigEntry(domain=DOMAIN, unique_id=HOST, data={"host": HOST, "port": 80, "remote_code": "synthetic"},
+                            options={"home_poll_interval": 20})
     entry.add_to_hass(hass)
-    with patch.object(hass.config_entries, "async_reload", new=AsyncMock(return_value=True)) as reload:
+    with patch("custom_components.freebox_homexa.config_flow.get_api", return_value=api), \
+         patch.object(hass.config_entries, "async_reload", new=AsyncMock(return_value=True)) as reload:
         result = await hass.config_entries.flow.async_init(DOMAIN,
             context={"source": SOURCE_RECONFIGURE, "entry_id": entry.entry_id})
         result = await hass.config_entries.flow.async_configure(result["flow_id"], {"host": HOST, "port": 443})
         await hass.async_block_till_done()
     assert result["type"] == FlowResultType.ABORT
-    assert entry.unique_id == HOST
+    assert result["reason"] == "reconfigure_successful"
+    assert entry.unique_id == MAC
     assert entry.data["port"] == 443
+    assert entry.data["host"] == HOST
     assert entry.data["remote_code"] == "synthetic"
+    assert entry.options["home_poll_interval"] == 20
     reload.assert_awaited_once_with(entry.entry_id)
 
 

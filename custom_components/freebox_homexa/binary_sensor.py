@@ -20,9 +20,10 @@ from homeassistant.const import EntityCategory
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.dispatcher import async_dispatcher_connect
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
+from homeassistant.helpers import entity_registry as er
 
 from .discovery import DiscoveryCandidate, async_setup_discovery
-from .const import REPEATER_MODEL, FreeboxHomeCategory
+from .const import DOMAIN, REPEATER_MODEL, FreeboxHomeCategory
 from .entity import FreeboxHomeEntity
 from .errors import is_shutdown_error
 from .availability import FreeboxReachableMixin
@@ -257,6 +258,26 @@ class FreeboxWifiApSensor(FreeboxReachableMixin, BinarySensorEntity):
         )
 
 
+def migrate_raid_unique_ids(hass: HomeAssistant, entry_id: str, mac: str) -> None:
+    """Move a RAID unique id off its display name. The entity_id stays."""
+    registry = er.async_get(hass)
+    prefix = f"{mac}_raid_degraded_"
+    planned: list[tuple[str, str]] = []
+    for entity in er.async_entries_for_config_entry(registry, entry_id):
+        unique_id = entity.unique_id
+        if not unique_id.startswith(prefix) or "_" not in unique_id[len(prefix):]:
+            continue
+        raid_id = unique_id.rsplit("_", 1)[-1]
+        new_unique_id = f"{prefix}{raid_id}"
+        if new_unique_id == unique_id or registry.async_get_entity_id(entity.domain, DOMAIN, new_unique_id):
+            continue
+        planned.append((entity.entity_id, new_unique_id))
+    for entity_id, new_unique_id in planned:
+        current = registry.async_get(entity_id)
+        if current is not None and current.unique_id != new_unique_id:
+            registry.async_update_entity(entity_id, new_unique_id=new_unique_id)
+
+
 class FreeboxRaidDegradedSensor(FreeboxReachableMixin, BinarySensorEntity):
     """Représentation d'un capteur RAID dégradé Freebox."""
     _attr_should_poll = False
@@ -274,7 +295,7 @@ class FreeboxRaidDegradedSensor(FreeboxReachableMixin, BinarySensorEntity):
         self._raid_id = raid["id"]
         self._attr_translation_key = "raid_degraded"
         self._attr_translation_placeholders = {"raid_id": str(raid["id"])}
-        self._attr_unique_id = f"{router.mac}_{description.key}_{raid['name']}_{raid['id']}"
+        self._attr_unique_id = f"{router.mac}_{description.key}_{raid['id']}"
 
     @property
     def available(self) -> bool:

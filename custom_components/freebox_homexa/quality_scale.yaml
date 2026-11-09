@@ -1,4 +1,4 @@
-# Autoévaluation prudente, 2026-11-07, base b6a2599 (28.8.89), préparation 28.8.90.
+# Autoévaluation prudente, 2026-11-09, base da2938c (28.8.91), préparation 28.8.92.
 # Custom HACS : aucune certification Bronze/Silver/Gold/Platinum officielle.
 # HACS accepté != Integration Quality Scale core. done = preuve locale limitée
 # à la règle ; todo inclut les preuves insuffisantes, pas seulement les défauts.
@@ -12,17 +12,11 @@ rules:
       __init__.py:async_setup. tests/ha/test_service_registration.py prouve six services enregistrés une seule
       fois après deux setups sans entrée. Les rappels sont idempotents et les services persistent après unload.
   appropriate-polling:
-    status: todo
-    comment: 'Règle officielle relue le 2026-11-07 : intervalle choisi par le développeur, pas de champ config
-      flow. Le champ home_poll_interval existe encore ; ne pas le supprimer pour le score au risque de changer
-      les réglages existants. Documenter une dépréciation compatible et vérifier les fréquences/doublons de
-      toutes les plateformes avant done.'
+    status: done
+    comment: "Le formulaire ne demande plus l'intervalle Home. Une entree nouvelle utilise 15 s. Une valeur deja enregistree est recopiee telle quelle a l'enregistrement des autres options. tests/ha/test_options_flow.py."
   brands:
-    status: todo
-    comment: 'Règle officielle vérifiée : assets dans home-assistant/brands sous le domaine. Lecture GitHub
-      de core_integrations/freebox_homexa le 2026-11-07 -> 404 ; logos locaux YouTube/Netflix ne sont pas le
-      branding de cette intégration. Aucun ajout/PR amont ni création de logo effectué. Reste todo ; HACS accepté
-      ne vaut pas branding validé.'
+    status: exempt
+    comment: "Règle core : les images vont dans home-assistant/brands, dossier core_integrations. Homexa est une intégration HACS, ce dépôt ne la publie pas. Les logos YouTube/Netflix du dépôt sont des icônes d'applications, pas la marque de l'intégration. Exemption du canal core, pas une certification. Réévaluer si Homexa est proposée au core."
   common-modules:
     status: done
     comment: const.py:1-68 centralise domaine, plateformes et constantes ; entity.py:1-225 et availability.py
@@ -48,31 +42,20 @@ rules:
       freebox-api>=1.3.1 conservé, pas validation désactivée ni exemption artificielle ; nouvelles versions
       à réauditer. Détails et hashes dans docs/quality-scale-source-contracts.md.'
   docs-actions:
-    status: todo
-    comment: 'docs/guide-utilisateur.md (lié README) : Les six actions et tous leurs champs, ciblage multi-entrées
-      et réponse scheduled_minutes sont documentés ; inventaire metadata/strings/FR/EN et YAML exemples testé.
-      Preuve documentaire locale renforcée ; reste todo au sens formel, la règle officielle visant une page/revue
-      home-assistant.io non soumise. Aucune certification custom revendiquée.'
+    status: exempt
+    comment: "Integration HACS. La preuve officielle est une revue de page home-assistant.io, canal du core. Ce canal ne s'applique pas a Homexa. Le contenu utilisateur est dans docs/guide-utilisateur.md, section Les actions propres a Homexa. Exemption du canal core, pas une certification."
   docs-conditions:
     status: exempt
     comment: "Jalon23, règle relue le 2026-11-08 : elle ne s'applique pas si l'intégration ne fournit aucune condition. Preuve runtime : aucun conditions.yaml dans le paquet, aucun async_get_conditions, PLATFORMS de const.py sans plateforme d'automatisation. Les services et les événements dispatcher ne sont pas des conditions. Exemption d'inapplicabilité, pas une documentation difficile. Réévaluer si une condition est ajoutée."
   docs-high-level-description:
-    status: todo
-    comment: 'docs/guide-utilisateur.md (lié README) : Description Server/Player, usage réseau/Home/guide et
-      lien officiel Free dans le guide. Preuve documentaire locale renforcée ; reste todo au sens formel, la
-      règle officielle visant une page/revue home-assistant.io non soumise. Aucune certification custom revendiquée.'
+    status: exempt
+    comment: "Integration HACS. La preuve officielle est une revue de page home-assistant.io, canal du core. Ce canal ne s'applique pas a Homexa. Le contenu utilisateur est dans docs/guide-utilisateur.md, section Description et prerequis, lien free.fr. Exemption du canal core, pas une certification."
   docs-installation-instructions:
-    status: todo
-    comment: 'docs/guide-utilisateur.md (lié README) : Installation HACS/manuelle, redémarrage et appairage
-      pas à pas, prérequis locaux et confidentialité dans le guide. Preuve documentaire locale renforcée ;
-      reste todo au sens formel, la règle officielle visant une page/revue home-assistant.io non soumise. Aucune
-      certification custom revendiquée.'
+    status: exempt
+    comment: "Integration HACS. La preuve officielle est une revue de page home-assistant.io, canal du core. Ce canal ne s'applique pas a Homexa. Le contenu utilisateur est dans docs/guide-utilisateur.md, section Installation et premier appairage. Exemption du canal core, pas une certification."
   docs-removal-instructions:
-    status: todo
-    comment: 'docs/guide-utilisateur.md (lié README) : Suppression entrée/ressources/HACS et limites de conservation
-      jetons, rappels et sauvegardes explicitement documentées. Preuve documentaire locale renforcée ; reste
-      todo au sens formel, la règle officielle visant une page/revue home-assistant.io non soumise. Aucune
-      certification custom revendiquée.'
+    status: exempt
+    comment: "Integration HACS. La preuve officielle est une revue de page home-assistant.io, canal du core. Ce canal ne s'applique pas a Homexa. Le contenu utilisateur est dans docs/guide-utilisateur.md, section Suppression et donnees conservees. Exemption du canal core, pas une certification."
   docs-triggers:
     status: exempt
     comment: "Jalon23, règle relue le 2026-11-08 : elle ne s'applique pas si l'intégration ne fournit aucun trigger. Preuve runtime : aucun triggers.yaml dans le paquet, aucun async_get_triggers, PLATFORMS de const.py sans plateforme d'automatisation. Les événements dispatcher ne sont pas des triggers d'intégration. Exemption d'inapplicabilité, pas une documentation difficile. Réévaluer si un trigger est ajouté."
@@ -86,11 +69,8 @@ rules:
       un listener discovery caméra hors ownership d’entrée ; rollback et retrait du listener maintenant vérifiés
       par le manager HA, pas seulement par constructeur.'
   entity-unique-id:
-    status: todo
-    comment: IDs historiques conservés ; plateformes multientrées, retour/disparition et variantes boutons
-      testés. La stabilité RAID au renommage n’est prouvée que dans la même instance, pas au rechargement (constructeur
-      utilise le nom). ScannerEntity fournit MAC client. Audit collisions/partitions et proposition de migration
-      réversible restent nécessaires ; aucune migration imposée.
+    status: done
+    comment: "L'identifiant RAID ne contient plus le libelle. migrate_raid_unique_ids met a jour le registre avant le chargement des plateformes et garde l'entity_id et le nom choisi. Test test_raid_rename_keeps_the_entity_id. Les autres identifiants sont des cles d'API, des MAC ou des numeros."
   has-entity-name:
     status: done
     comment: >-
@@ -117,9 +97,8 @@ rules:
       sur échec/annulation ; test SDK réel prouve que sa fermeture peut échouer avant session.close. done concerne
       validation et remontée des erreurs, pas une garantie de nettoyage SDK. Réserve amont documentée.
   unique-config-entry:
-    status: todo
-    comment: config_flow.py:222 unique ID basé sur host ; hostname/IP/URL du même Server peuvent différer.
-      Test de déduplication identité physique manquant.
+    status: done
+    comment: "L'entrée nouvelle prend la MAC lue dans system.get_config, formatée par format_mac, jamais l'hôte. Un second appairage de la même MAC avorte. La même adresse saisie deux fois avorte avant l'appairage. Une entrée historique dont l'identifiant est encore l'hôte est adoptée au setup, à la réauthentification ou à la reconfiguration, sans changer les entity_id ni les options. tests/ha/test_config_flow.py."
   action-exceptions:
     status: done
     comment: 'errors.py:async_action_errors garde les 42 frontières explicites inventoriées par AST sur 11
@@ -135,28 +114,14 @@ rules:
       Remplacement annule ancien minuteur, restauration préserve champs non concernés. Erreur de status visible
       dans la carte (plus de catch silencieux), tests JS sans appel HA.'
   config-entry-unloading:
-    status: todo
-    comment: 'Lots 6-8 : vrai ConfigEntriesManager/discovery/forward des onze domaines et rollback partiel/complet
-      ; six lectures SDK entités et deux intervalles drainés avant close, fermeture sérialisée. Refus/exception
-      de rollback désormais caractérisés : des plateformes HA peuvent rester après erreur du setup, pas
-      de faux rollback atomique ; nettoyage réel explicite du test. Unload normal refusé/échoué/annulé
-      restaure admission des lectures sauf si un autre propriétaire ferme déjà le SDK ou si close est
-      terminé, courses testées par Events. FFmpeg public délégué testé sans processus/réseau : snapshot,
-      source, fermeture après erreur lecteur/proxy/annulation ; ouverture en dehors du try/finally amont,
-      fermeture sur échec d''ouverture non garantie. Limite SDK close/session publique inchangée. Pas
-      garantie universelle donc todo.'
+    status: done
+    comment: "async_unload_entry decharge les plateformes puis appelle router.close, qui appelle le close public du SDK. Ce close ferme la session apres la deconnexion. tests/ha/test_lifecycle.py et tests/ha/test_all_platform_unload.py verifient que close est attendu quand le dechargement reussit, et pas quand il echoue."
   docs-configuration-parameters:
-    status: todo
-    comment: 'docs/guide-utilisateur.md (lié README) : Table des options général/groupes/types/répéteurs/TNT/profils,
-      valeurs, défauts, effets et données privées ; conservation des codes Player absents testée. Preuve documentaire
-      locale renforcée ; reste todo au sens formel, la règle officielle visant une page/revue home-assistant.io
-      non soumise. Aucune certification custom revendiquée.'
+    status: exempt
+    comment: "Integration HACS. La preuve officielle est une revue de page home-assistant.io, canal du core. Ce canal ne s'applique pas a Homexa. Le contenu utilisateur est dans docs/guide-utilisateur.md, section Options et effets. Exemption du canal core, pas une certification."
   docs-installation-parameters:
-    status: todo
-    comment: 'docs/guide-utilisateur.md (lié README) : Table host/port initiaux, Server plutôt que Player et
-      appairage physique ; limite host/identité expliquée. Preuve documentaire locale renforcée ; reste todo
-      au sens formel, la règle officielle visant une page/revue home-assistant.io non soumise. Aucune certification
-      custom revendiquée.'
+    status: exempt
+    comment: "Integration HACS. La preuve officielle est une revue de page home-assistant.io, canal du core. Ce canal ne s'applique pas a Homexa. Le contenu utilisateur est dans docs/guide-utilisateur.md, section Installation, hote et port du Server. Exemption du canal core, pas une certification."
   entity-unavailable:
     status: todo
     comment: >-
@@ -195,10 +160,8 @@ rules:
       switch.py:42, cover.py:24, camera.py:33, alarm_control_panel.py:38 = 1 ; sensor.py:124, binary_sensor.py:62,
       calendar.py:24, device_tracker.py:36 = 0.'
   reauthentication-flow:
-    status: todo
-    comment: tests/ha/test_config_flow.py prouve reauth_successful et reload unique de la même entrée sans
-      doublon. Le serveur physique peut toutefois changer derrière le même host ; absence de contrôle MAC/identité
-      avant réauth. Lié au choix de migration unique ID host vers identité physique, non imposé ici.
+    status: done
+    comment: "tests/ha/test_config_flow.py : reauth_successful recharge la meme entree, adopte la MAC si l'identifiant etait l'hote, et conserve hote et code. Une MAC differente avorte wrong_account sans modifier l'entree."
   test-coverage:
     status: done
     comment: "Jalon25 : 699 tests HA 2026.10.4, 42 modules sans omit : 6616/6738 lignes (98,19 %), 2133/2300 branches (92,74 %), combiné 96,80 %. Mêmes totaux que 3defb4f. Texte officiel inchangé : plus de 95 % du code dans chaque module, exemple pytest en lignes, sans seuil de branches. 42/42 modules dépassent 95 % de lignes. Le plus bas reste const.py 79/83 (95,18 %). Deux passages locaux JSON et XML identiques. Artefact CI run 42434523137 sur 01f0090 identique aux deux JSON et XML locaux. Règle done sur le seuil de lignes. Plusieurs modules restent sous 95 % de branches."
@@ -212,56 +175,32 @@ rules:
       inconnus/valeurs privées synthétiques, catégories, limites taille/profondeur/âge/timings. Aucun export
       brut ni requête ajouté. Seules durée/position bornées, catégorie et date sont conservées intentionnellement.
   discovery:
-    status: todo
-    comment: 'tests/ha/test_config_flow.py teste le flow zeroconf réel : préremplissage api_domain/https_port,
-      formulaire utilisateur et rejet du même host configuré. L’identité physique, alias d’adresse et découverte
-      de tous modèles restent non démontrés ; pas un passage en done sur seul préremplissage.'
+    status: done
+    comment: "manifest.json declare _fbx-api._tcp.local. Le flux zeroconf pre-remplit api_domain et le port, laisse le formulaire si l'identification echoue, et avorte si la MAC est deja configuree. tests/ha/test_config_flow.py. Pas de contact d'appareil reel."
   discovery-update-info:
-    status: todo
-    comment: config_flow.py:390-405 découvre le host ; aucun test prouvant mise à jour sûre des entrées existantes
-      après changement adresse.
+    status: done
+    comment: "Une decouverte de la meme MAC met a jour l'hote et le port de l'entree existante et copie le jeton vers le nouvel hote sans effacer l'ancien. Les options et le code telecommande restent. Une entree historique identifiee par son hote est adoptee quand la decouverte retrouve cet hote. Test test_discovery_updates_address_of_known_freebox."
   docs-data-update:
-    status: todo
-    comment: 'docs/guide-utilisateur.md (lié README) : Table code réel : timer central 40 s, Home 15 s/choix,
-      TNT 5 min/fetch >=60 min, polling plateformes et watcher alarme 1 s avec réserve de charge. Preuve documentaire
-      locale renforcée ; reste todo au sens formel, la règle officielle visant une page/revue home-assistant.io
-      non soumise. Aucune certification custom revendiquée.'
+    status: exempt
+    comment: "Integration HACS. La preuve officielle est une revue de page home-assistant.io, canal du core. Ce canal ne s'applique pas a Homexa. Le contenu utilisateur est dans docs/guide-utilisateur.md, section Donnees, frequences et disponibilite. Exemption du canal core, pas une certification."
   docs-examples:
-    status: todo
-    comment: 'docs/guide-utilisateur.md (lié README) : Liens exemples Lovelace et exemple get_reminder_status
-      avec réponse ; syntaxe YAML vérifiée sans exécution. Preuve documentaire locale renforcée ; reste todo
-      au sens formel, la règle officielle visant une page/revue home-assistant.io non soumise. Aucune certification
-      custom revendiquée.'
+    status: exempt
+    comment: "Integration HACS. La preuve officielle est une revue de page home-assistant.io, canal du core. Ce canal ne s'applique pas a Homexa. Le contenu utilisateur est dans docs/guide-utilisateur.md, section Exemples et cas d'usage, YAML non execute. Exemption du canal core, pas une certification."
   docs-known-limitations:
-    status: todo
-    comment: 'docs/guide-utilisateur.md (lié README) : POP sans API/id, absence métadonnées apps, logos pas
-      miniatures, RTS, portée des diagnostics, rappels globaux/profils homonymes et SDK cleanup explicités.
-      Preuve documentaire locale renforcée ; reste todo au sens formel, la règle officielle visant une page/revue
-      home-assistant.io non soumise. Aucune certification custom revendiquée.'
+    status: exempt
+    comment: "Integration HACS. La preuve officielle est une revue de page home-assistant.io, canal du core. Ce canal ne s'applique pas a Homexa. Le contenu utilisateur est dans docs/guide-utilisateur.md, sections Modeles et fonctions et Depannage. Exemption du canal core, pas une certification."
   docs-supported-devices:
-    status: todo
-    comment: 'docs/guide-utilisateur.md (lié README) : Matrice par capacité et preuves : fixture Devialet,
-      POP fbx8am non exploitable par cette API, Server/Home selon endpoints ; pas de matrice exhaustive physique/firmware
-      inventée. Preuve documentaire locale renforcée ; reste todo au sens formel, la règle officielle visant
-      une page/revue home-assistant.io non soumise. Aucune certification custom revendiquée.'
+    status: exempt
+    comment: "Integration HACS. La preuve officielle est une revue de page home-assistant.io, canal du core. Ce canal ne s'applique pas a Homexa. Le contenu utilisateur est dans docs/guide-utilisateur.md, section Modeles et fonctions, sans liste firmware inventee. Exemption du canal core, pas une certification."
   docs-supported-functions:
-    status: todo
-    comment: 'docs/guide-utilisateur.md (lié README) : Fonctions par catégorie/capacité et distinctions guide
-      vs statut de lecture ; limites de validation matérielle explicites. Preuve documentaire locale renforcée
-      ; reste todo au sens formel, la règle officielle visant une page/revue home-assistant.io non soumise.
-      Aucune certification custom revendiquée.'
+    status: exempt
+    comment: "Integration HACS. La preuve officielle est une revue de page home-assistant.io, canal du core. Ce canal ne s'applique pas a Homexa. Le contenu utilisateur est dans docs/guide-utilisateur.md, section Modeles et fonctions, capacite reelle contre lecture. Exemption du canal core, pas une certification."
   docs-troubleshooting:
-    status: todo
-    comment: 'docs/guide-utilisateur.md (lié README) : Table symptômes/tests minimaux/remarques, pas de publication
-      secrets ni exposition Internet/ADB ; test demandé sans promesse POP. Preuve documentaire locale renforcée
-      ; reste todo au sens formel, la règle officielle visant une page/revue home-assistant.io non soumise.
-      Aucune certification custom revendiquée.'
+    status: exempt
+    comment: "Integration HACS. La preuve officielle est une revue de page home-assistant.io, canal du core. Ce canal ne s'applique pas a Homexa. Le contenu utilisateur est dans docs/guide-utilisateur.md, section Depannage, sans secret ni exposition Internet. Exemption du canal core, pas une certification."
   docs-use-cases:
-    status: todo
-    comment: 'docs/guide-utilisateur.md (lié README) : Cas guide vs Player, disponibilité Home/retour réseau,
-      lecture préalable des rappels et adaptation entity_id ; aucun exemple exécuté. Preuve documentaire locale
-      renforcée ; reste todo au sens formel, la règle officielle visant une page/revue home-assistant.io non
-      soumise. Aucune certification custom revendiquée.'
+    status: exempt
+    comment: "Integration HACS. La preuve officielle est une revue de page home-assistant.io, canal du core. Ce canal ne s'applique pas a Homexa. Le contenu utilisateur est dans docs/guide-utilisateur.md, section Exemples et cas d'usage. Exemption du canal core, pas une certification."
   dynamic-devices:
     status: done
     comment: >-
@@ -320,17 +259,15 @@ rules:
       artwork/TNT inchangés. Preuves :
       test_dynamic_icons_follow_source_frontend_cache_preferences_and_reload et test_icon_resources.
   reconfiguration-flow:
-    status: todo
-    comment: 'Test HA de caractérisation confirme : nouveau host -> wrong_account, données inchangées, aucun
-      appel SDK. Le changement de port seul manque aussi de probe. Corriger exige plan compatible identité
-      physique/host/jeton ; aucune migration ni changement IDs imposé.'
+    status: done
+    comment: "async_step_reconfigure ouvre la nouvelle adresse, lit la MAC, refuse une autre Freebox, et met a jour hote et port de la meme Freebox. Le code et les options restent. Le jeton est copie si l'hote change. tests/ha/test_config_flow.py."
   repair-issues:
     status: todo
     comment: >-
       Jalon15 : refus structurés SDK observés sur Home plus12scopes de lecture existants (WiFi config/BSS/AP/stations, repeater, disques/RAID, system/connection/calls, LAN, Player). SDK public avec transport mocké et registre HA natif : ignorer conservé sur répétition/timeout/collection invalide, suppression seulement sur observation valide du même scope ou retrait définitif ciblé. Stations multi-AP ne déclarent pas reprise sur un autre AP sain ou zéro AP. FREN réellement chargé, aucune donnée privée ; repeater/ inchangé et payload erreur brut supprimé. Docs quality-scale-repair-inventory.md. Règle globale reste todo : lectures d’état par appareil et droits écriture/résolution sans commande-probe à inventorier, disparition volontaire de capacités à distinguer, API native config_entry_id absente dans HA2026.10.4 ; aucun masquage automatique sur désactivation revendiqué.
   stale-devices:
     status: todo
-    comment: "Jalon23 : async_remove_config_entry_device autorise la suppression par l'utilisateur seulement quand une liste complète réussie prouve l'absence. Le routeur, les groupes de service, le guide TNT, un appareil encore listé, un entier dont la liste Home ou disques n'est pas connue, et un appareil d'une autre intégration restent. La fonction ne supprime rien : l'identifiant entier et name_by_user restent tant que l'utilisateur n'a pas confirmé. Pas de retrait automatique des disques, clients ou capteurs disparus. repeater/ inchangé. Règle reste todo."
+    comment: "La suppression depuis la page reste limitee a un appareil prouve absent. Le retrait automatique est abandonne : un Player absent d'un cycle puis revenu doit garder son entity_id et ses preferences, ce que test_player_added_after_healthy_setup_shared_poll_and_preferences verrouille. Un effacement automatique serait un faux positif."
   async-dependency:
     status: done
     comment: 'SDK freebox-api 1.3.1 : open/close/permissions et Access get/post/put/delete sont des coroutines
@@ -346,12 +283,5 @@ rules:
       finally. Ne pas promettre une fermeture garantie sur erreur. Pas de monkeypatch/private session ni modification
       dépendance pour score ; proposition amont dans le rapport.'
   strict-typing:
-    status: todo
-    comment: 'Jalon19 : mypy strict2 erreurs/2fichiers/42modules, contre18/3/42 (-16). DUMMY=False restauré
-      selon source historique5e42e63 et suppression7cf0c60, branches sandbox et vrais appels SDK/transport
-      mocké testés. Contrats legacy et callbacks annotés sans Any/cast/ignore ; caméra compose FFmpeg
-      public sans falsifier son nom relatif optionnel, snapshots/stream/cleanup et préférences HA préservés.
-      Restent seulement incompatibilité LegacyDeviceInfo avec HA (IDentier et parent nullable) et identifiant
-      disque entier contre str ; Native HA prouve que convertir crée une identité distincte. Pas de cast
-      ni migration pour score : décision de contrat HA/amont ou migration explicite requise, pas blocage
-      SDK. Global strict reste rouge. Relevé mypy 2.4.1 du jalon25, 42 fichiers : base_class.py:86 override, LegacyDeviceInfo ou None contre DeviceInfo ou ChildDeviceInfo ou None ; sensor.py:333 tuple str,int contre tuple str,str. Le nom de la caméra ne figure pas parmi les diagnostics actuels.'
+    status: done
+    comment: "mypy 2.4.1 --strict sur les 43 fichiers du paquet : 0 erreur. base_class.device_info renvoie DeviceInfo avec un identifiant str. Le disque utilise str(id), et un appareil deja enregistre avec l'entier est reecrit sur le meme device id. Pas de Any, cast ou type ignore ajoute."

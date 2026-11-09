@@ -60,7 +60,7 @@ Dans **Paramètres → Appareils et services → Freebox Homexa → Configurer**
 | Général : `track_lan_clients` | activé | Crée les trackers LAN ; un appareil inconnu n'est pas automatiquement une présence fiable |
 | Général : `create_wifi_sensors` | activé | Capteurs de signal Wi-Fi des clients connus |
 | Général : `create_lan_devices` | désactivé pour nouvelle entrée | Crée des appareils pour les clients ; les anciennes entrées migrées conservent leur choix/ancien comportement activé |
-| Général : `home_poll_interval` | 15 s ; choix 5/10/15/20/25/30 s | Relevé Home séparé ; choisir plus court augmente la charge, pas une garantie de latence |
+| Général : `home_poll_interval` | 15 s pour une entrée nouvelle ; une valeur déjà enregistrée est conservée | Le formulaire ne demande plus l'intervalle. Une installation existante garde son choix. |
 | Général : `remote_code` | vide | Code télécommande réseau commun ; information privée, ne pas le publier |
 | Général : `remote_code_<id>` | vide | Code spécifique à un Player détecté ; prioritaire sur le code commun ; regroupé aussi dans `remote_codes` |
 | Groupes : `device_group_overrides` | automatique | Surcharge du rangement des appareils ; ne change pas leur identité |

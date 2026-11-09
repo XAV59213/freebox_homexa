@@ -229,7 +229,7 @@ async def test_invalid_stored_poll_interval_uses_default_without_mutation(hass, 
     entry.add_to_hass(hass)
     result = await hass.config_entries.options.async_init(entry.entry_id)
     result = await hass.config_entries.options.async_configure(result["flow_id"], {"next_step_id": "general"})
-    assert result["data_schema"]({})["home_poll_interval"] == DEFAULT_HOME_POLL_INTERVAL
+    assert "home_poll_interval" not in result["data_schema"]({})
     assert entry.options["home_poll_interval"] == invalid
 
 

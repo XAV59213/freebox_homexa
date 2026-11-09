@@ -24,6 +24,7 @@ from homeassistant.const import (
 )
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.device_registry import CONNECTION_NETWORK_MAC, DeviceInfo
+from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.dispatcher import async_dispatcher_connect
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
@@ -314,6 +315,46 @@ class FreeboxCallLogSensor(FreeboxSensor):
         )
 
 
+def _disk_entity_unique_id(unique_id: str, mac: str, disk_id: int) -> bool:
+    parts = unique_id.split(" ")
+    return len(parts) == 4 and parts[0] == mac and parts[1] == "partition_free_space" and parts[2] == str(disk_id)
+
+
+def _adopt_disk_device(router: FreeboxRouter, disk_id: int) -> None:
+    """Replace a stored integer disk identifier with its string form, same device."""
+    registry = dr.async_get(router.hass)
+    target = (DOMAIN, str(disk_id))
+    for device in dr.async_entries_for_config_entry(registry, router.entry_id):
+        legacy = False
+        rewritten: set[tuple[str, str]] = set()
+        usable = True
+        for ident in device.identifiers:
+            if not isinstance(ident, tuple) or len(ident) < 2 or not isinstance(ident[0], str):
+                usable = False
+                break
+            domain = ident[0]
+            raw: object = ident[1]
+            if domain == DOMAIN and raw == disk_id and not isinstance(raw, str):
+                legacy = True
+                rewritten.add(target)
+            elif isinstance(raw, str):
+                rewritten.add((domain, raw))
+            else:
+                usable = False
+                break
+        if not usable or not legacy or target in device.identifiers:
+            continue
+        entities = er.async_entries_for_device(
+            er.async_get(router.hass), device.id, include_disabled_entities=True
+        )
+        disk_only = bool(entities) and all(
+            _disk_entity_unique_id(entity.unique_id, router.mac, disk_id) for entity in entities
+        )
+        named_disk = not entities and device.name == f"Disque {disk_id}"
+        if disk_only or named_disk:
+            registry.async_update_device(device.id, new_identifiers=rewritten)
+
+
 class FreeboxDiskSensor(FreeboxSensor):
     def __init__(self, router: FreeboxRouter, disk: Mapping[str, object],
                  partition: Mapping[str, object], description: SensorEntityDescription) -> None:
@@ -329,8 +370,9 @@ class FreeboxDiskSensor(FreeboxSensor):
         self._partition_id = partition_id
         self._attr_translation_placeholders = {"partition": str(partition["label"])}
         self._attr_unique_id = f"{router.mac} {description.key} {disk['id']} {partition['id']}"
+        _adopt_disk_device(router, disk_id)
         device_info: DeviceInfo = {
-            "identifiers": {(DOMAIN, disk_id)},
+            "identifiers": {(DOMAIN, str(disk_id))},
             "model": model,
             "name": f"Disque {disk['id']}",
             "sw_version": as_version(disk.get("firmware")),

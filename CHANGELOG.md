@@ -2,6 +2,7 @@
 
 ## 28.8.92 — 2026-11-09
 - L'entrée se reconnaît par la MAC de la Freebox, plus seulement par l'hôte. La découverte met à jour l'adresse d'une Freebox déjà connue. La reconfiguration et la réauthentification refusent une autre Freebox. Les entity_id et les options ne changent pas.
+- Le capteur RAID ne dépend plus du libellé : l'identifiant du registre est migré, l'entity_id choisi reste. Le disque utilise l'identifiant texte exigé par Home Assistant. L'intervalle Home n'est plus demandé ; une valeur déjà enregistrée est gardée.
 - Autoévaluation Quality Scale, pas une certification Home Assistant. Les règles documentaires qui exigent une page core sont exemptées pour cette intégration HACS. Plusieurs critères restent todo.
 
 ## 28.8.91 — 2026-11-09

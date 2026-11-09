@@ -29,7 +29,7 @@ async def test_legacy_module_import_and_identity_contract(hass, home_context, ca
     assert DUMMY is False  # historical source default, not invented by a test stub
     assert entity._unique_id == router.mac + '-node_42'
     info = entity.device_info
-    assert info['identifiers'] == {(DOMAIN, 42)}
+    assert info['identifiers'] == {(DOMAIN, '42')}
     assert info['model'] == model and info['manufacturer'] == manufacturer
     assert info['name'] == 'Legacy'
     registry = dr.async_get(hass)
@@ -37,7 +37,7 @@ async def test_legacy_module_import_and_identity_contract(hass, home_context, ca
     registry.async_update_device(device.id, name_by_user='My legacy device')
     again = registry.async_get_or_create(config_entry_id=router.entry_id, **entity.device_info)
     assert again.id == device.id and again.name_by_user == 'My legacy device'
-    assert registry.async_get_device_by_identifier((DOMAIN, '42'), router.entry_id) is None
+    assert registry.async_get_device_by_identifier((DOMAIN, '42'), router.entry_id) is again
     entity._is_device = False
     assert entity.device_info is None
 
@@ -135,16 +135,15 @@ async def test_disk_native_registry_keeps_integer_and_user_name(hass, home_conte
     disk = {'id': 7, 'model': 'Synthetic disk'}
     partition = {'id': 2, 'label': 'Saved partition'}
     registry = dr.async_get(hass)
+    legacy = registry.async_get_or_create(
+        config_entry_id=router.entry_id, identifiers={(DOMAIN, 7)}, name='Disque 7',
+    )
+    registry.async_update_device(legacy.id, name_by_user='My disk')
     entity = FreeboxDiskSensor(router, disk, partition, SensorEntityDescription(key='free'))
-    uid = entity.unique_id
-    original = registry.async_get_or_create(config_entry_id=router.entry_id, **entity.device_info)
-    registry.async_update_device(original.id, name_by_user='My disk')
-    second = FreeboxDiskSensor(router, disk, partition, SensorEntityDescription(key='free'))
-    again = registry.async_get_or_create(config_entry_id=router.entry_id, **second.device_info)
-    assert uid == second.unique_id == f'{router.mac} free 7 2'
-    assert original.id == again.id and again.name_by_user == 'My disk'
-    assert again.identifiers == {(DOMAIN, 7)}
-    assert registry.async_get_device_by_identifier((DOMAIN, '7'), router.entry_id) is None
+    again = registry.async_get_or_create(config_entry_id=router.entry_id, **entity.device_info)
+    assert entity.unique_id == f'{router.mac} free 7 2'
+    assert legacy.id == again.id and again.name_by_user == 'My disk'
+    assert again.identifiers == {(DOMAIN, '7')}
 
 
 @pytest.mark.parametrize('disk,partition', [({'id': '7', 'model': 'Disk'}, {'id': 2, 'label': 'P'}),
@@ -166,3 +165,6 @@ async def test_restored_legacy_constructor_does_not_log_node_credentials(hass, h
     assert 'SYNTHETIC_PRIVATE_PASSWORD' not in caplog.text
     assert 'rtsp://' not in caplog.text
     assert 'Synthetic private label' not in caplog.text
+    created = FreeboxBaseClass(hass, router, {'id': 42, 'label': 'Synthetic', 'category': 'camera', 'props': {}})
+    assert created.device_info is not None
+    assert created.device_info['identifiers'] == {(DOMAIN, '42')}

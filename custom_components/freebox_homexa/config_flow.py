@@ -133,12 +133,6 @@ def _options_schema(
             CONF_CREATE_LAN_DEVICES,
             default=defaults.get(CONF_CREATE_LAN_DEVICES, DEFAULT_CREATE_LAN_DEVICES),
         ): bool,
-        vol.Required(
-            CONF_HOME_POLL_INTERVAL,
-            default=_coerce_home_poll_interval(
-                defaults.get(CONF_HOME_POLL_INTERVAL, DEFAULT_HOME_POLL_INTERVAL)
-            ),
-        ): vol.In(HOME_POLL_INTERVAL_OPTIONS),
         vol.Optional(
             CONF_REMOTE_CODE,
             default=_coerce_remote_code(defaults.get(CONF_REMOTE_CODE)),
@@ -1021,6 +1015,8 @@ class FreeboxOptionsFlowHandler(OptionsFlowWithReload):
 
         if user_input is not None:
             options = _options_from_input(user_input, players)
+            if CONF_HOME_POLL_INTERVAL in self.config_entry.options:
+                options[CONF_HOME_POLL_INTERVAL] = self.config_entry.options[CONF_HOME_POLL_INTERVAL]
             new_data = dict(self.config_entry.data)
             shared = options.get(CONF_REMOTE_CODE)
             if shared:

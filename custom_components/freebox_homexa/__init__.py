@@ -294,6 +294,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: FreeboxConfigEntry) -> b
         _LOGGER.exception("Rappels TNT indisponibles (le reste de l'intégration n'est pas affecté)")
 
     forward_started = True
+    from .binary_sensor import migrate_raid_unique_ids
+
+    migrate_raid_unique_ids(hass, entry.entry_id, mac)
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     # Parents virtuels créés à la demande par les entités. Les groupes inutilisés
     # sont retirés un peu plus tard : certaines plateformes ajoutent leurs entités

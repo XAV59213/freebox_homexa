@@ -3,6 +3,7 @@ from __future__ import annotations
 import logging
 from typing import NotRequired, TypedDict
 from homeassistant.core import HomeAssistant
+from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity import Entity
 from .const import DOMAIN, VALUE_NOT_SET, DUMMY
 from .router import FreeboxRouter
@@ -29,16 +30,6 @@ class LegacyHomeEndpoint(TypedDict):
     name: str
     ep_type: str
     value: NotRequired[object]
-
-
-class LegacyDeviceInfo(TypedDict):
-    """Exact legacy registry payload; intentionally not falsely a HA DeviceInfo."""
-    identifiers: set[tuple[str, int]]
-    name: str
-    manufacturer: str
-    model: str
-    sw_version: str | None
-    via_device_id: str | None
 
 
 class FreeboxBaseClass(Entity):
@@ -83,18 +74,21 @@ class FreeboxBaseClass(Entity):
             self._model = "IOcontrol"
 
     @property
-    def device_info(self) -> LegacyDeviceInfo | None:
-        """Device info avec via_device corrigé (obligatoire pour HA 2025.12)."""
+    def device_info(self) -> DeviceInfo | None:
+        """DeviceInfo HA. Cette classe n'est pas une plateforme active."""
         if not self._is_device:
             return None
-        return {
-            "identifiers": {(DOMAIN, self._id)},
+        info: DeviceInfo = {
+            "identifiers": {(DOMAIN, str(self._id))},
             "name": self._device_name,
             "manufacturer": self._manufacturer,
             "model": self._model,
             "sw_version": as_version(self._firmware),
-            "via_device_id": self._router.device_id,
         }
+        parent = self._router.device_id
+        if isinstance(parent, str):
+            info["via_device_id"] = parent
+        return info
 
     # === Méthodes API (inchangées) ===
     async def set_home_endpoint_value(self, command_id: int, value: dict[str, object]) -> bool:

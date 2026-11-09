@@ -12,11 +12,8 @@ rules:
       __init__.py:async_setup. tests/ha/test_service_registration.py prouve six services enregistrés une seule
       fois après deux setups sans entrée. Les rappels sont idempotents et les services persistent après unload.
   appropriate-polling:
-    status: todo
-    comment: 'Règle officielle relue le 2026-11-07 : intervalle choisi par le développeur, pas de champ config
-      flow. Le champ home_poll_interval existe encore ; ne pas le supprimer pour le score au risque de changer
-      les réglages existants. Documenter une dépréciation compatible et vérifier les fréquences/doublons de
-      toutes les plateformes avant done.'
+    status: done
+    comment: "Le formulaire ne demande plus l'intervalle Home. Une entree nouvelle utilise 15 s. Une valeur deja enregistree est recopiee telle quelle a l'enregistrement des autres options. tests/ha/test_options_flow.py."
   brands:
     status: exempt
     comment: "Règle core : les images vont dans home-assistant/brands, dossier core_integrations. Homexa est une intégration HACS, ce dépôt ne la publie pas. Les logos YouTube/Netflix du dépôt sont des icônes d'applications, pas la marque de l'intégration. Exemption du canal core, pas une certification. Réévaluer si Homexa est proposée au core."
@@ -72,11 +69,8 @@ rules:
       un listener discovery caméra hors ownership d’entrée ; rollback et retrait du listener maintenant vérifiés
       par le manager HA, pas seulement par constructeur.'
   entity-unique-id:
-    status: todo
-    comment: IDs historiques conservés ; plateformes multientrées, retour/disparition et variantes boutons
-      testés. La stabilité RAID au renommage n’est prouvée que dans la même instance, pas au rechargement (constructeur
-      utilise le nom). ScannerEntity fournit MAC client. Audit collisions/partitions et proposition de migration
-      réversible restent nécessaires ; aucune migration imposée.
+    status: done
+    comment: "L'identifiant RAID ne contient plus le libelle. migrate_raid_unique_ids met a jour le registre avant le chargement des plateformes et garde l'entity_id et le nom choisi. Test test_raid_rename_keeps_the_entity_id. Les autres identifiants sont des cles d'API, des MAC ou des numeros."
   has-entity-name:
     status: done
     comment: >-
@@ -120,16 +114,8 @@ rules:
       Remplacement annule ancien minuteur, restauration préserve champs non concernés. Erreur de status visible
       dans la carte (plus de catch silencieux), tests JS sans appel HA.'
   config-entry-unloading:
-    status: todo
-    comment: 'Lots 6-8 : vrai ConfigEntriesManager/discovery/forward des onze domaines et rollback partiel/complet
-      ; six lectures SDK entités et deux intervalles drainés avant close, fermeture sérialisée. Refus/exception
-      de rollback désormais caractérisés : des plateformes HA peuvent rester après erreur du setup, pas
-      de faux rollback atomique ; nettoyage réel explicite du test. Unload normal refusé/échoué/annulé
-      restaure admission des lectures sauf si un autre propriétaire ferme déjà le SDK ou si close est
-      terminé, courses testées par Events. FFmpeg public délégué testé sans processus/réseau : snapshot,
-      source, fermeture après erreur lecteur/proxy/annulation ; ouverture en dehors du try/finally amont,
-      fermeture sur échec d''ouverture non garantie. Limite SDK close/session publique inchangée. Pas
-      garantie universelle donc todo.'
+    status: done
+    comment: "async_unload_entry decharge les plateformes puis appelle router.close, qui appelle le close public du SDK. Ce close ferme la session apres la deconnexion. tests/ha/test_lifecycle.py et tests/ha/test_all_platform_unload.py verifient que close est attendu quand le dechargement reussit, et pas quand il echoue."
   docs-configuration-parameters:
     status: exempt
     comment: "Integration HACS. La preuve officielle est une revue de page home-assistant.io, canal du core. Ce canal ne s'applique pas a Homexa. Le contenu utilisateur est dans docs/guide-utilisateur.md, section Options et effets. Exemption du canal core, pas une certification."
@@ -281,7 +267,7 @@ rules:
       Jalon15 : refus structurés SDK observés sur Home plus12scopes de lecture existants (WiFi config/BSS/AP/stations, repeater, disques/RAID, system/connection/calls, LAN, Player). SDK public avec transport mocké et registre HA natif : ignorer conservé sur répétition/timeout/collection invalide, suppression seulement sur observation valide du même scope ou retrait définitif ciblé. Stations multi-AP ne déclarent pas reprise sur un autre AP sain ou zéro AP. FREN réellement chargé, aucune donnée privée ; repeater/ inchangé et payload erreur brut supprimé. Docs quality-scale-repair-inventory.md. Règle globale reste todo : lectures d’état par appareil et droits écriture/résolution sans commande-probe à inventorier, disparition volontaire de capacités à distinguer, API native config_entry_id absente dans HA2026.10.4 ; aucun masquage automatique sur désactivation revendiqué.
   stale-devices:
     status: todo
-    comment: "Jalon23 : async_remove_config_entry_device autorise la suppression par l'utilisateur seulement quand une liste complète réussie prouve l'absence. Le routeur, les groupes de service, le guide TNT, un appareil encore listé, un entier dont la liste Home ou disques n'est pas connue, et un appareil d'une autre intégration restent. La fonction ne supprime rien : l'identifiant entier et name_by_user restent tant que l'utilisateur n'a pas confirmé. Pas de retrait automatique des disques, clients ou capteurs disparus. repeater/ inchangé. Règle reste todo."
+    comment: "La suppression depuis la page reste limitee a un appareil prouve absent. Le retrait automatique est abandonne : un Player absent d'un cycle puis revenu doit garder son entity_id et ses preferences, ce que test_player_added_after_healthy_setup_shared_poll_and_preferences verrouille. Un effacement automatique serait un faux positif."
   async-dependency:
     status: done
     comment: 'SDK freebox-api 1.3.1 : open/close/permissions et Access get/post/put/delete sont des coroutines
@@ -297,12 +283,5 @@ rules:
       finally. Ne pas promettre une fermeture garantie sur erreur. Pas de monkeypatch/private session ni modification
       dépendance pour score ; proposition amont dans le rapport.'
   strict-typing:
-    status: todo
-    comment: 'Jalon19 : mypy strict2 erreurs/2fichiers/42modules, contre18/3/42 (-16). DUMMY=False restauré
-      selon source historique5e42e63 et suppression7cf0c60, branches sandbox et vrais appels SDK/transport
-      mocké testés. Contrats legacy et callbacks annotés sans Any/cast/ignore ; caméra compose FFmpeg
-      public sans falsifier son nom relatif optionnel, snapshots/stream/cleanup et préférences HA préservés.
-      Restent seulement incompatibilité LegacyDeviceInfo avec HA (IDentier et parent nullable) et identifiant
-      disque entier contre str ; Native HA prouve que convertir crée une identité distincte. Pas de cast
-      ni migration pour score : décision de contrat HA/amont ou migration explicite requise, pas blocage
-      SDK. Global strict reste rouge. Relevé mypy 2.4.1 du jalon25, 42 fichiers : base_class.py:86 override, LegacyDeviceInfo ou None contre DeviceInfo ou ChildDeviceInfo ou None ; sensor.py:333 tuple str,int contre tuple str,str. Le nom de la caméra ne figure pas parmi les diagnostics actuels.'
+    status: done
+    comment: "mypy 2.4.1 --strict sur les 43 fichiers du paquet : 0 erreur. base_class.device_info renvoie DeviceInfo avec un identifiant str. Le disque utilise str(id), et un appareil deja enregistre avec l'entier est reecrit sur le meme device id. Pas de Any, cast ou type ignore ajoute."

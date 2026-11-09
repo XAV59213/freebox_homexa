@@ -76,12 +76,12 @@ async def test_entity_families_share_seven_device_contracts(hass, home_context):
         router, {"id": 7, "model": "Synthetic"}, {"id": 2, "label": "Data"},
         SensorEntityDescription(key="free"),
     )
-    assert disk.device_info["identifiers"] == {(DOMAIN, 7)}
+    assert disk.device_info["identifiers"] == {(DOMAIN, "7")}
     assert "serial_number" not in disk.device_info
     assert "hw_version" not in disk.device_info
     stored = devices.async_get_or_create(config_entry_id=entry.entry_id, **disk.device_info)
     devices.async_update_device(stored.id, name_by_user="Mon disque")
-    assert (DOMAIN, 7) in devices.async_get(stored.id).identifiers
+    assert (DOMAIN, "7") in devices.async_get(stored.id).identifiers
     assert devices.async_get(stored.id).name_by_user == "Mon disque"
     assert stored.via_device_id == server.id
 

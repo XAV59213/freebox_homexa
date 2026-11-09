@@ -62,13 +62,13 @@ async def test_two_servers_keep_shared_integer_and_service_devices_apart(hass):
     partition = {"id": 2, "label": "Data"}
     disk_first = FreeboxDiskSensor(first, disk, partition, SensorEntityDescription(key="free"))
     disk_second = FreeboxDiskSensor(second, disk, partition, SensorEntityDescription(key="free"))
-    assert disk_first.device_info["identifiers"] == {(DOMAIN, 7)}
+    assert disk_first.device_info["identifiers"] == {(DOMAIN, "7")}
     assert "serial_number" not in disk_first.device_info
     stored_first = devices.async_get_or_create(config_entry_id=first_entry.entry_id, **disk_first.device_info)
     stored_second = devices.async_get_or_create(config_entry_id=second_entry.entry_id, **disk_second.device_info)
     devices.async_update_device(stored_first.id, name_by_user="Mon disque")
     assert stored_first.id != stored_second.id
-    assert (DOMAIN, 7) in devices.async_get(stored_first.id).identifiers
+    assert (DOMAIN, "7") in devices.async_get(stored_first.id).identifiers
     assert devices.async_get(stored_first.id).name_by_user == "Mon disque"
     assert devices.async_get(stored_second.id).name_by_user is None
 

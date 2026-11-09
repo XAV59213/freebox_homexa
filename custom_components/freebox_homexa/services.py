@@ -15,7 +15,15 @@ from homeassistant.core import HomeAssistant, ServiceCall, callback
 from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
 from homeassistant.helpers import device_registry as dr
 
-from .const import DOMAIN, SERVICE_REBOOT, SERVICE_RELOAD, SERVICE_REMOTE
+from .const import (
+    DOMAIN,
+    SERVICE_REBOOT,
+    SERVICE_RELOAD,
+    SERVICE_REMOTE,
+    SERVICE_START_FXS_RING,
+    SERVICE_STOP_FXS_RING,
+)
+from .fxs_ring import async_ring_for_entry, async_stop_for_entry, duration_from_call
 from .player_remote import (
     VALID_COMMANDS,
     async_send_player_keys,
@@ -219,10 +227,25 @@ def async_setup_services(hass: HomeAssistant) -> None:
                     translation_domain=DOMAIN, translation_key="command_failed"
                 ) from failures[0][1]
 
+    @async_action_errors
+    async def async_start_fxs_ring(call: ServiceCall) -> None:
+        """Fait sonner le port FXS. Une durée programme toujours l'arrêt."""
+        duration = duration_from_call(call)
+        for entry in async_resolve_entries(hass, call):
+            await async_ring_for_entry(entry, duration)
+
+    @async_action_errors
+    async def async_stop_fxs_ring(call: ServiceCall) -> None:
+        """Arrête la sonnerie du port FXS."""
+        for entry in async_resolve_entries(hass, call):
+            await async_stop_for_entry(entry)
+
     for service, handler in (
         (SERVICE_REBOOT, async_reboot),
         (SERVICE_RELOAD, async_reload_config),
         (SERVICE_REMOTE, async_freebox_player_remote),
+        (SERVICE_START_FXS_RING, async_start_fxs_ring),
+        (SERVICE_STOP_FXS_RING, async_stop_fxs_ring),
     ):
         if not hass.services.has_service(DOMAIN, service):
             hass.services.async_register(DOMAIN, service, handler)

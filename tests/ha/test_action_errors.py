@@ -326,13 +326,13 @@ def test_inventory_every_explicit_user_action_is_guarded():
     root = Path(__file__).resolve().parents[2] / "custom_components/freebox_homexa"
     expected = {"button": 3, "remote": 3, "media_player": 11, "switch": 4,
         "alarm_control_panel": 4, "cover": 7, "camera": 2, "calendar": 1,
-        "services": 3, "tnt_reminders": 3, "router": 1}
+        "services": 5, "tnt_reminders": 3, "router": 1}
     exact = {"async_press", "async_set_volume_level", "async_mute_volume", "async_select_source",
         "async_play_media", "async_send_command", "async_open_cover", "async_close_cover",
         "async_stop_cover", "async_set_cover_position", "async_enable_motion_detection",
         "async_disable_motion_detection", "async_get_events", "async_handle_schedule",
         "async_handle_cancel", "async_handle_status", "async_reboot", "async_reload_config",
-        "async_freebox_player_remote"}
+        "async_freebox_player_remote", "async_start_fxs_ring", "async_stop_fxs_ring"}
     actual = {}
     for path in root.glob("*.py"):
         count = 0
@@ -348,7 +348,7 @@ def test_inventory_every_explicit_user_action_is_guarded():
         if count:
             actual[path.stem] = count
     assert actual == expected
-    assert sum(actual.values()) == 42
+    assert sum(actual.values()) == 44
 
 
 @pytest.mark.parametrize("cancel", [False, True])

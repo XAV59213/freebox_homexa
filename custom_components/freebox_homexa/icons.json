@@ -3,6 +3,12 @@
     "reboot": {
       "service": "mdi:restart"
     },
+    "start_fxs_ring": {
+      "service": "mdi:phone-ring"
+    },
+    "stop_fxs_ring": {
+      "service": "mdi:phone-off"
+    },
     "cover_open": {
       "service": "mdi:window-shutter-open"
     },
@@ -15,6 +21,12 @@
   },
   "entity": {
     "button": {
+      "start_fxs_ring": {
+        "default": "mdi:phone-ring"
+      },
+      "stop_fxs_ring": {
+        "default": "mdi:phone-off"
+      },
       "accueil": {
         "default": "mdi:home"
       },

@@ -21,7 +21,7 @@
 
 Intégration **Home Assistant** pour la Freebox Server, Freebox Home, les répéteurs Wi-Fi Free et le Freebox Player.
 
-**Version actuelle :** [28.8.90](https://github.com/XAV59213/freebox_homexa/releases/tag/28.8.90) · Home Assistant **2026.8.0+**
+**Version actuelle :** [28.8.91](https://github.com/XAV59213/freebox_homexa/releases/tag/28.8.91) · Home Assistant **2026.8.0+**
 
 Wiki : [Documentation](https://github.com/XAV59213/freebox_homexa/wiki)
 
@@ -135,8 +135,22 @@ Volume et lecture passent par l’API Player, sans ce code.
 | `freebox_homexa.schedule_reminder` | Programme un rappel TNT (notification et/ou annonce vocale) 5, 10 ou 15 min avant un programme |
 | `freebox_homexa.cancel_reminder` | Annule un rappel TNT |
 | `freebox_homexa.get_reminder_status` | Indique si un rappel est programmé (réponse de l’action) |
+| `freebox_homexa.start_fxs_ring` | Fait sonner le téléphone du port FXS, avec une durée facultative |
+| `freebox_homexa.stop_fxs_ring` | Arrête la sonnerie du port FXS |
 
-Avec plusieurs Freebox, `config_entry_id` ou `device_id` choisit la Freebox visée par `reboot`, `reload` et `remote`.
+Avec plusieurs Freebox, `config_entry_id` ou `device_id` choisit la Freebox visée par `reboot`, `reload`, `remote`, `start_fxs_ring` et `stop_fxs_ring`.
+
+### Sonnerie du téléphone (port FXS)
+
+Deux boutons sur le Freebox Server : **Démarrer la sonnerie FXS** et **Arrêter la sonnerie FXS**. La même chose existe en actions, pour les automatisations. Il faut le droit **Téléphonie** de l’application Home Assistant dans Freebox OS (Paramètres → Gestion des accès → Applications). Sans ce droit, ou si la box n’a pas de port FXS, l’action échoue avec un message traduit : ce n’est pas un succès.
+
+Sans durée, la sonnerie continue jusqu’à l’arrêt. Avec `duration` (1 à 300 secondes), Homexa demande **toujours** l’arrêt, y compris si l’action échoue, est annulée ou si l’intégration est déchargée.
+
+```yaml
+action: freebox_homexa.start_fxs_ring
+data:
+  duration: 5
+```
 
 ### `freebox_homexa.remote`
 

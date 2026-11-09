@@ -65,7 +65,7 @@ async def test_every_fixed_label_consumed_by_real_entity_platform(hass, home_con
                 assert registry.async_get(entity.entity_id).icon == 'mdi:heart'
             finally:
                 await platform.async_reset()
-        assert len(consumed) == 67
+        assert len(consumed) == 69
         assert consumed['battery'] == ('Batterie' if language == 'fr' else 'Battery')
         assert consumed['rate_down'] == ('Vitesse de téléchargement' if language == 'fr' else 'Download speed')
         assert consumed['partition_free_space'] == ('Synthetic espace libre' if language == 'fr' else 'Synthetic free space')

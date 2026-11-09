@@ -18,12 +18,14 @@ DOMAIN = "freebox_homexa"
 SERVICE_REBOOT = "reboot"
 SERVICE_RELOAD = "reload"
 SERVICE_REMOTE = "remote"
+SERVICE_START_FXS_RING = "start_fxs_ring"
+SERVICE_STOP_FXS_RING = "stop_fxs_ring"
 
 VALUE_NOT_SET = -1
 DEFAULT_DEVICE_NAME = "Unknown device"
 REPEATER_MODEL = "F-RP01A"
 
-VERSION = "28.8.90"
+VERSION = "28.8.91"
 URL_BASE = "/freebox_homexa"
 CARD_FILENAME = "freebox-homexa-card.js"
 STATIC_CARD_PATH = f"{URL_BASE}/{CARD_FILENAME}"

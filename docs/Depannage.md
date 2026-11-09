@@ -9,6 +9,7 @@
 | Player introuvable | Droit API / version Player | Droits Player dans Freebox OS |
 | HDMI ne change pas l’entrée TV | Limite CEC | Attendu : réveil TV seulement |
 | Setup entry échoue au chargement d’une plateforme | Fichier plateforme manquant ou syntaxe | Mettre à jour + redémarrer |
+| Sonnerie FXS refusée | Droit Téléphonie absent, ou pas de port FXS | Autoriser Téléphonie puis recharger ; le message traduit distingue le refus et l’absence de port |
 
 Filtre de logs : `custom_components.freebox_homexa`.
 

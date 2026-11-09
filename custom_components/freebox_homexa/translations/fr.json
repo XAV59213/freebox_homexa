@@ -205,6 +205,38 @@
         }
       }
     },
+    "start_fxs_ring": {
+      "name": "Démarrer la sonnerie FXS",
+      "description": "Fait sonner le téléphone branché sur le port FXS. Nécessite le droit Téléphonie. Avec une durée, l’arrêt est toujours demandé, y compris en cas d’erreur, d’annulation ou de déchargement.",
+      "fields": {
+        "duration": {
+          "name": "Durée",
+          "description": "Durée en secondes, de 1 à 300. Sans durée, la sonnerie continue jusqu’à l’arrêt. Avec une durée, l’arrêt est toujours demandé."
+        },
+        "config_entry_id": {
+          "name": "Entrée de l’intégration",
+          "description": "ID facultatif de l’entrée Homexa. Permet de choisir la bonne Freebox s’il y a plusieurs entrées ; device_id est une autre possibilité."
+        },
+        "device_id": {
+          "name": "Appareil Homexa",
+          "description": "Appareil Homexa permettant de choisir l’entrée de l’intégration."
+        }
+      }
+    },
+    "stop_fxs_ring": {
+      "name": "Arrêter la sonnerie FXS",
+      "description": "Arrête la sonnerie du téléphone branché sur le port FXS. Nécessite le droit Téléphonie. Ne lit ni le journal d’appels ni les noms d’appelants.",
+      "fields": {
+        "config_entry_id": {
+          "name": "Entrée de l’intégration",
+          "description": "ID facultatif de l’entrée Homexa. Permet de choisir la bonne Freebox s’il y a plusieurs entrées ; device_id est une autre possibilité."
+        },
+        "device_id": {
+          "name": "Appareil Homexa",
+          "description": "Appareil Homexa permettant de choisir l’entrée de l’intégration."
+        }
+      }
+    },
     "schedule_reminder": {
       "name": "Programmer un rappel TNT",
       "description": "Programme un rappel (notification et/ou annonce vocale) avant le début d'un programme.",
@@ -395,6 +427,12 @@
       "mark_calls_as_read": {
         "name": "Marquer les appels comme lus"
       },
+      "start_fxs_ring": {
+        "name": "Démarrer la sonnerie FXS"
+      },
+      "stop_fxs_ring": {
+        "name": "Arrêter la sonnerie FXS"
+      },
       "remote_key_home": {
         "name": "Accueil"
       },
@@ -570,6 +608,15 @@
     },
     "cannot_fetch_tnt": {
       "message": "Impossible de récupérer le guide TNT : {error}"
+    },
+    "fxs_ring_permission": {
+      "message": "L’application Home Assistant n’a pas le droit Téléphonie sur la Freebox. Dans Freebox OS : Paramètres → Gestion des accès → Applications → Home Assistant, autorise Téléphonie, puis recharge l’intégration."
+    },
+    "fxs_ring_unavailable": {
+      "message": "Cette Freebox n’a pas de port téléphonique FXS, ou la sonnerie analogique n’est pas disponible. Aucune sonnerie n’a été confirmée."
+    },
+    "fxs_ring_duration": {
+      "message": "La durée de sonnerie doit être comprise entre {minimum} et {maximum} secondes."
     },
     "command_failed": {
       "message": "L’action n’a pas pu être exécutée. Vérifiez la connexion et les autorisations de la Freebox."

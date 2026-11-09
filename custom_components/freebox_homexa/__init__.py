@@ -46,6 +46,7 @@ from .tnt_setup import (
     async_setup_bundled_tnt,
     async_unload_bundled_tnt,
 )
+from .fxs_ring import async_release_fxs_ring
 from .services import async_setup_services, _save_config
 from .tnt_reminders import async_setup_reminders
 from .registry_compat import as_version
@@ -318,6 +319,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: FreeboxConfigEntry) -> b
     entry.async_on_unload(async_call_later(hass, 120, _cleanup_groups))
 
     async def async_close_connection(event: Event) -> None:
+        await async_release_fxs_ring(router)
         await router.close()
         await save_data()
 
@@ -336,6 +338,8 @@ async def async_unload_entry(hass: HomeAssistant, entry: FreeboxConfigEntry) -> 
     await _save_config(hass)
     router: FreeboxRouter | None = getattr(entry, "runtime_data", None)
     if router is not None:
+        # Arrêt FXS tant que la session répond, avant de refuser les nouveaux relevés.
+        await async_release_fxs_ring(router)
         # Déchargement / rechargement : les relevés encore en vol ne journalisent plus
         # « Connector is closed » comme une erreur.
         router.closing = True

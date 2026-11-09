@@ -18,7 +18,7 @@ une liste de clients n’est pas automatiquement un diagnostic technique seconda
 | FreeboxAlarm | 1 | principale (aucune) | Fonction principale : commande, contenu ou observation métier ; pas un réglage ni un contrôle de santé. |
 | FreeboxBasicShutter | 1 | principale (aucune) | Fonction principale : commande, contenu ou observation métier ; pas un réglage ni un contrôle de santé. |
 | FreeboxBatterySensor | 1 | diagnostic | État de santé de l’alimentation du périphérique Home. |
-| FreeboxButton | 2 | config, diagnostic | Reboot configure le serveur ; effacer les appels acquitte un compteur de diagnostic. |
+| FreeboxButton | 4 | config, diagnostic, principale | Reboot configure le serveur ; effacer les appels acquitte un compteur de diagnostic. Démarrer et arrêter la sonnerie FXS sont des commandes principales (pas un réglage). |
 | FreeboxCallLogSensor | 1 | principale (aucune) | Fonction principale : commande, contenu ou observation métier ; pas un réglage ni un contrôle de santé. |
 | FreeboxCallSensor | 1 | diagnostic | Compteur technique des appels manqués ; distinct du journal métier des appels. |
 | FreeboxCamera | 1 | principale (aucune) | Fonction principale : commande, contenu ou observation métier ; pas un réglage ni un contrôle de santé. |

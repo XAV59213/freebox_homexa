@@ -50,6 +50,26 @@
     "unit": null
   },
   {
+    "class": "FreeboxButton",
+    "variant": "server-button/start_fxs_ring",
+    "category": null,
+    "device_class": null,
+    "enabled_default": true,
+    "has_entity_name": true,
+    "translation_key": "start_fxs_ring",
+    "unit": null
+  },
+  {
+    "class": "FreeboxButton",
+    "variant": "server-button/stop_fxs_ring",
+    "category": null,
+    "device_class": null,
+    "enabled_default": true,
+    "has_entity_name": true,
+    "translation_key": "stop_fxs_ring",
+    "unit": null
+  },
+  {
     "class": "FreeboxCallLogSensor",
     "variant": "call-log",
     "category": null,

@@ -205,6 +205,38 @@
         }
       }
     },
+    "start_fxs_ring": {
+      "name": "Start FXS ring",
+      "description": "Rings the phone plugged into the Freebox FXS port. Requires the Telephony permission. With a duration, stop is always requested, including on error, cancellation or unload.",
+      "fields": {
+        "duration": {
+          "name": "Duration",
+          "description": "Ring duration in seconds, from 1 to 300. Omit it to keep ringing until stop. When set, stop is always requested."
+        },
+        "config_entry_id": {
+          "name": "Integration entry",
+          "description": "Optional Homexa config entry ID. Selects the Freebox when several entries exist; device_id is an alternative."
+        },
+        "device_id": {
+          "name": "Homexa device",
+          "description": "Homexa device used to select the integration entry."
+        }
+      }
+    },
+    "stop_fxs_ring": {
+      "name": "Stop FXS ring",
+      "description": "Stops the FXS phone ring. Requires the Telephony permission. Does not read call logs or caller names.",
+      "fields": {
+        "config_entry_id": {
+          "name": "Integration entry",
+          "description": "Optional Homexa config entry ID. Selects the Freebox when several entries exist; device_id is an alternative."
+        },
+        "device_id": {
+          "name": "Homexa device",
+          "description": "Homexa device used to select the integration entry."
+        }
+      }
+    },
     "schedule_reminder": {
       "name": "Schedule TNT reminder",
       "description": "Schedules a reminder (notification and/or voice announcement) before a programme starts.",
@@ -395,6 +427,12 @@
       "mark_calls_as_read": {
         "name": "Mark calls as read"
       },
+      "start_fxs_ring": {
+        "name": "Start FXS ring"
+      },
+      "stop_fxs_ring": {
+        "name": "Stop FXS ring"
+      },
       "remote_key_home": {
         "name": "Home"
       },
@@ -570,6 +608,15 @@
     },
     "cannot_fetch_tnt": {
       "message": "Could not retrieve the TNT guide: {error}"
+    },
+    "fxs_ring_permission": {
+      "message": "The Home Assistant application does not have the Telephony permission on the Freebox. In Freebox OS, open Settings → Access management → Applications → Home Assistant, allow Telephony, then reload the integration."
+    },
+    "fxs_ring_unavailable": {
+      "message": "This Freebox has no FXS phone port, or analog ringing is unavailable. No ring was confirmed."
+    },
+    "fxs_ring_duration": {
+      "message": "The ring duration must be between {minimum} and {maximum} seconds."
     },
     "command_failed": {
       "message": "The action could not be completed. Check the Freebox connection and permissions."

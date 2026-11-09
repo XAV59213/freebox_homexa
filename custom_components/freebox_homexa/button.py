@@ -34,6 +34,7 @@ from .player_remote import async_send_player_keys, filter_ready_players
 from .availability import FreeboxReachableMixin, FreeboxPlayerReachableMixin
 
 from .errors import async_action_errors
+from .fxs_ring import async_ring_start, async_ring_stop
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -49,6 +50,15 @@ def _mark_calls_as_read(router: FreeboxRouter) -> Awaitable[object]:
     return calls.mark_calls_log_as_read()
 
 
+def _start_fxs_ring(router: FreeboxRouter) -> Awaitable[object]:
+    """Sonnerie immédiate, sans durée : l'arrêt reste une action séparée."""
+    return async_ring_start(router, None)
+
+
+def _stop_fxs_ring(router: FreeboxRouter) -> Awaitable[object]:
+    return async_ring_stop(router)
+
+
 BUTTON_DESCRIPTIONS: tuple[FreeboxButtonEntityDescription, ...] = (
     FreeboxButtonEntityDescription(
         key="reboot",
@@ -62,6 +72,16 @@ BUTTON_DESCRIPTIONS: tuple[FreeboxButtonEntityDescription, ...] = (
         name="Marquer les appels comme lus",
         entity_category=EntityCategory.DIAGNOSTIC,
         async_press=_mark_calls_as_read,
+    ),
+    FreeboxButtonEntityDescription(
+        key="start_fxs_ring",
+        name="Démarrer la sonnerie FXS",
+        async_press=_start_fxs_ring,
+    ),
+    FreeboxButtonEntityDescription(
+        key="stop_fxs_ring",
+        name="Arrêter la sonnerie FXS",
+        async_press=_stop_fxs_ring,
     ),
 )
 

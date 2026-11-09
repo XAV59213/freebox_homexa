@@ -1,5 +1,8 @@
 # Changelog
 
+## 28.8.91 — 2026-11-09
+- Téléphone FXS (#120) : boutons « Démarrer la sonnerie FXS » et « Arrêter la sonnerie FXS », actions `start_fxs_ring` et `stop_fxs_ring`. Une durée (1 à 300 s) demande toujours l'arrêt, y compris en cas d'erreur, d'annulation ou de déchargement. Droit Téléphonie requis. Sans ce droit ou sans port FXS : erreur traduite, pas de succès fictif, les boutons restent en place. Aucun numéro ni nom d'appelant n'est lu.
+
 ## 28.8.90 — 2026-11-08
 - 23 critères Quality Scale démontrés, 29 todo, 2 exempt. Pas de certification Home Assistant officielle. Tout n'est pas résolu.
 

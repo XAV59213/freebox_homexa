@@ -15,6 +15,7 @@ from collections.abc import Awaitable, Callable
 from freebox_api import Freepybox
 from freebox_api.api.call import Call
 from freebox_api.api.home import Home
+from freebox_api.api.phone import Phone
 from freebox_api.api.wifi import Wifi
 from freebox_api.exceptions import HttpRequestError, NotOpenError
 
@@ -1469,6 +1470,11 @@ class FreeboxRouter:
     @property
     def call(self) -> Call:
         return self._api.call
+
+    @property
+    def phone(self) -> Phone:
+        """API téléphonie (sonnerie FXS). Ne lit pas le journal d'appels."""
+        return self._api.phone
 
     @property
     def wifi(self) -> Wifi:

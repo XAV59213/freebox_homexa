@@ -114,7 +114,7 @@ si la chaîne reconnue correspond ; cela ne constitue pas une identification vid
 Android TV Remote, ADB ou Cast ne garantissent pas le titre OQEE/chaîne/app/lecture
 sur tous les modèles : ne pas remplacer une absence de donnée par une promesse.
 
-## Les six actions propres à Homexa
+## Les actions propres à Homexa
 
 Elles existent avant le chargement d'une entrée ; une action sans entrée valable
 renvoie une erreur traduite. Les exemples ci-dessous sont documentaires : ils ne
@@ -185,6 +185,38 @@ scheduled_minutes: [5, 10]
 Dans un script HA, utiliser `response_variable` ; il s'agit d'une action à réponse
 uniquement, pas d'un capteur ni d'un envoi de notification.
 
+### `freebox_homexa.start_fxs_ring`
+
+Fait sonner le téléphone branché sur le **port FXS** (prise téléphonique analogique)
+du Freebox Server. L'application Home Assistant doit avoir le droit **Téléphonie**
+dans Freebox OS : Paramètres → Gestion des accès → Applications → Home Assistant.
+Sans ce droit, ou si la box n'a pas de port FXS, l'action échoue avec un message
+traduit. Ce n'est pas un succès, et les boutons restent utilisables (ils ne passent
+pas indisponibles pour cette erreur).
+
+Champs :
+
+- `duration` (facultatif) : durée en secondes, de 1 à 300. Sans durée, la sonnerie
+  continue jusqu'à `stop_fxs_ring` ou au bouton « Arrêter la sonnerie FXS ».
+  Avec une durée, Homexa appelle **toujours** l'arrêt, y compris si le démarrage
+  échoue, si l'automatisation est annulée ou si l'entrée est déchargée.
+- `config_entry_id` (facultatif) : entrée Homexa, s'il y en a plusieurs.
+- `device_id` (facultatif) : appareil Homexa pour retrouver l'entrée.
+
+Les boutons du Server « Démarrer la sonnerie FXS » et « Arrêter la sonnerie FXS »
+font la même chose, sans durée. Aucun numéro ni nom d'appelant n'est lu.
+
+```yaml
+action: freebox_homexa.start_fxs_ring
+data:
+  duration: 5
+```
+
+### `freebox_homexa.stop_fxs_ring`
+
+Arrête la sonnerie FXS. Même droit Téléphonie. Champs facultatifs :
+`config_entry_id`, `device_id`. Pas de réponse métier.
+
 ## Exemples et cas d'usage
 
 - [Cartes/dashboards du dépôt](../examples/lovelace/) : remplacer les entity_id
@@ -221,6 +253,7 @@ Vérifier leurs destinataires et volumes avant un essai réel.
 | Guide vide/ancien | Source XMLTV accessible, chaînes sélectionnées, attendre le cycle ; Internet nécessaire | Pas de lien avec l'état du Player |
 | Image Player absente | État actif, entity_picture/media_image_url existant et ressource carte à jour | Pas de hotlink app requis : logos YouTube/Netflix embarqués |
 | Rappel sans annonce | Nom de profil unique, cibles notify/TTS existantes, moteur TTS si requis, date future | Un nom de profil correct ne garantit pas que l'appareil de diffusion réponde |
+| Le téléphone FXS ne sonne pas | Droit Téléphonie de l'application Home Assistant, présence d'un port FXS sur le Server | Un refus ou un port absent est une erreur traduite, pas un succès ; l'essai sur une box réelle reste à faire |
 
 Pour une issue, commencer par version Homexa/HA, fonction/app concernée et message
 d'erreur précis, sans données personnelles. Les diagnostics Homexa exportent

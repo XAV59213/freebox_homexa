@@ -1,6 +1,7 @@
 # Inventaire fini des travaux restants — jalon22
 
-**23 done / 29 todo / 2 exempt, préparation 28.8.90 ; aucune certification HA.**
+**28 done / 10 todo / 16 exempt, préparation 28.8.92 ; aucune certification HA.**
+La MAC remplace l'hôte comme identifiant d'entrée. Les règles dont la preuve officielle est une page core sont exemptées pour cette intégration HACS. Le guide du dépôt reste la documentation utilisateur. Dix critères restent todo : polling réglable, pin exact du SDK, identifiants d'entités historiques, disponibilité caméra, classes d'appareil, déchargement SDK, réparations, retrait automatique, session HTTP injectée, typage strict.
 Jalon22 mesuré : 695 tests, 6530/6653 lignes (98,15 %), 2078/2248 branches (92,44 %),
 combiné 96,71 %. Le critère officiel, relu le 2026-11-08, est plus de 95 % du code
 dans chaque module. L'exemple pytest est la couverture de lignes, pas un second

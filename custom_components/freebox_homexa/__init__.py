@@ -138,6 +138,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: FreeboxConfigEntry) -> b
             model_name = model_info.get("pretty_name")
             if not isinstance(model_name, str):
                 raise ValueError("Invalid system model response")
+            from .config_flow import adopt_hardware_unique_id
+
+            adopt_hardware_unique_id(hass, entry, mac)
             connected = True
         finally:
             if not connected:

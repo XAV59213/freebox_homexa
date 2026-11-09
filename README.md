@@ -1,6 +1,4 @@
-<p align="center">
-  <a href="https://hacs.xyz"><img src="https://img.shields.io/badge/HACS-Default-41BDF5?style=for-the-badge&logo=homeassistantcommunitystore&logoColor=white" alt="HACS Default"></a>
-</p>
+
 
 [![HACS Default](https://img.shields.io/badge/HACS-Default-41BDF5.svg)](https://hacs.xyz) [![Release](https://img.shields.io/github/v/release/XAV59213/freebox_homexa?label=release)](https://github.com/XAV59213/freebox_homexa/releases/latest) [![Hassfest](https://img.shields.io/github/actions/workflow/status/XAV59213/freebox_homexa/hassfest.yaml?branch=main&label=Hassfest&logo=github)](https://github.com/XAV59213/freebox_homexa/actions/workflows/hassfest.yaml) [![HACS validation](https://img.shields.io/github/actions/workflow/status/XAV59213/freebox_homexa/validate.yaml?branch=main&label=HACS%20validation&logo=github)](https://github.com/XAV59213/freebox_homexa/actions/workflows/validate.yaml) [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE) [![Downloads](https://img.shields.io/github/downloads/XAV59213/freebox_homexa/total.svg?label=Downloads)](https://github.com/XAV59213/freebox_homexa/releases) [![Version](https://img.shields.io/github/v/release/XAV59213/freebox_homexa?label=VERSION&color=blue)](https://github.com/XAV59213/freebox_homexa/releases/latest) [![Home Assistant](https://img.shields.io/badge/HOME%20ASSISTANT-%3E%3D2026.8.0-41BDF5.svg)](https://www.home-assistant.io)
 

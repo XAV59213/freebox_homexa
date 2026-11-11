@@ -78,7 +78,7 @@ async def test_sdk_explicit_denial_ignore_transient_then_scope_recovery(hass, ho
     assert 'SYNTHETIC secret payload' not in caplog.text
     mode['error'] = None
     valid = payloads[path]
-    payloads[path] = None
+    payloads[path] = False
     try:
         await getattr(router, method)()
     except ValueError:
@@ -182,7 +182,7 @@ async def test_invalid_call_log_is_unavailable_not_a_false_zero_then_recovers(ha
         await hass.async_block_till_done()
         eid, uid = entity.entity_id, entity.unique_id
         assert hass.states.get(eid).state == '1'
-        payloads['call/log/'] = None
+        payloads['call/log/'] = {'not': 'a list'}
         await router.update_sensors()
         await hass.async_block_till_done()
         assert hass.states.get(eid).state == 'unavailable'

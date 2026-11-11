@@ -290,6 +290,10 @@ class FreeboxCallSensor(FreeboxSensor):
         super().__init__(router, description)
         self._call_list_for_type: list[dict[str, Any]] = []
 
+    @property
+    def available(self) -> bool:
+        return super().available and self._router.calls_available
+
     @callback
     def async_update_state(self) -> None:
         self._call_list_for_type = [
@@ -307,6 +311,10 @@ class FreeboxCallLogSensor(FreeboxSensor):
     Aucun nom ni numéro dans les attributs d'état : la carte homexa-calls-card
     lit la liste via la commande WebSocket ``freebox_homexa/calls``.
     """
+
+    @property
+    def available(self) -> bool:
+        return super().available and self._router.calls_available
 
     @callback
     def async_update_state(self) -> None:

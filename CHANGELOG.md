@@ -1,5 +1,8 @@
 # Changelog
 
+## 28.8.93 — 2026-11-11
+- Listes vides de l'API Freebox (#123) : quand la Freebox omet `result`, freebox-api renvoie None. Ce n'est plus une erreur. Températures, débits, IP, uptime et espace disque restent disponibles. Seul un vrai échec du journal d'appels rend les deux capteurs d'appels indisponibles.
+
 ## 28.8.92 — 2026-11-09
 - L'entrée se reconnaît par la MAC de la Freebox, plus seulement par l'hôte. La découverte met à jour l'adresse d'une Freebox déjà connue. La reconfiguration et la réauthentification refusent une autre Freebox. Les entity_id et les options ne changent pas.
 - Le capteur RAID ne dépend plus du libellé : l'identifiant du registre est migré, l'entity_id choisi reste. Le disque utilise l'identifiant texte exigé par Home Assistant. L'intervalle Home n'est plus réglable dans les options : la valeur existante est conservée, et 15 s par défaut pour une nouvelle installation.

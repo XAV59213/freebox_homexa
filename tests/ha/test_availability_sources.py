@@ -176,8 +176,10 @@ async def test_wifi_all_sources_fail_unavailable_disabled_wifi_recovers(hass, ro
         router._refresh_repeaters()
         async_dispatcher_send(hass, router.signal_device_update)
         await hass.async_block_till_done()
-        if failure == {}:
-            assert gateway.available  # valid config, only its enabled field is missing
+        if failure == {} or failure is None:
+            # {} : config valide sans « enabled ». None : BSS et AP vides (result omis),
+            # config illisible. Dans les deux cas la box reste connue, pas en panne totale.
+            assert gateway.available
             assert hass.states.get(gateway.entity_id).state == 'unknown'
         else:
             assert not gateway.available

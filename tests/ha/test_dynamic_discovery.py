@@ -392,7 +392,7 @@ async def test_late_lan_wifi_repeater_native_observers_and_closing(hass, forward
     transport.put.assert_not_called()
 
 
-@pytest.mark.parametrize('bad_payload', [None, {}, [None], [{1: 'bad key'}]])
+@pytest.mark.parametrize('bad_payload', [{}, [None], [{1: 'bad key'}]])
 async def test_player_invalid_inventory_retains_cache_and_recovers(hass, forwarded_empty, bad_payload, caplog):
     router, entry, _, _, _ = forwarded_empty
     before = owned(hass, entry)

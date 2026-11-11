@@ -169,6 +169,21 @@ def _app_desc_from_token(token_file: Path) -> dict[str, str]:
     return app_desc
 
 
+def _sdk_list(payload: object, what: str) -> list[object]:
+    """Normalise une collection renvoyée par freebox-api.
+
+    Une liste vide fait omettre le champ ``result`` : le SDK renvoie alors None.
+    """
+    if payload is None:  # Freebox API: empty list => no "result" field
+        return []
+    if not isinstance(payload, list):
+        raise ValueError(f"Invalid {what} collection")
+    items: list[object] = []
+    for item in payload:
+        items.append(item)
+    return items
+
+
 async def get_api(hass: HomeAssistant, host: str) -> Freepybox:
     """Obtient l'API Freebox en réutilisant le token déjà enregistré."""
     token_file = _token_path(hass, host)
@@ -202,12 +217,10 @@ async def get_hosts_list_if_supported(
     fbx_devices: list[dict[str, Any]] = []
     try:
         lan: LanObservations = fbx_api.lan
-        response = await lan.get_hosts_list()
-        if not isinstance(response, list):
-            raise ValueError("Invalid LAN hosts collection")
-        if any(not isinstance(row, dict) for row in response):
-            raise ValueError("Invalid LAN host record")
-        fbx_devices = response
+        for row in _sdk_list(await lan.get_hosts_list(), "LAN hosts"):
+            if not isinstance(row, dict):
+                raise ValueError("Invalid LAN host record")
+            fbx_devices.append(row)
     except HttpRequestError as err:
         if api_error_code(err) == "nodev":
             supports_hosts = False
@@ -283,6 +296,8 @@ class FreeboxRouter:
         # Journalisation unique de l'indisponibilité (règle log-when-unavailable).
         self.reachable: bool = True
         self.sensors_available: bool = True
+        # Une panne du journal ne rend indisponibles que les deux capteurs d'appels.
+        self.calls_available: bool = True
         self.disks_available = True
         self.raids_available = True
         self.home_available = True
@@ -476,9 +491,7 @@ class FreeboxRouter:
             self._wifi_api_error("config", "wifi/config/", err)
         try:
             bss_api: WifiObservations = self._api.wifi
-            bss_list = await bss_api.get_bss()
-            if not isinstance(bss_list, list):
-                raise ValueError("Invalid Wi-Fi BSS collection")
+            bss_list = _sdk_list(await bss_api.get_bss(), "Wi-Fi BSS")
             self.wifi_api_errors.pop("bss", None)
             self.note_permission("wifi_bss")
             self.note_source(("wifi", "bss"), True, "API Freebox Wi-Fi bss")
@@ -486,7 +499,7 @@ class FreeboxRouter:
             self._wifi_api_error("bss", "wifi/bss/", err)
             bss_list = []
         self.wifi_bss_status = []
-        for bss in bss_list if isinstance(bss_list, list) else []:
+        for bss in bss_list:
             if not isinstance(bss, dict):
                 continue
             status = bss.get("status") or {}
@@ -507,17 +520,13 @@ class FreeboxRouter:
             device.pop("_wifi_station", None)
         try:
             wifi: WifiObservations = self._api.wifi
-            access_points = await wifi.get_ap_list()
-            if not isinstance(access_points, list):
-                raise ValueError("Invalid Wi-Fi AP collection")
+            access_points = _sdk_list(await wifi.get_ap_list(), "Wi-Fi AP")
             self.wifi_api_errors.pop("ap", None)
             self.note_permission("wifi_ap")
             self.note_source(("wifi", "ap"), True, "API Freebox Wi-Fi ap")
         except Exception as err:  # noqa: BLE001 — API wifi absente selon firmware
             self.wifi_stations_available = False
             self._wifi_api_error("ap", "wifi/ap/", err)
-            access_points = []
-        if not isinstance(access_points, list):
             access_points = []
 
         self.wifi_radio_status = []
@@ -540,9 +549,11 @@ class FreeboxRouter:
             if ap_id is None:
                 continue
             try:
-                stations = await wifi.get_station_list(ap_id)
-                if not isinstance(stations, list):
-                    raise ValueError("Invalid Wi-Fi stations collection")
+                stations = []
+                for station in _sdk_list(await wifi.get_station_list(ap_id), "Wi-Fi stations"):
+                    if not isinstance(station, dict):
+                        raise ValueError("Invalid Wi-Fi stations collection")
+                    stations.append(station)
                 stations_observed = True
             except HttpRequestError as err:
                 self.note_permission("wifi_stations", err)
@@ -629,13 +640,11 @@ class FreeboxRouter:
             return
         async with self._players_update_lock:
             try:
-                payload: object = await self.async_read(self._api.player.get_players)
+                payload = await self.async_read(self._api.player.get_players)
                 if self.closing:
                     return
-                if not isinstance(payload, list):
-                    raise ValueError("Invalid Player collection")
                 players: list[dict[str, object]] = []
-                for item in payload:
+                for item in _sdk_list(payload, "Player"):
                     if not isinstance(item, dict):
                         raise ValueError("Invalid Player metadata")
                     player: dict[str, object] = {}
@@ -796,13 +805,7 @@ class FreeboxRouter:
                 "serial": serial,
             }
 
-            permission_source = "calls"
-            call_api: CallObservations = self._api.call
-            calls = await call_api.get_calls_log()
-            if not isinstance(calls, list):
-                raise ValueError("Invalid call log collection")
-            self.call_list = calls
-            self.note_permission("calls")
+            await self._update_call_log()
             await self._update_disks_sensors()
             await self._update_raids_sensors()
 
@@ -820,14 +823,33 @@ class FreeboxRouter:
             self.sensors_available = False
             async_dispatcher_send(self.hass, self.signal_sensor_update)
 
+    async def _update_call_log(self) -> None:
+        """Lit le journal. None (liste vide) ne coupe pas les autres capteurs."""
+        try:
+            call_api: CallObservations = self._api.call
+            calls: list[dict[str, Any]] = []
+            for call in _sdk_list(await call_api.get_calls_log(), "call log"):
+                if not isinstance(call, dict):
+                    raise ValueError("Invalid call log collection")
+                calls.append(call)
+            self.call_list = calls
+            self.note_permission("calls")
+            if not self.calls_available:
+                _LOGGER.info("Journal d'appels Freebox de nouveau disponible")
+            self.calls_available = True
+        except Exception as err:  # une panne du journal ne coupe pas températures, débits ni disques
+            self.note_permission("calls", err)
+            if self.calls_available:
+                _LOGGER.info("Journal d'appels Freebox indisponible")
+            self.calls_available = False
+
     async def _update_disks_sensors(self) -> None:
         try:
             storage: StorageObservations = self._api.storage
-            fbx_disks = await storage.get_disks()
-            if not isinstance(fbx_disks, list):
-                raise ValueError("Invalid disks collection")
             disks: dict[int, dict[str, Any]] = {}
-            for fbx_disk in fbx_disks:
+            for fbx_disk in _sdk_list(await storage.get_disks(), "disks"):
+                if not isinstance(fbx_disk, dict):
+                    raise ValueError("Invalid disks collection")
                 disk = {**fbx_disk}
                 disk["partitions"] = {part["id"]: part for part in fbx_disk.get("partitions", [])}
                 disks[fbx_disk["id"]] = disk
@@ -849,10 +871,11 @@ class FreeboxRouter:
             return
         try:
             storage: StorageObservations = self._api.storage
-            fbx_raids = await storage.get_raids()
-            if not isinstance(fbx_raids, list):
-                raise ValueError("Invalid RAID collection")
-            raids = {raid["id"]: raid for raid in fbx_raids}
+            raids: dict[int, dict[str, Any]] = {}
+            for raid in _sdk_list(await storage.get_raids(), "RAID"):
+                if not isinstance(raid, dict):
+                    raise ValueError("Invalid RAID collection")
+                raids[raid["id"]] = raid
             self.note_permission("raids")
             self.raids = raids
             if not self.raids_available:
@@ -876,14 +899,15 @@ class FreeboxRouter:
         async with self._home_update_lock:
             try:
                 home: HomeObservations = self.home
-                home_nodes = await home.get_home_nodes()
+                home_payload = await home.get_home_nodes()
                 if self.closing:
                     return
-                if not isinstance(home_nodes, list):
-                    raise ValueError("Invalid Home collection")
+                home_nodes = _sdk_list(home_payload, "Home")
                 devices: dict[str, Any] = {}
                 new_device = False
                 for home_node in home_nodes:
+                    if not isinstance(home_node, dict):
+                        raise ValueError("Invalid Home collection")
                     if home_node["category"] in HOME_COMPATIBLE_CATEGORIES:
                         node_id = home_node["id"]
                         if node_id not in self.home_devices:

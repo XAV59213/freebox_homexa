@@ -23,7 +23,7 @@ from test_home_platforms import home_context, make_platform
     ('raid', 'storage/raid/', '_update_raids_sensors', 'raids_available'),
 ])
 @pytest.mark.parametrize('failure', [HttpRequestError('SYNTHETIC private payload'), TimeoutError(),
-                                      ClientPayloadError('SYNTHETIC private payload'), NotOpenError('synthetic closed'), None, [{}]])
+                                      ClientPayloadError('SYNTHETIC private payload'), NotOpenError('synthetic closed'), [{}]])
 async def test_storage_error_empty_and_recovery_real_sdk(hass, router, kind, path, method, flag, failure, caplog):
     transport = Mock(get=AsyncMock(), post=AsyncMock(), put=AsyncMock())
     router._api.storage = Storage(transport)
@@ -104,7 +104,7 @@ async def test_connection_byte_rate_and_missing_uptime_contract(hass, home_conte
 
 
 @pytest.mark.parametrize('failure', [HttpRequestError('synthetic transient'), TimeoutError(),
-                                    ClientPayloadError('synthetic payload'), None, [{}]])
+                                    ClientPayloadError('synthetic payload'), [{}]])
 async def test_home_snapshot_error_removal_and_recovery(hass, home_context, failure):
     router, node = home_context
     transport = Mock(get=AsyncMock(return_value=[node]), put=AsyncMock(), post=AsyncMock())

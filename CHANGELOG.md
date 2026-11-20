@@ -1,5 +1,8 @@
 # Changelog
 
+## 28.8.94 — 2026-11-20
+- README : bouton « Discuter sur Forum Domotique » qui renvoie vers le sujet du projet sur forumdomotique.com (#126). Aucun changement de code.
+
 ## 28.8.93 — 2026-11-11
 - Listes vides de l'API Freebox (#123) : quand la Freebox omet `result`, freebox-api renvoie None. Ce n'est plus une erreur. Températures, débits, IP, uptime et espace disque restent disponibles. Seul un vrai échec du journal d'appels rend les deux capteurs d'appels indisponibles.
 

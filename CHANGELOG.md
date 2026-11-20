@@ -1,5 +1,8 @@
 # Changelog
 
+## 28.8.95 — 2026-11-20
+- README : badge des étoiles GitHub qui renvoie vers la liste des stargazers (#128). Aucun changement de code.
+
 ## 28.8.94 — 2026-11-20
 - README : bouton « Discuter sur Forum Domotique » qui renvoie vers le sujet du projet sur forumdomotique.com (#126). Aucun changement de code.
 

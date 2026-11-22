@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Player : `media_player.play_media` avec une URL HTTP ou HTTPS audio (`audio/*`, `music`, ou sans type si l'adresse finit par .mp3, .aac, .ogg, .wav ou .flac) passe par AirMedia (`action=start`, type video), le même chemin que la messagerie. `control/open` est le second essai. Si l'état du Player ne change pas, l'action échoue avec un message traduit. Les chaînes `tv:`, les autres adresses et la vidéo ne changent pas. Une source média est résolue en URL avant la lecture.
+
 ## 28.8.101 — 2026-11-22
 
 - Carte Téléphone : l'éditeur visuel accepte plusieurs lecteurs (`media_players`). L'ancienne clé `media_player` reste lue telle quelle. Un seul lecteur garde le bouton « Écouter sur le Player ». Plusieurs lecteurs ouvrent une liste de noms ; le dernier choix est mémorisé dans le navigateur pour cette carte. Le rendu reste en place.

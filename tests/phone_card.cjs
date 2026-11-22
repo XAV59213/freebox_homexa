@@ -1114,6 +1114,38 @@ async function main() {
   assert.equal(mini.shadowRoot.innerHTML.includes("http"), false);
   assert.equal(mini.shadowRoot.innerHTML.includes("authSig"), false);
 
+  const before = mediaCalls.length;
+  mini._hass.states["media_player.echo_show"].state = "paused";
+  mini._hass.states["media_player.echo_show"].attributes.media_content_id = "spotify:track";
+  mini._hass.states["media_player.echo_show"].attributes.media_title = "Autre musique";
+  mini._remote = {
+    id: "msg.au",
+    entityId: "media_player.echo_show",
+    sentAt: Date.now() - 20000,
+    started: true,
+    sawPlaying: true,
+    late: false,
+    released: false,
+    duration: 8,
+  };
+  mini._key = "";
+  mini._render();
+  assert.equal(mediaCalls.length, before);
+
+  mini._hass.states["media_player.echo_show"].attributes.media_content_id =
+    "https://home.example/api/freebox_homexa/voicemail/entry/token";
+  mini._hass.states["media_player.echo_show"].attributes.media_title = "Message vocal Freebox";
+  mini._hass.states["media_player.echo_show"].attributes.supported_features = 8192;
+  mini._remote.released = false;
+  mini._key = "";
+  mini._render();
+  await new Promise((resolve) => setImmediate(resolve));
+  const released = mediaCalls.slice(before);
+  assert.equal(released[0][1], "media_stop");
+  assert.equal(released[0][2].entity_id, "media_player.echo_show");
+  assert.equal(released[1][1], "clear_playlist");
+  assert.equal(JSON.stringify(released).includes("token"), false);
+
   console.log("OK: carte Téléphone, numéro masqué, confirmation, sonneries, lecteur");
 }
 

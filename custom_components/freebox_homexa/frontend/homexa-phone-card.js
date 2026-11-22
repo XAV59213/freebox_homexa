@@ -248,7 +248,30 @@ function _integrationName(platform) {
   return platform ? platform.replace(/_/g, " ") : "";
 }
 
-const FEATURE = { pause: 1, volumeSet: 4, volumeStep: 1024, stop: 4096, play: 16384 };
+const FEATURE = { pause: 1, volumeSet: 4, volumeStep: 1024, stop: 4096, clear: 8192, play: 16384 };
+const VOICEMAIL_TITLE = "Message vocal Freebox";
+
+function _ownership(state) {
+  if (!state || !state.attributes) return "pending";
+  const id = typeof state.attributes.media_content_id === "string" ? state.attributes.media_content_id : "";
+  const title = typeof state.attributes.media_title === "string" ? state.attributes.media_title : "";
+  if (id.indexOf("freebox_homexa/voicemail") !== -1 || title === VOICEMAIL_TITLE) return "ours";
+  if (id) return "other";
+  return "pending";
+}
+
+function _shouldRelease(remote, state) {
+  if (!remote || remote.released || _ownership(state) === "other") return false;
+  const name = state && state.state;
+  if (remote.sawPlaying && (name === "paused" || name === "idle" || name === "off")) return true;
+  const progress = _progress(state);
+  if (remote.sawPlaying && progress && progress.current + 0.2 >= progress.duration) return true;
+  const duration = Number(remote.duration);
+  if (Number.isFinite(duration) && duration >= 1 && Date.now() - remote.sentAt >= (duration + 4) * 1000) {
+    return true;
+  }
+  return false;
+}
 
 function _feature(attrs, bit) {
   const value = attrs && attrs.supported_features;
@@ -897,8 +920,12 @@ class HomexaPhoneCard extends HTMLElement {
     if (!remote || !hass || !hass.states) return;
     const state = hass.states[remote.entityId];
     const name = state && state.state;
-    if (name === "playing" || name === "buffering") remote.started = true;
+    if (name === "playing" || name === "buffering") {
+      remote.started = true;
+      remote.sawPlaying = true;
+    }
     if (!remote.started && Date.now() - remote.sentAt >= 10000) remote.late = true;
+    if (_shouldRelease(remote, state)) this._releaseRemote();
   }
 
   _armRemote() {
@@ -1010,6 +1037,21 @@ class HomexaPhoneCard extends HTMLElement {
     }
     if (ctrls.childNodes.length) box.appendChild(ctrls);
     return box;
+  }
+
+  _releaseRemote() {
+    const remote = this._remote;
+    if (!remote || remote.released) return;
+    const state = this._hass && this._hass.states ? this._hass.states[remote.entityId] : null;
+    if (_ownership(state) === "other") return;
+    remote.released = true;
+    const attrs = (state && state.attributes) || {};
+    const pending = this._media("media_stop");
+    const clear = () => {
+      if (_feature(attrs, FEATURE.clear)) this._media("clear_playlist");
+    };
+    if (pending && typeof pending.then === "function") pending.then(clear).catch(() => {});
+    else clear();
   }
 
   _nudgeVolume(direction) {
@@ -1212,7 +1254,7 @@ class HomexaPhoneCard extends HTMLElement {
       this._render();
     }
     else if (act === "remote-toggle") this._media("media_play_pause");
-    else if (act === "remote-stop") this._media("media_stop");
+    else if (act === "remote-stop") this._releaseRemote();
     else if (act === "remote-up" || act === "remote-down") this._nudgeVolume(act === "remote-up" ? 1 : -1);
     else if (act === "read") this._mutate("mark_read", id);
     else if (act === "delete") this._delete(id);
@@ -1263,7 +1305,21 @@ class HomexaPhoneCard extends HTMLElement {
       pending.then(() => {
         this._notice = "";
         this._error = "";
-        this._remote = { id, entityId, sentAt: Date.now(), started: false, late: false };
+        let seconds = NaN;
+        const messages = this._messages || [];
+        for (let index = 0; index < messages.length; index += 1) {
+          if (messages[index] && messages[index].id === id) seconds = Number(messages[index].duration);
+        }
+        this._remote = {
+          id,
+          entityId,
+          sentAt: Date.now(),
+          started: false,
+          sawPlaying: false,
+          late: false,
+          released: false,
+          duration: seconds,
+        };
         this._armRemote();
         this._key = "";
         this._render();

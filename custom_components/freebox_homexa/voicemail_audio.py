@@ -312,6 +312,10 @@ async def _open_freebox_player_audio(
 
     state = hass.states.get(entity_id)
     attributes = state.attributes if state is not None else {}
+    from .player_airmedia import remember_player_source
+
+    source = attributes.get("source") if isinstance(attributes, dict) else None
+    remember_player_source(entity_id, source)
     player_id = _coerce_player_id(attributes.get("player_id"))
     raw_version = attributes.get("api_version")
     version = raw_version if isinstance(raw_version, str) and raw_version.startswith("v") else "v6"
@@ -417,6 +421,7 @@ async def _play_via_media_player(hass: HomeAssistant, entity_id: str, url: str) 
                 "entity_id": entity_id,
                 "media_content_id": url,
                 "media_content_type": playback_content_type(hass, entity_id),
+                "extra": {"title": "Message vocal Freebox"},
             },
             blocking=True,
         )

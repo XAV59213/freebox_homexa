@@ -440,6 +440,7 @@ async def test_play_marks_read_and_echo_needs_a_public_url(hass, home_context, c
         await async_play_on_player(hass, router, played_id, "media_player.box")
     assert played and played[0]["media_content_type"] == "audio/mpeg"
     assert "codec=mp3" in str(played[0]["media_content_id"])
+    assert played[0]["extra"]["title"] == "Message vocal Freebox"
     assert SECRET not in str(played) and MESSAGE not in str(played) and SECRET not in caplog.text
     assert any(item[0] == "put" for item in script.paths)
 
@@ -1647,6 +1648,7 @@ async def test_play_keeps_going_when_mark_read_fails(hass, home_context, caplog)
         await async_play_on_player(hass, router, tokens_of(router).issue(MESSAGE), "media_player.box")
     assert played and played[0]["media_content_type"] == "audio/mpeg"
     assert "codec=mp3" in str(played[0]["media_content_id"])
+    assert played[0]["extra"]["title"] == "Message vocal Freebox"
     assert any("marquage lu reporté" in record.getMessage() for record in caplog.records)
     assert SECRET not in caplog.text and MESSAGE not in caplog.text
     from custom_components.freebox_homexa.voicemail import cancel_voicemail_retry

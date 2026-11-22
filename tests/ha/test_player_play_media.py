@@ -254,6 +254,69 @@ async def test_media_source_resolves_before_airmedia(hass, home_context):
     assert sent == ["http://127.0.0.1:8123/local/sirene.mp3"]
 
 
+async def test_voicemail_stop_leaves_airmedia_and_restores_the_source(hass, home_context):
+    router, entity = _entity(hass, home_context)
+    entity.entity_id = "media_player.test_player"
+    entity._attr_source = "TV"
+    entity._attr_media_content_id = "freebox_homexa/voicemail"
+    from custom_components.freebox_homexa.player_airmedia import remember_player_source
+
+    remember_player_source(entity.entity_id, "TV")
+    commands: list[str] = []
+    stopped: list[str] = []
+    restored: list[str] = []
+
+    async def command(name: str) -> None:
+        commands.append(name)
+
+    async def stop_air(_router) -> None:
+        stopped.append("air")
+
+    async def select_source(source: str) -> None:
+        restored.append(source)
+
+    entity._command = command
+    entity.async_select_source = select_source
+    with patch(
+        "custom_components.freebox_homexa.media_player.async_stop_player_audio",
+        new=stop_air,
+    ):
+        await entity.async_media_stop()
+    assert commands == ["stop"]
+    assert stopped == ["air"]
+    assert restored == ["TV"]
+
+    commands.clear()
+    stopped.clear()
+    entity._attr_media_content_id = "spotify:track"
+    await entity.async_media_stop()
+    assert commands == ["stop"]
+    assert stopped == []
+
+    status = {
+        "playback_state": "playing",
+        "reachable": True,
+        "title": "a" * 40,
+        "foreground_app": {
+            "cur_url": "http://192.0.2.10/api/freebox_homexa/voicemail/entry/token?authSig=synthetic-token",
+        },
+    }
+
+    async def read(_router, _player_id, version):
+        return status, version
+
+    entity._get = AsyncMock(return_value={})
+    with patch(
+        "custom_components.freebox_homexa.media_player.async_read_player_status",
+        side_effect=read,
+    ):
+        await entity.async_update()
+    assert entity._attr_media_title == "Message vocal Freebox"
+    assert entity._attr_media_content_id == "freebox_homexa/voicemail"
+    assert "synthetic-token" not in str(entity._attr_source or "")
+    assert "synthetic-token" not in str(entity._attr_media_content_id)
+
+
 async def test_missing_player_id_is_translated(hass, home_context):
     _router, entity = _entity(hass, home_context)
     entity._player_id = None

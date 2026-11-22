@@ -34,6 +34,33 @@ function _duration(sec) {
   return m ? `${m} min ${String(s % 60).padStart(2, "0")}` : `${s} s`;
 }
 
+function _audioReason(audio) {
+  const code = audio && audio.error ? audio.error.code : 0;
+  if (code === 1) return "interrompu";
+  if (code === 2) return "réseau";
+  if (code === 3) return "décodage";
+  if (code === 4) return "format";
+  return "erreur";
+}
+
+function _playerUrl(hass, url) {
+  if (!url) return "";
+  if (hass && typeof hass.hassUrl === "function") return hass.hassUrl(url);
+  return url;
+}
+
+function _sensorList(hass, sensorId) {
+  if (!hass || !sensorId || !hass.states || !hass.states[sensorId]) return null;
+  const attrs = hass.states[sensorId].attributes || {};
+  if (attrs.voicemail !== true) return null;
+  return {
+    messages: Array.isArray(attrs.messages) ? attrs.messages : [],
+    total: typeof attrs.total === "number" ? attrs.total : null,
+    available: attrs.voicemail_available !== false,
+    supported: attrs.voicemail_supported !== false,
+  };
+}
+
 function _totalLabel(count) {
   if (typeof count !== "number" || !Number.isFinite(count)) return "";
   const total = Math.max(0, Math.trunc(count));
@@ -99,6 +126,8 @@ class HomexaPhoneCard extends HTMLElement {
     this._audioUrl = "";
     this._audioFor = "";
     this._key = "";
+    this._loading = false;
+    this._fetchPending = false;
     this.attachShadow({ mode: "open" });
   }
 
@@ -142,12 +171,14 @@ class HomexaPhoneCard extends HTMLElement {
     }
     this._config = { ...config };
     this._key = "";
+    this._showList(null);
     this._render();
     this._fetch(true);
   }
 
   set hass(hass) {
     this._hass = hass;
+    this._showList(null);
     this._render();
     this._fetch(false);
   }
@@ -198,9 +229,48 @@ class HomexaPhoneCard extends HTMLElement {
     return Object.values(chips);
   }
 
+  _showList(ws) {
+    const stored = _sensorList(this._hass, this._sensors()[0] || "");
+    const sensorMessages = stored ? stored.messages : [];
+    const wsMessages = ws && Array.isArray(ws.messages) ? ws.messages : [];
+    if (wsMessages.length) {
+      this._messages = wsMessages;
+      this._total = typeof ws.total === "number" ? ws.total : wsMessages.length;
+      this._error = "";
+      return;
+    }
+    if (sensorMessages.length && !(ws && ws.supported === false && stored && stored.supported === false)) {
+      this._messages = sensorMessages;
+      this._total = stored && typeof stored.total === "number" ? stored.total : sensorMessages.length;
+      this._error = "";
+      return;
+    }
+    if (!ws) return;
+    if (ws.supported === false) {
+      this._messages = [];
+      this._total = null;
+      this._error = "Messagerie vocale non disponible sur cette Freebox";
+      return;
+    }
+    if (ws.available === false) {
+      this._messages = [];
+      this._total = null;
+      const code = typeof ws.error === "string" && ws.error ? ` (${ws.error})` : "";
+      this._error = `Messagerie vocale indisponible${code}`;
+      return;
+    }
+    this._messages = [];
+    this._total = typeof ws.total === "number" ? ws.total : 0;
+    this._error = "";
+  }
+
   async _fetch(force) {
     const hass = this._hass;
-    if (!hass || !hass.callWS || this._loading) return;
+    if (!hass || !hass.callWS) return;
+    if (this._loading) {
+      this._fetchPending = true;
+      return;
+    }
     const sensor = this._sensors()[0] || "";
     const entry = this._entry();
     const key = `${sensor}|${entry}|${force ? Date.now() : (hass.states[sensor] || {}).last_updated || ""}`;
@@ -212,23 +282,22 @@ class HomexaPhoneCard extends HTMLElement {
       if (sensor) payload.entity_id = sensor;
       if (entry) payload.config_entry_id = entry;
       const res = await hass.callWS(payload);
-      if (res && res.supported === false) {
+      this._showList(res);
+    } catch (err) {
+      const stored = _sensorList(this._hass, this._sensors()[0] || "");
+      if (!stored || !stored.messages.length) {
         this._messages = [];
         this._total = null;
-        this._error = "Messagerie vocale non disponible sur cette Freebox";
-      } else if (res && res.available === false) {
-        this._messages = [];
-        this._total = null;
-        const code = typeof res.error === "string" && res.error ? ` (${res.error})` : "";
+        const code = err && typeof err.code === "string" && err.code ? ` (${err.code})` : "";
         this._error = `Messagerie vocale indisponible${code}`;
-      } else {
-        this._messages = Array.isArray(res && res.messages) ? res.messages : [];
-        this._total = typeof (res && res.total) === "number" ? res.total : this._messages.length;
-        this._error = "";
       }
-      if (this._on("show_calls", false)) {
-        const callsEntity = _callsSensor(hass, entry);
-        const showNumber = this._on("show_number", false);
+    } finally {
+      this._loading = false;
+    }
+    if (hass && hass.callWS && this._on("show_calls", false)) {
+      const callsEntity = _callsSensor(hass, entry);
+      const showNumber = this._on("show_number", false);
+      try {
         if (callsEntity) {
           const calls = await hass.callWS({
             type: "freebox_homexa/calls",
@@ -238,17 +307,18 @@ class HomexaPhoneCard extends HTMLElement {
           });
           this._calls = Array.isArray(calls && calls.calls) ? calls.calls : [];
         } else this._calls = [];
-      } else this._calls = null;
-    } catch (err) {
-      this._messages = [];
-      this._total = null;
-      const code = err && typeof err.code === "string" && err.code ? ` (${err.code})` : "";
-      this._error = `Messagerie vocale indisponible${code}`;
-    } finally {
-      this._loading = false;
+      } catch (err) {
+        this._calls = [];
+      }
+    } else if (hass) {
+      this._calls = this._on("show_calls", false) ? this._calls : null;
     }
     this._key = "";
     this._render();
+    if (this._fetchPending) {
+      this._fetchPending = false;
+      this._fetch(false);
+    }
   }
 
   _service(name, data) {
@@ -284,7 +354,7 @@ class HomexaPhoneCard extends HTMLElement {
     const hass = this._hass;
     if (!hass || !hass.callWS) return;
     const sensor = this._sensors()[0] || "";
-    const payload = { type: "freebox_homexa/voicemails", action: "audio_url", message_id: id, codec: "wav" };
+    const payload = { type: "freebox_homexa/voicemails", action: "audio_url", message_id: id, codec: "mp3" };
     if (sensor) payload.entity_id = sensor;
     const entry = this._entry();
     if (entry) payload.config_entry_id = entry;
@@ -337,6 +407,7 @@ class HomexaPhoneCard extends HTMLElement {
         const number = showNumber && item.phone_number ? item.phone_number : "";
         const meta = [_when(item.date), _duration(item.duration), number].filter(Boolean).join(" · ");
         const confirm = this._pendingDelete === item.id;
+        const src = this._audioFor === item.id ? _playerUrl(hass, this._audioUrl) : "";
         return `<div class="row">
           <div class="main ${item.read ? "" : "unread"}">${_esc(item.read ? "Lu" : "Non lu")}<div class="meta">${_esc(meta)}</div></div>
           <div class="tools">
@@ -345,7 +416,7 @@ class HomexaPhoneCard extends HTMLElement {
             <button data-act="read" data-id="${_esc(item.id)}">Lu</button>
             <button class="${confirm ? "warn" : ""}" data-act="delete" data-id="${_esc(item.id)}">${confirm ? "Confirmer" : "Supprimer"}</button>
           </div>
-        </div>${this._audioFor === item.id && this._audioUrl ? `<audio controls src="${_esc(this._audioUrl)}"></audio>` : ""}`;
+        </div>${src ? `<audio controls preload="none" src="${_esc(src)}"></audio>` : ""}`;
       })
       .join("");
     const max = Math.max(1, Math.min(30, Number(cfg.max_calls) || 5));
@@ -365,12 +436,23 @@ class HomexaPhoneCard extends HTMLElement {
       ${chips ? `<div class="chips">${chips}</div>` : ""}
       ${several ? `<div class="error">Plusieurs Freebox : choisissez-en une dans l'éditeur.</div>` : ""}
       <div class="section">Messagerie vocale</div>
+      ${rows && this._error ? `<div class="error">${_esc(this._error)}</div>` : ""}
       ${_totalLabel(this._total) ? `<div class="meta">${_esc(_totalLabel(this._total))}</div>` : ""}
       <div class="list">${rows || `<div class="empty">${_esc(this._error || (this._messages === null ? "Chargement…" : "Aucun message"))}</div>`}</div>
       ${this._on("show_calls", false) ? `<div class="section">Derniers appels</div><div class="list">${calls || `<div class="empty">Aucun appel</div>`}</div>` : ""}
     </ha-card>`;
     this.shadowRoot.querySelectorAll("button").forEach((button) => {
       button.addEventListener("click", () => this._click(button.dataset || {}));
+    });
+    this.shadowRoot.querySelectorAll("audio").forEach((audio) => {
+      audio.addEventListener("error", () => {
+        const reason = _audioReason(audio);
+        this._error = `Lecture impossible (${reason})`;
+        this._audioUrl = "";
+        this._audioFor = "";
+        this._key = "";
+        this._render();
+      });
     });
   }
 

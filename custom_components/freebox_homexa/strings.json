@@ -32,10 +32,12 @@
           "create_wifi_sensors": "Create Wi-Fi RSSI sensors",
           "create_lan_devices": "Create devices for network clients",
           "home_poll_interval": "Home poll interval (seconds)",
-          "remote_code": "Player remote code"
+          "remote_code": "Player remote code",
+          "event_include_number": "Include the phone number in events"
         },
         "data_description": {
           "track_lan_clients": "Phones, PCs and IoT hosts seen by the Freebox.",
+          "event_include_number": "Off by default. Events then say Inconnu when the caller is not a contact, and omit the number.",
           "create_wifi_sensors": "Signal strength in dBm when the client is on Wi-Fi.",
           "create_lan_devices": "Off (default): tracker and RSSI stay standalone entities, linked to another integration's device when one exists. On: one device per client, filed by group.",
           "home_poll_interval": "How often to query PIR, contacts, alarm and shutters. 5 s is closer to the official integration if that one is disabled.",
@@ -88,10 +90,12 @@
           "create_wifi_sensors": "Create Wi-Fi RSSI sensors",
           "create_lan_devices": "Create devices for network clients",
           "home_poll_interval": "Home poll interval (seconds)",
-          "remote_code": "Player remote code"
+          "remote_code": "Player remote code",
+          "event_include_number": "Include the phone number in events"
         },
         "data_description": {
           "track_lan_clients": "Disable this if presence is already handled by another integration.",
+          "event_include_number": "Off by default. Missed-call and new-voicemail events use the contact name, or Inconnu, and do not include the number.",
           "create_wifi_sensors": "RSSI is added when a client is seen on Wi-Fi, including after the first setup.",
           "create_lan_devices": "On: each client is filed under Network › Amazon, Phones, Computers, TV & media, Smart devices, Consoles, Printers or Other. Off: tracker and RSSI stay standalone entities and existing client devices are removed on reload.",
           "home_poll_interval": "PIR, contacts, alarm and shutters. Disable the official Freebox integration before using 5 s.",

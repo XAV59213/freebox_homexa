@@ -26,6 +26,7 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.util import dt as dt_util
 
 from .availability import FreeboxReachableMixin
+from .calls_ws import contact_label, event_caller_fields, events_include_number
 from .const import DOMAIN
 from .errors import api_error_code, is_permission_denied, is_shutdown_error
 
@@ -62,6 +63,7 @@ class VoicemailMessage:
     date: int
     read: bool
     duration: int
+    contact_name: str = ""
 
     def __repr__(self) -> str:
         return f"VoicemailMessage(read={self.read!r}, duration={self.duration!r})"
@@ -134,10 +136,30 @@ def resolve_voicemail_token(router: FreeboxRouter, public_id: str) -> str:
     return validated_voicemail_id(raw)
 
 
-def voicemail_api_path(message_id: str, suffix: str = "") -> str:
-    """Identifiant cité. Les points du fichier sont encodés : ``quote`` les laisse."""
-    quoted = quote(message_id, safe="").replace(".", "%2E")
+def voicemail_api_path(message_id: str, suffix: str = "", *, encode_dot: bool = False) -> str:
+    """Chemin ``call/voicemail/<id>``. Le point de ``.au`` reste littéral.
+
+    ``encode_dot`` est le second essai quand la forme littérale répond 404.
+    ``..``, ``/`` et tout caractère hors ``[A-Za-z0-9._-]`` sont refusés.
+    """
+    ident = validated_voicemail_id(message_id)
+    quoted = quote(ident, safe="")
+    if encode_dot:
+        quoted = quoted.replace(".", "%2E")
     return f"call/voicemail/{quoted}{suffix}"
+
+
+def _not_found(err: BaseException) -> bool:
+    """404 HTTP ou Freebox. Un refus de droit ne change pas l'encodage du point."""
+    if is_permission_denied(err):
+        return False
+    if isinstance(err, VoicemailEndpointError):
+        return err.code == "not_found"
+    code = api_error_code(err)
+    if code in {"404", "not_found"}:
+        return True
+    status = getattr(err, "status", None)
+    return status == 404 or re.search(r"\b404\b", str(err)) is not None
 
 
 def _stamp(value: object) -> int:
@@ -188,14 +210,16 @@ def parse_voicemails(payload: object) -> list[VoicemailMessage]:
         number = item.get("phone_number")
         country = item.get("country_code")
         read = item.get("read")
+        phone = number if isinstance(number, str) else ""
         messages.append(
             VoicemailMessage(
                 id=ident,
                 country_code=country if isinstance(country, str) else "",
-                phone_number=number if isinstance(number, str) else "",
+                phone_number=phone,
                 date=_stamp(item.get("date")),
                 read=read if isinstance(read, bool) else False,
                 duration=_stamp(item.get("duration")),
+                contact_name=contact_label(item.get("name"), phone),
             )
         )
     return messages
@@ -403,29 +427,32 @@ async def _invoke(access: object, method: str, path: str, payload: object) -> ob
     return _reject_status(result)
 
 
+def _with_prefix(prefix: str, relative: str) -> str:
+    if not prefix:
+        return relative
+    return f"{prefix}{relative}"
+
+
 async def async_voicemail_exchange(
     router: FreeboxRouter, method: str, relative: str, payload: object = None
 ) -> object:
-    """Appelle call/voicemail. Sur 404 ou endpoint inconnu, rejoue la version annoncée.
+    """Appelle call/voicemail. Au premier 404, rejoue la version annoncée.
 
-    La variante qui répond est mémorisée pour la liste, PUT, DELETE et l'audio.
+    ``""`` veut dire que le chemin relatif de la session (v6) a déjà répondu :
+    un 404 plus tard ne change plus de version et ne conclut pas que la
+    messagerie n'existe pas. La variante qui répond est mémorisée.
     """
     access = router._api.call._access
     remembered = router.voicemail_api_prefix
-    first = relative if not remembered else f"{remembered}{relative}"
+    first = relative if remembered is None else _with_prefix(remembered, relative)
     try:
         result = await _invoke(access, method, first, payload)
     except Exception as err:
-        if not _is_version_mismatch(err):
+        if not _is_version_mismatch(err) or remembered is not None:
             raise
         try:
-            if remembered:
-                alternative = relative
-                chosen = ""
-            else:
-                advertised = await _advertised_prefix(router)
-                alternative = f"{advertised}{relative}"
-                chosen = advertised
+            advertised = await _advertised_prefix(router)
+            alternative = _with_prefix(advertised, relative)
             if alternative == first:
                 raise err
             result = await _invoke(access, method, alternative, payload)
@@ -437,11 +464,43 @@ async def async_voicemail_exchange(
             ):
                 raise err
             raise
-        router.voicemail_api_prefix = chosen
+        router.voicemail_api_prefix = advertised
         return result
     if remembered is None:
         router.voicemail_api_prefix = ""
     return result
+
+
+async def async_voicemail_by_id(
+    router: FreeboxRouter,
+    method: str,
+    ident: str,
+    suffix: str = "",
+    payload: object = None,
+) -> object:
+    """Point littéral, puis ``%2E`` si cette forme répond 404. La forme utile est mémorisée."""
+    if "." not in ident:
+        order = (False,)
+    elif router.voicemail_encode_dot is True:
+        order = (True, False)
+    else:
+        order = (False, True)
+    last: BaseException | None = None
+    for index, encode in enumerate(order):
+        path = voicemail_api_path(ident, suffix, encode_dot=encode)
+        try:
+            result = await async_voicemail_exchange(router, method, path, payload)
+        except Exception as err:
+            last = err
+            if index + 1 == len(order) or not _not_found(err):
+                raise
+            continue
+        if "." in ident:
+            router.voicemail_encode_dot = encode
+        return result
+    if last is not None:
+        raise last
+    raise VoicemailEndpointError("not_found")
 
 
 def _announce(router: FreeboxRouter, messages: list[VoicemailMessage]) -> None:
@@ -462,6 +521,13 @@ def _announce(router: FreeboxRouter, messages: list[VoicemailMessage]) -> None:
                 "id": store.issue(item.id),
                 "duration": item.duration,
                 "date": _iso(item.date),
+                **event_caller_fields(
+                    router.call_list if isinstance(router.call_list, list) else None,
+                    number=item.phone_number,
+                    stamp=item.date,
+                    own_name=item.contact_name,
+                    include_number=events_include_number(router),
+                ),
             },
         )
 
@@ -511,22 +577,53 @@ def _note_failure(router: FreeboxRouter, err: BaseException) -> None:
     _LOGGER.warning("Messagerie vocale Freebox indisponible (%s, %s)", kind, code)
 
 
+def _keep_snapshot(router: FreeboxRouter, err: BaseException) -> None:
+    """Une panne passagère garde la liste et le capteur disponible."""
+    code = stored_error(err)
+    router.voicemail_error = code
+    kind = type(err).__name__
+    if not _SAFE_CODE.fullmatch(kind):
+        kind = "Error"
+    if router.voicemail_failure_logged:
+        _LOGGER.debug("Messagerie vocale Freebox momentanément indisponible (%s, %s)", kind, code)
+        return
+    router.voicemail_failure_logged = True
+    _LOGGER.warning("Messagerie vocale Freebox momentanément indisponible (%s, %s)", kind, code)
+    _signal(router)
+
+
 async def async_refresh_voicemails(router: FreeboxRouter) -> None:
     """Relevé isolé. Un refus de droit ``calls`` rend le capteur indisponible.
 
-    Un 404, ``invalid_request`` ou endpoint inconnu, y compris après un essai de
-    la version d'API annoncée, veut dire que la Freebox n'a pas de messagerie.
-    Le capteur reste disponible.
+    Un 404, ``invalid_request`` ou endpoint inconnu, au premier essai et sur la
+    version annoncée, veut dire que la Freebox n'a pas de messagerie.
+    Après un relevé réussi, une panne passagère garde les messages.
     """
+    async with router.voicemail_refresh_lock:
+        await _refresh_voicemails(router)
+
+
+async def _refresh_voicemails(router: FreeboxRouter) -> None:
     if router.voicemail_supported is False:
         router.voicemail_available = True
         return
     was_available = router.voicemail_available is not False
     try:
         payload = await async_voicemail_exchange(router, "get", _LIST_PATH)
+        if payload is None and router.voicemail_supported is True and messages_of(router):
+            return
         found = parse_voicemails(payload)
     except Exception as err:
         if router.closing and is_shutdown_error(err, router):
+            return
+        if is_permission_denied(err):
+            router.note_permission("calls", err)
+            router.voicemail_available = False
+            _note_failure(router, err)
+            _signal(router)
+            return
+        if router.voicemail_supported is True:
+            _keep_snapshot(router, err)
             return
         if _is_version_mismatch(err):
             _mark_unsupported(router, err)
@@ -565,15 +662,10 @@ async def async_mark_voicemail_read(router: FreeboxRouter, message_id: str) -> N
     _unsupported(router)
     ident = resolve_voicemail_token(router, message_id)
     try:
-        await async_voicemail_exchange(
-            router, "put", voicemail_api_path(ident), {"read": True}
-        )
+        await async_voicemail_by_id(router, "put", ident, "", {"read": True})
     except HomeAssistantError:
         raise
     except Exception as err:
-        if _is_version_mismatch(err):
-            _mark_unsupported(router, err)
-            _unsupported(router)
         if is_permission_denied(err):
             await _deny(router, err)
         raise
@@ -588,13 +680,10 @@ async def async_delete_voicemail(router: FreeboxRouter, message_id: str) -> None
     _unsupported(router)
     ident = resolve_voicemail_token(router, message_id)
     try:
-        await async_voicemail_exchange(router, "delete", voicemail_api_path(ident))
+        await async_voicemail_by_id(router, "delete", ident)
     except HomeAssistantError:
         raise
     except Exception as err:
-        if _is_version_mismatch(err):
-            _mark_unsupported(router, err)
-            _unsupported(router)
         if is_permission_denied(err):
             await _deny(router, err)
         raise
@@ -607,15 +696,10 @@ async def async_voicemail_audio(router: FreeboxRouter, message_id: str) -> bytes
     _unsupported(router)
     ident = resolve_voicemail_token(router, message_id)
     try:
-        payload = await async_voicemail_exchange(
-            router, "get", voicemail_api_path(ident, "/audio_file")
-        )
+        payload = await async_voicemail_by_id(router, "get", ident, "/audio_file")
     except HomeAssistantError:
         raise
     except Exception as err:
-        if _is_version_mismatch(err):
-            _mark_unsupported(router, err)
-            _unsupported(router)
         if is_permission_denied(err):
             await _deny(router, err)
         raise

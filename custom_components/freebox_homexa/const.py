@@ -45,6 +45,7 @@ CONF_CREATE_LAN_DEVICES = "create_lan_devices"
 CONF_HOME_POLL_INTERVAL = "home_poll_interval"
 CONF_REMOTE_CODE = "remote_code"
 CONF_REMOTE_CODES = "remote_codes"
+CONF_EVENT_INCLUDE_NUMBER = "event_include_number"
 
 DEFAULT_TRACK_LAN_CLIENTS = True
 DEFAULT_CREATE_WIFI_SENSORS = True
@@ -53,6 +54,7 @@ DEFAULT_CREATE_WIFI_SENSORS = True
 # (migration 1.2 dans __init__.async_migrate_entry).
 DEFAULT_CREATE_LAN_DEVICES = False
 DEFAULT_HOME_POLL_INTERVAL = 15
+DEFAULT_EVENT_INCLUDE_NUMBER = False
 HOME_POLL_INTERVAL_OPTIONS = [5, 10, 15, 20, 25, 30]
 
 # Must stay stable. freebox-api requests a new pairing if this dict differs

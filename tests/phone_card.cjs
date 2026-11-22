@@ -5,9 +5,28 @@ const vm = require("node:vm");
 
 class Shadow {
   constructor() {
-    this.innerHTML = "";
+    this._html = "";
+    this.audios = [];
   }
-  querySelectorAll() {
+  get innerHTML() {
+    return this._html;
+  }
+  set innerHTML(value) {
+    this._html = String(value);
+    this.audios = [];
+  }
+  querySelectorAll(selector) {
+    if (selector === "audio" && this._html.includes("<audio")) {
+      const node = {
+        error: null,
+        listeners: {},
+        addEventListener: (type, fn) => {
+          node.listeners[type] = fn;
+        },
+      };
+      this.audios.push(node);
+      return [node];
+    }
     return [];
   }
 }
@@ -128,8 +147,16 @@ async function main() {
   card._click({ act: "browser", id: "msg.au" });
   await new Promise((resolve) => setImmediate(resolve));
   html = card.shadowRoot.innerHTML;
-  assert.match(html, /<audio controls src="\/api\/freebox_homexa\/voicemail\/entry-a\/msg\.au\?authSig=synthetic"/);
+  assert.equal(ws.find((item) => item.action === "audio_url").codec, "mp3");
+  assert.match(html, /<audio controls preload="none" src="\/api\/freebox_homexa\/voicemail\/entry-a\/msg\.au\?authSig=synthetic"/);
   assert.equal(html.includes(SECRET), false);
+  const player = card.shadowRoot.audios[0];
+  assert.equal(typeof player.listeners.error, "function");
+  player.error = { code: 4 };
+  player.listeners.error();
+  html = card.shadowRoot.innerHTML;
+  assert.match(html, /Lecture impossible \(format\)/);
+  assert.equal(html.includes("<audio"), false);
 
   card._click({ act: "delete", id: "msg.au" });
   html = card.shadowRoot.innerHTML;
@@ -272,6 +299,56 @@ async function main() {
   await new Promise((resolve) => setImmediate(resolve));
   assert.match(callsCard.shadowRoot.innerHTML, /Inconnu/);
   assert.equal(callsCard.shadowRoot.innerHTML.includes(hidden), false);
+  const listed = makeCard();
+  const token = "ab".repeat(32);
+  listed.setConfig({ title: "Téléphone", show_calls: false });
+  listed.hass = {
+    states: {
+      "sensor.salon_freebox_v7_r1_messages_vocaux_non_lus": {
+        state: "1",
+        last_updated: "2026-11-22T12:06:57.000Z",
+        attributes: {
+          voicemail: true,
+          voicemail_available: true,
+          voicemail_supported: true,
+          voicemail_error: null,
+          total: 1,
+          latest: "2026-11-22T12:06:57+00:00",
+          messages: [{
+            id: token,
+            date: "2026-11-22T12:06:57+00:00",
+            duration: 8,
+            read: false,
+          }],
+        },
+      },
+    },
+    entities: {
+      "sensor.salon_freebox_v7_r1_messages_vocaux_non_lus": {
+        platform: "freebox_homexa",
+        config_entry_id: "entry-a",
+      },
+    },
+    hassUrl: (url) => `https://ha.example${url}`,
+    callService() {},
+    callWS: async (payload) => {
+      if (payload.action === "audio_url") {
+        assert.equal(payload.codec, "mp3");
+        return { url: "/api/freebox_homexa/voicemail/entry-a/msg.au?authSig=synthetic" };
+      }
+      return { available: true, supported: true, messages: [], total: 0, error: null };
+    },
+  };
+  await new Promise((resolve) => setImmediate(resolve));
+  const listedHtml = listed.shadowRoot.innerHTML;
+  assert.equal(listedHtml.includes("Aucun message"), false);
+  assert.match(listedHtml, /Non lu/);
+  assert.match(listedHtml, /1 message sur la Freebox/);
+  assert.equal(listedHtml.includes(token), true);
+  listed._click({ act: "browser", id: token });
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.match(listed.shadowRoot.innerHTML, /src="https:\/\/ha\.example\/api\/freebox_homexa\/voicemail\/entry-a\/msg\.au\?authSig=synthetic"/);
+
   console.log("OK: carte Téléphone, numéro masqué, confirmation, sonneries, lecteur");
 }
 

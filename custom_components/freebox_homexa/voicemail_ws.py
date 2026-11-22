@@ -68,7 +68,7 @@ async def websocket_homexa_voicemails(
     action = msg.get("action", "list")
     if not isinstance(action, str) or action not in _ACTIONS:
         raise vol.Invalid("Invalid voicemail action", path=["action"])
-    codec = msg.get("codec", "wav")
+    codec = msg.get("codec", "mp3")
     if not isinstance(codec, str) or codec not in ("wav", "mp3"):
         raise vol.Invalid("Invalid audio codec", path=["codec"])
     include_number = msg.get("include_number", False)
@@ -86,7 +86,8 @@ async def websocket_homexa_voicemails(
     router = _router(entry)
     if action == "list":
         await async_refresh_voicemails(router)
-        if router.voicemail_supported is False:
+        found_now = messages_of(router)
+        if not found_now and router.voicemail_supported is False:
             connection.send_result(
                 message_id,
                 {
@@ -99,7 +100,7 @@ async def websocket_homexa_voicemails(
                 },
             )
             return
-        if router.voicemail_available is False:
+        if not found_now and router.voicemail_available is False:
             connection.send_result(
                 message_id,
                 {
@@ -122,7 +123,7 @@ async def websocket_homexa_voicemails(
         elif action == "audio_url":
             assert isinstance(voicemail_id, str)
             url = signed_voicemail_path(
-                hass, entry.entry_id, voicemail_id, mp3=codec == "mp3"
+                hass, entry.entry_id, voicemail_id, mp3=codec != "wav"
             )
             connection.send_result(message_id, {"url": url})
             return

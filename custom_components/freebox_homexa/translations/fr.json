@@ -32,10 +32,12 @@
           "create_wifi_sensors": "Créer les capteurs RSSI Wi-Fi",
           "create_lan_devices": "Créer des appareils pour les clients réseau",
           "home_poll_interval": "Intervalle Home (secondes)",
-          "remote_code": "Code télécommande Player"
+          "remote_code": "Code télécommande Player",
+          "event_include_number": "Inclure le numéro dans les événements"
         },
         "data_description": {
           "track_lan_clients": "Téléphones, PC et objets vus par la Freebox.",
+          "event_include_number": "Décoché par défaut. Sans contact, l'événement dit Inconnu et n'emporte pas le numéro.",
           "create_wifi_sensors": "Force du signal en dBm quand le client est en Wi-Fi.",
           "create_lan_devices": "Décoché (défaut) : tracker et RSSI restent des entités seules, reliées à l'appareil d'une autre intégration s'il existe. Coché : un appareil par client, rangé par groupe.",
           "home_poll_interval": "Fréquence PIR, contacts, alarme et volets. 5 s se rapproche de l'officielle si celle-ci est désactivée.",
@@ -88,10 +90,12 @@
           "create_wifi_sensors": "Créer les capteurs RSSI Wi-Fi",
           "create_lan_devices": "Créer des appareils pour les clients réseau",
           "home_poll_interval": "Intervalle Home (secondes)",
-          "remote_code": "Code télécommande Player"
+          "remote_code": "Code télécommande Player",
+          "event_include_number": "Inclure le numéro dans les événements"
         },
         "data_description": {
           "track_lan_clients": "Désactivez si la présence est déjà gérée par une autre intégration.",
+          "event_include_number": "Décoché par défaut. Les événements d'appel manqué et de nouveau message vocal utilisent le nom du contact, ou Inconnu, sans numéro.",
           "create_wifi_sensors": "Le RSSI est ajouté dès qu'un client est vu en Wi-Fi, y compris après la première config.",
           "create_lan_devices": "Activé : chaque client est rangé sous Réseau › Amazon, Téléphones, Ordinateurs, TV & multimédia, Objets connectés, Consoles, Imprimantes ou Autres. Désactivé : tracker et RSSI restent des entités seules et les appareils clients existants sont retirés au rechargement.",
           "home_poll_interval": "PIR, contacts, alarme et volets. Désactivez l'intégration officielle Freebox avant de passer à 5 s.",

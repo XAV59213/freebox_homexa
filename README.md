@@ -21,7 +21,7 @@
 
 Intégration **Home Assistant** pour la Freebox Server, Freebox Home, les répéteurs Wi-Fi Free et le Freebox Player.
 
-**Version actuelle :** [28.8.101](https://github.com/XAV59213/freebox_homexa/releases/tag/28.8.101) · Home Assistant **2026.8.0+**
+**Version actuelle :** [28.8.102](https://github.com/XAV59213/freebox_homexa/releases/tag/28.8.102) · Home Assistant **2026.8.0+**
 
 Wiki : [Documentation](https://github.com/XAV59213/freebox_homexa/wiki)
 
@@ -199,7 +199,7 @@ Un nouvel appel manqué, après le premier relevé du journal, émet `freebox_ho
 
 La carte **Homexa Téléphone** (chargée avec les autres cartes Homexa, sans ressource Lovelace à ajouter) regroupe les sonneries, l'état des combinés, la messagerie et, si on l'active, les derniers appels. Le numéro reste masqué tant que `show_number` n'est pas coché. On peut écouter dans le navigateur (MP3), ou envoyer le message à un ou plusieurs lecteurs, puis le marquer lu ou le supprimer (avec confirmation). La liste affichée est celle du capteur : un rafraîchissement vide ne la cache pas.
 
-Dans l'éditeur visuel : titre, Freebox, lecteurs (`media_players`, plusieurs entités `media_player`), afficher le numéro, derniers appels et nombre d'appels. Une carte déjà réglée avec `media_player: media_player.salon` continue de fonctionner : cette clé est lue comme une liste d'un seul lecteur. Avec un seul lecteur, le bouton reste « Écouter sur le Player ». Avec plusieurs, « Écouter sur… » ouvre les noms affichés ; le choix appelle `play_voicemail` sur cette entité et le navigateur retient le dernier choix pour cette carte.
+Dans l'éditeur visuel : titre, Freebox, lecteurs (`media_players`, plusieurs entités `media_player`), afficher le numéro, derniers appels et nombre d'appels. Une carte déjà réglée avec `media_player: media_player.salon` continue de fonctionner : cette clé est lue comme une liste d'un seul lecteur. Avec un seul lecteur, le bouton reste « Écouter sur le Player ». Avec plusieurs, « Écouter sur… » ouvre les noms affichés ; deux lecteurs du même nom sont distingués par l'intégration, ou par l'entity_id s'ils viennent de la même. Le choix appelle `play_voicemail` sur cette entité et le navigateur retient le dernier choix pour cette carte. Si le lecteur refuse, la carte affiche le code d'erreur, sans l'adresse du message.
 
 ```yaml
 type: custom:homexa-phone-card
@@ -211,7 +211,7 @@ show_number: false
 show_calls: false
 ```
 
-La lecture est un MP3 signé, valable quelques minutes, y compris pour un lecteur quelconque. Une enceinte **Alexa / Echo** doit en plus pouvoir télécharger ce MP3 depuis une **URL HTTPS publique** (Nabu Casa ou l'URL externe des réglages réseau de Home Assistant). Sans cette URL, l'action échoue avec un message clair au lieu d'un faux succès.
+La lecture est un MP3 signé, valable quelques minutes, y compris pour un lecteur quelconque. Une enceinte jointe par **Music Assistant** doit pouvoir télécharger ce MP3 depuis une **URL HTTPS publique** (Nabu Casa ou l'URL externe des réglages réseau de Home Assistant). Les entités **Alexa Media** et **Alexa Devices** ne lisent pas cette adresse : leur lecture est une recherche ou une commande, pas un flux. L'action le dit et conseille l'entité Music Assistant du même appareil. Sans URL publique pour un autre lecteur distant, l'action échoue avec un message clair au lieu d'un faux succès. Dans les paramètres généraux, **Lecture de la messagerie sur un lecteur** est activée par défaut. La décocher refuse `play_voicemail` et retire le bouton du lecteur de la carte. L'écoute sur le téléphone reste disponible.
 
 ```yaml
 alias: Notifier un appel manqué

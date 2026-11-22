@@ -34,6 +34,7 @@ from .voicemail import (
     public_messages,
     stored_error,
     unread_count,
+    voicemail_player_enabled,
     voicemail_status,
 )
 from .voicemail_audio import signed_voicemail_path
@@ -165,6 +166,7 @@ def _list_result(
     hide = not messages and (status["supported"] is False or status["available"] is False or status["loading"] is True)
     return {
         **status,
+        "player_enabled": voicemail_player_enabled(router),
         "messages": [] if hide else public_messages(router, messages, include_number=include_number),
         "unread": 0 if hide else unread_count(messages),
         "total": None if hide else len(messages),

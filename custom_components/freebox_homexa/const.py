@@ -30,7 +30,7 @@ VALUE_NOT_SET = -1
 DEFAULT_DEVICE_NAME = "Unknown device"
 REPEATER_MODEL = "F-RP01A"
 
-VERSION = "28.8.101"
+VERSION = "28.8.102"
 URL_BASE = "/freebox_homexa"
 CARD_FILENAME = "freebox-homexa-card.js"
 STATIC_CARD_PATH = f"{URL_BASE}/{CARD_FILENAME}"
@@ -46,6 +46,7 @@ CONF_HOME_POLL_INTERVAL = "home_poll_interval"
 CONF_REMOTE_CODE = "remote_code"
 CONF_REMOTE_CODES = "remote_codes"
 CONF_EVENT_INCLUDE_NUMBER = "event_include_number"
+CONF_VOICEMAIL_PLAYER_ENABLED = "voicemail_player_enabled"
 
 DEFAULT_TRACK_LAN_CLIENTS = True
 DEFAULT_CREATE_WIFI_SENSORS = True
@@ -55,6 +56,7 @@ DEFAULT_CREATE_WIFI_SENSORS = True
 DEFAULT_CREATE_LAN_DEVICES = False
 DEFAULT_HOME_POLL_INTERVAL = 15
 DEFAULT_EVENT_INCLUDE_NUMBER = False
+DEFAULT_VOICEMAIL_PLAYER_ENABLED = True
 HOME_POLL_INTERVAL_OPTIONS = [5, 10, 15, 20, 25, 30]
 
 # Must stay stable. freebox-api requests a new pairing if this dict differs

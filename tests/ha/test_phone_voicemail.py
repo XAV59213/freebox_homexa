@@ -1791,6 +1791,116 @@ async def test_freebox_player_open_requires_a_real_state_change(hass, home_conte
     assert not any(item[0] == "put" for item in script.paths)
 
 
+async def test_disabled_player_option_refuses_playback(hass, home_context, caplog):
+    router, _node = home_context
+    script = bind(router)
+    load(hass, router)
+    assert await async_setup_component(hass, "http", {"http": {}})
+    script.messages = [message()]
+    await router._update_voicemails()
+    played: list[str] = []
+
+    async def play(call) -> None:
+        played.append(str(call.data.get("entity_id")))
+
+    hass.services.async_register("media_player", "play_media", play)
+    hass.states.async_set("media_player.box", "idle", {"friendly_name": "Salon"})
+    entry = hass.config_entries.async_get_entry(router.entry_id)
+    hass.config_entries.async_update_entry(
+        entry, options={**entry.options, "voicemail_player_enabled": False}
+    )
+    from custom_components.freebox_homexa.voicemail import FreeboxVoicemailSensor
+    sensor = FreeboxVoicemailSensor(router)
+    sensor.hass = hass
+    assert sensor.extra_state_attributes["voicemail_player_enabled"] is False
+    from custom_components.freebox_homexa.voicemail_ws import _list_result
+    listed = _list_result(router, list(router.voicemails))
+    assert listed["player_enabled"] is False
+    with caplog.at_level(logging.DEBUG, logger=_LOG):
+        with pytest.raises(HomeAssistantError) as refused:
+            await async_play_on_player(
+                hass, router, tokens_of(router).issue(MESSAGE), "media_player.box"
+            )
+    assert refused.value.translation_key == "voicemail_player_disabled"
+    assert played == []
+    assert not any(item[0] == "put" for item in script.paths)
+    assert SECRET not in caplog.text and MESSAGE not in caplog.text
+    hass.config_entries.async_update_entry(entry, options={
+        key: value for key, value in entry.options.items() if key != "voicemail_player_enabled"
+    })
+    assert sensor.extra_state_attributes["voicemail_player_enabled"] is True
+
+
+async def test_direct_alexa_is_not_sent_a_url(hass, home_context, caplog):
+    router, _node = home_context
+    script = bind(router)
+    load(hass, router)
+    assert await async_setup_component(hass, "http", {"http": {}})
+    script.messages = [message()]
+    await router._update_voicemails()
+    played: list[dict[str, object]] = []
+
+    async def play(call) -> None:
+        played.append(dict(call.data))
+
+    hass.services.async_register("media_player", "play_media", play)
+    from homeassistant.helpers import entity_registry as er
+    registry = er.async_get(hass)
+    devices = registry.async_get_or_create(
+        "media_player", "alexa_devices", "echo-show", suggested_object_id="echo_show"
+    )
+    media = registry.async_get_or_create(
+        "media_player", "alexa_media", "echo-amp", suggested_object_id="echo_amp"
+    )
+    hass.states.async_set(devices.entity_id, "idle", {"friendly_name": "Echo"})
+    hass.states.async_set(media.entity_id, "idle", {"friendly_name": "Echo"})
+    token = tokens_of(router).issue(MESSAGE)
+    with caplog.at_level(logging.DEBUG, logger=_LOG):
+        with pytest.raises(HomeAssistantError) as refused:
+            await async_play_on_player(hass, router, token, devices.entity_id)
+    assert refused.value.translation_key == "voicemail_alexa_direct"
+    assert refused.value.translation_placeholders == {"platform": "alexa_devices"}
+    with pytest.raises(HomeAssistantError) as amp:
+        await async_play_on_player(hass, router, token, media.entity_id)
+    assert amp.value.translation_placeholders == {"platform": "alexa_media"}
+    assert played == []
+    assert not any(item[0] == "put" for item in script.paths)
+    own = "\n".join(record.getMessage() for record in caplog.records if record.name.startswith(_LOG))
+    assert "alexa_devices" in own and "alexa_media" in own
+    assert SECRET not in own and MESSAGE not in own
+    assert "http" not in own and "authSig" not in own
+
+
+async def test_player_refusal_reports_the_code_only(hass, home_context, caplog):
+    router, _node = home_context
+    script = bind(router)
+    load(hass, router)
+    assert await async_setup_component(hass, "http", {"http": {}})
+    script.messages = [message()]
+    await router._update_voicemails()
+
+    async def play(_call) -> None:
+        raise HomeAssistantError(
+            translation_domain="alexa_devices",
+            translation_key="cannot_retrieve_data_with_error",
+            translation_placeholders={"error": "https://secret.example/token?authSig=abc"},
+        )
+
+    hass.services.async_register("media_player", "play_media", play)
+    hass.states.async_set("media_player.box", "idle", {"friendly_name": "Salon"})
+    with caplog.at_level(logging.DEBUG, logger=_LOG):
+        with pytest.raises(HomeAssistantError) as refused:
+            await async_play_on_player(
+                hass, router, tokens_of(router).issue(MESSAGE), "media_player.box"
+            )
+    assert refused.value.translation_key == "voicemail_player_refused"
+    assert refused.value.translation_placeholders == {"code": "cannot_retrieve_data_with_error"}
+    assert "cannot_retrieve_data_with_error" in caplog.text
+    assert "secret.example" not in caplog.text and "authSig" not in caplog.text
+    assert SECRET not in caplog.text and MESSAGE not in caplog.text
+    assert not any(item[0] == "put" for item in script.paths)
+
+
 async def async_delete_voicemail_direct(router) -> None:
     from custom_components.freebox_homexa.voicemail import async_delete_voicemail, tokens_of
     await async_delete_voicemail(router, tokens_of(router).issue(MESSAGE))

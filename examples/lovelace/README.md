@@ -72,7 +72,7 @@ show_calls: true
 max_calls: 5
 ```
 
-L'éditeur visuel couvre le titre, la Freebox, les lecteurs, le numéro et les appels. `media_player: media_player.salon` (une seule chaîne) reste accepté. Un lecteur : bouton « Écouter sur le Player ». Plusieurs : « Écouter sur… » liste les noms, et le dernier choix est gardé dans le navigateur.
+L'éditeur visuel couvre le titre, la Freebox, les lecteurs, le numéro et les appels. `media_player: media_player.salon` (une seule chaîne) reste accepté. Un lecteur : bouton « Écouter sur le Player ». Plusieurs : « Écouter sur… » liste les noms ; deux noms identiques montrent l'intégration ou l'entity_id. Le dernier choix est gardé dans le navigateur. Un lecteur Alexa Media ou Alexa Devices est signalé : il faut l'entité Music Assistant du même appareil. Si la lecture sur un lecteur est décochée dans les réglages de l'intégration, le bouton disparaît et l'éditeur le signale.
 
 # Carte « Homexa Appels » (journal téléphonique)
 

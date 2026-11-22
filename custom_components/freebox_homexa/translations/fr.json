@@ -91,11 +91,13 @@
           "create_lan_devices": "Créer des appareils pour les clients réseau",
           "home_poll_interval": "Intervalle Home (secondes)",
           "remote_code": "Code télécommande Player",
-          "event_include_number": "Inclure le numéro dans les événements"
+          "event_include_number": "Inclure le numéro dans les événements",
+          "voicemail_player_enabled": "Lecture de la messagerie sur un lecteur"
         },
         "data_description": {
           "track_lan_clients": "Désactivez si la présence est déjà gérée par une autre intégration.",
           "event_include_number": "Décoché par défaut. Les événements d'appel manqué et de nouveau message vocal utilisent le nom du contact, ou Inconnu, sans numéro.",
+          "voicemail_player_enabled": "Activé par défaut. Décochez pour masquer le bouton du lecteur sur la carte Téléphone et refuser play_voicemail. L'écoute sur le téléphone reste disponible.",
           "create_wifi_sensors": "Le RSSI est ajouté dès qu'un client est vu en Wi-Fi, y compris après la première config.",
           "create_lan_devices": "Activé : chaque client est rangé sous Réseau › Amazon, Téléphones, Ordinateurs, TV & multimédia, Objets connectés, Consoles, Imprimantes ou Autres. Désactivé : tracker et RSSI restent des entités seules et les appareils clients existants sont retirés au rechargement.",
           "home_poll_interval": "PIR, contacts, alarme et volets. Désactivez l'intégration officielle Freebox avant de passer à 5 s.",
@@ -761,7 +763,13 @@
       "message": "Ce lecteur média est indisponible. Vérifiez qu'il est connecté, puis réessayez."
     },
     "voicemail_player_refused": {
-      "message": "Le lecteur a refusé le message vocal. Il n'a pas été marqué comme lu."
+      "message": "Le lecteur a refusé le message vocal : {code}. Il n'a pas été marqué comme lu."
+    },
+    "voicemail_player_disabled": {
+      "message": "La lecture de la messagerie sur un lecteur est désactivée dans les réglages de Freebox Homexa."
+    },
+    "voicemail_alexa_direct": {
+      "message": "Ce lecteur Alexa ({platform}) ne lit pas une adresse de message vocal. Choisissez l'entité Music Assistant du même appareil. Le message n'a pas été marqué comme lu."
     },
     "voicemail_player_silent": {
       "message": "Le Player Freebox a accepté la demande mais n'a pas lancé la lecture. Le message n'a pas été marqué comme lu."

@@ -315,6 +315,21 @@ def unread_count(messages: list[VoicemailMessage]) -> int:
     return sum(1 for item in messages if not item.read)
 
 
+def voicemail_player_enabled(router: object) -> bool:
+    """Option d'entrée. Absente = activée, pour ne pas changer les installations existantes."""
+    from .const import CONF_VOICEMAIL_PLAYER_ENABLED, option_enabled
+
+    hass = getattr(router, "hass", None)
+    entry_id = getattr(router, "entry_id", None)
+    entries = getattr(getattr(hass, "config_entries", None), "async_get_entry", None)
+    if not isinstance(entry_id, str) or not callable(entries):
+        return True
+    entry = entries(entry_id)
+    if entry is None:
+        return True
+    return option_enabled(entry, CONF_VOICEMAIL_PLAYER_ENABLED, True)
+
+
 def voicemail_status(router: FreeboxRouter) -> dict[str, object]:
     """État visible. ``error`` reste posé au chargement initial, pas à chaque à-coup."""
     loading = router.voicemail_loading is True
@@ -1160,6 +1175,7 @@ class FreeboxVoicemailSensor(FreeboxReachableMixin, SensorEntity):
         summary["voicemail_error"] = self._router.voicemail_error
         summary["voicemail_stale"] = self._router.voicemail_stale is True
         summary["voicemail_loading"] = self._router.voicemail_loading is True
+        summary["voicemail_player_enabled"] = voicemail_player_enabled(self._router)
         return summary
 
     async def async_added_to_hass(self) -> None:

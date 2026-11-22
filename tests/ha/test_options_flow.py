@@ -7,6 +7,27 @@ from pytest_homeassistant_custom_component.common import MockConfigEntry
 DOMAIN = 'freebox_homexa'
 
 
+async def test_voicemail_player_option_defaults_on_and_can_be_turned_off(hass):
+    entry = MockConfigEntry(domain=DOMAIN, data={'host': 'freebox.test', 'port': 80},
+                            options={'tnt_channels': ['TF1'], 'event_include_number': False})
+    entry.add_to_hass(hass)
+    with patch.object(hass.config_entries, 'async_reload', new=AsyncMock(return_value=True)):
+        result = await hass.config_entries.options.async_init(entry.entry_id)
+        result = await hass.config_entries.options.async_configure(result['flow_id'], {'next_step_id': 'general'})
+        labels = [marker.schema for marker in result['data_schema'].schema]
+        assert labels.count('voicemail_player_enabled') == 1
+        assert 'event_include_number' in labels
+        assert result['data_schema']({})['voicemail_player_enabled'] is True
+        result = await hass.config_entries.options.async_configure(
+            result['flow_id'], {'voicemail_player_enabled': False}
+        )
+        await hass.async_block_till_done()
+    assert result['type'] == FlowResultType.CREATE_ENTRY
+    assert entry.options['voicemail_player_enabled'] is False
+    assert entry.options['tnt_channels'] == ['TF1']
+    assert entry.options['event_include_number'] is False
+
+
 async def test_general_options_preserve_other_pages(hass):
     entry = MockConfigEntry(domain=DOMAIN, data={'host': 'freebox.test', 'port': 80},
                             options={'tnt_channels': ['TF1'], 'reminder_profiles': []})

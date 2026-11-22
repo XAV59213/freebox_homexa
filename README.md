@@ -137,8 +137,13 @@ Volume et lecture passent par l’API Player, sans ce code.
 | `freebox_homexa.get_reminder_status` | Indique si un rappel est programmé (réponse de l’action) |
 | `freebox_homexa.start_fxs_ring` | Fait sonner le téléphone du port FXS, avec une durée facultative |
 | `freebox_homexa.stop_fxs_ring` | Arrête la sonnerie du port FXS |
+| `freebox_homexa.start_dect_ring` | Fait sonner les combinés DECT (30 s par défaut, 1 à 300 s) |
+| `freebox_homexa.stop_dect_ring` | Arrête la sonnerie DECT |
+| `freebox_homexa.mark_voicemail_read` | Marque un message vocal comme lu |
+| `freebox_homexa.delete_voicemail` | Supprime un message vocal |
+| `freebox_homexa.play_voicemail` | Lit un message sur un lecteur média, puis le marque lu |
 
-Avec plusieurs Freebox, `config_entry_id` ou `device_id` choisit la Freebox visée par `reboot`, `reload`, `remote`, `start_fxs_ring` et `stop_fxs_ring`.
+Avec plusieurs Freebox, `config_entry_id` ou `device_id` choisit la Freebox visée par `reboot`, `reload`, `remote`, les sonneries et la messagerie.
 
 ### Sonnerie du téléphone (port FXS)
 
@@ -150,6 +155,31 @@ Sans durée, la sonnerie continue jusqu’à l’arrêt. Avec `duration` (1 à 3
 action: freebox_homexa.start_fxs_ring
 data:
   duration: 5
+```
+
+### Sonnerie DECT
+
+Les boutons **Faire sonner les combinés DECT** et **Arrêter la sonnerie DECT** n'apparaissent que si `phone/` renvoie au moins un combiné de type DECT. L'action sans `duration` sonne 30 secondes. L'arrêt est toujours demandé. Chaque combiné ajoute **Sonne** (`is_ringing`) et **Décroché** (combiné pas sur son socle). Ce second état reprend `on_hook` tel que la Freebox le donne : le firmware peut l'omettre ou le mettre à jour en retard, le capteur reste alors inconnu. Aucun numéro n'est lu.
+
+```yaml
+action: freebox_homexa.start_dect_ring
+data:
+  duration: 30
+```
+
+### Messagerie vocale
+
+Le capteur **Messages vocaux non lus** compte les messages non lus. Ses attributs donnent le total, la date du plus récent et une liste (identifiant, date, durée, lu) **sans numéro**. Un nouveau message non lu, après le premier relevé, émet `freebox_homexa_new_voicemail` (identifiant, durée, date, pas de numéro).
+
+La carte **Homexa Téléphone** (chargée avec les autres cartes Homexa, sans ressource Lovelace à ajouter) regroupe les sonneries, l'état des combinés, la messagerie et, si on l'active, les derniers appels. Le numéro reste masqué tant que `show_number` n'est pas coché. On peut écouter dans le navigateur, ou envoyer le message à un lecteur (`play_voicemail`), puis le marquer lu ou le supprimer (avec confirmation).
+
+La lecture sur une enceinte **Alexa / Echo** est au mieux. Ces enceintes doivent télécharger un MP3 depuis une **URL HTTPS publique** (Nabu Casa ou l'URL externe des réglages réseau de Home Assistant). Sans cette URL, l'action échoue avec un message clair au lieu d'un faux succès. Les autres lecteurs reçoivent le WAV signé, valable quelques minutes.
+
+```yaml
+action: freebox_homexa.play_voicemail
+data:
+  id: "20221215_154135_r0334371508.au"
+  entity_id: media_player.echo_salon
 ```
 
 ### `freebox_homexa.remote`

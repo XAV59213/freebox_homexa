@@ -224,6 +224,96 @@
         }
       }
     },
+    "start_dect_ring": {
+      "name": "Ring DECT handsets",
+      "description": "Rings the Freebox DECT handsets. Requires the Telephony permission. Duration defaults to 30 seconds (1 to 300). Stop is always requested, including on error, cancellation or unload.",
+      "fields": {
+        "duration": {
+          "name": "Duration",
+          "description": "Ring duration in seconds, from 1 to 300. Defaults to 30 when omitted. Stop is always requested."
+        },
+        "config_entry_id": {
+          "name": "Integration entry",
+          "description": "Optional Homexa config entry ID. Selects the Freebox when several entries exist; device_id is an alternative."
+        },
+        "device_id": {
+          "name": "Homexa device",
+          "description": "Homexa device used to select the integration entry."
+        }
+      }
+    },
+    "stop_dect_ring": {
+      "name": "Stop DECT ring",
+      "description": "Stops the DECT handset ring. Requires the Telephony permission. Does not read call logs, caller names or phone numbers.",
+      "fields": {
+        "config_entry_id": {
+          "name": "Integration entry",
+          "description": "Optional Homexa config entry ID. Selects the Freebox when several entries exist; device_id is an alternative."
+        },
+        "device_id": {
+          "name": "Homexa device",
+          "description": "Homexa device used to select the integration entry."
+        }
+      }
+    },
+    "mark_voicemail_read": {
+      "name": "Mark voicemail as read",
+      "description": "Marks one Freebox voicemail as read. Requires the Telephony permission. The message id never includes a phone number in logs.",
+      "fields": {
+        "id": {
+          "name": "Message",
+          "description": "Voicemail id returned by the Freebox (for example 20221215_154135_r0334371508.au)."
+        },
+        "config_entry_id": {
+          "name": "Integration entry",
+          "description": "Optional Homexa config entry ID. Selects the Freebox when several entries exist; device_id is an alternative."
+        },
+        "device_id": {
+          "name": "Homexa device",
+          "description": "Homexa device used to select the integration entry."
+        }
+      }
+    },
+    "delete_voicemail": {
+      "name": "Delete voicemail",
+      "description": "Deletes one Freebox voicemail. Requires the Telephony permission.",
+      "fields": {
+        "id": {
+          "name": "Message",
+          "description": "Voicemail id returned by the Freebox."
+        },
+        "config_entry_id": {
+          "name": "Integration entry",
+          "description": "Optional Homexa config entry ID. Selects the Freebox when several entries exist; device_id is an alternative."
+        },
+        "device_id": {
+          "name": "Homexa device",
+          "description": "Homexa device used to select the integration entry."
+        }
+      }
+    },
+    "play_voicemail": {
+      "name": "Play voicemail",
+      "description": "Plays one voicemail on a media player, then marks it as read. Alexa or Echo playback is best effort and needs a public HTTPS URL (Nabu Casa or an external URL).",
+      "fields": {
+        "id": {
+          "name": "Message",
+          "description": "Voicemail id returned by the Freebox."
+        },
+        "entity_id": {
+          "name": "Media player",
+          "description": "media_player entity that should play the message (for example an Echo)."
+        },
+        "config_entry_id": {
+          "name": "Integration entry",
+          "description": "Optional Homexa config entry ID. Selects the Freebox when several entries exist; device_id is an alternative."
+        },
+        "device_id": {
+          "name": "Homexa device",
+          "description": "Homexa device used to select the integration entry."
+        }
+      }
+    },
     "schedule_reminder": {
       "name": "Schedule TNT reminder",
       "description": "Schedules a reminder (notification and/or voice announcement) before a programme starts.",
@@ -340,6 +430,12 @@
       "raid_degraded": {
         "name": "RAID array {raid_id} degraded"
       },
+      "dect_ringing": {
+        "name": "Ringing {handset}"
+      },
+      "dect_off_hook": {
+        "name": "Off hook {handset}"
+      },
       "tamper": {
         "name": "Tamper"
       }
@@ -400,6 +496,9 @@
       "calls_log": {
         "name": "Recent calls"
       },
+      "voicemail_unread": {
+        "name": "Unread voicemails"
+      },
       "partition_free_space": {
         "name": "{partition} free space"
       },
@@ -419,6 +518,12 @@
       },
       "stop_fxs_ring": {
         "name": "Stop FXS ring"
+      },
+      "start_dect_ring": {
+        "name": "Ring DECT handsets"
+      },
+      "stop_dect_ring": {
+        "name": "Stop DECT ring"
       },
       "remote_key_home": {
         "name": "Home"
@@ -604,6 +709,30 @@
     },
     "fxs_ring_duration": {
       "message": "The ring duration must be between {minimum} and {maximum} seconds."
+    },
+    "dect_ring_permission": {
+      "message": "The Home Assistant application does not have the Telephony permission on the Freebox, so the DECT handsets cannot ring. In Freebox OS, open Settings → Access management → Applications → Home Assistant, allow Telephony, then reload the integration."
+    },
+    "dect_ring_disabled": {
+      "message": "DECT is disabled on this Freebox, or no handset can ring. No ring was confirmed."
+    },
+    "dect_ring_duration": {
+      "message": "The DECT ring duration must be between {minimum} and {maximum} seconds."
+    },
+    "voicemail_invalid_id": {
+      "message": "That voicemail id is not valid."
+    },
+    "voicemail_permission": {
+      "message": "The Home Assistant application does not have the Telephony permission required for voicemail. Allow Telephony in Freebox OS, then reload the integration."
+    },
+    "voicemail_audio": {
+      "message": "The voicemail audio could not be read."
+    },
+    "voicemail_public_url": {
+      "message": "Playback on a remote speaker (Alexa, Echo) needs a public HTTPS URL: Nabu Casa or an external URL in Home Assistant network settings."
+    },
+    "voicemail_player": {
+      "message": "Choose an existing media player."
     },
     "command_failed": {
       "message": "The action could not be completed. Check the Freebox connection and permissions."

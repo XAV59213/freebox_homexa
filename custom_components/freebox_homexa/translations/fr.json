@@ -237,6 +237,96 @@
         }
       }
     },
+    "start_dect_ring": {
+      "name": "Faire sonner les combinés DECT",
+      "description": "Fait sonner les combinés DECT de la Freebox. Nécessite le droit Téléphonie. La durée est de 30 secondes par défaut (1 à 300). L’arrêt est toujours demandé, y compris en cas d’erreur, d’annulation ou de déchargement.",
+      "fields": {
+        "duration": {
+          "name": "Durée",
+          "description": "Durée en secondes, de 1 à 300. 30 secondes si le champ est omis. L’arrêt est toujours demandé."
+        },
+        "config_entry_id": {
+          "name": "Entrée de l’intégration",
+          "description": "ID facultatif de l’entrée Homexa. Permet de choisir la bonne Freebox s’il y a plusieurs entrées ; device_id est une autre possibilité."
+        },
+        "device_id": {
+          "name": "Appareil Homexa",
+          "description": "Appareil Homexa permettant de choisir l’entrée de l’intégration."
+        }
+      }
+    },
+    "stop_dect_ring": {
+      "name": "Arrêter la sonnerie DECT",
+      "description": "Arrête la sonnerie des combinés DECT. Nécessite le droit Téléphonie. Ne lit ni le journal d’appels, ni les noms, ni les numéros.",
+      "fields": {
+        "config_entry_id": {
+          "name": "Entrée de l’intégration",
+          "description": "ID facultatif de l’entrée Homexa. Permet de choisir la bonne Freebox s’il y a plusieurs entrées ; device_id est une autre possibilité."
+        },
+        "device_id": {
+          "name": "Appareil Homexa",
+          "description": "Appareil Homexa permettant de choisir l’entrée de l’intégration."
+        }
+      }
+    },
+    "mark_voicemail_read": {
+      "name": "Marquer le message vocal comme lu",
+      "description": "Marque un message de la messagerie Freebox comme lu. Nécessite le droit Téléphonie. L’identifiant n’est pas un numéro, et aucun numéro n’est journalisé.",
+      "fields": {
+        "id": {
+          "name": "Message",
+          "description": "Identifiant du message renvoyé par la Freebox (par exemple 20221215_154135_r0334371508.au)."
+        },
+        "config_entry_id": {
+          "name": "Entrée de l’intégration",
+          "description": "ID facultatif de l’entrée Homexa. Permet de choisir la bonne Freebox s’il y a plusieurs entrées ; device_id est une autre possibilité."
+        },
+        "device_id": {
+          "name": "Appareil Homexa",
+          "description": "Appareil Homexa permettant de choisir l’entrée de l’intégration."
+        }
+      }
+    },
+    "delete_voicemail": {
+      "name": "Supprimer le message vocal",
+      "description": "Supprime un message de la messagerie Freebox. Nécessite le droit Téléphonie.",
+      "fields": {
+        "id": {
+          "name": "Message",
+          "description": "Identifiant du message renvoyé par la Freebox."
+        },
+        "config_entry_id": {
+          "name": "Entrée de l’intégration",
+          "description": "ID facultatif de l’entrée Homexa. Permet de choisir la bonne Freebox s’il y a plusieurs entrées ; device_id est une autre possibilité."
+        },
+        "device_id": {
+          "name": "Appareil Homexa",
+          "description": "Appareil Homexa permettant de choisir l’entrée de l’intégration."
+        }
+      }
+    },
+    "play_voicemail": {
+      "name": "Lire le message vocal",
+      "description": "Lit un message sur un lecteur média, puis le marque comme lu. La lecture sur Alexa ou Echo est au mieux : elle exige une URL HTTPS publique (Nabu Casa ou une URL externe).",
+      "fields": {
+        "id": {
+          "name": "Message",
+          "description": "Identifiant du message renvoyé par la Freebox."
+        },
+        "entity_id": {
+          "name": "Lecteur média",
+          "description": "Entité media_player qui doit lire le message (par exemple une enceinte Echo)."
+        },
+        "config_entry_id": {
+          "name": "Entrée de l’intégration",
+          "description": "ID facultatif de l’entrée Homexa. Permet de choisir la bonne Freebox s’il y a plusieurs entrées ; device_id est une autre possibilité."
+        },
+        "device_id": {
+          "name": "Appareil Homexa",
+          "description": "Appareil Homexa permettant de choisir l’entrée de l’intégration."
+        }
+      }
+    },
     "schedule_reminder": {
       "name": "Programmer un rappel TNT",
       "description": "Programme un rappel (notification et/ou annonce vocale) avant le début d'un programme.",
@@ -353,6 +443,12 @@
       "raid_degraded": {
         "name": "Array RAID {raid_id} degradé"
       },
+      "dect_ringing": {
+        "name": "Sonne {handset}"
+      },
+      "dect_off_hook": {
+        "name": "Décroché {handset}"
+      },
       "tamper": {
         "name": "Autoprotection"
       }
@@ -413,6 +509,9 @@
       "calls_log": {
         "name": "Derniers appels"
       },
+      "voicemail_unread": {
+        "name": "Messages vocaux non lus"
+      },
       "partition_free_space": {
         "name": "{partition} espace libre"
       },
@@ -432,6 +531,12 @@
       },
       "stop_fxs_ring": {
         "name": "Arrêter la sonnerie FXS"
+      },
+      "start_dect_ring": {
+        "name": "Faire sonner les combinés DECT"
+      },
+      "stop_dect_ring": {
+        "name": "Arrêter la sonnerie DECT"
       },
       "remote_key_home": {
         "name": "Accueil"
@@ -617,6 +722,30 @@
     },
     "fxs_ring_duration": {
       "message": "La durée de sonnerie doit être comprise entre {minimum} et {maximum} secondes."
+    },
+    "dect_ring_permission": {
+      "message": "L’application Home Assistant n’a pas le droit Téléphonie sur la Freebox : les combinés DECT ne peuvent pas sonner. Dans Freebox OS : Paramètres → Gestion des accès → Applications → Home Assistant, autorise Téléphonie, puis recharge l’intégration."
+    },
+    "dect_ring_disabled": {
+      "message": "Le DECT est désactivé sur cette Freebox, ou aucun combiné ne peut sonner. Aucune sonnerie n’a été confirmée."
+    },
+    "dect_ring_duration": {
+      "message": "La durée de la sonnerie DECT doit être comprise entre {minimum} et {maximum} secondes."
+    },
+    "voicemail_invalid_id": {
+      "message": "Cet identifiant de message vocal n’est pas valide."
+    },
+    "voicemail_permission": {
+      "message": "L’application Home Assistant n’a pas le droit Téléphonie nécessaire à la messagerie vocale. Autorise Téléphonie dans Freebox OS, puis recharge l’intégration."
+    },
+    "voicemail_audio": {
+      "message": "Le message vocal n’a pas pu être lu."
+    },
+    "voicemail_public_url": {
+      "message": "La lecture sur une enceinte distante (Alexa, Echo) exige une URL HTTPS publique : Nabu Casa ou une URL externe dans les réglages réseau de Home Assistant."
+    },
+    "voicemail_player": {
+      "message": "Choisis un lecteur média existant."
     },
     "command_failed": {
       "message": "L’action n’a pas pu être exécutée. Vérifiez la connexion et les autorisations de la Freebox."

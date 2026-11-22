@@ -35,6 +35,7 @@ from .availability import FreeboxReachableMixin, FreeboxPlayerReachableMixin
 
 from .errors import async_action_errors
 from .fxs_ring import async_ring_start, async_ring_stop
+from .phone_dect import DECT_RING_DEFAULT_SECONDS, async_dect_start, async_dect_stop, has_dect
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -57,6 +58,15 @@ def _start_fxs_ring(router: FreeboxRouter) -> Awaitable[object]:
 
 def _stop_fxs_ring(router: FreeboxRouter) -> Awaitable[object]:
     return async_ring_stop(router)
+
+
+def _start_dect_ring(router: FreeboxRouter) -> Awaitable[object]:
+    """Sonnerie DECT bornée : 30 s, l'arrêt reste possible avant."""
+    return async_dect_start(router, float(DECT_RING_DEFAULT_SECONDS))
+
+
+def _stop_dect_ring(router: FreeboxRouter) -> Awaitable[object]:
+    return async_dect_stop(router)
 
 
 BUTTON_DESCRIPTIONS: tuple[FreeboxButtonEntityDescription, ...] = (
@@ -82,6 +92,20 @@ BUTTON_DESCRIPTIONS: tuple[FreeboxButtonEntityDescription, ...] = (
         key="stop_fxs_ring",
         name="Arrêter la sonnerie FXS",
         async_press=_stop_fxs_ring,
+    ),
+)
+
+# Créés seulement quand au moins un combiné DECT est connu. Identifiants stables.
+DECT_BUTTON_DESCRIPTIONS: tuple[FreeboxButtonEntityDescription, ...] = (
+    FreeboxButtonEntityDescription(
+        key="start_dect_ring",
+        name="Faire sonner les combinés DECT",
+        async_press=_start_dect_ring,
+    ),
+    FreeboxButtonEntityDescription(
+        key="stop_dect_ring",
+        name="Arrêter la sonnerie DECT",
+        async_press=_stop_dect_ring,
     ),
 )
 
@@ -155,6 +179,15 @@ async def async_setup_entry(
     ]
 
     async_add_entities(entities, True)
+
+    def dect_candidates() -> Iterable[DiscoveryCandidate]:
+        if has_dect(router):
+            for description in DECT_BUTTON_DESCRIPTIONS:
+                yield description.key, partial(FreeboxButton, router, description)
+
+    async_setup_discovery(
+        hass, entry, router, [router.signal_sensor_update], dect_candidates, async_add_entities
+    )
 
     router.player_discovery_active = True
     if not router.players_initialized:

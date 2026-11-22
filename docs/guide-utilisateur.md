@@ -217,6 +217,71 @@ data:
 Arrête la sonnerie FXS. Même droit Téléphonie. Champs facultatifs :
 `config_entry_id`, `device_id`. Pas de réponse métier.
 
+### `freebox_homexa.start_dect_ring`
+
+Fait sonner les combinés DECT. Même droit **Téléphonie**. Si la base DECT est
+coupée ou qu'aucun combiné ne peut sonner, l'action échoue avec un message
+traduit. Ce n'est pas un succès.
+
+Champs :
+
+- `duration` (facultatif) : durée en secondes, de 1 à 300. Sans durée, Homexa
+  utilise 30 secondes. Avec une durée, l'arrêt est toujours demandé, y compris
+  si le démarrage échoue, si l'automatisation est annulée ou si l'entrée est
+  déchargée.
+- `config_entry_id` (facultatif) : entrée Homexa, s'il y en a plusieurs.
+- `device_id` (facultatif) : appareil Homexa pour retrouver l'entrée.
+
+Les boutons « Faire sonner les combinés DECT » et « Arrêter la sonnerie DECT »
+n'apparaissent que si la Freebox a au moins un combiné DECT. Le bouton de
+démarrage sonne 30 secondes. Aucun numéro ni nom n'est lu. Le capteur
+« Décroché » reflète `on_hook` : s'il manque, l'état reste inconnu.
+
+```yaml
+action: freebox_homexa.start_dect_ring
+data:
+  duration: 30
+```
+
+### `freebox_homexa.stop_dect_ring`
+
+Arrête la sonnerie DECT. Champs facultatifs : `config_entry_id`, `device_id`.
+
+### `freebox_homexa.mark_voicemail_read`
+
+Marque un message vocal comme lu. Droit Téléphonie. Champs :
+
+- `id` (requis) : identifiant du message, tel que renvoyé par la Freebox.
+- `config_entry_id` (facultatif).
+- `device_id` (facultatif).
+
+Aucun numéro n'est journalisé.
+
+### `freebox_homexa.delete_voicemail`
+
+Supprime un message vocal. Champs : `id` (requis), `config_entry_id` et
+`device_id` (facultatifs).
+
+### `freebox_homexa.play_voicemail`
+
+Lit un message sur un lecteur média, puis le marque comme lu. Champs :
+
+- `id` (requis) : identifiant du message.
+- `entity_id` (requis) : entité `media_player` (par exemple une enceinte).
+- `config_entry_id` (facultatif).
+- `device_id` (facultatif).
+
+Sur Alexa ou Echo, la lecture est au mieux : l'enceinte doit pouvoir télécharger
+un MP3 via une URL HTTPS publique (Nabu Casa ou URL externe). Sans cette URL,
+l'action échoue avec un message clair.
+
+```yaml
+action: freebox_homexa.play_voicemail
+data:
+  id: "20221215_154135_r0334371508.au"
+  entity_id: media_player.echo_salon
+```
+
 ## Exemples et cas d'usage
 
 - [Cartes/dashboards du dépôt](../examples/lovelace/) : remplacer les entity_id

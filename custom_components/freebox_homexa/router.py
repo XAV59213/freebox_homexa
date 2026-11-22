@@ -347,6 +347,11 @@ class FreeboxRouter:
         self.sensors_temperature: dict[str, int] = {}
         self.sensors_connection: dict[str, float | None] = {}
         self.call_list: list[dict[str, Any]] = []
+        self.phones: list[object] = []
+        self.phones_available: bool = True
+        self.voicemails: list[object] = []
+        self.voicemail_available: bool = True
+        self.voicemail_seen: set[str] | None = None
         self.home_granted = True
         self.home_devices: dict[str, Any] = {}
         self.listeners: list[object] = []
@@ -806,6 +811,8 @@ class FreeboxRouter:
             }
 
             await self._update_call_log()
+            await self._update_phones()
+            await self._update_voicemails()
             await self._update_disks_sensors()
             await self._update_raids_sensors()
 
@@ -842,6 +849,18 @@ class FreeboxRouter:
             if self.calls_available:
                 _LOGGER.info("Journal d'appels Freebox indisponible")
             self.calls_available = False
+
+    async def _update_phones(self) -> None:
+        """Combinés FXS et DECT, sans faire échouer les autres capteurs."""
+        from .phone_dect import async_refresh_phones
+
+        await async_refresh_phones(self)
+
+    async def _update_voicemails(self) -> None:
+        """Messagerie vocale. Un refus de droit ``calls`` suit le même Repair."""
+        from .voicemail import async_refresh_voicemails
+
+        await async_refresh_voicemails(self)
 
     async def _update_disks_sensors(self) -> None:
         try:

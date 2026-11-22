@@ -20,10 +20,24 @@ from .const import (
     SERVICE_REBOOT,
     SERVICE_RELOAD,
     SERVICE_REMOTE,
+    SERVICE_DELETE_VOICEMAIL,
+    SERVICE_MARK_VOICEMAIL_READ,
+    SERVICE_PLAY_VOICEMAIL,
+    SERVICE_START_DECT_RING,
     SERVICE_START_FXS_RING,
+    SERVICE_STOP_DECT_RING,
     SERVICE_STOP_FXS_RING,
 )
-from .fxs_ring import async_ring_for_entry, async_stop_for_entry, duration_from_call
+from .fxs_ring import (
+    FXS_RING_MAX_SECONDS,
+    FXS_RING_MIN_SECONDS,
+    async_ring_for_entry,
+    async_stop_for_entry,
+    duration_from_call,
+)
+from .phone_dect import DECT_RING_DEFAULT_SECONDS, async_dect_for_entry, async_dect_stop_for_entry
+from .voicemail import async_delete_voicemail, async_mark_voicemail_read
+from .voicemail_audio import async_play_on_player
 from .player_remote import (
     VALID_COMMANDS,
     async_send_player_keys,
@@ -240,12 +254,79 @@ def async_setup_services(hass: HomeAssistant) -> None:
         for entry in async_resolve_entries(hass, call):
             await async_stop_for_entry(entry)
 
+    def _dect_duration(call: ServiceCall) -> float:
+        try:
+            value = duration_from_call(call)
+        except ServiceValidationError:
+            raise ServiceValidationError(
+                translation_domain=DOMAIN,
+                translation_key="dect_ring_duration",
+                translation_placeholders={
+                    "minimum": str(FXS_RING_MIN_SECONDS),
+                    "maximum": str(FXS_RING_MAX_SECONDS),
+                },
+            ) from None
+        if value is None:
+            return float(DECT_RING_DEFAULT_SECONDS)
+        return value
+
+    @async_action_errors
+    async def async_service_start_dect_ring(call: ServiceCall) -> None:
+        """Fait sonner les combinés DECT. Sans durée : 30 secondes."""
+        duration = _dect_duration(call)
+        for entry in async_resolve_entries(hass, call):
+            await async_dect_for_entry(entry, duration)
+
+    @async_action_errors
+    async def async_service_stop_dect_ring(call: ServiceCall) -> None:
+        """Arrête la sonnerie DECT."""
+        for entry in async_resolve_entries(hass, call):
+            await async_dect_stop_for_entry(entry)
+
+    def _message_id(call: ServiceCall) -> str:
+        raw = call.data.get("id")
+        if not isinstance(raw, str):
+            raise ServiceValidationError(
+                translation_domain=DOMAIN,
+                translation_key="voicemail_invalid_id",
+            )
+        return raw
+
+    @async_action_errors
+    async def async_service_mark_voicemail_read(call: ServiceCall) -> None:
+        ident = _message_id(call)
+        for entry in async_resolve_entries(hass, call):
+            await async_mark_voicemail_read(entry.runtime_data, ident)
+
+    @async_action_errors
+    async def async_service_delete_voicemail(call: ServiceCall) -> None:
+        ident = _message_id(call)
+        for entry in async_resolve_entries(hass, call):
+            await async_delete_voicemail(entry.runtime_data, ident)
+
+    @async_action_errors
+    async def async_service_play_voicemail(call: ServiceCall) -> None:
+        ident = _message_id(call)
+        player = call.data.get("entity_id")
+        if not isinstance(player, str):
+            raise ServiceValidationError(
+                translation_domain=DOMAIN,
+                translation_key="voicemail_player",
+            )
+        for entry in async_resolve_entries(hass, call):
+            await async_play_on_player(hass, entry.runtime_data, ident, player)
+
     for service, handler in (
         (SERVICE_REBOOT, async_reboot),
         (SERVICE_RELOAD, async_reload_config),
         (SERVICE_REMOTE, async_freebox_player_remote),
         (SERVICE_START_FXS_RING, async_start_fxs_ring),
         (SERVICE_STOP_FXS_RING, async_stop_fxs_ring),
+        (SERVICE_START_DECT_RING, async_service_start_dect_ring),
+        (SERVICE_STOP_DECT_RING, async_service_stop_dect_ring),
+        (SERVICE_MARK_VOICEMAIL_READ, async_service_mark_voicemail_read),
+        (SERVICE_DELETE_VOICEMAIL, async_service_delete_voicemail),
+        (SERVICE_PLAY_VOICEMAIL, async_service_play_voicemail),
     ):
         if not hass.services.has_service(DOMAIN, service):
             hass.services.async_register(DOMAIN, service, handler)

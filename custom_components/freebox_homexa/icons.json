@@ -9,6 +9,21 @@
     "stop_fxs_ring": {
       "service": "mdi:phone-off"
     },
+    "start_dect_ring": {
+      "service": "mdi:phone-ring"
+    },
+    "stop_dect_ring": {
+      "service": "mdi:phone-off"
+    },
+    "mark_voicemail_read": {
+      "service": "mdi:voicemail"
+    },
+    "delete_voicemail": {
+      "service": "mdi:delete"
+    },
+    "play_voicemail": {
+      "service": "mdi:play"
+    },
     "cover_open": {
       "service": "mdi:window-shutter-open"
     },
@@ -25,6 +40,12 @@
         "default": "mdi:phone-ring"
       },
       "stop_fxs_ring": {
+        "default": "mdi:phone-off"
+      },
+      "start_dect_ring": {
+        "default": "mdi:phone-ring"
+      },
+      "stop_dect_ring": {
         "default": "mdi:phone-off"
       },
       "accueil": {
@@ -170,6 +191,9 @@
       "calls_log": {
         "default": "mdi:phone-log"
       },
+      "voicemail_unread": {
+        "default": "mdi:voicemail"
+      },
       "partition_free_space": {
         "default": "mdi:harddisk"
       },
@@ -212,6 +236,12 @@
       },
       "repeater_online": {
         "default": "mdi:wifi-sync"
+      },
+      "dect_ringing": {
+        "default": "mdi:phone-ring"
+      },
+      "dect_off_hook": {
+        "default": "mdi:phone-in-talk"
       }
     },
     "switch": {

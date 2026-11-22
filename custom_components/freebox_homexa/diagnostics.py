@@ -42,6 +42,12 @@ TO_REDACT = {
     "ipv6",
     "ssid",
     "wifi_ssid",
+    "phone_number",
+    "number",
+    "caller",
+    "caller_name",
+    "contact_name",
+    "country_code",
 }
 
 

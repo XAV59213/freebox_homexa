@@ -264,12 +264,13 @@ async def test_initial_codes_and_player_without_id(hass, api):
         result = await start(hass)
         result = await hass.config_entries.flow.async_configure(result["flow_id"], {})
         result = await hass.config_entries.flow.async_configure(result["flow_id"], {
-            "remote_code": " synthetic-shared ", "remote_code_1": " synthetic-player "})
+            "remote_code": " synthetic-shared "})
         await hass.async_block_till_done()
     assert result["type"] == FlowResultType.CREATE_ENTRY
     assert result["result"].unique_id == MAC
     assert result["data"]["remote_code"] == "synthetic-shared"
-    assert result["options"]["remote_codes"] == {"1": "synthetic-player"}
+    assert result["options"]["remote_codes"] == {}
+    assert "remote_code_1" not in result["options"]
 
 
 async def test_reconfigure_same_freebox_updates_port_and_adopts_mac(hass, api):

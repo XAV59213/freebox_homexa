@@ -69,10 +69,12 @@ def _voicemail_diagnostics(router: object) -> dict[str, object]:
     available = getattr(router, "voicemail_available", None)
     supported = getattr(router, "voicemail_supported", None)
     stale = getattr(router, "voicemail_stale", None)
+    loading = getattr(router, "voicemail_loading", None)
     return {
         "available": available is not False,
         "supported": supported if isinstance(supported, bool) else None,
         "stale": stale is True,
+        "loading": loading is True,
         "error": error if isinstance(error, str) and _SAFE_CODE.fullmatch(error) else None,
         "total": len(messages),
         "unread": unread_count(messages),
@@ -103,6 +105,7 @@ async def async_get_config_entry_diagnostics(
                 "available": False,
                 "supported": None,
                 "stale": False,
+                "loading": False,
                 "error": None,
                 "total": 0,
                 "unread": 0,

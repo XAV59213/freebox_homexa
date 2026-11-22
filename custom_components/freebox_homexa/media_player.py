@@ -436,8 +436,10 @@ class FreeboxPlayerMediaPlayer(FreeboxReachableMixin, MediaPlayerEntity):
 
     @async_action_errors
     async def async_play_media(self, media_type: str, media_id: str, **kwargs: Any) -> None:
+        # ``control/open`` ne connaît que ``url``. ``music`` / ``audio/mpeg``
+        # feraient rejeter l'ouverture d'un message vocal.
         payload: dict[str, Any] = {"url": media_id}
-        if media_type:
+        if media_type and media_type not in {"music", "audio", "audio/mpeg", "audio/mp3"}:
             payload["type"] = media_type
         await self._post("control/open", payload)
 

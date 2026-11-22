@@ -7,25 +7,28 @@ reçoit un jeton opaque et ne demande le numéro que si elle l'affiche.
 
 from __future__ import annotations
 
-from dataclasses import dataclass, replace
+import asyncio
 import hashlib
 import hmac
+import json
 import logging
 import math
 import re
 import secrets
 import time
+from dataclasses import dataclass, replace
 from typing import TYPE_CHECKING
 from urllib.parse import quote, urljoin
 
 import aiohttp
 from aiohttp import ClientTimeout
-from homeassistant.helpers.event import async_call_later
+from freebox_api.exceptions import HttpRequestError, InsufficientPermissionsError
 from homeassistant.components.sensor import SensorEntity
 from homeassistant.core import callback
 from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
 from homeassistant.helpers.dispatcher import async_dispatcher_connect
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
+from homeassistant.helpers.event import async_call_later
 from homeassistant.util import dt as dt_util
 
 from .availability import FreeboxReachableMixin
@@ -58,6 +61,8 @@ _LIST_PATH = "call/voicemail/"
 VOICEMAIL_RETRY_DELAYS = (15, 30, 60)
 # Plusieurs échecs de suite, environ 10 minutes, avant de rendre le capteur indisponible.
 VOICEMAIL_UNAVAILABLE_AFTER = 600
+# Écritures (lu, suppression) : quelques essais rapides, pas le cycle de 10 minutes.
+_WRITE_RETRY_DELAYS = (0, 1, 2)
 _TRANSIENT_CODES = frozenset({
     "internal_error",
     "timeout",
@@ -303,6 +308,28 @@ def unread_count(messages: list[VoicemailMessage]) -> int:
     return sum(1 for item in messages if not item.read)
 
 
+def voicemail_status(router: FreeboxRouter) -> dict[str, object]:
+    """État visible. ``error`` reste posé au chargement initial, pas à chaque à-coup."""
+    loading = router.voicemail_loading is True
+    available = router.voicemail_available is not False
+    supported = router.voicemail_supported
+    has_list = bool(messages_of(router))
+    cached = (
+        router.voicemail_failure_since is not None
+        and has_list
+        and available
+        and not loading
+    )
+    reveal_error = loading or not available or supported is False
+    return {
+        "available": available,
+        "supported": supported is not False,
+        "loading": loading,
+        "cached": cached,
+        "error": router.voicemail_error if reveal_error else None,
+    }
+
+
 def stored_error(err: BaseException) -> str:
     """Code Freebox affichable. Pas de chiffres, d'URL, d'identifiant ni de numéro."""
     if isinstance(err, VoicemailEndpointError) and _SAFE_CODE.fullmatch(err.code):
@@ -436,7 +463,85 @@ async def _advertised_prefix(router: FreeboxRouter) -> str:
     return prefix
 
 
+def _safe_kind(err: BaseException) -> str:
+    kind = type(err).__name__
+    if not _SAFE_CODE.fullmatch(kind):
+        return "Error"
+    return kind
+
+
+def _minimal_http_error(err: BaseException) -> HttpRequestError | InsufficientPermissionsError:
+    """Chaîne une erreur dont le message est seulement le code, jamais le corps."""
+    code = stored_error(err)
+    text = f'Request failed (APIResponse: {{"error_code": "{code}"}})'
+    if is_permission_denied(err):
+        return InsufficientPermissionsError(text)
+    return HttpRequestError(text)
+
+
+async def _read_api_result(response: object) -> object:
+    """Lit une réponse d'écriture. Le corps brut ne part ni dans l'exception ni au journal."""
+    status = _http_status(response)
+    content_type = getattr(response, "content_type", None)
+    reader = getattr(response, "json", None)
+    try:
+        if content_type != "application/json" or not callable(reader):
+            if status is not None and status >= 400:
+                raise VoicemailEndpointError("http_error")
+            return _reject_status(response)
+        data = reader()
+        if hasattr(data, "__await__"):
+            data = await data
+    finally:
+        release = getattr(response, "release", None)
+        if callable(release):
+            released = release()
+            if hasattr(released, "__await__"):
+                await released
+    if isinstance(data, dict) and data.get("success") is False:
+        code = data.get("error_code")
+        safe = code if isinstance(code, str) and _SAFE_CODE.fullmatch(code) else "error"
+        text = f'Request failed (APIResponse: {{"error_code": "{safe}"}})'
+        if safe == "insufficient_rights":
+            raise InsufficientPermissionsError(text)
+        raise HttpRequestError(text)
+    if isinstance(data, dict) and "result" in data:
+        return data.get("result")
+    return data
+
+
+class _NoJsonSession:
+    """La session Freebox n'est pas disponible : repli sur ``access.put`` / ``delete``."""
+
+
+_NO_JSON_SESSION = _NoJsonSession()
+
+
+async def _invoke_json(access: object, method: str, path: str, payload: object) -> object:
+    """PUT/DELETE avec ``Content-Type: application/json``. Sentinel si pas de session."""
+    session = getattr(access, "session", None)
+    base_url = getattr(access, "base_url", None)
+    token = getattr(access, "session_token", None)
+    verb = getattr(session, method, None) if session is not None else None
+    if not callable(verb) or not isinstance(base_url, str) or not base_url:
+        return _NO_JSON_SESSION
+    if not isinstance(token, str) or not token:
+        return _NO_JSON_SESSION
+    headers = {"X-Fbx-App-Auth": token, "Content-Type": "application/json"}
+    body = json.dumps(payload) if isinstance(payload, dict) else None
+    kwargs: dict[str, object] = {"headers": headers, "data": body}
+    timeout = getattr(access, "timeout", None)
+    if isinstance(timeout, int) and not isinstance(timeout, bool) and timeout > 0:
+        kwargs["timeout"] = ClientTimeout(total=timeout)
+    response = await verb(urljoin(base_url, path), **kwargs)
+    return await _read_api_result(response)
+
+
 async def _invoke(access: object, method: str, path: str, payload: object) -> object:
+    if method != "get":
+        sent = await _invoke_json(access, method, path, payload)
+        if sent is not _NO_JSON_SESSION:
+            return sent
     action = getattr(access, method, None)
     if not callable(action):
         raise VoicemailEndpointError("http_error")
@@ -459,16 +564,22 @@ async def async_voicemail_exchange(
     """Appelle call/voicemail. Au premier 404, rejoue la version annoncée.
 
     ``""`` veut dire que le chemin relatif de la session (v6) a déjà répondu :
-    un 404 plus tard ne change plus de version et ne conclut pas que la
-    messagerie n'existe pas. La variante qui répond est mémorisée.
+    un 404 de lecture plus tard ne change plus de version et ne conclut pas
+    que la messagerie n'existe pas. Une écriture (PUT/DELETE) qui répond
+    404 ou endpoint inconnu sur ce préfixe est rejouée une fois sur la
+    version annoncée : la liste et l'audio existent souvent en v6, pas les
+    écritures. La variante qui répond est mémorisée à part.
     """
     access = router._api.call._access
-    remembered = router.voicemail_api_prefix
+    write = method != "get"
+    remembered = router.voicemail_write_prefix if write and router.voicemail_write_prefix else router.voicemail_api_prefix
     first = relative if remembered is None else _with_prefix(remembered, relative)
     try:
         result = await _invoke(access, method, first, payload)
     except Exception as err:
-        if not _is_version_mismatch(err) or remembered is not None:
+        if not _is_version_mismatch(err) or (remembered is not None and not write):
+            raise
+        if write and remembered == router.voicemail_write_prefix and router.voicemail_write_prefix:
             raise
         try:
             advertised = await _advertised_prefix(router)
@@ -484,9 +595,12 @@ async def async_voicemail_exchange(
             ):
                 raise err
             raise
-        router.voicemail_api_prefix = advertised
+        if write:
+            router.voicemail_write_prefix = advertised
+        else:
+            router.voicemail_api_prefix = advertised
         return result
-    if remembered is None:
+    if remembered is None and not write:
         router.voicemail_api_prefix = ""
     return result
 
@@ -499,6 +613,17 @@ async def async_voicemail_by_id(
     payload: object = None,
 ) -> object:
     """Point littéral, puis ``%2E`` si cette forme répond 404. La forme utile est mémorisée."""
+    async with router.voicemail_refresh_lock:
+        return await _voicemail_by_id(router, method, ident, suffix, payload)
+
+
+async def _voicemail_by_id(
+    router: FreeboxRouter,
+    method: str,
+    ident: str,
+    suffix: str,
+    payload: object,
+) -> object:
     if "." not in ident:
         order = (False,)
     elif router.voicemail_encode_dot is True:
@@ -615,6 +740,10 @@ def cancel_voicemail_retry(router: FreeboxRouter) -> None:
     router.voicemail_retry_unsub = None
     if callable(unsub):
         unsub()
+    mark = getattr(router, "voicemail_mark_unsub", None)
+    router.voicemail_mark_unsub = None
+    if callable(mark):
+        mark()
 
 
 def _schedule_voicemail_retry(router: FreeboxRouter) -> None:
@@ -631,7 +760,7 @@ def _schedule_voicemail_retry(router: FreeboxRouter) -> None:
         router.voicemail_retry_unsub = None
         if router.closing:
             return
-        await async_refresh_voicemails(router)
+        await async_refresh_voicemails(router, force=True)
 
     router.voicemail_retry_unsub = async_call_later(router.hass, delay, _run)
 
@@ -644,30 +773,67 @@ def request_voicemail_refresh(router: object) -> None:
         return
     if router.closing or router.voicemail_supported is not True:
         return
-    router.hass.async_create_task(async_refresh_voicemails(router))
+    router.hass.async_create_task(async_refresh_voicemails(router, force=True))
+
+
+def _snapshot(router: FreeboxRouter) -> tuple[object, ...]:
+    return (
+        router.voicemail_available,
+        router.voicemail_supported,
+        router.voicemail_loading,
+        router.voicemail_error,
+        router.voicemail_stale,
+        tuple((item.id, item.read, item.date) for item in messages_of(router)),
+    )
+
+
+def _publish(router: FreeboxRouter, before: tuple[object, ...]) -> None:
+    """N'écrit l'état que si la partie visible a changé."""
+    if _snapshot(router) != before:
+        _signal(router)
 
 
 def _note_transient(router: FreeboxRouter, err: BaseException) -> None:
-    """Garde la dernière liste. Indisponible seulement après environ 10 minutes."""
+    """Panne passagère. L'état visible ne bouge qu'au démarrage ou après 10 minutes.
+
+    Tant qu'une liste existe et que les échecs durent moins d'environ 10 minutes,
+    on ne pose ni ``voicemail_error`` ni ``voicemail_stale`` : chaque bascule
+    réécrivait le capteur, la carte rappelait ``call/voicemail/``, et la Freebox
+    répondait encore ``internal_error``. Le journal de ces à-coups reste en debug.
+    """
     now = time.monotonic()
     if router.voicemail_failure_since is None:
         router.voicemail_failure_since = now
-    router.voicemail_stale = True
     code = stored_error(err)
-    router.voicemail_error = code
+    kind = _safe_kind(err)
     elapsed = now - router.voicemail_failure_since
-    router.voicemail_available = elapsed < VOICEMAIL_UNAVAILABLE_AFTER
-    kind = type(err).__name__
-    if not _SAFE_CODE.fullmatch(kind):
-        kind = "Error"
-    if router.voicemail_failure_logged:
-        _LOGGER.debug("Messagerie vocale Freebox momentanément indisponible (%s, %s)", kind, code)
-    else:
-        router.voicemail_failure_logged = True
-        _LOGGER.warning(
-            "Messagerie vocale Freebox momentanément indisponible (%s, %s)", kind, code
-        )
-    _signal(router)
+    past = elapsed >= VOICEMAIL_UNAVAILABLE_AFTER
+    has_list = bool(messages_of(router))
+    known = router.voicemail_supported is True or has_list
+    _LOGGER.debug(
+        "Messagerie vocale Freebox momentanément indisponible (%s, %s)", kind, code
+    )
+    before = _snapshot(router)
+    if not past:
+        if not known and (
+            router.voicemail_loading is not True or router.voicemail_error != code
+        ):
+            router.voicemail_loading = True
+            router.voicemail_error = code
+            router.voicemail_available = True
+            router.voicemail_stale = False
+            _publish(router, before)
+        _schedule_voicemail_retry(router)
+        return
+    router.voicemail_loading = False
+    router.voicemail_error = code
+    router.voicemail_stale = has_list
+    became_unavailable = router.voicemail_available is not False
+    router.voicemail_available = False
+    if became_unavailable or not router.voicemail_outage_logged:
+        router.voicemail_outage_logged = True
+        _LOGGER.warning("Messagerie vocale Freebox indisponible (%s, %s)", kind, code)
+    _publish(router, before)
     _schedule_voicemail_retry(router)
 
 
@@ -689,22 +855,54 @@ def _keep_snapshot(router: FreeboxRouter, err: BaseException) -> None:
     _signal(router)
 
 
-async def async_refresh_voicemails(router: FreeboxRouter) -> None:
+def _list_due(router: FreeboxRouter) -> bool:
+    """N'empile pas un relevé sur une relance déjà posée après un échec.
+
+    Un succès n'impose pas d'attente : le poll (40 s) et un second relevé
+    restent possibles. Seule une série d'échecs espace les essais.
+    """
+    if router.voicemail_retry_unsub is not None:
+        return False
+    if router.voicemail_failure_since is None:
+        return True
+    last = router.voicemail_last_attempt
+    if last is None:
+        return True
+    index = router.voicemail_retry_index - 1
+    if index < 0:
+        index = 0
+    wait = VOICEMAIL_RETRY_DELAYS[min(index, len(VOICEMAIL_RETRY_DELAYS) - 1)]
+    return time.monotonic() - last >= wait
+
+
+async def async_refresh_voicemails(router: FreeboxRouter, *, force: bool = False) -> None:
     """Relevé isolé. Un refus de droit ``calls`` rend le capteur indisponible.
 
     Un 404, ``invalid_request`` ou endpoint inconnu, au premier essai et sur la
     version annoncée, veut dire que la Freebox n'a pas de messagerie.
     Après un relevé réussi, une panne passagère garde les messages.
+    ``force`` est réservé au minuteur de relance : le poll, la carte et un
+    appel manqué n'ajoutent pas une requête si une relance est déjà posée
+    ou si le dernier essai a moins de 15 s.
     """
+    if not force and not _list_due(router):
+        return
     async with router.voicemail_refresh_lock:
+        if not force and not _list_due(router):
+            return
         await _refresh_voicemails(router)
 
 
 async def _refresh_voicemails(router: FreeboxRouter) -> None:
     if router.voicemail_supported is False:
         router.voicemail_available = True
+        router.voicemail_loading = False
         return
-    was_available = router.voicemail_available is not False
+    before = _snapshot(router)
+    was_down = router.voicemail_available is False
+    was_loading = router.voicemail_loading is True
+    had_failure = router.voicemail_failure_since is not None
+    router.voicemail_last_attempt = time.monotonic()
     try:
         payload = await async_voicemail_exchange(router, "get", _LIST_PATH)
         if payload is None and router.voicemail_supported is True and messages_of(router):
@@ -716,10 +914,11 @@ async def _refresh_voicemails(router: FreeboxRouter) -> None:
         if is_permission_denied(err):
             router.note_permission("calls", err)
             router.voicemail_available = False
+            router.voicemail_loading = False
             _note_failure(router, err)
-            _signal(router)
+            _publish(router, before)
             return
-        if _is_transient(err) and router.voicemail_supported is True:
+        if _is_transient(err):
             _note_transient(router, err)
             return
         if router.voicemail_supported is True:
@@ -730,28 +929,32 @@ async def _refresh_voicemails(router: FreeboxRouter) -> None:
             return
         router.note_permission("calls", err)
         router.voicemail_available = False
+        router.voicemail_loading = False
         _note_failure(router, err)
-        _signal(router)
+        _publish(router, before)
         return
     _announce(router, found)
     router.voicemails = found
-    was_stale = router.voicemail_stale or router.voicemail_failure_since is not None
-    if was_stale:
+    if was_down:
         _LOGGER.warning("Messagerie vocale Freebox de nouveau disponible")
-    elif was_available is False:
+    elif was_loading:
         _LOGGER.info("Messagerie vocale Freebox de nouveau disponible")
+    elif had_failure:
+        _LOGGER.debug("Messagerie vocale Freebox de nouveau disponible")
     router.voicemail_supported = True
     router.voicemail_available = True
+    router.voicemail_loading = False
     router.voicemail_stale = False
     router.voicemail_failure_since = None
     router.voicemail_retry_index = 0
     router.voicemail_error = None
     router.voicemail_failure_logged = False
+    router.voicemail_outage_logged = False
     cancel_voicemail_retry(router)
     # Le journal d'appels reste prioritaire : on ne lève le Repair que s'il va bien.
     if router.calls_available is not False:
         router.note_permission("calls")
-    _signal(router)
+    _publish(router, before)
 
 
 async def _deny(router: FreeboxRouter, err: Exception) -> None:
@@ -765,38 +968,103 @@ async def _deny(router: FreeboxRouter, err: Exception) -> None:
     ) from err
 
 
+def _log_write(action: str, err: BaseException) -> None:
+    """Code et classe seulement. Pas de numéro, de jeton, d'URL ni de corps."""
+    _LOGGER.warning(
+        "Écriture messagerie vocale échouée (%s, %s, %s)",
+        action,
+        _safe_kind(err),
+        stored_error(err),
+    )
+
+
+def _write_error(err: BaseException) -> HomeAssistantError:
+    return HomeAssistantError(
+        translation_domain=DOMAIN,
+        translation_key="voicemail_write_failed",
+        translation_placeholders={"code": stored_error(err)},
+    )
+
+
+async def _write_voicemail(
+    router: FreeboxRouter,
+    method: str,
+    ident: str,
+    payload: object = None,
+) -> None:
+    """PUT/DELETE. Relance la version annoncée et un ``internal_error`` passager."""
+    last: BaseException | None = None
+    for delay in _WRITE_RETRY_DELAYS:
+        if delay:
+            await asyncio.sleep(delay)
+        try:
+            await async_voicemail_by_id(router, method, ident, "", payload)
+            return
+        except HomeAssistantError:
+            raise
+        except Exception as err:
+            last = err
+            if is_permission_denied(err):
+                await _deny(router, err)
+            if _is_transient(err):
+                _LOGGER.debug(
+                    "Écriture messagerie vocale retentée (%s, %s)",
+                    _safe_kind(err),
+                    stored_error(err),
+                )
+                continue
+            _log_write(method, err)
+            raise _write_error(err) from _minimal_http_error(err)
+    if last is not None:
+        _log_write(method, last)
+        raise _write_error(last) from _minimal_http_error(last)
+
+
+def schedule_mark_read_retry(router: FreeboxRouter, message_id: str) -> None:
+    """Relance le marquage lu sans faire échouer une lecture déjà commencée."""
+
+    async def _run(_now: object) -> None:
+        if router.closing:
+            return
+        try:
+            await async_mark_voicemail_read(router, message_id)
+        except Exception as err:
+            _LOGGER.warning(
+                "Marquage lu reporté toujours en échec (%s, %s)",
+                _safe_kind(err),
+                stored_error(err) if not isinstance(err, HomeAssistantError) else (
+                    err.translation_key or "error"
+                ),
+            )
+
+    previous = getattr(router, "voicemail_mark_unsub", None)
+    if callable(previous):
+        previous()
+    router.voicemail_mark_unsub = async_call_later(
+        router.hass, VOICEMAIL_RETRY_DELAYS[0], _run
+    )
+
+
 async def async_mark_voicemail_read(router: FreeboxRouter, message_id: str) -> None:
     _unsupported(router)
     ident = resolve_voicemail_token(router, message_id)
-    try:
-        await async_voicemail_by_id(router, "put", ident, "", {"read": True})
-    except HomeAssistantError:
-        raise
-    except Exception as err:
-        if is_permission_denied(err):
-            await _deny(router, err)
-        raise
+    await _write_voicemail(router, "put", ident, {"read": True})
+    before = _snapshot(router)
     router.voicemails = [
         replace(item, read=True) if item.id == ident else item for item in messages_of(router)
     ]
-    await async_refresh_voicemails(router)
-    _signal(router)
+    _publish(router, before)
+    await async_refresh_voicemails(router, force=True)
 
 
 async def async_delete_voicemail(router: FreeboxRouter, message_id: str) -> None:
     _unsupported(router)
     ident = resolve_voicemail_token(router, message_id)
-    try:
-        await async_voicemail_by_id(router, "delete", ident)
-    except HomeAssistantError:
-        raise
-    except Exception as err:
-        if is_permission_denied(err):
-            await _deny(router, err)
-        raise
+    await _write_voicemail(router, "delete", ident)
+    before = _snapshot(router)
     router.voicemails = [item for item in messages_of(router) if item.id != ident]
-    await async_refresh_voicemails(router)
-    _signal(router)
+    _publish(router, before)
+    await async_refresh_voicemails(router, force=True)
 
 
 async def async_voicemail_audio(router: FreeboxRouter, message_id: str) -> bytes:
@@ -869,6 +1137,7 @@ class FreeboxVoicemailSensor(FreeboxReachableMixin, SensorEntity):
         summary["voicemail_supported"] = self._router.voicemail_supported
         summary["voicemail_error"] = self._router.voicemail_error
         summary["voicemail_stale"] = self._router.voicemail_stale is True
+        summary["voicemail_loading"] = self._router.voicemail_loading is True
         return summary
 
     async def async_added_to_hass(self) -> None:

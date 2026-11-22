@@ -6,16 +6,23 @@ La carte ne reçoit le numéro que si elle le demande (``include_number``).
 
 from __future__ import annotations
 
+import logging
 from typing import TYPE_CHECKING
 
 import voluptuous as vol
-
 from homeassistant.components import websocket_api
 from homeassistant.components.websocket_api.connection import ActiveConnection
-from homeassistant.components.websocket_api.const import ERR_INVALID_FORMAT, ERR_NOT_FOUND
+from homeassistant.components.websocket_api.const import (
+    ERR_INVALID_FORMAT,
+    ERR_NOT_FOUND,
+)
 from homeassistant.components.websocket_api.decorators import websocket_command
 from homeassistant.core import HomeAssistant
-from homeassistant.exceptions import HomeAssistantError, ServiceValidationError, Unauthorized
+from homeassistant.exceptions import (
+    HomeAssistantError,
+    ServiceValidationError,
+    Unauthorized,
+)
 from homeassistant.helpers import entity_registry as er
 
 from .const import DOMAIN
@@ -25,12 +32,16 @@ from .voicemail import (
     async_refresh_voicemails,
     messages_of,
     public_messages,
+    stored_error,
     unread_count,
+    voicemail_status,
 )
 from .voicemail_audio import signed_voicemail_path
 
 if TYPE_CHECKING:
     from .router import FreeboxConfigEntry, FreeboxRouter
+
+_LOGGER = logging.getLogger(__name__)
 
 _ACTIONS = frozenset({"list", "mark_read", "delete", "audio_url"})
 _READ_ACTIONS = frozenset({"list", "audio_url"})
@@ -87,31 +98,13 @@ async def websocket_homexa_voicemails(
     if action == "list":
         await async_refresh_voicemails(router)
         found_now = messages_of(router)
-        if not found_now and router.voicemail_supported is False:
-            connection.send_result(
-                message_id,
-                {
-                    "available": True,
-                    "supported": False,
-                    "error": router.voicemail_error,
-                    "messages": [],
-                    "unread": 0,
-                    "total": None,
-                },
-            )
+        if not found_now and (
+            router.voicemail_supported is False or router.voicemail_available is False
+        ):
+            connection.send_result(message_id, _list_result(router, []))
             return
-        if not found_now and router.voicemail_available is False:
-            connection.send_result(
-                message_id,
-                {
-                    "available": False,
-                    "supported": router.voicemail_supported is not False,
-                    "error": router.voicemail_error,
-                    "messages": [],
-                    "unread": 0,
-                    "total": None,
-                },
-            )
+        if not found_now and router.voicemail_loading is True:
+            connection.send_result(message_id, _list_result(router, []))
             return
     try:
         if action == "mark_read":
@@ -130,24 +123,52 @@ async def websocket_homexa_voicemails(
     except ServiceValidationError:
         connection.send_error(message_id, ERR_INVALID_FORMAT, "Identifiant de message vocal invalide")
         return
-    except HomeAssistantError:
-        connection.send_error(message_id, "home_assistant_error", "Messagerie vocale indisponible")
+    except HomeAssistantError as err:
+        connection.send_error(message_id, "home_assistant_error", _action_message(err))
         return
-    except Exception:
+    except Exception as err:
+        _LOGGER.warning(
+            "Action messagerie vocale échouée (%s, %s)",
+            type(err).__name__ if err.__class__.__name__.isidentifier() else "Error",
+            stored_error(err),
+        )
         connection.send_error(message_id, "home_assistant_error", "Messagerie vocale indisponible")
         return
     found = messages_of(router)
     connection.send_result(
         message_id,
-        {
-            "available": True,
-            "supported": True,
-            "error": None,
-            "messages": public_messages(router, found, include_number=include_number),
-            "unread": unread_count(found),
-            "total": len(found),
-        },
+        _list_result(router, found, include_number=include_number),
     )
+
+
+def _action_message(err: HomeAssistantError) -> str:
+    key = err.translation_key or ""
+    if key == "voicemail_write_failed":
+        return "Le message vocal n'a pas pu être modifié"
+    if key == "voicemail_permission":
+        return "Droit Téléphonie requis pour la messagerie"
+    if key == "voicemail_unsupported":
+        return "Messagerie vocale non disponible sur cette Freebox"
+    return "Messagerie vocale indisponible"
+
+
+def _list_result(
+    router: FreeboxRouter,
+    found: list[object],
+    *,
+    include_number: bool = False,
+) -> dict[str, object]:
+    from .voicemail import VoicemailMessage
+
+    messages = [item for item in found if isinstance(item, VoicemailMessage)]
+    status = voicemail_status(router)
+    hide = not messages and (status["supported"] is False or status["available"] is False or status["loading"] is True)
+    return {
+        **status,
+        "messages": [] if hide else public_messages(router, messages, include_number=include_number),
+        "unread": 0 if hide else unread_count(messages),
+        "total": None if hide else len(messages),
+    }
 
 
 def _resolve_entry(

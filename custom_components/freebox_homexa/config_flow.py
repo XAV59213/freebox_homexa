@@ -114,6 +114,38 @@ def _player_label(player: dict[str, Any]) -> str:
     return str(name)
 
 
+def _players_with_id(players: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    return [player for player in players if player.get("id") is not None]
+
+
+def _prefill_shared_remote_code(
+    defaults: dict[str, Any], players: list[dict[str, Any]]
+) -> None:
+    """Un seul Player : le code déjà stocké sous ``remote_code_<id>`` préremplit le champ commun."""
+    if _coerce_remote_code(defaults.get(CONF_REMOTE_CODE)):
+        return
+    found = _players_with_id(players)
+    if len(found) != 1:
+        return
+    pid = found[0].get("id")
+    raw_codes = defaults.get(CONF_REMOTE_CODES)
+    codes = raw_codes if isinstance(raw_codes, dict) else {}
+    stored = defaults.get(remote_code_field(pid)) or codes.get(str(pid)) or codes.get(pid)
+    cleaned = _coerce_remote_code(stored)
+    if cleaned:
+        defaults[CONF_REMOTE_CODE] = cleaned
+
+
+def _player_code_lines(players: list[dict[str, Any]]) -> str:
+    """Texte neutre : la clé dynamique n'a pas de traduction Home Assistant."""
+    found = _players_with_id(players)
+    if len(found) < 2:
+        return ""
+    return "\n".join(
+        f"{remote_code_field(player.get('id'))} — {_player_label(player)}" for player in found
+    )
+
+
 def _options_schema(
     schema_factory: Callable[[object], _SchemaT],
     defaults: dict[str, Any] | None = None,
@@ -145,15 +177,19 @@ def _options_schema(
     }
     raw_codes = defaults.get(CONF_REMOTE_CODES)
     codes = raw_codes if isinstance(raw_codes, dict) else {}
-    for player in players:
-        pid = player.get("id")
-        if pid is None:
-            continue
-        key = remote_code_field(pid)
-        default = _coerce_remote_code(
-            defaults.get(key) or codes.get(str(pid)) or codes.get(pid)
-        )
-        fields[vol.Optional(key, default=default)] = str
+    # Un seul Player : le champ commun suffit. La clé remote_code_<id> reste en
+    # mémoire et n'est pas renommée. Plusieurs Players : un champ par id, dont
+    # le libellé brut est expliqué par {player_codes}.
+    if len(_players_with_id(players)) > 1:
+        for player in players:
+            pid = player.get("id")
+            if pid is None:
+                continue
+            key = remote_code_field(pid)
+            default = _coerce_remote_code(
+                defaults.get(key) or codes.get(str(pid)) or codes.get(pid)
+            )
+            fields[vol.Optional(key, default=default)] = str
     return schema_factory(fields)
 
 
@@ -392,7 +428,10 @@ class FreeboxFlowHandler(ConfigFlow, domain=DOMAIN):
             return self.async_show_form(
                 step_id="lan_options",
                 data_schema=_options_schema(type(cv.PLATFORM_SCHEMA), {}, players),
-                description_placeholders={"players": names},
+                description_placeholders={
+                    "players": names,
+                    "player_codes": _player_code_lines(players),
+                },
             )
 
         self._options = _options_from_input(user_input, players)
@@ -1016,6 +1055,7 @@ class FreeboxOptionsFlowHandler(OptionsFlowWithReload):
             self._players = await self._list_players()
         players = self._players
         defaults = dict(self.config_entry.options)
+        _prefill_shared_remote_code(defaults, players)
         if not _coerce_remote_code(defaults.get(CONF_REMOTE_CODE)):
             defaults[CONF_REMOTE_CODE] = self.config_entry.data.get(CONF_REMOTE_CODE) or ""
 
@@ -1033,7 +1073,14 @@ class FreeboxOptionsFlowHandler(OptionsFlowWithReload):
             # Conserver les options des autres écrans (Guide TNT, rappels…)
             # An absent/temporarily unlistable Player has no field on this form.
             # Preserve its private code; only visible fields can explicitly clear one.
-            visible_ids = {str(p["id"]) for p in players if p.get("id") is not None}
+            # Un Player seul n'a pas de champ remote_code_<id> : ne pas effacer
+            # la clé déjà enregistrée. Plusieurs Players : le champ visible peut
+            # être vidé explicitement.
+            visible_ids = (
+                set()
+                if len(_players_with_id(players)) <= 1
+                else {str(p["id"]) for p in players if p.get("id") is not None}
+            )
             merged = dict(self.config_entry.options)
             for pid in visible_ids:
                 merged.pop(remote_code_field(pid), None)
@@ -1046,13 +1093,25 @@ class FreeboxOptionsFlowHandler(OptionsFlowWithReload):
             codes.update(options[CONF_REMOTE_CODES])
             merged.update(options)
             merged[CONF_REMOTE_CODES] = codes
+            alone = _players_with_id(players)
+            if len(alone) == 1:
+                pid = alone[0]["id"]
+                key = remote_code_field(pid)
+                shared = _coerce_remote_code(options.get(CONF_REMOTE_CODE))
+                if key in self.config_entry.options and shared:
+                    merged[key] = shared
+                    codes[str(pid)] = shared
+                    merged[CONF_REMOTE_CODES] = codes
             return self.async_create_entry(title="", data=merged)
 
         names = ", ".join(_player_label(p) for p in players) or "aucun Player détecté"
         return self.async_show_form(
             step_id="general",
             data_schema=_options_schema(type(cv.PLATFORM_SCHEMA), defaults, players),
-            description_placeholders={"players": names},
+            description_placeholders={
+                "players": names,
+                "player_codes": _player_code_lines(players),
+            },
         )
 
     async def async_step_repeaters(

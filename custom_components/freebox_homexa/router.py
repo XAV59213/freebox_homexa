@@ -396,13 +396,19 @@ class FreeboxRouter:
         self.voicemail_error: str | None = None
         self.voicemail_failure_logged: bool = False
         self.voicemail_stale: bool = False
+        self.voicemail_loading: bool = False
+        self.voicemail_outage_logged: bool = False
         self.voicemail_failure_since: float | None = None
+        self.voicemail_last_attempt: float | None = None
         self.voicemail_retry_index: int = 0
         self.voicemail_retry_unsub: object | None = None
         # "" = chemin relatif de la session (v6). "/api/v10/" = version annoncée.
         # None = pas encore déterminé.
         self.voicemail_api_prefix: str | None = None
         self.voicemail_advertised_prefix: str | None = None
+        # Écritures (lu / suppression). None = même préfixe que la lecture.
+        self.voicemail_write_prefix: str | None = None
+        self.voicemail_mp3_cache: dict[str, bytes] = {}
         self.voicemail_tokens: object | None = None
         self.voicemail_seen: set[str] | None = None
         # None = forme du point pas encore vue. False = « .au » littéral. True = « %2E ».

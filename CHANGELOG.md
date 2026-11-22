@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+- Messagerie vocale : un `internal_error` passager, au démarrage ou plus tard, ne bascule plus l'état à chaque essai. Sans liste encore reçue, le capteur reste disponible avec `voicemail_loading` et la carte affiche « Chargement de la messagerie… ». Une liste déjà connue reste affichée (mention « données en cache ») et `voicemail_error` / `voicemail_stale` ne sont publiés qu'après environ 10 minutes d'échecs de suite. Les à-coups sont journalisés en debug ; l'indisponibilité et le retour le sont une seule fois. Les requêtes `call/voicemail/` sont sérialisées, une relance déjà posée n'est pas doublée, et le succès annule le minuteur.
+- Options : un seul Player n'affiche plus le champ brut `remote_code_<id>`. Le code commun est prérempli depuis cette clé si elle existe, et la clé stockée est conservée. Plusieurs Players : la description indique quel identifiant correspond à quel Player.
+- Lecture sur un lecteur : Music Assistant garde `audio/mpeg` ; le Player Freebox reçoit `music` et une URL seule (`control/open` ne connaît pas le type). Si la lecture a commencé et que le marquage lu échoue, l'action réussit quand même et le marquage est retenté. Les écritures (lu, suppression) rejouent la version annoncée si la session v6 ne les expose pas, retentent un `internal_error`, et remontent une erreur traduite avec le code seulement.
+- Carte Téléphone : le rendu ne reconstruit plus toute la carte à chaque mise à jour. La hauteur reste stable et un message en cours de lecture n'est pas réinitialisé.
+
 ## 28.8.98 — 2026-11-22
 
 - Messagerie vocale : la carte, la source média et la lecture sur n'importe quel lecteur demandent un MP3. ffmpeg (déjà fourni par Home Assistant) accepte le WAV A-law/µ-law et l'AU `.snd`. La réponse est `audio/mpeg` avec `Content-Length`. `codec=wav` reste possible. La carte utilise `hass.hassUrl` quand il existe et affiche « Lecture impossible » avec une raison courte si le lecteur audio échoue.

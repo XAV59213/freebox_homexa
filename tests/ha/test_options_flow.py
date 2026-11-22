@@ -127,15 +127,45 @@ async def test_general_can_explicitly_clear_visible_player_code(hass):
     })
     entry.add_to_hass(hass)
     api = AsyncMock()
-    api.player.get_players.return_value = [{'id': 2, 'name': 'Test Player'}]
+    api.player.get_players.return_value = [
+        {'id': 2, 'name': 'Test Player'}, {'id': 3, 'name': 'Other Player'},
+    ]
     entry.runtime_data = SimpleNamespace(_api=api)
     with patch.object(hass.config_entries, 'async_reload', new=AsyncMock(return_value=True)):
         result = await hass.config_entries.options.async_init(entry.entry_id)
         result = await hass.config_entries.options.async_configure(result['flow_id'], {'next_step_id': 'general'})
+        assert "remote_code_2" in result["description_placeholders"]["player_codes"]
+        assert "Test Player" in result["description_placeholders"]["player_codes"]
         await hass.config_entries.options.async_configure(result['flow_id'], {'remote_code_2': ''})
         await hass.async_block_till_done()
     assert entry.options['remote_codes'] == {}
     assert 'remote_code_2' not in entry.options
+
+
+async def test_single_player_uses_shared_code_and_keeps_private_key(hass):
+    entry = MockConfigEntry(domain=DOMAIN, data={'host': 'freebox.test'}, options={
+        'remote_code_17': 'synthetic-stored',
+    })
+    entry.add_to_hass(hass)
+    api = AsyncMock()
+    api.player.get_players.return_value = [{'id': 17, 'name': 'Salon'}]
+    entry.runtime_data = SimpleNamespace(_api=api)
+    with patch.object(hass.config_entries, 'async_reload', new=AsyncMock(return_value=True)):
+        result = await hass.config_entries.options.async_init(entry.entry_id)
+        result = await hass.config_entries.options.async_configure(result['flow_id'], {'next_step_id': 'general'})
+        schema = result['data_schema']({})
+        assert schema['remote_code'] == 'synthetic-stored'
+        assert 'remote_code_17' not in schema
+        assert result['description_placeholders']['player_codes'] == ''
+        result = await hass.config_entries.options.async_configure(
+            result['flow_id'], {'remote_code': 'synthetic-shared'}
+        )
+        await hass.async_block_till_done()
+    assert result['type'] == FlowResultType.CREATE_ENTRY
+    assert entry.options['remote_code'] == 'synthetic-shared'
+    assert entry.options['remote_code_17'] == 'synthetic-shared'
+    from custom_components.freebox_homexa.const import option_remote_code
+    assert option_remote_code(entry, 17) == 'synthetic-shared'
 
 
 async def test_repeater_page_empty_aborts_without_changes(hass):

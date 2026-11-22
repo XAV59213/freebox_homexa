@@ -58,7 +58,15 @@ function _sensorList(hass, sensorId) {
     total: typeof attrs.total === "number" ? attrs.total : null,
     available: attrs.voicemail_available !== false,
     supported: attrs.voicemail_supported !== false,
+    loading: attrs.voicemail_loading === true,
+    error: typeof attrs.voicemail_error === "string" ? attrs.voicemail_error : "",
   };
+}
+
+function _el(tag) {
+  const doc = typeof document !== "undefined" ? document : null;
+  if (doc && typeof doc.createElement === "function") return doc.createElement(tag);
+  throw new Error("document.createElement manquant");
 }
 
 function _totalLabel(count) {
@@ -109,8 +117,11 @@ const STYLES = `
   .tools { display: flex; gap: 4px; flex: none; }
   .tools button { padding: 4px 8px; }
   audio { width: 100%; margin-top: 6px; }
-  .empty { padding: 8px 0; color: var(--secondary-text-color); }
+  .empty, .notice { padding: 8px 0; color: var(--secondary-text-color); }
   .error { color: var(--error-color, #db4437); font-size: 13px; }
+  .hint { font-size: 12px; color: var(--secondary-text-color); }
+  .list { min-height: 48px; }
+  ha-card { min-height: 220px; }
 `;
 
 class HomexaPhoneCard extends HTMLElement {
@@ -122,6 +133,8 @@ class HomexaPhoneCard extends HTMLElement {
     this._calls = null;
     this._total = null;
     this._error = "";
+    this._notice = "";
+    this._hint = "";
     this._pendingDelete = "";
     this._audioUrl = "";
     this._audioFor = "";
@@ -233,34 +246,55 @@ class HomexaPhoneCard extends HTMLElement {
     const stored = _sensorList(this._hass, this._sensors()[0] || "");
     const sensorMessages = stored ? stored.messages : [];
     const wsMessages = ws && Array.isArray(ws.messages) ? ws.messages : [];
-    if (wsMessages.length) {
-      this._messages = wsMessages;
-      this._total = typeof ws.total === "number" ? ws.total : wsMessages.length;
-      this._error = "";
+    const loading = (ws && ws.loading === true) || (!ws && stored && stored.loading === true);
+    const supported = ws ? ws.supported !== false : !stored || stored.supported !== false;
+    const available = ws ? ws.available !== false : !stored || stored.available !== false;
+    const cached = Boolean(ws && ws.cached === true);
+    const codeSource = ws && typeof ws.error === "string" ? ws.error : "";
+    if (!supported) {
+      this._messages = [];
+      this._total = null;
+      this._notice = "";
+      this._hint = "";
+      this._error = "Messagerie vocale non disponible sur cette Freebox";
       return;
     }
-    if (sensorMessages.length && !(ws && ws.supported === false && stored && stored.supported === false)) {
-      this._messages = sensorMessages;
-      this._total = stored && typeof stored.total === "number" ? stored.total : sensorMessages.length;
+    const fromSocket = wsMessages.length > 0;
+    const messages = fromSocket ? wsMessages : sensorMessages;
+    if (messages.length && supported) {
+      this._messages = messages;
+      if (fromSocket && ws && typeof ws.total === "number") this._total = ws.total;
+      else if (stored && typeof stored.total === "number") this._total = stored.total;
+      else this._total = messages.length;
+      this._notice = "";
+      this._hint = cached && !fromSocket ? "données en cache" : cached ? "données en cache" : "";
+      const code = !available && codeSource ? ` (${codeSource})` : "";
+      this._error = available ? "" : `Messagerie vocale indisponible${code}`;
+      return;
+    }
+    if (!ws && this._messages && this._messages.length) return;
+    if (loading) {
+      this._messages = this._messages && this._messages.length ? this._messages : [];
+      if (!this._messages.length) this._total = null;
+      this._notice = "Chargement de la messagerie…";
+      this._hint = "";
       this._error = "";
       return;
     }
     if (!ws) return;
-    if (ws.supported === false) {
+    if (!available) {
       this._messages = [];
       this._total = null;
-      this._error = "Messagerie vocale non disponible sur cette Freebox";
-      return;
-    }
-    if (ws.available === false) {
-      this._messages = [];
-      this._total = null;
-      const code = typeof ws.error === "string" && ws.error ? ` (${ws.error})` : "";
+      this._notice = "";
+      this._hint = "";
+      const code = codeSource ? ` (${codeSource})` : "";
       this._error = `Messagerie vocale indisponible${code}`;
       return;
     }
     this._messages = [];
     this._total = typeof ws.total === "number" ? ws.total : 0;
+    this._notice = "";
+    this._hint = "";
     this._error = "";
   }
 
@@ -285,11 +319,19 @@ class HomexaPhoneCard extends HTMLElement {
       this._showList(res);
     } catch (err) {
       const stored = _sensorList(this._hass, this._sensors()[0] || "");
-      if (!stored || !stored.messages.length) {
+      const server = err && typeof err.message === "string" ? err.message : "";
+      if (stored && stored.loading && (!stored.messages || !stored.messages.length)) {
+        this._notice = "Chargement de la messagerie…";
+        this._error = "";
+      } else if (!stored || !stored.messages.length) {
         this._messages = [];
         this._total = null;
-        const code = err && typeof err.code === "string" && err.code ? ` (${err.code})` : "";
-        this._error = `Messagerie vocale indisponible${code}`;
+        this._notice = "";
+        if (server && !/\d/.test(server)) this._error = server;
+        else {
+          const code = err && typeof err.code === "string" && err.code ? ` (${err.code})` : "";
+          this._error = `Messagerie vocale indisponible${code}`;
+        }
       }
     } finally {
       this._loading = false;
@@ -343,7 +385,8 @@ class HomexaPhoneCard extends HTMLElement {
       this._messages = Array.isArray(res && res.messages) ? res.messages : this._messages;
       this._error = "";
     } catch (err) {
-      this._error = "Action messagerie impossible";
+      const server = err && typeof err.message === "string" ? err.message : "";
+      this._error = server && !/\d/.test(server) ? server : "Action messagerie impossible";
     }
     this._pendingDelete = "";
     this._key = "";
@@ -381,79 +424,238 @@ class HomexaPhoneCard extends HTMLElement {
     this._mutate("delete", id);
   }
 
+  _signature() {
+    const hass = this._hass;
+    const cfg = this._config || {};
+    const title = cfg.title === undefined ? "Téléphone" : cfg.title;
+    const sensor = this._sensors()[0] || "";
+    const state = hass && hass.states ? hass.states[sensor] : null;
+    const attrs = (state && state.attributes) || {};
+    return JSON.stringify([
+      title,
+      cfg,
+      this._messages,
+      this._total,
+      this._calls,
+      this._error,
+      this._notice,
+      this._hint,
+      this._pendingDelete,
+      this._audioFor,
+      this._audioUrl,
+      this._handsets(),
+      this._on("show_number", false),
+      attrs.voicemail_loading === true,
+      attrs.voicemail_available !== false,
+      attrs.voicemail_supported !== false,
+      attrs.voicemail_error || "",
+    ]);
+  }
+
+  _ensureShell() {
+    if (this._shell) return;
+    const root = this.shadowRoot;
+    const style = _el("style");
+    style.textContent = STYLES;
+    const card = _el("ha-card");
+    card.addEventListener("click", (event) => {
+      const button = event.target && event.target.closest ? event.target.closest("button") : null;
+      if (!button || !card.contains(button)) return;
+      this._click(button.dataset || {});
+    });
+    this._nodes = {
+      card,
+      head: _el("div"),
+      title: _el("span"),
+      actions: _el("div"),
+      chips: _el("div"),
+      several: _el("div"),
+      section: _el("div"),
+      error: _el("div"),
+      total: _el("div"),
+      hint: _el("div"),
+      list: _el("div"),
+      callsSection: _el("div"),
+      callsTitle: _el("div"),
+      calls: _el("div"),
+    };
+    const n = this._nodes;
+    n.head.className = "head";
+    n.title.className = "title";
+    n.head.appendChild(n.title);
+    n.actions.className = "actions";
+    [
+      ["dect", "Sonner DECT", ""],
+      ["fxs", "Sonner FXS", ""],
+      ["stop-dect", "Arrêter DECT", "stop"],
+      ["stop-fxs", "Arrêter FXS", "stop"],
+    ].forEach(([act, label, cls]) => {
+      const button = _el("button");
+      button.dataset.act = act;
+      button.textContent = label;
+      if (cls) button.className = cls;
+      n.actions.appendChild(button);
+    });
+    n.chips.className = "chips";
+    n.several.className = "error";
+    n.several.textContent = "Plusieurs Freebox : choisissez-en une dans l'éditeur.";
+    n.section.className = "section";
+    n.section.textContent = "Messagerie vocale";
+    n.error.className = "error";
+    n.total.className = "meta";
+    n.hint.className = "hint";
+    n.list.className = "list";
+    n.callsTitle.className = "section";
+    n.callsTitle.textContent = "Derniers appels";
+    n.calls.className = "list";
+    n.callsSection.appendChild(n.callsTitle);
+    n.callsSection.appendChild(n.calls);
+    [n.head, n.actions, n.chips, n.several, n.section, n.error, n.total, n.hint, n.list, n.callsSection]
+      .forEach((node) => card.appendChild(node));
+    root.appendChild(style);
+    root.appendChild(card);
+    this._shell = true;
+  }
+
+  _fill(node, nodes) {
+    const playing = this._playingAudio();
+    Array.from(node.childNodes || []).forEach((child) => {
+      if (child === playing) return;
+      if (playing && child.contains && child.contains(playing)) return;
+      node.removeChild(child);
+    });
+    nodes.forEach((child) => {
+      if (child !== playing) node.appendChild(child);
+    });
+  }
+
+  _playingAudio() {
+    const audio = this._audioNode;
+    if (!audio || audio.paused !== false || audio.ended === true) return null;
+    if (!(Number(audio.currentTime) > 0)) return null;
+    return audio;
+  }
+
+  _button(act, id, label, warn) {
+    const button = _el("button");
+    button.dataset.act = act;
+    button.dataset.id = id;
+    button.textContent = label;
+    if (warn) button.className = "warn";
+    return button;
+  }
+
   _render() {
     if (!this.shadowRoot) return;
     const hass = this._hass;
     if (!hass) return;
-    const cfg = this._config || {};
-    const title = cfg.title === undefined ? "Téléphone" : cfg.title;
-    const showNumber = this._on("show_number", false);
-    const messages = this._messages || [];
-    const handsets = this._handsets();
-    const several = _voicemailSensors(hass).length > 1 && !cfg.config_entry;
-    const key = JSON.stringify([title, cfg, messages, this._total, this._calls, this._error, this._pendingDelete, this._audioFor, handsets, showNumber]);
+    const key = this._signature();
     if (key === this._key) return;
     this._key = key;
-    const chips = handsets
-      .map((row) => {
-        const hook = row.hook === "on" ? "Décroché" : row.hook === "off" ? "Raccroché" : "Décroché ?";
-        const ring = row.ringing === "on" ? "Sonne" : row.ringing === "off" ? "" : "";
-        const on = row.hook === "on" || row.ringing === "on";
-        return `<span class="chip ${on ? "on" : ""}">Combiné ${_esc(row.id)} · ${_esc([hook, ring].filter(Boolean).join(" · "))}</span>`;
-      })
-      .join("");
-    const rows = messages
-      .map((item) => {
-        const number = showNumber && item.phone_number ? item.phone_number : "";
-        const meta = [_when(item.date), _duration(item.duration), number].filter(Boolean).join(" · ");
-        const confirm = this._pendingDelete === item.id;
-        const src = this._audioFor === item.id ? _playerUrl(hass, this._audioUrl) : "";
-        return `<div class="row">
-          <div class="main ${item.read ? "" : "unread"}">${_esc(item.read ? "Lu" : "Non lu")}<div class="meta">${_esc(meta)}</div></div>
-          <div class="tools">
-            <button data-act="browser" data-id="${_esc(item.id)}">Écouter</button>
-            ${cfg.media_player ? `<button data-act="player" data-id="${_esc(item.id)}">Sur le lecteur</button>` : ""}
-            <button data-act="read" data-id="${_esc(item.id)}">Lu</button>
-            <button class="${confirm ? "warn" : ""}" data-act="delete" data-id="${_esc(item.id)}">${confirm ? "Confirmer" : "Supprimer"}</button>
-          </div>
-        </div>${src ? `<audio controls preload="none" src="${_esc(src)}"></audio>` : ""}`;
-      })
-      .join("");
-    const max = Math.max(1, Math.min(30, Number(cfg.max_calls) || 5));
-    const calls = (this._calls || []).slice(0, max).map((call) => {
-      const number = showNumber && call.number ? call.number : "";
-      const label = [call.name || "Inconnu", number, _when(call.datetime)].filter(Boolean).join(" · ");
-      return `<div class="row"><div class="main">${_esc(label)}</div></div>`;
-    }).join("");
-    this.shadowRoot.innerHTML = `<style>${STYLES}</style><ha-card>
-      ${title ? `<div class="head"><span class="title">${_esc(title)}</span></div>` : ""}
-      <div class="actions">
-        <button data-act="dect">Sonner DECT</button>
-        <button data-act="fxs">Sonner FXS</button>
-        <button class="stop" data-act="stop-dect">Arrêter DECT</button>
-        <button class="stop" data-act="stop-fxs">Arrêter FXS</button>
-      </div>
-      ${chips ? `<div class="chips">${chips}</div>` : ""}
-      ${several ? `<div class="error">Plusieurs Freebox : choisissez-en une dans l'éditeur.</div>` : ""}
-      <div class="section">Messagerie vocale</div>
-      ${rows && this._error ? `<div class="error">${_esc(this._error)}</div>` : ""}
-      ${_totalLabel(this._total) ? `<div class="meta">${_esc(_totalLabel(this._total))}</div>` : ""}
-      <div class="list">${rows || `<div class="empty">${_esc(this._error || (this._messages === null ? "Chargement…" : "Aucun message"))}</div>`}</div>
-      ${this._on("show_calls", false) ? `<div class="section">Derniers appels</div><div class="list">${calls || `<div class="empty">Aucun appel</div>`}</div>` : ""}
-    </ha-card>`;
-    this.shadowRoot.querySelectorAll("button").forEach((button) => {
-      button.addEventListener("click", () => this._click(button.dataset || {}));
+    this._ensureShell();
+    const cfg = this._config || {};
+    const n = this._nodes;
+    const title = cfg.title === undefined ? "Téléphone" : cfg.title;
+    const showNumber = this._on("show_number", false);
+    n.head.hidden = !title;
+    n.title.textContent = title || "";
+    const chips = this._handsets();
+    this._fill(n.chips, chips.map((row) => {
+      const hook = row.hook === "on" ? "Décroché" : row.hook === "off" ? "Raccroché" : "Décroché ?";
+      const ring = row.ringing === "on" ? "Sonne" : "";
+      const chip = _el("span");
+      const on = row.hook === "on" || row.ringing === "on";
+      chip.className = on ? "chip on" : "chip";
+      chip.textContent = `Combiné ${row.id} · ${[hook, ring].filter(Boolean).join(" · ")}`;
+      return chip;
+    }));
+    n.chips.hidden = chips.length === 0;
+    const several = _voicemailSensors(hass).length > 1 && !cfg.config_entry;
+    n.several.hidden = !several;
+    n.error.hidden = !this._error;
+    n.error.textContent = this._error || "";
+    const total = _totalLabel(this._total);
+    n.total.hidden = !total;
+    n.total.textContent = total;
+    n.hint.hidden = !this._hint;
+    n.hint.textContent = this._hint || "";
+    const messages = this._messages || [];
+    const playing = this._playingAudio();
+    const rows = [];
+    if (!messages.length) {
+      const empty = _el("div");
+      empty.className = this._error ? "empty error" : "empty";
+      empty.textContent = this._notice || this._error || (this._messages === null ? "Chargement…" : "Aucun message");
+      rows.push(empty);
+    }
+    messages.forEach((item) => {
+      const row = _el("div");
+      row.className = "row";
+      const main = _el("div");
+      main.className = item.read ? "main" : "main unread";
+      const label = _el("span");
+      label.textContent = item.read ? "Lu" : "Non lu";
+      const meta = _el("div");
+      meta.className = "meta";
+      const number = showNumber && item.phone_number ? item.phone_number : "";
+      meta.textContent = [_when(item.date), _duration(item.duration), number].filter(Boolean).join(" · ");
+      main.appendChild(label);
+      main.appendChild(meta);
+      const tools = _el("div");
+      tools.className = "tools";
+      tools.appendChild(this._button("browser", item.id, "Écouter", false));
+      if (cfg.media_player) tools.appendChild(this._button("player", item.id, "Sur le lecteur", false));
+      tools.appendChild(this._button("read", item.id, "Lu", false));
+      const confirm = this._pendingDelete === item.id;
+      tools.appendChild(this._button("delete", item.id, confirm ? "Confirmer" : "Supprimer", confirm));
+      row.appendChild(main);
+      row.appendChild(tools);
+      rows.push(row);
+      const src = this._audioFor === item.id ? _playerUrl(hass, this._audioUrl) : "";
+      if (src && playing && playing.getAttribute("data-id") === String(item.id)) {
+        // Le même élément <audio> reste en place pendant la lecture.
+      } else if (src) {
+        const audio = _el("audio");
+        audio.setAttribute("controls", "");
+        audio.setAttribute("preload", "none");
+        audio.setAttribute("src", src);
+        audio.setAttribute("data-id", item.id);
+        audio.addEventListener("error", () => {
+          const reason = _audioReason(audio);
+          this._error = `Lecture impossible (${reason})`;
+          this._audioUrl = "";
+          this._audioFor = "";
+          this._audioNode = null;
+          this._key = "";
+          this._render();
+        });
+        this._audioNode = audio;
+        rows.push(audio);
+      }
     });
-    this.shadowRoot.querySelectorAll("audio").forEach((audio) => {
-      audio.addEventListener("error", () => {
-        const reason = _audioReason(audio);
-        this._error = `Lecture impossible (${reason})`;
-        this._audioUrl = "";
-        this._audioFor = "";
-        this._key = "";
-        this._render();
+    this._fill(n.list, rows);
+    const showCalls = this._on("show_calls", false);
+    n.callsSection.hidden = !showCalls;
+    if (showCalls) {
+      const max = Math.max(1, Math.min(30, Number(cfg.max_calls) || 5));
+      const callRows = (this._calls || []).slice(0, max).map((call) => {
+        const number = showNumber && call.number ? call.number : "";
+        const line = _el("div");
+        line.className = "row";
+        const main = _el("div");
+        main.className = "main";
+        main.textContent = [call.name || "Inconnu", number, _when(call.datetime)].filter(Boolean).join(" · ");
+        line.appendChild(main);
+        return line;
       });
-    });
+      if (!callRows.length) {
+        const empty = _el("div");
+        empty.className = "empty";
+        empty.textContent = "Aucun appel";
+        callRows.push(empty);
+      }
+      this._fill(n.calls, callRows);
+    }
   }
 
   _click(dataset) {

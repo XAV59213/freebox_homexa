@@ -26,7 +26,7 @@
       },
       "lan_options": {
         "title": "LAN clients",
-        "description": "Choose this **before** Home Assistant lists devices. Freebox Server, repeaters and Home devices (alarm, PIR, cameras, shutters) are always created.\n\n« Create devices for network clients » is off by default (Home Assistant rule: a device tracker does not create devices); turn it on to file each client under Wired / Wi-Fi network clients.\nUncheck « Track LAN clients » if presence is already handled by another integration.\n\nPlayers detected: {players}",
+        "description": "Choose this **before** Home Assistant lists devices. Freebox Server, repeaters and Home devices (alarm, PIR, cameras, shutters) are always created.\n\n« Create devices for network clients » is off by default (Home Assistant rule: a device tracker does not create devices); turn it on to file each client under Wired / Wi-Fi network clients.\nUncheck « Track LAN clients » if presence is already handled by another integration.\n\nPlayers detected: {players}\n{player_codes}",
         "data": {
           "track_lan_clients": "Track LAN clients (device trackers)",
           "create_wifi_sensors": "Create Wi-Fi RSSI sensors",
@@ -41,7 +41,7 @@
           "create_wifi_sensors": "Signal strength in dBm when the client is on Wi-Fi.",
           "create_lan_devices": "Off (default): tracker and RSSI stay standalone entities, linked to another integration's device when one exists. On: one device per client, filed by group.",
           "home_poll_interval": "How often to query PIR, contacts, alarm and shutters. 5 s is closer to the official integration if that one is disabled.",
-          "remote_code": "8 digits from the Player: Settings → System → Information. Extra fields appear per detected Player. Leave empty without a Player, or for Mini 4K / Pop."
+          "remote_code": "8 digits from the Player: Settings → System → Information. With one Player this field is enough. With several, each id is listed above. Leave empty without a Player, or for Mini 4K / Pop."
         }
       }
     },
@@ -71,7 +71,7 @@
       },
       "general": {
         "title": "Freebox Homexa options",
-        "description": "LAN clients are phones, PCs and IoT hosts seen by the Freebox. Freebox Server, repeaters and Home devices are not affected. Since Home Assistant 2026.8, devices are no longer merged across integrations.\n\nPlayers detected: {players}",
+        "description": "LAN clients are phones, PCs and IoT hosts seen by the Freebox. Freebox Server, repeaters and Home devices are not affected. Since Home Assistant 2026.8, devices are no longer merged across integrations.\n\nPlayers detected: {players}\n{player_codes}",
         "data": {
           "track_lan_clients": "Track LAN clients (device trackers)",
           "create_wifi_sensors": "Create Wi-Fi RSSI sensors",
@@ -86,7 +86,7 @@
           "create_wifi_sensors": "RSSI is added when a client is seen on Wi-Fi, including after the first setup.",
           "create_lan_devices": "On: each client is filed under Network › Amazon, Phones, Computers, TV & media, Smart devices, Consoles, Printers or Other. Off: tracker and RSSI stay standalone entities and existing client devices are removed on reload.",
           "home_poll_interval": "PIR, contacts, alarm and shutters. Disable the official Freebox integration before using 5 s.",
-          "remote_code": "8 digits. On the Player: Settings → System → Information. Used for power, TV and digits. Mini 4K / Pop often use Android TV Remote."
+          "remote_code": "8 digits. On the Player: Settings → System → Information. Used for power, TV and digits. One Player uses this field. Several Players: the lines above name each remote_code_ID. Mini 4K / Pop often use Android TV Remote."
         }
       },
       "tnt": {
@@ -743,6 +743,15 @@
     },
     "voicemail_player": {
       "message": "Choose an existing media player."
+    },
+    "voicemail_player_unreachable": {
+      "message": "That media player is unavailable. Check that it is connected, then try again."
+    },
+    "voicemail_player_refused": {
+      "message": "The media player refused the voicemail. The message was not marked as read."
+    },
+    "voicemail_write_failed": {
+      "message": "The voicemail could not be updated ({code})."
     },
     "command_failed": {
       "message": "The action could not be completed. Check the Freebox connection and permissions."

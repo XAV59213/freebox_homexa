@@ -26,7 +26,7 @@
       },
       "lan_options": {
         "title": "Clients LAN",
-        "description": "Faites ces choix **avant** que Home Assistant n'affiche la liste des appareils. Le Server, les répéteurs et le pack Home (alarme, PIR, caméras, volets) sont toujours créés.\n\n« Créer des appareils pour les clients réseau » est décoché par défaut (règle Home Assistant : un suivi d'appareil ne crée pas d'appareil) ; cochez-le pour ranger chaque client sous Clients réseau filaires / Clients Wi-Fi.\nDécochez « Suivre les clients LAN » si la présence est déjà gérée ailleurs.\n\nPlayers détectés : {players}",
+        "description": "Faites ces choix **avant** que Home Assistant n'affiche la liste des appareils. Le Server, les répéteurs et le pack Home (alarme, PIR, caméras, volets) sont toujours créés.\n\n« Créer des appareils pour les clients réseau » est décoché par défaut (règle Home Assistant : un suivi d'appareil ne crée pas d'appareil) ; cochez-le pour ranger chaque client sous Clients réseau filaires / Clients Wi-Fi.\nDécochez « Suivre les clients LAN » si la présence est déjà gérée ailleurs.\n\nPlayers détectés : {players}\n{player_codes}",
         "data": {
           "track_lan_clients": "Suivre les clients LAN (device trackers)",
           "create_wifi_sensors": "Créer les capteurs RSSI Wi-Fi",
@@ -41,7 +41,7 @@
           "create_wifi_sensors": "Force du signal en dBm quand le client est en Wi-Fi.",
           "create_lan_devices": "Décoché (défaut) : tracker et RSSI restent des entités seules, reliées à l'appareil d'une autre intégration s'il existe. Coché : un appareil par client, rangé par groupe.",
           "home_poll_interval": "Fréquence PIR, contacts, alarme et volets. 5 s se rapproche de l'officielle si celle-ci est désactivée.",
-          "remote_code": "8 chiffres : sur le Player, Réglages → Système → Informations. Un champ par Player peut s'ajouter. Laissez vide sans Player, ou pour Mini 4K / Pop."
+          "remote_code": "8 chiffres : sur le Player, Réglages → Système → Informations. Un seul Player utilise ce champ. S'il y en a plusieurs, chaque identifiant est listé au-dessus. Laissez vide sans Player, ou pour Mini 4K / Pop."
         }
       },
       "reconfigure": {
@@ -84,7 +84,7 @@
       },
       "general": {
         "title": "Options Freebox Homexa",
-        "description": "Les clients LAN sont les téléphones, PC et objets vus par la Freebox. Le Server, les répéteurs et le pack Home ne sont pas concernés. Depuis Home Assistant 2026.8, les devices ne sont plus fusionnés entre intégrations.\n\nPlayers détectés : {players}",
+        "description": "Les clients LAN sont les téléphones, PC et objets vus par la Freebox. Le Server, les répéteurs et le pack Home ne sont pas concernés. Depuis Home Assistant 2026.8, les devices ne sont plus fusionnés entre intégrations.\n\nPlayers détectés : {players}\n{player_codes}",
         "data": {
           "track_lan_clients": "Suivre les clients LAN (device trackers)",
           "create_wifi_sensors": "Créer les capteurs RSSI Wi-Fi",
@@ -99,7 +99,7 @@
           "create_wifi_sensors": "Le RSSI est ajouté dès qu'un client est vu en Wi-Fi, y compris après la première config.",
           "create_lan_devices": "Activé : chaque client est rangé sous Réseau › Amazon, Téléphones, Ordinateurs, TV & multimédia, Objets connectés, Consoles, Imprimantes ou Autres. Désactivé : tracker et RSSI restent des entités seules et les appareils clients existants sont retirés au rechargement.",
           "home_poll_interval": "PIR, contacts, alarme et volets. Désactivez l'intégration officielle Freebox avant de passer à 5 s.",
-          "remote_code": "8 chiffres. Sur le Player : Réglages → Système → Informations. Sert pour power, TV et chiffres. Mini 4K / Pop : souvent Android TV Remote."
+          "remote_code": "8 chiffres. Sur le Player : Réglages → Système → Informations. Sert pour power, TV et chiffres. Un seul Player utilise ce champ. Plusieurs Players : les lignes au-dessus nomment chaque remote_code_ID. Mini 4K / Pop : souvent Android TV Remote."
         }
       },
       "tnt": {
@@ -756,6 +756,15 @@
     },
     "voicemail_player": {
       "message": "Choisis un lecteur média existant."
+    },
+    "voicemail_player_unreachable": {
+      "message": "Ce lecteur média est indisponible. Vérifiez qu'il est connecté, puis réessayez."
+    },
+    "voicemail_player_refused": {
+      "message": "Le lecteur a refusé le message vocal. Il n'a pas été marqué comme lu."
+    },
+    "voicemail_write_failed": {
+      "message": "Le message vocal n'a pas pu être modifié ({code})."
     },
     "command_failed": {
       "message": "L’action n’a pas pu être exécutée. Vérifiez la connexion et les autorisations de la Freebox."

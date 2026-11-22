@@ -9,15 +9,15 @@ pouvoir joindre une URL HTTPS publique.
 from __future__ import annotations
 
 import asyncio
-from datetime import timedelta
 import logging
+from datetime import timedelta
 from typing import TYPE_CHECKING
 from urllib.parse import quote
 
 from aiohttp import web
 from homeassistant.components.ffmpeg import DATA_FFMPEG
-from homeassistant.components.http.auth import async_sign_path
 from homeassistant.components.http import HomeAssistantView
+from homeassistant.components.http.auth import async_sign_path
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
 from homeassistant.helpers import entity_registry as er
@@ -74,16 +74,26 @@ def signed_voicemail_path(
     return async_sign_path(hass, path, _AUDIO_TTL)
 
 
+def playback_content_type(hass: HomeAssistant, entity_id: str) -> str:
+    """Music Assistant accepte ``audio/mpeg``. Le Player Freebox ouvre une URL (``music``)."""
+    row = er.async_get(hass).async_get(entity_id)
+    if row is not None and row.platform == DOMAIN and row.domain == "media_player":
+        return "music"
+    return "audio/mpeg"
+
+
 def absolute_voicemail_url(hass: HomeAssistant, signed_path: str, *, external: bool) -> str:
     try:
         if external:
-            base = get_url(hass, allow_internal=False, allow_external=True)
+            base = get_url(hass, allow_internal=False, allow_external=True, prefer_external=True)
         else:
-            base = get_url(hass, allow_external=False)
+            base = get_url(hass, prefer_external=False)
     except NoURLAvailableError as err:
         raise HomeAssistantError(
             translation_domain=DOMAIN,
-            translation_key="voicemail_public_url",
+            translation_key=(
+                "voicemail_public_url" if external else "voicemail_player_unreachable"
+            ),
         ) from err
     return f"{base.rstrip('/')}{signed_path}"
 
@@ -188,9 +198,13 @@ class VoicemailAudioView(HomeAssistantView):
             return web.Response(status=404, text="Messagerie vocale introuvable")
         payload: bytes | None = None
         try:
-            payload = await async_voicemail_audio(router, message_id)
             wants_wav = request.query.get("codec") == "wav"
-            body = payload if wants_wav else await async_wav_to_mp3(hass, payload)
+            if wants_wav:
+                payload = await async_voicemail_audio(router, message_id)
+                body = payload
+            else:
+                body = await async_cached_mp3(hass, router, message_id)
+                payload = body
         except ServiceValidationError:
             return web.Response(status=404, text="Message vocal introuvable")
         except HomeAssistantError as err:
@@ -224,31 +238,110 @@ def async_register_voicemail_view(hass: HomeAssistant) -> None:
         _LOGGER.debug("Vue messagerie vocale déjà enregistrée")
 
 
+def _mp3_cache(router: FreeboxRouter) -> dict[str, bytes]:
+    store = router.voicemail_mp3_cache
+    if not isinstance(store, dict):
+        store = {}
+        router.voicemail_mp3_cache = store
+    return store
+
+
+async def async_cached_mp3(hass: HomeAssistant, router: FreeboxRouter, message_id: str) -> bytes:
+    """Réutilise le MP3 déjà produit pour « Écouter ». Sinon convertit et mémorise."""
+    from .voicemail import resolve_voicemail_token
+
+    ident = resolve_voicemail_token(router, message_id)
+    cache = _mp3_cache(router)
+    found = cache.get(ident)
+    if isinstance(found, bytes) and found:
+        return found
+    payload = await async_voicemail_audio(router, message_id)
+    body = payload if _looks_like_mp3(payload) else await async_wav_to_mp3(hass, payload)
+    while len(cache) >= 8:
+        cache.pop(next(iter(cache)))
+    cache[ident] = body
+    return body
+
+
+def _looks_like_mp3(payload: bytes) -> bool:
+    return payload.startswith((b"ID3", b"\xff\xfb"))
+
+
 async def async_play_on_player(
     hass: HomeAssistant, router: FreeboxRouter, message_id: str, entity_id: str
 ) -> None:
-    """Joue le message sur un media_player, puis le marque lu."""
-    from .voicemail import async_mark_voicemail_read
+    """Joue le message. Un échec du marquage lu ne fait pas échouer la lecture."""
+    from .voicemail import (
+        async_mark_voicemail_read,
+        schedule_mark_read_retry,
+        stored_error,
+    )
 
     if not isinstance(entity_id, str) or not entity_id.startswith("media_player."):
         raise ServiceValidationError(
             translation_domain=DOMAIN, translation_key="voicemail_player"
         )
-    if hass.states.get(entity_id) is None:
+    state = hass.states.get(entity_id)
+    if state is None:
         raise ServiceValidationError(
             translation_domain=DOMAIN, translation_key="voicemail_player"
         )
+    if state.state == "unavailable":
+        _LOGGER.warning("Lecteur injoignable pour la messagerie")
+        raise HomeAssistantError(
+            translation_domain=DOMAIN, translation_key="voicemail_player_unreachable"
+        )
     external = player_needs_mp3(hass, entity_id)
-    signed = signed_voicemail_path(hass, router.entry_id, message_id, mp3=True)
-    url = absolute_voicemail_url(hass, signed, external=external)
-    await hass.services.async_call(
-        "media_player",
-        "play_media",
-        {
-            "entity_id": entity_id,
-            "media_content_id": url,
-            "media_content_type": "audio/mpeg",
-        },
-        blocking=True,
-    )
-    await async_mark_voicemail_read(router, message_id)
+    try:
+        signed = signed_voicemail_path(hass, router.entry_id, message_id, mp3=True)
+        url = absolute_voicemail_url(hass, signed, external=external)
+    except HomeAssistantError:
+        raise
+    except Exception as err:
+        _LOGGER.warning("URL de lecture indisponible (%s)", type(err).__name__)
+        raise HomeAssistantError(
+            translation_domain=DOMAIN, translation_key="voicemail_audio"
+        ) from err
+    try:
+        await hass.services.async_call(
+            "media_player",
+            "play_media",
+            {
+                "entity_id": entity_id,
+                "media_content_id": url,
+                "media_content_type": playback_content_type(hass, entity_id),
+            },
+            blocking=True,
+        )
+    except HomeAssistantError as err:
+        if err.translation_key in {
+            "voicemail_player",
+            "voicemail_player_unreachable",
+            "voicemail_public_url",
+            "voicemail_audio",
+        }:
+            raise
+        _LOGGER.warning(
+            "Lecteur a refusé la messagerie (%s)", err.translation_key or "error"
+        )
+        raise HomeAssistantError(
+            translation_domain=DOMAIN, translation_key="voicemail_player_refused"
+        ) from err
+    except Exception as err:
+        _LOGGER.warning(
+            "Lecteur a refusé la messagerie (%s, %s)",
+            type(err).__name__,
+            stored_error(err),
+        )
+        raise HomeAssistantError(
+            translation_domain=DOMAIN, translation_key="voicemail_player_refused"
+        ) from err
+    try:
+        await async_mark_voicemail_read(router, message_id)
+    except Exception as err:
+        _LOGGER.warning(
+            "Lecture commencée, marquage lu reporté (%s)",
+            err.translation_key if isinstance(err, HomeAssistantError) and err.translation_key
+            else stored_error(err),
+        )
+        schedule_mark_read_retry(router, message_id)

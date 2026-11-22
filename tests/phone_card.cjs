@@ -3,36 +3,143 @@ const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const vm = require("node:vm");
 
-class Shadow {
-  constructor() {
-    this._html = "";
-    this.audios = [];
+function _escape(value) {
+  return String(value)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
+function _serialize(node) {
+  if (!node || node.hidden) return "";
+  if (node.nodeType === 3) return _escape(node._text || "");
+  const tag = String(node.tagName || "div").toLowerCase();
+  if (tag === "style") return "";
+  const cls = node.className ? ` class="${node.className}"` : "";
+  const attrs = Object.entries(node._attrs || {})
+    .map(([key, value]) => (value === "" ? ` ${key}` : ` ${key}="${_escape(value)}"`))
+    .join("");
+  const kids = (node.childNodes || []).map(_serialize).join("");
+  return `<${tag}${cls}${attrs}>${kids}</${tag}>`;
+}
+
+class El {
+  constructor(tag) {
+    this.tagName = String(tag || "div").toUpperCase();
+    this.childNodes = [];
+    this.parentNode = null;
+    this.className = "";
+    this.hidden = false;
+    this._attrs = {};
+    this.listeners = {};
+    this.dataset = new Proxy(
+      {},
+      {
+        set: (target, key, value) => {
+          target[key] = value;
+          this._attrs[`data-${key}`] = value;
+          return true;
+        },
+      }
+    );
+    this.paused = true;
+    this.ended = false;
+    this.currentTime = 0;
+    this.error = null;
+  }
+  appendChild(node) {
+    if (node.parentNode) node.parentNode.removeChild(node);
+    node.parentNode = this;
+    this.childNodes.push(node);
+    return node;
+  }
+  removeChild(node) {
+    this.childNodes = this.childNodes.filter((child) => child !== node);
+    node.parentNode = null;
+    return node;
+  }
+  get firstChild() {
+    return this.childNodes[0] || null;
+  }
+  contains(node) {
+    if (node === this) return true;
+    return this.childNodes.some((child) => child.contains && child.contains(node));
+  }
+  closest(selector) {
+    const name = String(selector || "").toLowerCase();
+    let node = this;
+    while (node) {
+      if (String(node.tagName || "").toLowerCase() === name) return node;
+      node = node.parentNode;
+    }
+    return null;
+  }
+  set textContent(value) {
+    if (this.nodeType === 3) {
+      this._text = value == null ? "" : String(value);
+      return;
+    }
+    this.childNodes = [];
+    if (value !== "" && value != null) {
+      const text = new El("#text");
+      text.nodeType = 3;
+      text._text = String(value);
+      text.parentNode = this;
+      this.childNodes.push(text);
+    }
+  }
+  get textContent() {
+    if (this.nodeType === 3) return this._text || "";
+    return this.childNodes.map((child) => child.textContent || "").join("");
+  }
+  setAttribute(name, value) {
+    this._attrs[name] = value;
+  }
+  getAttribute(name) {
+    return this._attrs[name];
+  }
+  addEventListener(type, fn) {
+    this.listeners[type] = fn;
+  }
+  querySelectorAll(selector) {
+    const name = String(selector || "").toLowerCase();
+    const found = [];
+    const walk = (node) => {
+      if (String(node.tagName || "").toLowerCase() === name) found.push(node);
+      (node.childNodes || []).forEach(walk);
+    };
+    walk(this);
+    return found;
+  }
+  querySelector(selector) {
+    return this.querySelectorAll(selector)[0] || null;
   }
   get innerHTML() {
-    return this._html;
+    if (this.childNodes && this.childNodes.length) return this.childNodes.map(_serialize).join("");
+    return this._html || "";
   }
   set innerHTML(value) {
-    this._html = String(value);
+    this._html = String(value ?? "");
+    this.childNodes = [];
+  }
+}
+
+class Shadow extends El {
+  constructor() {
+    super("div");
     this.audios = [];
   }
   querySelectorAll(selector) {
-    if (selector === "audio" && this._html.includes("<audio")) {
-      const node = {
-        error: null,
-        listeners: {},
-        addEventListener: (type, fn) => {
-          node.listeners[type] = fn;
-        },
-      };
-      this.audios.push(node);
-      return [node];
-    }
-    return [];
+    const found = super.querySelectorAll(selector);
+    if (selector === "audio") this.audios = found;
+    return found;
   }
 }
 const registry = new Map();
 const context = {
   HTMLElement: class {},
+  document: { createElement: (tag) => new El(tag) },
   window: { customCards: [] },
   customElements: {
     get: (name) => registry.get(name),
@@ -150,7 +257,7 @@ async function main() {
   assert.equal(ws.find((item) => item.action === "audio_url").codec, "mp3");
   assert.match(html, /<audio controls preload="none" src="\/api\/freebox_homexa\/voicemail\/entry-a\/msg\.au\?authSig=synthetic"/);
   assert.equal(html.includes(SECRET), false);
-  const player = card.shadowRoot.audios[0];
+  const player = card.shadowRoot.querySelector("audio");
   assert.equal(typeof player.listeners.error, "function");
   player.error = { code: 4 };
   player.listeners.error();
@@ -258,6 +365,7 @@ async function main() {
 
   const callsContext = {
     HTMLElement: class {},
+    document: context.document,
     window: { customCards: [] },
     customElements: {
       get: (name) => registry.get(name),

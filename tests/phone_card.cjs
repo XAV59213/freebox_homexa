@@ -619,7 +619,15 @@ async function main() {
   assert.deepEqual([...form.data.media_players], ["media_player.echo"]);
   assert.equal(form.data.show_number, false);
   assert.equal(form.data.show_calls, true);
-  assert.equal(form.schema.find((item) => item.name === "media_players").selector.entity.multiple, true);
+  const playerSelector = form.schema.find((item) => item.name === "media_players").selector.entity;
+  assert.equal(playerSelector.multiple, true);
+  assert.equal(
+    JSON.stringify(playerSelector.filter),
+    JSON.stringify([
+      { integration: "freebox_homexa", domain: "media_player" },
+      { integration: "music_assistant", domain: "media_player" },
+    ])
+  );
   assert.equal(form.schema.some((item) => item.name === "show_number"), true);
   assert.equal(form.schema.some((item) => item.name === "max_calls"), true);
   assert.equal(form.computeLabel({ name: "show_number" }), "Afficher le numéro");
@@ -643,8 +651,11 @@ async function main() {
   assert.equal(Card.getConfigElement().tagName, "HOMEXA-PHONE-CARD-EDITOR");
   assert.equal(Card.getStubConfig().show_number, false);
   assert.equal(
-    Card.getConfigForm().schema.find((item) => item.name === "media_players").selector.entity.domain,
-    "media_player"
+    JSON.stringify(Card.getConfigForm().schema.find((item) => item.name === "media_players").selector.entity.filter),
+    JSON.stringify([
+      { integration: "freebox_homexa", domain: "media_player" },
+      { integration: "music_assistant", domain: "media_player" },
+    ])
   );
 
   editor.hass = {
@@ -665,6 +676,54 @@ async function main() {
   assert.equal(
     editorHost.querySelectorAll("div").some((node) => node.className === "alexa-note"),
     false
+  );
+  editor.hass = {
+    language: "fr",
+    entities: { "media_player.echo_ma": { platform: "music_assistant" } },
+  };
+  editor.setConfig({
+    title: "Téléphone",
+    media_players: ["media_player.echo_ma", "media_player.inconnu"],
+  });
+  const unknownNote = editorHost.querySelectorAll("div").find((node) => node.className === "unknown-note");
+  assert.ok(unknownNote);
+  assert.match(unknownNote.textContent, /pas connue/);
+  const dropped = [];
+  editor.dispatchEvent = (event) => dropped.push(event);
+  editorHost.querySelector("ha-form").listeners["value-changed"]({
+    detail: {
+      value: {
+        title: "Téléphone",
+        media_players: ["media_player.echo_ma", "media_player.echo_direct", "media_player.inconnu"],
+        show_number: false,
+        show_calls: false,
+      },
+    },
+  });
+  editor.hass = {
+    language: "fr",
+    entities: {
+      "media_player.echo_ma": { platform: "music_assistant" },
+      "media_player.echo_direct": { platform: "alexa_devices" },
+    },
+  };
+  editor._config = {
+    title: "Téléphone",
+    media_players: ["media_player.echo_ma", "media_player.echo_direct", "media_player.inconnu"],
+  };
+  editor._onForm({
+    detail: {
+      value: {
+        title: "Téléphone",
+        media_players: ["media_player.echo_ma", "media_player.echo_direct", "media_player.inconnu"],
+        show_number: false,
+        show_calls: false,
+      },
+    },
+  });
+  assert.deepEqual(
+    [...dropped[dropped.length - 1].detail.config.media_players],
+    ["media_player.echo_ma", "media_player.inconnu"]
   );
 
   const twins = makeCard();
@@ -698,18 +757,168 @@ async function main() {
     media_players: ["media_player.echo_direct", "media_player.echo_ma", "media_player.echo_other"],
   });
   await new Promise((resolve) => setImmediate(resolve));
-  twins.shadowRoot.querySelector("ha-card").listeners.click({
-    target: twins.shadowRoot.querySelectorAll("button").find((button) =>
+  assert.equal(twins.shadowRoot.innerHTML.includes("echo_direct"), false);
+  assert.equal(twins.shadowRoot.innerHTML.includes("echo_other"), false);
+  const onlyMa = twins.shadowRoot.querySelectorAll("button").find((button) =>
+    String(button.textContent || "").includes("Écouter sur le Player")
+  );
+  assert.ok(onlyMa);
+  twins.shadowRoot.querySelector("ha-card").listeners.click({ target: onlyMa });
+  assert.equal(twinCalls.length, 1);
+  assert.equal(twinCalls[0][2].entity_id, "media_player.echo_ma");
+
+  const yamlAlexa = makeCard();
+  const yamlCalls = [];
+  yamlAlexa._hass = {
+    language: "fr",
+    states: {
+      "sensor.messages": card._hass.states["sensor.messages"],
+      "media_player.echo_core": { state: "idle", attributes: { friendly_name: "Cuisine" } },
+      "media_player.echo_amp": { state: "idle", attributes: { friendly_name: "Chambre" } },
+      "media_player.salon_ma": { state: "idle", attributes: { friendly_name: "Salon" } },
+    },
+    entities: {
+      ...card._hass.entities,
+      "media_player.echo_core": { platform: "alexa_devices" },
+      "media_player.echo_amp": { platform: "alexa_media" },
+      "media_player.salon_ma": { platform: "music_assistant" },
+    },
+    callService: (domain, service, data) => {
+      yamlCalls.push([domain, service, data]);
+      return Promise.resolve();
+    },
+    callWS: async () => ({
+      available: true,
+      messages: [{ id: "msg.au", date: "2026-11-22T10:00:00Z", duration: 12, read: false }],
+      total: 1,
+    }),
+  };
+  yamlAlexa.setConfig({
+    title: "Téléphone",
+    media_player: "media_player.echo_amp",
+    media_players: ["media_player.echo_core", "media_player.echo_amp", "media_player.salon_ma"],
+  });
+  await new Promise((resolve) => setImmediate(resolve));
+  const yamlHtml = yamlAlexa.shadowRoot.innerHTML;
+  assert.equal(yamlHtml.includes("Cuisine"), false);
+  assert.equal(yamlHtml.includes("Chambre"), false);
+  assert.equal(yamlHtml.includes("echo_core"), false);
+  assert.equal(yamlHtml.includes("echo_amp"), false);
+  assert.equal(yamlHtml.includes('class="menu"'), false);
+  const yamlButton = yamlAlexa.shadowRoot.querySelectorAll("button").find((button) =>
+    String(button.textContent || "").includes("Écouter sur le Player")
+  );
+  assert.ok(yamlButton);
+  yamlAlexa.shadowRoot.querySelector("ha-card").listeners.click({ target: yamlButton });
+  assert.equal(yamlCalls.length, 1);
+  assert.equal(yamlCalls[0][1], "play_voicemail");
+  assert.equal(yamlCalls[0][2].entity_id, "media_player.salon_ma");
+  const yamlEditor = Object.create(Editor.prototype);
+  const yamlHost = new El("div");
+  yamlEditor.appendChild = (node) => yamlHost.appendChild(node);
+  yamlEditor.querySelector = (selector) => yamlHost.querySelector(selector);
+  yamlEditor.dispatchEvent = () => {};
+  yamlEditor.hass = yamlAlexa._hass;
+  yamlEditor.setConfig({
+    title: "Téléphone",
+    media_player: "media_player.echo_amp",
+    media_players: ["media_player.echo_core", "media_player.echo_amp", "media_player.salon_ma"],
+  });
+  const yamlForm = yamlHost.querySelector("ha-form");
+  const yamlFilter = yamlForm.schema.find((item) => item.name === "media_players").selector.entity.filter;
+  assert.equal(JSON.stringify(yamlFilter.map((item) => item.integration)), JSON.stringify(["freebox_homexa", "music_assistant"]));
+  assert.equal(JSON.stringify(yamlFilter).includes("alexa_devices"), false);
+  assert.equal(JSON.stringify(yamlFilter).includes("alexa_media"), false);
+  assert.deepEqual([...yamlForm.data.media_players], ["media_player.salon_ma"]);
+
+  const menuCard = makeCard();
+  const bothCalls = [];
+  menuCard._hass = {
+    language: "fr",
+    states: {
+      "sensor.messages": card._hass.states["sensor.messages"],
+      "media_player.salon_freebox_player": { state: "idle", attributes: { friendly_name: "Salon" } },
+      "media_player.salon_ma": { state: "idle", attributes: { friendly_name: "Salon" } },
+      "media_player.echo_direct": { state: "idle", attributes: { friendly_name: "Salon" } },
+    },
+    entities: {
+      ...card._hass.entities,
+      "media_player.salon_freebox_player": { platform: "freebox_homexa" },
+      "media_player.salon_ma": { platform: "music_assistant" },
+      "media_player.echo_direct": { platform: "alexa_media" },
+    },
+    callService: (domain, service, data) => {
+      bothCalls.push([domain, service, data]);
+      return Promise.resolve();
+    },
+    callWS: async () => ({
+      available: true,
+      messages: [{ id: "msg.au", date: "2026-11-22T10:00:00Z", duration: 12, read: false }],
+      total: 1,
+    }),
+  };
+  menuCard.setConfig({
+    title: "Téléphone",
+    media_player: "media_player.echo_direct",
+    media_players: ["media_player.salon_freebox_player", "media_player.salon_ma", "media_player.echo_direct"],
+  });
+  await new Promise((resolve) => setImmediate(resolve));
+  menuCard.shadowRoot.querySelector("ha-card").listeners.click({
+    target: menuCard.shadowRoot.querySelectorAll("button").find((button) =>
       String(button.textContent || "").includes("Écouter sur…")
     ),
   });
-  const labels = twins.shadowRoot.querySelectorAll("button").map((button) => button.textContent);
-  assert.ok(labels.includes("Echo (Music Assistant)"));
-  assert.ok(labels.includes("Echo (media_player.echo_direct)"));
-  assert.ok(labels.includes("Echo (media_player.echo_other)"));
-  const ma = twins.shadowRoot.querySelectorAll("button").find((button) => button.textContent === "Echo (Music Assistant)");
-  twins.shadowRoot.querySelector("ha-card").listeners.click({ target: ma });
-  assert.equal(twinCalls[0][2].entity_id, "media_player.echo_ma");
+  const bothLabels = menuCard.shadowRoot.querySelectorAll("button").map((button) => button.textContent);
+  assert.ok(bothLabels.includes("Salon (Homexa)"));
+  assert.ok(bothLabels.includes("Salon (Music Assistant)"));
+  assert.equal(bothLabels.includes("Salon (Alexa Media)"), false);
+  const homexa = menuCard.shadowRoot.querySelectorAll("button").find((button) => button.textContent === "Salon (Homexa)");
+  menuCard.shadowRoot.querySelector("ha-card").listeners.click({ target: homexa });
+  assert.equal(bothCalls[0][2].entity_id, "media_player.salon_freebox_player");
+
+  const legacy = makeCard();
+  const legacyCalls = [];
+  legacy._hass = {
+    language: "fr",
+    states: {
+      "sensor.messages": card._hass.states["sensor.messages"],
+      "media_player.salon_freebox_player": { state: "idle", attributes: { friendly_name: "Salon" } },
+      "media_player.inconnu": { state: "idle", attributes: { friendly_name: "Inconnu" } },
+    },
+    entities: {
+      ...card._hass.entities,
+      "media_player.salon_freebox_player": { platform: "freebox_homexa" },
+    },
+    callService: (domain, service, data) => {
+      legacyCalls.push([domain, service, data]);
+      return Promise.resolve();
+    },
+    callWS: async () => ({
+      available: true,
+      messages: [{ id: "msg.au", date: "2026-11-22T10:00:00Z", duration: 12, read: false }],
+      total: 1,
+    }),
+  };
+  legacy.setConfig({ title: "Téléphone", media_player: "media_player.salon_freebox_player" });
+  await new Promise((resolve) => setImmediate(resolve));
+  const legacyButton = legacy.shadowRoot.querySelectorAll("button").find((button) =>
+    String(button.textContent || "").includes("Écouter sur le Player")
+  );
+  legacy.shadowRoot.querySelector("ha-card").listeners.click({ target: legacyButton });
+  assert.equal(legacyCalls[0][2].entity_id, "media_player.salon_freebox_player");
+  legacy.setConfig({
+    title: "Téléphone",
+    media_players: ["media_player.salon_freebox_player", "media_player.inconnu"],
+  });
+  await new Promise((resolve) => setImmediate(resolve));
+  legacy.shadowRoot.querySelector("ha-card").listeners.click({
+    target: legacy.shadowRoot.querySelectorAll("button").find((button) =>
+      String(button.textContent || "").includes("Écouter sur…")
+    ),
+  });
+  const legacyLabels = legacy.shadowRoot.querySelectorAll("button").map((button) => button.textContent);
+  assert.ok(legacyLabels.includes("Salon"));
+  assert.ok(legacyLabels.includes("Inconnu"));
 
   const refused = makeCard();
   refused._hass = {

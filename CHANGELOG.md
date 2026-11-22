@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Carte Téléphone : le sélecteur et le menu de lecture ne proposent que le Freebox Player et Music Assistant. Une configuration déjà enregistrée retire explicitement `alexa_devices` et `alexa_media` dès que l'intégration est connue. Si l'intégration n'est pas connue, le lecteur reste et l'éditeur le signale. L'ancienne clé `media_player` est toujours lue.
 - Player : `media_player.play_media` avec une URL HTTP ou HTTPS audio (`audio/*`, `music`, ou sans type si l'adresse finit par .mp3, .aac, .ogg, .wav ou .flac) passe par AirMedia (`action=start`, type video), le même chemin que la messagerie. `control/open` est le second essai. Si l'état du Player ne change pas, l'action échoue avec un message traduit. Les chaînes `tv:`, les autres adresses et la vidéo ne changent pas. Une source média est résolue en URL avant la lecture.
 
 ## 28.8.102 — 2026-11-22

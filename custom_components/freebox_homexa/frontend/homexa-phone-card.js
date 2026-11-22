@@ -122,9 +122,10 @@ const COPY = {
       show_calls: "Derniers appels",
       max_calls: "Nombre d'appels",
       helpEntry: "Utile s'il y a plusieurs Freebox. Vide = détection automatique.",
-      helpPlayers: "Un ou plusieurs lecteurs. L'ancienne option media_player reste acceptée.",
+      helpPlayers: "Freebox Player ou Music Assistant. L'ancienne option media_player reste acceptée.",
       helpNumber: "Masqué par défaut. Les numéros ne sont pas dans les états Home Assistant.",
-      alexaDirect: "Un lecteur Alexa direct ne lit pas le message vocal. Préférez l'entité Music Assistant du même appareil.",
+      alexaDirect: "Ces lecteurs ne sont pas proposés. Seuls le Freebox Player et Music Assistant lisent le message.",
+      unknownPlayers: "L'intégration de certains lecteurs n'est pas connue. Ils restent dans le menu.",
       playerOff: "La lecture sur un lecteur est désactivée dans les réglages de l'intégration.",
     },
   },
@@ -150,9 +151,10 @@ const COPY = {
       show_calls: "Recent calls",
       max_calls: "Number of calls",
       helpEntry: "Useful with several Freeboxes. Empty = automatic detection.",
-      helpPlayers: "One or more players. The older media_player option still works.",
+      helpPlayers: "Freebox Player or Music Assistant. The older media_player option still works.",
       helpNumber: "Hidden by default. Numbers are not stored in Home Assistant states.",
-      alexaDirect: "A direct Alexa player cannot play the voicemail. Prefer the Music Assistant entity of the same device.",
+      alexaDirect: "These players are not offered. Only the Freebox Player and Music Assistant can play the message.",
+      unknownPlayers: "The integration of some players is unknown. They stay in the menu.",
       playerOff: "Playback on a media player is turned off in the integration settings.",
     },
   },
@@ -177,6 +179,27 @@ function _playerIds(config) {
     ids.push(id);
   });
   return ids;
+}
+
+function _platformsKnown(hass) {
+  return Boolean(hass && hass.entities && typeof hass.entities === "object");
+}
+
+function _playablePlatform(platform) {
+  return platform === "freebox_homexa" || platform === "music_assistant";
+}
+
+function _blockedPlatform(platform) {
+  return platform === "alexa_devices" || platform === "alexa_media";
+}
+
+function _playableIds(hass, config) {
+  return _playerIds(config).filter((id) => {
+    const platform = _platform(hass, id);
+    if (_blockedPlatform(platform)) return false;
+    if (!platform) return true;
+    return _playablePlatform(platform);
+  });
 }
 
 function _friendly(hass, entityId) {
@@ -225,11 +248,12 @@ function _visibleError(err, fallback) {
   return fallback;
 }
 
-function _playerKey(config) {
+function _playerKey(config, ids) {
   const cfg = config || {};
   const entry = typeof cfg.config_entry === "string" ? cfg.config_entry : "";
   const title = typeof cfg.title === "string" ? cfg.title : "";
-  return `homexa-phone-card:${entry}:${title}:${_playerIds(cfg).join("|")}`;
+  const list = ids || _playerIds(cfg);
+  return `homexa-phone-card:${entry}:${title}:${list.join("|")}`;
 }
 
 function _memory() {
@@ -246,17 +270,28 @@ function _editorSchema() {
   return [
     { name: "title", selector: { text: {} } },
     { name: "config_entry", selector: { config_entry: { integration: "freebox_homexa" } } },
-    { name: "media_players", selector: { entity: { domain: "media_player", multiple: true } } },
+    {
+      name: "media_players",
+      selector: {
+        entity: {
+          multiple: true,
+          filter: [
+            { integration: "freebox_homexa", domain: "media_player" },
+            { integration: "music_assistant", domain: "media_player" },
+          ],
+        },
+      },
+    },
     { name: "show_number", selector: { boolean: {} } },
     { name: "show_calls", selector: { boolean: {} } },
     { name: "max_calls", selector: { number: { min: 1, max: 30, mode: "box" } } },
   ];
 }
 
-function _editorData(config) {
+function _editorData(config, hass) {
   const cfg = config || {};
   const data = {
-    media_players: _playerIds(cfg),
+    media_players: _playableIds(hass, cfg),
     show_number: cfg.show_number === true,
     show_calls: cfg.show_calls === true,
   };
@@ -636,7 +671,7 @@ class HomexaPhoneCard extends HTMLElement {
       this._menuFor,
       this._playerEnabled,
       this._remembered(),
-      _playerIds(cfg).map((id) => _playerLabel(hass, id, _playerIds(cfg))),
+      _playableIds(hass, cfg).map((id) => _playerLabel(hass, id, _playableIds(hass, cfg))),
       this._handsets(),
       this._on("show_number", false),
       attrs.voicemail_loading === true,
@@ -792,7 +827,7 @@ class HomexaPhoneCard extends HTMLElement {
     n.total.hidden = !total;
     n.total.textContent = total;
     const copy = _copy(hass);
-    const players = _playerIds(cfg);
+    const players = _playableIds(hass, cfg);
     const allowed = this._playerEnabled !== false;
     const hint = this._notice || this._hint || (allowed && !players.length ? copy.noPlayer : "");
     n.hint.hidden = !hint;
@@ -911,7 +946,7 @@ class HomexaPhoneCard extends HTMLElement {
     else if (act === "stop-fxs") this._service("stop_fxs_ring", {});
     else if (act === "browser") this._playBrowser(id);
     else if (act === "player") {
-      const players = _playerIds(this._config);
+      const players = _playableIds(this._hass, this._config);
       if (players.length > 1) {
         this._menuFor = this._menuFor === id ? "" : id;
         this._key = "";
@@ -923,7 +958,7 @@ class HomexaPhoneCard extends HTMLElement {
     else if (act === "pick") {
       const entityId = dataset.entity || "";
       this._menuFor = "";
-      if (_playerIds(this._config).includes(entityId)) this._remember(entityId);
+      if (_playableIds(this._hass, this._config).includes(entityId)) this._remember(entityId);
       this._playOn(id, entityId);
     }
     else if (act === "read") this._mutate("mark_read", id);
@@ -932,21 +967,22 @@ class HomexaPhoneCard extends HTMLElement {
 
   _remember(entityId) {
     const box = _memory();
-    if (!box || !_playerIds(this._config).includes(entityId)) return;
+    const players = _playableIds(this._hass, this._config);
+    if (!box || !players.includes(entityId)) return;
     try {
-      box.setItem(_playerKey(this._config), entityId);
+      box.setItem(_playerKey(this._config, players), entityId);
     } catch (err) {
       // Navigation privée ou quota : le choix reste valable pour cet affichage.
     }
   }
 
   _remembered() {
-    const players = _playerIds(this._config);
+    const players = _playableIds(this._hass, this._config);
     const box = _memory();
     if (!box) return "";
     let value = "";
     try {
-      value = box.getItem(_playerKey(this._config)) || "";
+      value = box.getItem(_playerKey(this._config, players)) || "";
     } catch (err) {
       return "";
     }
@@ -955,7 +991,7 @@ class HomexaPhoneCard extends HTMLElement {
 
   _playOn(id, entityId) {
     const copy = _copy(this._hass);
-    const players = _playerIds(this._config);
+    const players = _playableIds(this._hass, this._config);
     if (!entityId || !players.includes(entityId)) {
       this._notice = copy.noPlayer;
       this._error = "";
@@ -1014,7 +1050,7 @@ class HomexaPhoneCardEditor extends HTMLElement {
       if (typeof this.appendChild === "function") this.appendChild(form);
     }
     const copy = _copy(this._hass);
-    const data = _editorData(this._config);
+    const data = _editorData(this._config, this._hass);
     const stamp = JSON.stringify(data);
     form.hass = this._hass;
     form.schema = _editorSchema();
@@ -1031,11 +1067,14 @@ class HomexaPhoneCardEditor extends HTMLElement {
           : schema.name === "media_players"
             ? copy.editors.helpPlayers
             : undefined;
-    const directAlexa = _playerIds(this._config).some((id) => {
+    const configured = _playerIds(this._config);
+    const known = _platformsKnown(this._hass);
+    const unsupported = known && configured.some((id) => {
       const platform = _platform(this._hass, id);
-      return platform === "alexa_media" || platform === "alexa_devices";
+      return platform && !_playablePlatform(platform);
     });
-    if (directAlexa) {
+    const unknown = known && configured.some((id) => !_platform(this._hass, id));
+    if (unsupported) {
       if (!this._alexaNote) {
         this._alexaNote = document.createElement("div");
         this._alexaNote.className = "alexa-note";
@@ -1045,6 +1084,17 @@ class HomexaPhoneCardEditor extends HTMLElement {
     } else if (this._alexaNote && this._alexaNote.parentNode) {
       this._alexaNote.parentNode.removeChild(this._alexaNote);
       this._alexaNote = null;
+    }
+    if (unknown) {
+      if (!this._unknownNote) {
+        this._unknownNote = document.createElement("div");
+        this._unknownNote.className = "unknown-note";
+        if (typeof this.appendChild === "function") this.appendChild(this._unknownNote);
+      }
+      this._unknownNote.textContent = copy.editors.unknownPlayers;
+    } else if (this._unknownNote && this._unknownNote.parentNode) {
+      this._unknownNote.parentNode.removeChild(this._unknownNote);
+      this._unknownNote = null;
     }
     const playerOff = _voicemailSensors(this._hass).some((id) => {
       const entry = this._config && this._config.config_entry;
@@ -1071,7 +1121,7 @@ class HomexaPhoneCardEditor extends HTMLElement {
     const value = (event && event.detail && event.detail.value) || {};
     const next = { ...(this._config || {}) };
     delete next.media_player;
-    const players = _playerIds({ media_players: value.media_players });
+    const players = _playableIds(this._hass, { media_players: value.media_players });
     if (players.length) next.media_players = players;
     else delete next.media_players;
     if (typeof value.title === "string" && value.title.trim()) next.title = value.title;

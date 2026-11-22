@@ -107,7 +107,20 @@ const COPY = {
     playerShort: "Sur le Player",
     choose: "Écouter sur…",
     chooseShort: "Sur…",
+    onShort: "Sur",
     listenOn: "Écouter sur",
+    playing: "Lecture",
+    paused: "Pause",
+    idle: "Inactif",
+    off: "Éteint",
+    buffering: "Mise en mémoire",
+    unavailable: "Indisponible",
+    notStarted: "Le lecteur n'a pas démarré la lecture",
+    resume: "Reprendre",
+    stop: "Stop",
+    volUp: "Volume +",
+    volDown: "Volume -",
+    close: "Fermer",
     asking: "Lecture demandée sur le Player…",
     askingNamed: "Lecture demandée sur ",
     launched: "Lecture lancée sur le Player",
@@ -136,7 +149,20 @@ const COPY = {
     playerShort: "On the Player",
     choose: "Play on…",
     chooseShort: "On…",
+    onShort: "On",
     listenOn: "Play on",
+    playing: "Playing",
+    paused: "Paused",
+    idle: "Idle",
+    off: "Off",
+    buffering: "Buffering",
+    unavailable: "Unavailable",
+    notStarted: "The player did not start playback",
+    resume: "Resume",
+    stop: "Stop",
+    volUp: "Volume +",
+    volDown: "Volume -",
+    close: "Close",
     asking: "Starting playback on the Player…",
     askingNamed: "Starting playback on ",
     launched: "Playback started on the Player",
@@ -220,6 +246,41 @@ function _integrationName(platform) {
   if (platform === "music_assistant") return "Music Assistant";
   if (platform === "freebox_homexa") return "Homexa";
   return platform ? platform.replace(/_/g, " ") : "";
+}
+
+const FEATURE = { pause: 1, volumeSet: 4, volumeStep: 1024, stop: 4096, play: 16384 };
+
+function _feature(attrs, bit) {
+  const value = attrs && attrs.supported_features;
+  return typeof value === "number" && (value & bit) === bit;
+}
+
+function _compactName(label) {
+  const text = String(label || "").replace(/\s+/g, " ").trim();
+  if (!text) return "";
+  const parts = text.split(/\s[-–—|]\s/);
+  const tail = parts[parts.length - 1].trim() || text;
+  return tail.length > 24 ? `${tail.slice(0, 23)}…` : tail;
+}
+
+function _clock(total) {
+  const seconds = Math.max(0, Math.floor(Number(total) || 0));
+  const minutes = Math.floor(seconds / 60);
+  return `${minutes}:${String(seconds % 60).padStart(2, "0")}`;
+}
+
+function _progress(state) {
+  const attrs = (state && state.attributes) || {};
+  const duration = Number(attrs.media_duration);
+  const position = Number(attrs.media_position);
+  if (!Number.isFinite(duration) || duration <= 0 || !Number.isFinite(position) || position < 0) return null;
+  let current = position;
+  if (state.state === "playing" && attrs.media_position_updated_at) {
+    const updated = Date.parse(attrs.media_position_updated_at);
+    if (Number.isFinite(updated)) current += Math.max(0, (Date.now() - updated) / 1000);
+  }
+  current = Math.min(current, duration);
+  return { current, duration, ratio: current / duration };
 }
 
 function _playerLabel(hass, entityId, ids) {
@@ -340,7 +401,16 @@ const STYLES = `
   }
   button:disabled { opacity: 0.55; cursor: default; }
   .picker { position: relative; display: inline-flex; max-width: 100%; }
-  .tools button.player .long { max-width: 12rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; vertical-align: bottom; }
+  .tools button.player .long, .tools button.player .short { max-width: 8.5rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; vertical-align: bottom; }
+  .remote { margin: 0 0 8px; padding: 8px; border-radius: 12px; background: var(--secondary-background-color, rgba(127,127,127,.12)); }
+  .remote .top { display: flex; align-items: center; gap: 8px; }
+  .remote .name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
+  .remote .meta { font-size: 12px; color: var(--secondary-text-color); }
+  .remote .warn { color: var(--error-color, #db4437); font-size: 12px; margin-top: 6px; }
+  .track { height: 6px; border-radius: 99px; background: var(--divider-color, rgba(127,127,127,.35)); margin: 8px 0 4px; overflow: hidden; }
+  .track span { display: block; height: 100%; width: 0; background: var(--primary-color); }
+  .remote .ctrls { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+  .remote button { background: var(--card-background-color, #fff); color: var(--primary-text-color); }
   .menu { position: absolute; z-index: 5; top: calc(100% + 4px); left: 0; display: flex; flex-direction: column; gap: 4px; min-width: 10rem; padding: 6px; border-radius: 12px; background: var(--card-background-color, #fff); box-shadow: 0 6px 18px rgba(0,0,0,.24); }
   .menu button { background: var(--secondary-background-color, #eee); color: var(--primary-text-color); text-align: left; }
   .menu button.chosen { outline: 2px solid var(--primary-color); }
@@ -367,6 +437,8 @@ class HomexaPhoneCard extends HTMLElement {
     this._audioUrl = "";
     this._audioFor = "";
     this._menuFor = "";
+    this._remote = null;
+    this._remoteTimer = null;
     this._playerEnabled = true;
     this._key = "";
     this._loading = false;
@@ -670,6 +742,11 @@ class HomexaPhoneCard extends HTMLElement {
       this._audioUrl,
       this._menuFor,
       this._playerEnabled,
+      this._remote && this._remote.id,
+      this._remote && this._remote.entityId,
+      this._remote && this._remote.late,
+      this._remote && this._remote.started,
+      this._remoteSnapshot(),
       this._remembered(),
       _playableIds(hass, cfg).map((id) => _playerLabel(hass, id, _playableIds(hass, cfg))),
       this._handsets(),
@@ -794,10 +871,175 @@ class HomexaPhoneCard extends HTMLElement {
     return button;
   }
 
+  disconnectedCallback() {
+    this._stopRemoteTimer();
+  }
+
+  _remoteSnapshot() {
+    const remote = this._remote;
+    const hass = this._hass;
+    if (!remote || !hass || !hass.states) return "";
+    const state = hass.states[remote.entityId];
+    const attrs = (state && state.attributes) || {};
+    return [
+      state && state.state,
+      attrs.media_position,
+      attrs.media_duration,
+      attrs.supported_features,
+      attrs.volume_level,
+      attrs.friendly_name,
+    ];
+  }
+
+  _noteRemote() {
+    const remote = this._remote;
+    const hass = this._hass;
+    if (!remote || !hass || !hass.states) return;
+    const state = hass.states[remote.entityId];
+    const name = state && state.state;
+    if (name === "playing" || name === "buffering") remote.started = true;
+    if (!remote.started && Date.now() - remote.sentAt >= 10000) remote.late = true;
+  }
+
+  _armRemote() {
+    if (this._remoteTimer || typeof setInterval !== "function") return;
+    this._remoteTimer = setInterval(() => {
+      if (!this._remote) {
+        this._stopRemoteTimer();
+        return;
+      }
+      const wasLate = this._remote.late === true;
+      this._noteRemote();
+      this._paintRemote();
+      if (!wasLate && this._remote && this._remote.late) {
+        this._key = "";
+        this._render();
+      }
+    }, 1000);
+  }
+
+  _stopRemoteTimer() {
+    if (this._remoteTimer && typeof clearInterval === "function") clearInterval(this._remoteTimer);
+    this._remoteTimer = null;
+  }
+
+  _paintRemote() {
+    const root = this.shadowRoot;
+    const remote = this._remote;
+    if (!root || !remote || typeof root.querySelector !== "function") return;
+    const box = root.querySelector(".remote");
+    if (!box || typeof box.querySelector !== "function") return;
+    const progress = _progress(this._hass && this._hass.states && this._hass.states[remote.entityId]);
+    const fill = box.querySelector(".track span");
+    const time = box.querySelector(".time");
+    if (fill && progress) {
+      if (!fill.style || typeof fill.style !== "object") fill.style = {};
+      fill.style.width = `${Math.round(progress.ratio * 100)}%`;
+    }
+    if (time && progress) time.textContent = `${_clock(progress.current)} / ${_clock(progress.duration)}`;
+  }
+
+  _remoteBox(hass, copy) {
+    const remote = this._remote;
+    const state = hass && hass.states ? hass.states[remote.entityId] : null;
+    const attrs = (state && state.attributes) || {};
+    const box = _el("div");
+    box.className = "remote";
+    const top = _el("div");
+    top.className = "top";
+    const name = _el("div");
+    name.className = "name";
+    name.textContent = _playerLabel(hass, remote.entityId, _playableIds(hass, this._config));
+    const meta = _el("div");
+    meta.className = "meta";
+    const current = !state || state.state === "unavailable" || state.state === "unknown"
+      ? "unavailable"
+      : state.state;
+    meta.textContent = copy[current] || copy.idle;
+    const close = this._button("remote-close", remote.id, copy.close, "", false);
+    close.className = "stop";
+    top.appendChild(name);
+    top.appendChild(meta);
+    top.appendChild(close);
+    box.appendChild(top);
+    const progress = _progress(state);
+    if (progress) {
+      const track = _el("div");
+      track.className = "track";
+      const fill = _el("span");
+      if (!fill.style || typeof fill.style !== "object") fill.style = {};
+      fill.style.width = `${Math.round(progress.ratio * 100)}%`;
+      track.appendChild(fill);
+      const time = _el("div");
+      time.className = "time meta";
+      time.textContent = `${_clock(progress.current)} / ${_clock(progress.duration)}`;
+      box.appendChild(track);
+      box.appendChild(time);
+    }
+    if (remote.late) {
+      const warn = _el("div");
+      warn.className = "warn";
+      warn.textContent = copy.notStarted;
+      box.appendChild(warn);
+    }
+    const ctrls = _el("div");
+    ctrls.className = "ctrls";
+    if (_feature(attrs, FEATURE.play) || _feature(attrs, FEATURE.pause)) {
+      const toggle = this._button(
+        "remote-toggle",
+        remote.id,
+        state && state.state === "playing" ? copy.paused : copy.resume,
+        "",
+        false
+      );
+      toggle.className = "stop";
+      ctrls.appendChild(toggle);
+    }
+    if (_feature(attrs, FEATURE.stop)) {
+      const stop = this._button("remote-stop", remote.id, copy.stop, "", false);
+      stop.className = "stop";
+      ctrls.appendChild(stop);
+    }
+    if (_feature(attrs, FEATURE.volumeSet) || _feature(attrs, FEATURE.volumeStep)) {
+      const down = this._button("remote-down", remote.id, copy.volDown, "", false);
+      const up = this._button("remote-up", remote.id, copy.volUp, "", false);
+      down.className = "stop";
+      up.className = "stop";
+      ctrls.appendChild(down);
+      ctrls.appendChild(up);
+    }
+    if (ctrls.childNodes.length) box.appendChild(ctrls);
+    return box;
+  }
+
+  _nudgeVolume(direction) {
+    const hass = this._hass;
+    const remote = this._remote;
+    if (!hass || !remote || !hass.states) return;
+    const state = hass.states[remote.entityId];
+    const attrs = (state && state.attributes) || {};
+    if (_feature(attrs, FEATURE.volumeSet) && typeof attrs.volume_level === "number") {
+      const next = Math.min(1, Math.max(0, attrs.volume_level + direction * 0.05));
+      this._media("volume_set", { volume_level: Math.round(next * 100) / 100 });
+      return;
+    }
+    if (_feature(attrs, FEATURE.volumeStep)) this._media(direction > 0 ? "volume_up" : "volume_down");
+  }
+
+  _media(service, data) {
+    const hass = this._hass;
+    const remote = this._remote;
+    if (!hass || typeof hass.callService !== "function" || !remote) return undefined;
+    const payload = { entity_id: remote.entityId };
+    if (data && typeof data.volume_level === "number") payload.volume_level = data.volume_level;
+    return hass.callService("media_player", service, payload);
+  }
+
   _render() {
     if (!this.shadowRoot) return;
     const hass = this._hass;
     if (!hass) return;
+    this._noteRemote();
     const key = this._signature();
     if (key === this._key) return;
     this._key = key;
@@ -859,11 +1101,12 @@ class HomexaPhoneCard extends HTMLElement {
       const copy = _copy(hass);
       tools.appendChild(this._button("browser", item.id, copy.phone, copy.phoneShort, false));
       const remembered = allowed && players.length > 1 ? this._remembered() : "";
-      const rememberedName = remembered ? _playerLabel(hass, remembered, players) : "";
-      const longLabel = players.length > 1
-        ? (rememberedName ? `${copy.listenOn} ${rememberedName}` : copy.choose)
-        : copy.player;
-      const shortLabel = players.length > 1 ? copy.chooseShort : copy.playerShort;
+      const targetId = players.length === 1 ? players[0] : remembered;
+      const targetName = targetId ? _compactName(_playerLabel(hass, targetId, players)) : "";
+      const longLabel = targetName
+        ? `${copy.onShort} ${targetName}`
+        : (players.length > 1 ? copy.choose : copy.player);
+      const shortLabel = targetName || (players.length > 1 ? copy.chooseShort : copy.playerShort);
       if (allowed) {
         const playerButton = this._button("player", item.id, longLabel, shortLabel, false);
         playerButton.className = players.length ? "player" : "player stop";
@@ -890,6 +1133,7 @@ class HomexaPhoneCard extends HTMLElement {
       row.appendChild(main);
       row.appendChild(tools);
       rows.push(row);
+      if (this._remote && this._remote.id === item.id) rows.push(this._remoteBox(hass, copy));
       const src = this._audioFor === item.id ? _playerUrl(hass, this._audioUrl) : "";
       if (src && playing && playing.getAttribute("data-id") === String(item.id)) {
         // Le même élément <audio> reste en place pendant la lecture.
@@ -961,6 +1205,15 @@ class HomexaPhoneCard extends HTMLElement {
       if (_playableIds(this._hass, this._config).includes(entityId)) this._remember(entityId);
       this._playOn(id, entityId);
     }
+    else if (act === "remote-close") {
+      this._remote = null;
+      this._stopRemoteTimer();
+      this._key = "";
+      this._render();
+    }
+    else if (act === "remote-toggle") this._media("media_play_pause");
+    else if (act === "remote-stop") this._media("media_stop");
+    else if (act === "remote-up" || act === "remote-down") this._nudgeVolume(act === "remote-up" ? 1 : -1);
     else if (act === "read") this._mutate("mark_read", id);
     else if (act === "delete") this._delete(id);
   }
@@ -999,7 +1252,7 @@ class HomexaPhoneCard extends HTMLElement {
       this._render();
       return;
     }
-    const named = players.length > 1 ? _playerLabel(this._hass, entityId, players) : "";
+    const named = _compactName(_playerLabel(this._hass, entityId, players));
     this._notice = named ? `${copy.askingNamed}${named}…` : copy.asking;
     this._error = "";
     this._menuFor = "";
@@ -1008,8 +1261,10 @@ class HomexaPhoneCard extends HTMLElement {
     const pending = this._service("play_voicemail", { id, entity_id: entityId });
     if (pending && typeof pending.then === "function") {
       pending.then(() => {
-        this._notice = named ? `${copy.launchedNamed}${named}` : copy.launched;
+        this._notice = "";
         this._error = "";
+        this._remote = { id, entityId, sentAt: Date.now(), started: false, late: false };
+        this._armRemote();
         this._key = "";
         this._render();
       }).catch((err) => {

@@ -477,17 +477,18 @@ async function main() {
   await new Promise((resolve) => setImmediate(resolve));
   const host = playerCard.shadowRoot.querySelector("ha-card");
   const playerButton = playerCard.shadowRoot.querySelectorAll("button").find((button) =>
-    String(button.textContent || "").includes("Écouter sur le Player")
+    String(button.textContent || "").includes("Sur salon freebox player")
   );
   assert.ok(playerButton);
-  const label = playerButton.childNodes.find((node) => String(node.textContent || "").includes("Écouter sur le Player"));
+  const label = playerButton.childNodes.find((node) => String(node.textContent || "").includes("Sur salon"));
   host.listeners.click({ target: label || playerButton });
   assert.equal(playerCalls[0][0], "freebox_homexa");
   assert.equal(playerCalls[0][1], "play_voicemail");
   assert.equal(playerCalls[0][2].id, "msg.au");
   assert.equal(playerCalls[0][2].entity_id, "media_player.salon_freebox_player");
   await new Promise((resolve) => setImmediate(resolve));
-  assert.match(playerCard.shadowRoot.innerHTML, /Lecture lancée sur le Player/);
+  assert.match(playerCard.shadowRoot.innerHTML, /class="remote"/);
+  assert.match(playerCard.shadowRoot.innerHTML, /salon freebox player/);
 
   const bare = makeCard();
   const bareCalls = [];
@@ -525,7 +526,7 @@ async function main() {
   oneList.setConfig({ title: "Téléphone", media_players: ["media_player.echo"] });
   await new Promise((resolve) => setImmediate(resolve));
   const oneButton = oneList.shadowRoot.querySelectorAll("button").find((button) =>
-    String(button.textContent || "").includes("Écouter sur le Player")
+    String(button.textContent || "").includes("Sur echo")
   );
   assert.ok(oneButton);
   assert.equal(oneButton.disabled, false);
@@ -588,9 +589,10 @@ async function main() {
   assert.equal(multiCalls[0][2].id, "msg.au");
   assert.equal([...saved.values()][0], "media_player.salon");
   await new Promise((resolve) => setImmediate(resolve));
-  assert.match(multi.shadowRoot.innerHTML, /Lecture lancée sur Salon/);
+  assert.match(multi.shadowRoot.innerHTML, /class="remote"/);
+  assert.match(multi.shadowRoot.innerHTML, /Salon/);
   const again = multi.shadowRoot.querySelectorAll("button").find((button) =>
-    String(button.textContent || "").includes("Écouter sur Salon")
+    String(button.textContent || "").includes("Sur Salon")
   );
   assert.ok(again);
   chooseHost.listeners.click({ target: again });
@@ -760,7 +762,7 @@ async function main() {
   assert.equal(twins.shadowRoot.innerHTML.includes("echo_direct"), false);
   assert.equal(twins.shadowRoot.innerHTML.includes("echo_other"), false);
   const onlyMa = twins.shadowRoot.querySelectorAll("button").find((button) =>
-    String(button.textContent || "").includes("Écouter sur le Player")
+    String(button.textContent || "").includes("Sur Echo")
   );
   assert.ok(onlyMa);
   twins.shadowRoot.querySelector("ha-card").listeners.click({ target: onlyMa });
@@ -806,7 +808,7 @@ async function main() {
   assert.equal(yamlHtml.includes("echo_amp"), false);
   assert.equal(yamlHtml.includes('class="menu"'), false);
   const yamlButton = yamlAlexa.shadowRoot.querySelectorAll("button").find((button) =>
-    String(button.textContent || "").includes("Écouter sur le Player")
+    String(button.textContent || "").includes("Sur Salon")
   );
   assert.ok(yamlButton);
   yamlAlexa.shadowRoot.querySelector("ha-card").listeners.click({ target: yamlButton });
@@ -902,7 +904,7 @@ async function main() {
   legacy.setConfig({ title: "Téléphone", media_player: "media_player.salon_freebox_player" });
   await new Promise((resolve) => setImmediate(resolve));
   const legacyButton = legacy.shadowRoot.querySelectorAll("button").find((button) =>
-    String(button.textContent || "").includes("Écouter sur le Player")
+    String(button.textContent || "").includes("Sur Salon")
   );
   legacy.shadowRoot.querySelector("ha-card").listeners.click({ target: legacyButton });
   assert.equal(legacyCalls[0][2].entity_id, "media_player.salon_freebox_player");
@@ -935,7 +937,7 @@ async function main() {
   refused.setConfig({ title: "Téléphone", media_player: "media_player.echo" });
   await new Promise((resolve) => setImmediate(resolve));
   const refusedButton = refused.shadowRoot.querySelectorAll("button").find((button) =>
-    String(button.textContent || "").includes("Écouter sur le Player")
+    String(button.textContent || "").includes("Sur echo")
   );
   refused.shadowRoot.querySelector("ha-card").listeners.click({ target: refusedButton });
   await new Promise((resolve) => setImmediate(resolve));
@@ -957,7 +959,7 @@ async function main() {
   await new Promise((resolve) => setImmediate(resolve));
   leaked.shadowRoot.querySelector("ha-card").listeners.click({
     target: leaked.shadowRoot.querySelectorAll("button").find((button) =>
-      String(button.textContent || "").includes("Écouter sur le Player")
+      String(button.textContent || "").includes("Sur echo")
     ),
   });
   await new Promise((resolve) => setImmediate(resolve));
@@ -1016,6 +1018,101 @@ async function main() {
   const offNote = editorHost.querySelectorAll("div").find((node) => node.className === "player-off");
   assert.ok(offNote);
   assert.match(offNote.textContent, /désactivée dans les réglages/);
+
+  const mini = makeCard();
+  const mediaCalls = [];
+  const features = 1 + 4 + 4096 + 16384;
+  mini._hass = {
+    language: "fr",
+    states: {
+      "sensor.messages": card._hass.states["sensor.messages"],
+      "media_player.echo_show": {
+        state: "idle",
+        attributes: {
+          friendly_name: "Xavier - Echo Show 5 2ème Gén",
+          supported_features: features,
+          volume_level: 0.4,
+          media_position: 12,
+          media_duration: 60,
+          media_position_updated_at: new Date().toISOString(),
+        },
+      },
+    },
+    entities: {
+      ...card._hass.entities,
+      "media_player.echo_show": { platform: "music_assistant" },
+    },
+    callService: (domain, service, data) => {
+      mediaCalls.push([domain, service, data]);
+      return Promise.resolve();
+    },
+    callWS: async () => ({
+      available: true,
+      messages: [{ id: "msg.au", date: "2026-11-22T10:00:00Z", duration: 12, read: false }],
+      total: 1,
+    }),
+  };
+  mini.setConfig({ title: "Téléphone", media_player: "media_player.echo_show" });
+  await new Promise((resolve) => setImmediate(resolve));
+  const shortButton = mini.shadowRoot.querySelectorAll("button").find((button) =>
+    String(button.textContent || "").includes("Sur Echo Show")
+  );
+  assert.ok(shortButton);
+  assert.equal(String(shortButton.textContent).includes("Écouter sur Xavier"), false);
+  mini.shadowRoot.querySelector("ha-card").listeners.click({ target: shortButton });
+  await new Promise((resolve) => setImmediate(resolve));
+  let miniHtml = mini.shadowRoot.innerHTML;
+  assert.match(miniHtml, /class="remote"/);
+  assert.match(miniHtml, /Echo Show 5 2ème Gén/);
+  assert.match(miniHtml, /Inactif/);
+  assert.match(miniHtml, /0:12 \/ 1:00/);
+  assert.equal(miniHtml.includes("n'a pas démarré"), false);
+  assert.match(miniHtml, /Volume \+/);
+  mini._hass.states["media_player.echo_show"].state = "playing";
+  mini._key = "";
+  mini._render();
+  miniHtml = mini.shadowRoot.innerHTML;
+  assert.match(miniHtml, />Pause</);
+  assert.match(miniHtml, />Stop</);
+  assert.match(miniHtml, /Volume \+/);
+  assert.match(miniHtml, /Volume -/);
+  const miniHost = mini.shadowRoot.querySelector("ha-card");
+  const clickNamed = (text) => {
+    const button = mini.shadowRoot.querySelectorAll("button").find((item) => item.textContent === text);
+    assert.ok(button);
+    miniHost.listeners.click({ target: button });
+  };
+  clickNamed("Pause");
+  clickNamed("Volume +");
+  clickNamed("Stop");
+  const controls = mediaCalls.filter((item) => item[0] === "media_player");
+  assert.equal(controls[0][1], "media_play_pause");
+  assert.equal(controls[0][2].entity_id, "media_player.echo_show");
+  assert.equal(controls[1][1], "volume_set");
+  assert.equal(controls[1][2].volume_level, 0.45);
+  assert.equal(controls[2][1], "media_stop");
+  mini._hass.states["media_player.echo_show"].attributes.supported_features = 0;
+  mini._key = "";
+  mini._render();
+  miniHtml = mini.shadowRoot.innerHTML;
+  assert.equal(miniHtml.includes(">Pause<"), false);
+  assert.equal(miniHtml.includes(">Stop<"), false);
+  assert.equal(miniHtml.includes("Volume"), false);
+  clickNamed("Fermer");
+  assert.equal(mini.shadowRoot.innerHTML.includes('class="remote"'), false);
+  mini._remote = {
+    id: "msg.au",
+    entityId: "media_player.echo_show",
+    sentAt: Date.now() - 11000,
+    started: false,
+    late: false,
+  };
+  mini._hass.states["media_player.echo_show"].state = "idle";
+  mini._key = "";
+  mini._render();
+  assert.match(mini.shadowRoot.innerHTML, /Le lecteur n'a pas démarré la lecture/);
+  assert.equal(mini.shadowRoot.innerHTML.includes("http"), false);
+  assert.equal(mini.shadowRoot.innerHTML.includes("authSig"), false);
 
   console.log("OK: carte Téléphone, numéro masqué, confirmation, sonneries, lecteur");
 }

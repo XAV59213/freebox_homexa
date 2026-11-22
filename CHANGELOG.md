@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Carte Téléphone : après un envoi vers un lecteur, un mini-lecteur montre son état, la progression et les commandes supportées (pause, stop, volume). S'il ne démarre pas en dix secondes, un message l'indique. Le bouton tient sur une ligne : « Sur » suivi du nom court.
+
 ## 28.8.103 — 2026-11-22
 
 - Carte Téléphone : le sélecteur et le menu de lecture ne proposent que le Freebox Player et Music Assistant. Une configuration déjà enregistrée retire explicitement `alexa_devices` et `alexa_media` dès que l'intégration est connue. Si l'intégration n'est pas connue, le lecteur reste et l'éditeur le signale. L'ancienne clé `media_player` est toujours lue.

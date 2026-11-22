@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 28.8.101 — 2026-11-22
 
 - Carte Téléphone : l'éditeur visuel accepte plusieurs lecteurs (`media_players`). L'ancienne clé `media_player` reste lue telle quelle. Un seul lecteur garde le bouton « Écouter sur le Player ». Plusieurs lecteurs ouvrent une liste de noms ; le dernier choix est mémorisé dans le navigateur pour cette carte. Le rendu reste en place.
 

@@ -395,6 +395,10 @@ class FreeboxRouter:
         self.voicemail_supported: bool | None = None
         self.voicemail_error: str | None = None
         self.voicemail_failure_logged: bool = False
+        self.voicemail_stale: bool = False
+        self.voicemail_failure_since: float | None = None
+        self.voicemail_retry_index: int = 0
+        self.voicemail_retry_unsub: object | None = None
         # "" = chemin relatif de la session (v6). "/api/v10/" = version annoncée.
         # None = pas encore déterminé.
         self.voicemail_api_prefix: str | None = None
@@ -1074,6 +1078,9 @@ class FreeboxRouter:
                 return
             # Stop new interval reads, drain current ones, then close the public SDK.
             self.closing = True
+            from .voicemail import cancel_voicemail_retry
+
+            cancel_voicemail_retry(self)
             pending = (self.poll_tasks | self.read_tasks) - {asyncio.current_task()}
             for task in pending:
                 task.cancel()

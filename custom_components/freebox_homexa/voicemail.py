@@ -14,10 +14,13 @@ import logging
 import math
 import re
 import secrets
+import time
 from typing import TYPE_CHECKING
 from urllib.parse import quote, urljoin
 
+import aiohttp
 from aiohttp import ClientTimeout
+from homeassistant.helpers.event import async_call_later
 from homeassistant.components.sensor import SensorEntity
 from homeassistant.core import callback
 from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
@@ -51,6 +54,23 @@ _VERSION_CODES = frozenset({
 VOICEMAIL_LIST_LIMIT = 30
 NEW_VOICEMAIL_EVENT = "freebox_homexa_new_voicemail"
 _LIST_PATH = "call/voicemail/"
+# Après un internal_error, on réessaie vite : la Freebox met souvent 3 minutes.
+VOICEMAIL_RETRY_DELAYS = (15, 30, 60)
+# Plusieurs échecs de suite, environ 10 minutes, avant de rendre le capteur indisponible.
+VOICEMAIL_UNAVAILABLE_AFTER = 600
+_TRANSIENT_CODES = frozenset({
+    "internal_error",
+    "timeout",
+    "network",
+    "network_error",
+    "TimeoutError",
+    "ServerTimeoutError",
+    "ClientConnectorError",
+    "ClientOSError",
+    "ClientError",
+    "OSError",
+    "ConnectionError",
+})
 
 
 @dataclass(frozen=True, slots=True)
@@ -577,18 +597,95 @@ def _note_failure(router: FreeboxRouter, err: BaseException) -> None:
     _LOGGER.warning("Messagerie vocale Freebox indisponible (%s, %s)", kind, code)
 
 
-def _keep_snapshot(router: FreeboxRouter, err: BaseException) -> None:
-    """Une panne passagère garde la liste et le capteur disponible."""
+def _is_transient(err: BaseException) -> bool:
+    """internal_error, délai ou réseau. Un 404 ou un refus de droit ne l'est pas."""
+    if is_permission_denied(err) or _is_version_mismatch(err):
+        return False
+    if isinstance(err, (TimeoutError, aiohttp.ClientError, OSError)):
+        return True
+    code = stored_error(err)
+    if code in _TRANSIENT_CODES:
+        return True
+    name = type(err).__name__.lower()
+    return "timeout" in name or "network" in name
+
+
+def cancel_voicemail_retry(router: FreeboxRouter) -> None:
+    unsub = router.voicemail_retry_unsub
+    router.voicemail_retry_unsub = None
+    if callable(unsub):
+        unsub()
+
+
+def _schedule_voicemail_retry(router: FreeboxRouter) -> None:
+    """15 s, puis 30 s, puis 60 s. Un minuteur déjà posé n'est pas remplacé."""
+    if router.closing or router.voicemail_retry_unsub is not None:
+        return
+    index = router.voicemail_retry_index
+    if index < 0:
+        index = 0
+    delay = VOICEMAIL_RETRY_DELAYS[min(index, len(VOICEMAIL_RETRY_DELAYS) - 1)]
+    router.voicemail_retry_index = index + 1
+
+    async def _run(_now: object) -> None:
+        router.voicemail_retry_unsub = None
+        if router.closing:
+            return
+        await async_refresh_voicemails(router)
+
+    router.voicemail_retry_unsub = async_call_later(router.hass, delay, _run)
+
+
+def request_voicemail_refresh(router: object) -> None:
+    """Relit la messagerie tout de suite, par exemple après un appel manqué."""
+    from .router import FreeboxRouter
+
+    if not isinstance(router, FreeboxRouter):
+        return
+    if router.closing or router.voicemail_supported is not True:
+        return
+    router.hass.async_create_task(async_refresh_voicemails(router))
+
+
+def _note_transient(router: FreeboxRouter, err: BaseException) -> None:
+    """Garde la dernière liste. Indisponible seulement après environ 10 minutes."""
+    now = time.monotonic()
+    if router.voicemail_failure_since is None:
+        router.voicemail_failure_since = now
+    router.voicemail_stale = True
     code = stored_error(err)
     router.voicemail_error = code
+    elapsed = now - router.voicemail_failure_since
+    router.voicemail_available = elapsed < VOICEMAIL_UNAVAILABLE_AFTER
     kind = type(err).__name__
     if not _SAFE_CODE.fullmatch(kind):
         kind = "Error"
     if router.voicemail_failure_logged:
         _LOGGER.debug("Messagerie vocale Freebox momentanément indisponible (%s, %s)", kind, code)
-        return
-    router.voicemail_failure_logged = True
-    _LOGGER.warning("Messagerie vocale Freebox momentanément indisponible (%s, %s)", kind, code)
+    else:
+        router.voicemail_failure_logged = True
+        _LOGGER.warning(
+            "Messagerie vocale Freebox momentanément indisponible (%s, %s)", kind, code
+        )
+    _signal(router)
+    _schedule_voicemail_retry(router)
+
+
+def _keep_snapshot(router: FreeboxRouter, err: BaseException) -> None:
+    """Une panne qui n'est pas un accès réseau garde la liste, sans relance rapide."""
+    code = stored_error(err)
+    router.voicemail_error = code
+    router.voicemail_stale = True
+    kind = type(err).__name__
+    if not _SAFE_CODE.fullmatch(kind):
+        kind = "Error"
+    if router.voicemail_failure_logged:
+        _LOGGER.debug("Messagerie vocale Freebox momentanément indisponible (%s, %s)", kind, code)
+    else:
+        router.voicemail_failure_logged = True
+        _LOGGER.warning(
+            "Messagerie vocale Freebox momentanément indisponible (%s, %s)", kind, code
+        )
     _signal(router)
 
 
@@ -622,6 +719,9 @@ async def _refresh_voicemails(router: FreeboxRouter) -> None:
             _note_failure(router, err)
             _signal(router)
             return
+        if _is_transient(err) and router.voicemail_supported is True:
+            _note_transient(router, err)
+            return
         if router.voicemail_supported is True:
             _keep_snapshot(router, err)
             return
@@ -635,12 +735,19 @@ async def _refresh_voicemails(router: FreeboxRouter) -> None:
         return
     _announce(router, found)
     router.voicemails = found
-    if was_available is False:
+    was_stale = router.voicemail_stale or router.voicemail_failure_since is not None
+    if was_stale:
+        _LOGGER.warning("Messagerie vocale Freebox de nouveau disponible")
+    elif was_available is False:
         _LOGGER.info("Messagerie vocale Freebox de nouveau disponible")
     router.voicemail_supported = True
     router.voicemail_available = True
+    router.voicemail_stale = False
+    router.voicemail_failure_since = None
+    router.voicemail_retry_index = 0
     router.voicemail_error = None
     router.voicemail_failure_logged = False
+    cancel_voicemail_retry(router)
     # Le journal d'appels reste prioritaire : on ne lève le Repair que s'il va bien.
     if router.calls_available is not False:
         router.note_permission("calls")
@@ -761,6 +868,7 @@ class FreeboxVoicemailSensor(FreeboxReachableMixin, SensorEntity):
         summary["voicemail_available"] = self._router.voicemail_available is not False
         summary["voicemail_supported"] = self._router.voicemail_supported
         summary["voicemail_error"] = self._router.voicemail_error
+        summary["voicemail_stale"] = self._router.voicemail_stale is True
         return summary
 
     async def async_added_to_hass(self) -> None:

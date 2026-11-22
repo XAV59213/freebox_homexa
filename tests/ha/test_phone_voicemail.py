@@ -2,6 +2,7 @@
 import logging
 import re
 import struct
+import time
 from datetime import timedelta
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, patch
@@ -1448,6 +1449,84 @@ async def test_missed_call_and_voicemail_events_name_the_contact(hass, home_cont
     assert voices[0]["name"] == "Nadia"
     assert voices[0]["number"] == SECRET
     assert MESSAGE not in str(voices[0])
+    assert SECRET not in caplog.text
+
+
+async def test_transient_voicemail_error_stays_available_and_retries(hass, home_context, caplog):
+    from datetime import timedelta
+
+    from pytest_homeassistant_custom_component.common import async_fire_time_changed
+
+    from custom_components.freebox_homexa.calls_ws import announce_missed_calls
+    from custom_components.freebox_homexa.voicemail import VOICEMAIL_UNAVAILABLE_AFTER
+    from homeassistant.util import dt as dt_util
+
+    router, _node = home_context
+    script = bind(router)
+    load(hass, router)
+    script.messages = [message()]
+    await router._update_voicemails()
+    assert router.voicemail_stale is False
+    script.error = http_error("internal_error")
+    script.error_on = "voicemail"
+    with caplog.at_level(logging.DEBUG, logger=_LOG):
+        await router._update_voicemails()
+        await router._update_voicemails()
+    assert router.voicemail_available is True
+    assert router.voicemail_stale is True
+    assert router.voicemail_error == "internal_error"
+    assert len(router.voicemails) == 1
+    warnings = [
+        record.getMessage()
+        for record in caplog.records
+        if record.levelno == logging.WARNING and "momentanément" in record.getMessage()
+    ]
+    assert len(warnings) == 1
+    assert "internal_error" in warnings[0]
+    assert SECRET not in caplog.text
+    assert MESSAGE not in caplog.text
+    router.voicemail_failure_since = time.monotonic() - VOICEMAIL_UNAVAILABLE_AFTER
+    await router._update_voicemails()
+    assert router.voicemail_available is False
+    assert len(router.voicemails) == 1
+    script.error = None
+    script.messages = [message(), message(ident="fresh.au")]
+    caplog.clear()
+    with caplog.at_level(logging.DEBUG, logger=_LOG):
+        await router._update_voicemails()
+    assert router.voicemail_available is True
+    assert router.voicemail_stale is False
+    assert router.voicemail_error is None
+    assert len(router.voicemails) == 2
+    recovered = [
+        record.getMessage()
+        for record in caplog.records
+        if record.levelno == logging.WARNING and "de nouveau disponible" in record.getMessage()
+    ]
+    assert len(recovered) == 1
+    assert SECRET not in recovered[0] and MESSAGE not in recovered[0]
+
+    script.error = TimeoutError("synthetic")
+    script.error_on = "voicemail"
+    before = dt_util.utcnow()
+    await router._update_voicemails()
+    assert router.voicemail_stale is True
+    async_fire_time_changed(hass, before + timedelta(seconds=15))
+    await hass.async_block_till_done()
+    assert sum(1 for item in script.paths if item[0] == "get" and item[1] == "call/voicemail/") >= 2
+    script.error = None
+    await router._update_voicemails()
+    script.paths.clear()
+    router.call_list = [{"id": 1, "type": "missed", "name": "Martin", "number": SECRET, "datetime": 10}]
+    announce_missed_calls(router)
+    await hass.async_block_till_done()
+    assert script.paths == []
+    router.call_list.append({
+        "id": 2, "type": "missed", "name": "Nadia", "number": SECRET, "datetime": 20,
+    })
+    announce_missed_calls(router)
+    await hass.async_block_till_done()
+    assert ("get", "call/voicemail/") in script.paths
     assert SECRET not in caplog.text
 
 

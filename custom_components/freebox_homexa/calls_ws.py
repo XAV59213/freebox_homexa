@@ -211,6 +211,7 @@ def announce_missed_calls(router: object) -> None:
     if not callable(fire):
         return
     entry_id = getattr(router, "entry_id", "")
+    announced = False
     for ident, call in missed:
         if ident in known:
             continue
@@ -224,6 +225,11 @@ def announce_missed_calls(router: object) -> None:
             caller_fields(contact_label(call.get("name"), number), number, include_number=include)
         )
         fire(MISSED_CALL_EVENT, payload)
+        announced = True
+    if announced:
+        from .voicemail import request_voicemail_refresh
+
+        request_voicemail_refresh(router)
 
 
 def format_calls(

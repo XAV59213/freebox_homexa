@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+- Lecture sur un lecteur : si le lecteur refuse, l'erreur traduite et la carte indiquent le code (par exemple cannot_retrieve_data_with_error), sans numéro, nom, jeton ni URL.
+- Alexa Media et Alexa Devices ne reçoivent plus l'adresse du message. Leur `play_media` ne lit pas une URL (recherche musicale, ou retéléchargement trop fragile). L'action explique de choisir l'entité Music Assistant du même appareil. Les autres lecteurs ne changent pas.
+- Carte Téléphone : deux lecteurs au même nom affichent l'intégration, ou l'entity_id s'ils viennent de la même. L'éditeur prévient si un lecteur Alexa direct est choisi.
+- Réglages : « Lecture de la messagerie sur un lecteur » (`voicemail_player_enabled`), activée si l'option est absente. Décochée, `play_voicemail` est refusé, la carte ne montre plus le bouton du lecteur, et l'écoute sur le téléphone reste disponible.
+
 ## 28.8.101 — 2026-11-22
 
 - Carte Téléphone : l'éditeur visuel accepte plusieurs lecteurs (`media_players`). L'ancienne clé `media_player` reste lue telle quelle. Un seul lecteur garde le bouton « Écouter sur le Player ». Plusieurs lecteurs ouvrent une liste de noms ; le dernier choix est mémorisé dans le navigateur pour cette carte. Le rendu reste en place.

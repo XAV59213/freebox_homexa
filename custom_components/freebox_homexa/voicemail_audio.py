@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import re
 from datetime import timedelta
 from typing import TYPE_CHECKING
 from urllib.parse import quote
@@ -38,6 +39,25 @@ _LOGGER = logging.getLogger(__name__)
 
 _AUDIO_TTL = timedelta(minutes=5)
 _MP3_PLATFORMS = frozenset({"alexa", "alexa_media", "alexa_devices"})
+_CODE = re.compile(r"^[A-Za-z][A-Za-z0-9_]{0,63}$")
+
+
+def public_error_code(err: BaseException) -> str:
+    """Code affichable. Jamais une URL, un jeton, un nom ou un numéro."""
+    key = getattr(err, "translation_key", None)
+    if isinstance(key, str) and _CODE.fullmatch(key) and not re.search(r"\d{6,}", key):
+        return key
+    code = stored_error(err)
+    if _CODE.fullmatch(code) and not re.search(r"\d{6,}", code):
+        return code
+    return "error"
+
+
+def _registry_platform(hass: HomeAssistant, entity_id: str) -> str:
+    row = er.async_get(hass).async_get(entity_id)
+    if row is None or not isinstance(row.platform, str):
+        return ""
+    return row.platform
 
 
 def player_needs_mp3(hass: HomeAssistant, entity_id: str) -> bool:
@@ -324,7 +344,9 @@ async def _player_request(
     action = getattr(access, method, None)
     if not callable(action):
         raise HomeAssistantError(
-            translation_domain=DOMAIN, translation_key="voicemail_player_refused"
+            translation_domain=DOMAIN,
+            translation_key="voicemail_player_refused",
+            translation_placeholders={"code": "refused"},
         )
     if method == "get":
         return await action(path)
@@ -441,7 +463,9 @@ async def _open_freebox_player_audio(
                 return
     if not opened:
         raise HomeAssistantError(
-            translation_domain=DOMAIN, translation_key="voicemail_player_refused"
+            translation_domain=DOMAIN,
+            translation_key="voicemail_player_refused",
+            translation_placeholders={"code": "refused"},
         )
     _LOGGER.warning("Le Player n'a pas changé d'état après l'ouverture audio")
     raise HomeAssistantError(
@@ -463,6 +487,7 @@ async def async_play_on_player(
         async_mark_voicemail_read,
         schedule_mark_read_retry,
         stored_error,
+        voicemail_player_enabled,
     )
 
     if not isinstance(entity_id, str) or not entity_id.startswith("media_player."):
@@ -479,6 +504,23 @@ async def async_play_on_player(
         raise HomeAssistantError(
             translation_domain=DOMAIN, translation_key="voicemail_player_unreachable"
         )
+    if not voicemail_player_enabled(router):
+        _LOGGER.warning("Lecture de la messagerie sur un lecteur désactivée")
+        raise HomeAssistantError(
+            translation_domain=DOMAIN, translation_key="voicemail_player_disabled"
+        )
+    platform = _registry_platform(hass, entity_id)
+    if platform == "alexa_media" or platform == "alexa_devices":
+        # play_media n'accepte pas une URL : Alexa Devices cherche un titre chez un
+        # fournisseur (audio/mpeg lève cannot_retrieve_data) et Alexa Media ne joue
+        # un MP3 qu'en le retéléchargeant sous son propre public_url, avec announce.
+        _LOGGER.warning("Lecteur Alexa direct ignoré (plateforme=%s)", platform)
+        shown = "alexa_media" if platform == "alexa_media" else "alexa_devices"
+        raise HomeAssistantError(
+            translation_domain=DOMAIN,
+            translation_key="voicemail_alexa_direct",
+            translation_placeholders={"platform": shown},
+        )
     external = player_needs_mp3(hass, entity_id)
     try:
         signed = signed_voicemail_path(hass, router.entry_id, message_id, mp3=True)
@@ -490,10 +532,7 @@ async def async_play_on_player(
         raise HomeAssistantError(
             translation_domain=DOMAIN, translation_key="voicemail_audio"
         ) from err
-    own_player = False
-    row = er.async_get(hass).async_get(entity_id)
-    if row is not None and row.platform == DOMAIN and row.domain == "media_player":
-        own_player = True
+    own_player = platform == DOMAIN
     if own_player:
         await _open_freebox_player_audio(hass, router, entity_id, url)
     else:
@@ -510,8 +549,6 @@ async def async_play_on_player(
 
 
 async def _play_via_media_player(hass: HomeAssistant, entity_id: str, url: str) -> None:
-    from .voicemail import stored_error
-
     try:
         await hass.services.async_call(
             "media_player",
@@ -531,20 +568,21 @@ async def _play_via_media_player(hass: HomeAssistant, entity_id: str, url: str) 
             "voicemail_audio",
             "voicemail_player_refused",
             "voicemail_player_silent",
+            "voicemail_alexa_direct",
         }:
             raise
-        _LOGGER.warning(
-            "Lecteur a refusé la messagerie (%s)", err.translation_key or "error"
-        )
+        code = public_error_code(err)
+        _LOGGER.warning("Lecteur a refusé la messagerie (code=%s)", code)
         raise HomeAssistantError(
-            translation_domain=DOMAIN, translation_key="voicemail_player_refused"
+            translation_domain=DOMAIN,
+            translation_key="voicemail_player_refused",
+            translation_placeholders={"code": code},
         ) from err
     except Exception as err:
-        _LOGGER.warning(
-            "Lecteur a refusé la messagerie (%s, %s)",
-            type(err).__name__,
-            stored_error(err),
-        )
+        code = public_error_code(err)
+        _LOGGER.warning("Lecteur a refusé la messagerie (code=%s)", code)
         raise HomeAssistantError(
-            translation_domain=DOMAIN, translation_key="voicemail_player_refused"
+            translation_domain=DOMAIN,
+            translation_key="voicemail_player_refused",
+            translation_placeholders={"code": code},
         ) from err

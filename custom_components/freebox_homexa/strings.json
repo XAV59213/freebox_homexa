@@ -91,11 +91,13 @@
           "create_lan_devices": "Create devices for network clients",
           "home_poll_interval": "Home poll interval (seconds)",
           "remote_code": "Player remote code",
-          "event_include_number": "Include the phone number in events"
+          "event_include_number": "Include the phone number in events",
+          "voicemail_player_enabled": "Play voicemail on a media player"
         },
         "data_description": {
           "track_lan_clients": "Disable this if presence is already handled by another integration.",
           "event_include_number": "Off by default. Missed-call and new-voicemail events use the contact name, or Inconnu, and do not include the number.",
+          "voicemail_player_enabled": "On by default. Turn off to hide the player button on the Phone card and refuse play_voicemail. Listening on the phone stays available.",
           "create_wifi_sensors": "RSSI is added when a client is seen on Wi-Fi, including after the first setup.",
           "create_lan_devices": "On: each client is filed under Network › Amazon, Phones, Computers, TV & media, Smart devices, Consoles, Printers or Other. Off: tracker and RSSI stay standalone entities and existing client devices are removed on reload.",
           "home_poll_interval": "PIR, contacts, alarm and shutters. Disable the official Freebox integration before using 5 s.",
@@ -761,7 +763,13 @@
       "message": "That media player is unavailable. Check that it is connected, then try again."
     },
     "voicemail_player_refused": {
-      "message": "The media player refused the voicemail. The message was not marked as read."
+      "message": "The media player refused the voicemail: {code}. The message was not marked as read."
+    },
+    "voicemail_player_disabled": {
+      "message": "Voicemail playback on a media player is turned off in the Freebox Homexa settings."
+    },
+    "voicemail_alexa_direct": {
+      "message": "This Alexa player ({platform}) cannot play a voicemail address. Choose the Music Assistant entity of the same device. The message was not marked as read."
     },
     "voicemail_player_silent": {
       "message": "The Freebox Player accepted the request but did not start playback. The message was not marked as read."

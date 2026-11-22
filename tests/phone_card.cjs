@@ -647,6 +647,167 @@ async function main() {
     "media_player"
   );
 
+  editor.hass = {
+    language: "fr",
+    entities: {
+      "media_player.echo_direct": { platform: "alexa_devices" },
+      "media_player.echo_ma": { platform: "music_assistant" },
+    },
+  };
+  editor.setConfig({
+    title: "Téléphone",
+    media_players: ["media_player.echo_direct", "media_player.echo_ma"],
+  });
+  const alexaNote = editorHost.querySelectorAll("div").find((node) => node.className === "alexa-note");
+  assert.ok(alexaNote);
+  assert.match(alexaNote.textContent, /Music Assistant/);
+  editor.setConfig({ title: "Téléphone", media_players: ["media_player.echo_ma"] });
+  assert.equal(
+    editorHost.querySelectorAll("div").some((node) => node.className === "alexa-note"),
+    false
+  );
+
+  const twins = makeCard();
+  const twinCalls = [];
+  twins._hass = {
+    language: "fr",
+    states: {
+      "sensor.messages": card._hass.states["sensor.messages"],
+      "media_player.echo_direct": { state: "idle", attributes: { friendly_name: "Echo" } },
+      "media_player.echo_ma": { state: "idle", attributes: { friendly_name: "Echo" } },
+      "media_player.echo_other": { state: "idle", attributes: { friendly_name: "Echo" } },
+    },
+    entities: {
+      ...card._hass.entities,
+      "media_player.echo_direct": { platform: "alexa_devices" },
+      "media_player.echo_ma": { platform: "music_assistant" },
+      "media_player.echo_other": { platform: "alexa_devices" },
+    },
+    callService: (domain, service, data) => {
+      twinCalls.push([domain, service, data]);
+      return Promise.resolve();
+    },
+    callWS: async () => ({
+      available: true,
+      messages: [{ id: "msg.au", date: "2026-11-22T10:00:00Z", duration: 12, read: false }],
+      total: 1,
+    }),
+  };
+  twins.setConfig({
+    title: "Téléphone",
+    media_players: ["media_player.echo_direct", "media_player.echo_ma", "media_player.echo_other"],
+  });
+  await new Promise((resolve) => setImmediate(resolve));
+  twins.shadowRoot.querySelector("ha-card").listeners.click({
+    target: twins.shadowRoot.querySelectorAll("button").find((button) =>
+      String(button.textContent || "").includes("Écouter sur…")
+    ),
+  });
+  const labels = twins.shadowRoot.querySelectorAll("button").map((button) => button.textContent);
+  assert.ok(labels.includes("Echo (Music Assistant)"));
+  assert.ok(labels.includes("Echo (media_player.echo_direct)"));
+  assert.ok(labels.includes("Echo (media_player.echo_other)"));
+  const ma = twins.shadowRoot.querySelectorAll("button").find((button) => button.textContent === "Echo (Music Assistant)");
+  twins.shadowRoot.querySelector("ha-card").listeners.click({ target: ma });
+  assert.equal(twinCalls[0][2].entity_id, "media_player.echo_ma");
+
+  const refused = makeCard();
+  refused._hass = {
+    language: "fr",
+    states: card._hass.states,
+    entities: card._hass.entities,
+    callService: () => Promise.reject(new Error("Le lecteur a refusé le message vocal : cannot_retrieve_data_with_error")),
+    callWS: async () => ({
+      available: true,
+      messages: [{ id: "msg.au", date: "2026-11-22T10:00:00Z", duration: 12, read: false }],
+      total: 1,
+    }),
+  };
+  refused.setConfig({ title: "Téléphone", media_player: "media_player.echo" });
+  await new Promise((resolve) => setImmediate(resolve));
+  const refusedButton = refused.shadowRoot.querySelectorAll("button").find((button) =>
+    String(button.textContent || "").includes("Écouter sur le Player")
+  );
+  refused.shadowRoot.querySelector("ha-card").listeners.click({ target: refusedButton });
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.match(refused.shadowRoot.innerHTML, /cannot_retrieve_data_with_error/);
+
+  const leaked = makeCard();
+  leaked._hass = {
+    language: "fr",
+    states: card._hass.states,
+    entities: card._hass.entities,
+    callService: () => Promise.reject(new Error("https://secret.example/voicemail?authSig=abc 0612345678")),
+    callWS: async () => ({
+      available: true,
+      messages: [{ id: "msg.au", date: "2026-11-22T10:00:00Z", duration: 12, read: false }],
+      total: 1,
+    }),
+  };
+  leaked.setConfig({ title: "Téléphone", media_player: "media_player.echo" });
+  await new Promise((resolve) => setImmediate(resolve));
+  leaked.shadowRoot.querySelector("ha-card").listeners.click({
+    target: leaked.shadowRoot.querySelectorAll("button").find((button) =>
+      String(button.textContent || "").includes("Écouter sur le Player")
+    ),
+  });
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.match(leaked.shadowRoot.innerHTML, /Le Player n'a pas lu le message/);
+  assert.equal(leaked.shadowRoot.innerHTML.includes("secret.example"), false);
+  assert.equal(leaked.shadowRoot.innerHTML.includes("0612345678"), false);
+  assert.equal(leaked.shadowRoot.innerHTML.includes("authSig"), false);
+
+  const quiet = makeCard();
+  quiet._hass = {
+    language: "fr",
+    states: {
+      "sensor.messages": {
+        state: "1",
+        attributes: {
+          voicemail: true,
+          voicemail_player_enabled: false,
+          messages: [{ id: "msg.au", date: "2026-11-22T10:00:00Z", duration: 12, read: false }],
+          total: 1,
+        },
+      },
+    },
+    entities: { "sensor.messages": { platform: "freebox_homexa", config_entry_id: "entry-a" } },
+    callService() {},
+    callWS: async () => ({
+      available: true,
+      player_enabled: false,
+      messages: [{ id: "msg.au", date: "2026-11-22T10:00:00Z", duration: 12, read: false }],
+      total: 1,
+    }),
+  };
+  quiet.setConfig({
+    title: "Téléphone",
+    media_players: ["media_player.echo_ma", "media_player.echo_direct"],
+  });
+  await new Promise((resolve) => setImmediate(resolve));
+  const quietText = quiet.shadowRoot.innerHTML;
+  assert.match(quietText, /Écouter sur mon téléphone/);
+  assert.match(quietText, />Lu</);
+  assert.match(quietText, /Supprimer/);
+  assert.equal(quietText.includes("Écouter sur le Player"), false);
+  assert.equal(quietText.includes("Écouter sur…"), false);
+  assert.equal(quietText.includes('class="menu"'), false);
+
+  editor.hass = {
+    language: "fr",
+    states: {
+      "sensor.messages": {
+        state: "0",
+        attributes: { voicemail: true, voicemail_player_enabled: false },
+      },
+    },
+    entities: { "sensor.messages": { platform: "freebox_homexa" } },
+  };
+  editor.setConfig({ title: "Téléphone", media_players: ["media_player.echo_ma"] });
+  const offNote = editorHost.querySelectorAll("div").find((node) => node.className === "player-off");
+  assert.ok(offNote);
+  assert.match(offNote.textContent, /désactivée dans les réglages/);
+
   console.log("OK: carte Téléphone, numéro masqué, confirmation, sonneries, lecteur");
 }
 

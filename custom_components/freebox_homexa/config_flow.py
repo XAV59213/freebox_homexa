@@ -38,6 +38,7 @@ from .const import (
     CONF_REMOTE_CODE,
     CONF_REMOTE_CODES,
     CONF_TRACK_LAN_CLIENTS,
+    CONF_VOICEMAIL_PLAYER_ENABLED,
     DEFAULT_CREATE_LAN_DEVICES,
     DEFAULT_CREATE_WIFI_SENSORS,
     DEFAULT_HOME_POLL_INTERVAL,
@@ -150,6 +151,8 @@ def _options_schema(
     schema_factory: Callable[[object], _SchemaT],
     defaults: dict[str, Any] | None = None,
     players: list[dict[str, Any]] | None = None,
+    *,
+    player_toggle: bool = False,
 ) -> _SchemaT:
     defaults = defaults or {}
     players = players or []
@@ -175,6 +178,11 @@ def _options_schema(
             default=bool(defaults.get(CONF_EVENT_INCLUDE_NUMBER, False)),
         ): bool,
     }
+    if player_toggle:
+        fields[vol.Required(
+            CONF_VOICEMAIL_PLAYER_ENABLED,
+            default=bool(defaults.get(CONF_VOICEMAIL_PLAYER_ENABLED, True)),
+        )] = bool
     raw_codes = defaults.get(CONF_REMOTE_CODES)
     codes = raw_codes if isinstance(raw_codes, dict) else {}
     # Un seul Player : le champ commun suffit. La clé remote_code_<id> reste en
@@ -208,7 +216,7 @@ def _options_from_input(
         if code:
             per_player[str(pid)] = code
             extra[remote_code_field(pid)] = code
-    return {
+    result = {
         CONF_TRACK_LAN_CLIENTS: user_input[CONF_TRACK_LAN_CLIENTS],
         CONF_CREATE_WIFI_SENSORS: user_input[CONF_CREATE_WIFI_SENSORS],
         CONF_CREATE_LAN_DEVICES: user_input[CONF_CREATE_LAN_DEVICES],
@@ -220,6 +228,9 @@ def _options_from_input(
         CONF_EVENT_INCLUDE_NUMBER: bool(user_input.get(CONF_EVENT_INCLUDE_NUMBER, False)),
         **extra,
     }
+    if CONF_VOICEMAIL_PLAYER_ENABLED in user_input:
+        result[CONF_VOICEMAIL_PLAYER_ENABLED] = bool(user_input[CONF_VOICEMAIL_PLAYER_ENABLED])
+    return result
 
 
 def hardware_unique_id(config: object) -> str | None:
@@ -1107,7 +1118,9 @@ class FreeboxOptionsFlowHandler(OptionsFlowWithReload):
         names = ", ".join(_player_label(p) for p in players) or "aucun Player détecté"
         return self.async_show_form(
             step_id="general",
-            data_schema=_options_schema(type(cv.PLATFORM_SCHEMA), defaults, players),
+            data_schema=_options_schema(
+                type(cv.PLATFORM_SCHEMA), defaults, players, player_toggle=True
+            ),
             description_placeholders={
                 "players": names,
                 "player_codes": _player_code_lines(players),

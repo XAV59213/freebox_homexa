@@ -45,6 +45,7 @@ TO_REDACT = {
     "wifi_ssid",
     "phone_number",
     "number",
+    "number_spoken",
     "caller",
     "caller_name",
     "contact_name",

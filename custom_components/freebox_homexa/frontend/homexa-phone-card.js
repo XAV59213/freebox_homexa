@@ -121,6 +121,9 @@ const COPY = {
     volUp: "Volume +",
     volDown: "Volume -",
     close: "Fermer",
+    loadTimeout: "La messagerie ne répond pas.",
+    loadFailed: "La messagerie n'a pas pu être lue.",
+    retry: "Réessayer",
     asking: "Lecture demandée sur le Player…",
     askingNamed: "Lecture demandée sur ",
     launched: "Lecture lancée sur le Player",
@@ -134,6 +137,8 @@ const COPY = {
       show_number: "Afficher le numéro",
       show_calls: "Derniers appels",
       max_calls: "Nombre d'appels",
+      voicemail_volume: "Volume du message (%)",
+      helpVolume: "50 par défaut. 0 laisse le volume du lecteur inchangé.",
       helpEntry: "Utile s'il y a plusieurs Freebox. Vide = détection automatique.",
       helpPlayers: "Freebox Player ou Music Assistant. L'ancienne option media_player reste acceptée.",
       helpNumber: "Masqué par défaut. Les numéros ne sont pas dans les états Home Assistant.",
@@ -163,6 +168,9 @@ const COPY = {
     volUp: "Volume +",
     volDown: "Volume -",
     close: "Close",
+    loadTimeout: "Voicemail is not responding.",
+    loadFailed: "Voicemail could not be loaded.",
+    retry: "Retry",
     asking: "Starting playback on the Player…",
     askingNamed: "Starting playback on ",
     launched: "Playback started on the Player",
@@ -176,6 +184,8 @@ const COPY = {
       show_number: "Show the number",
       show_calls: "Recent calls",
       max_calls: "Number of calls",
+      voicemail_volume: "Voicemail volume (%)",
+      helpVolume: "50 by default. 0 leaves the player volume unchanged.",
       helpEntry: "Useful with several Freeboxes. Empty = automatic detection.",
       helpPlayers: "Freebox Player or Music Assistant. The older media_player option still works.",
       helpNumber: "Hidden by default. Numbers are not stored in Home Assistant states.",
@@ -320,6 +330,17 @@ function _leaks(value) {
   return /https?:\/\//i.test(value) || /\d{6,}/.test(value) || /authSig|token=/i.test(value);
 }
 
+function _publicText(value) {
+  const text = String(value || "")
+    .replace(/https?:\/\/\S+/gi, "")
+    .replace(/authSig[=:][^\s&]+/gi, "")
+    .replace(/\d{6,}/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+  if (!text || text.length > 160) return "";
+  return text;
+}
+
 function _visibleError(err, fallback) {
   const direct = err && typeof err.message === "string" ? err.message : "";
   const body = err && err.body && typeof err.body === "object" ? err.body : null;
@@ -350,6 +371,19 @@ function _memory() {
   return null;
 }
 
+function _sleep(ms) {
+  if (typeof Promise !== "function" || typeof setTimeout !== "function") return null;
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function _volumePercent(config) {
+  const cfg = config || {};
+  if (!Object.prototype.hasOwnProperty.call(cfg, "voicemail_volume")) return 50;
+  const value = Number(cfg.voicemail_volume);
+  if (!Number.isFinite(value)) return 50;
+  return Math.max(0, Math.min(100, Math.round(value)));
+}
+
 function _editorSchema() {
   return [
     { name: "title", selector: { text: {} } },
@@ -369,6 +403,7 @@ function _editorSchema() {
     { name: "show_number", selector: { boolean: {} } },
     { name: "show_calls", selector: { boolean: {} } },
     { name: "max_calls", selector: { number: { min: 1, max: 30, mode: "box" } } },
+    { name: "voicemail_volume", selector: { number: { min: 0, max: 100, step: 1, mode: "box" } } },
   ];
 }
 
@@ -378,6 +413,7 @@ function _editorData(config, hass) {
     media_players: _playableIds(hass, cfg),
     show_number: cfg.show_number === true,
     show_calls: cfg.show_calls === true,
+    voicemail_volume: _volumePercent(cfg),
   };
   if (typeof cfg.title === "string") data.title = cfg.title;
   if (typeof cfg.config_entry === "string" && cfg.config_entry) data.config_entry = cfg.config_entry;
@@ -465,6 +501,9 @@ class HomexaPhoneCard extends HTMLElement {
     this._playerEnabled = true;
     this._key = "";
     this._loading = false;
+    this._loadingSince = 0;
+    this._loadError = "";
+    this._loadTimer = null;
     this._fetchPending = false;
     this.attachShadow({ mode: "open" });
   }
@@ -487,7 +526,9 @@ class HomexaPhoneCard extends HTMLElement {
             ? labels.helpNumber
             : schema.name === "media_players"
               ? labels.helpPlayers
-              : undefined,
+              : schema.name === "voicemail_volume"
+                ? labels.helpVolume
+                : undefined,
     };
   }
 
@@ -582,6 +623,9 @@ class HomexaPhoneCard extends HTMLElement {
     const fromSocket = wsMessages.length > 0;
     const messages = fromSocket ? wsMessages : sensorMessages;
     if (messages.length && supported) {
+      this._loadingSince = 0;
+      this._loadError = "";
+      this._stopLoadWatch();
       this._messages = messages;
       if (fromSocket && ws && typeof ws.total === "number") this._total = ws.total;
       else if (stored && typeof stored.total === "number") this._total = stored.total;
@@ -594,6 +638,13 @@ class HomexaPhoneCard extends HTMLElement {
     }
     if (!ws && this._messages && this._messages.length) return;
     if (loading) {
+      if (!(this._loadingSince > 0)) this._loadingSince = Date.now();
+      this._armLoadWatch();
+      if (this._checkLoadTimeout()) {
+        this._messages = [];
+        this._total = null;
+        return;
+      }
       this._messages = this._messages && this._messages.length ? this._messages : [];
       if (!this._messages.length) this._total = null;
       this._notice = "Chargement de la messagerie…";
@@ -601,6 +652,9 @@ class HomexaPhoneCard extends HTMLElement {
       this._error = "";
       return;
     }
+    this._loadingSince = 0;
+    this._loadError = "";
+    this._stopLoadWatch();
     if (!ws) return;
     if (!available) {
       this._messages = [];
@@ -631,30 +685,32 @@ class HomexaPhoneCard extends HTMLElement {
     if (!force && key === this._fetchKey) return;
     this._fetchKey = key;
     this._loading = true;
+    const generation = (this._loadGen = (this._loadGen || 0) + 1);
     try {
       const payload = { type: "freebox_homexa/voicemails", action: "list", include_number: this._on("show_number", false) };
       if (sensor) payload.entity_id = sensor;
       if (entry) payload.config_entry_id = entry;
       const res = await hass.callWS(payload);
+      if (generation !== this._loadGen) return;
       this._showList(res);
     } catch (err) {
+      if (generation !== this._loadGen) return;
       const stored = _sensorList(this._hass, this._sensors()[0] || "");
-      const server = err && typeof err.message === "string" ? err.message : "";
-      if (stored && stored.loading && (!stored.messages || !stored.messages.length)) {
-        this._notice = "Chargement de la messagerie…";
+      const server = _publicText(err && err.message);
+      this._loadError = server;
+      this._loadingSince = 0;
+      this._stopLoadWatch();
+      this._notice = "";
+      if (stored && stored.messages && stored.messages.length) {
+        this._messages = stored.messages;
         this._error = "";
-      } else if (!stored || !stored.messages.length) {
+      } else if (!(this._messages && this._messages.length)) {
         this._messages = [];
         this._total = null;
-        this._notice = "";
-        if (server && !/\d/.test(server)) this._error = server;
-        else {
-          const code = err && typeof err.code === "string" && err.code ? ` (${err.code})` : "";
-          this._error = `Messagerie vocale indisponible${code}`;
-        }
+        this._error = server || _copy(this._hass).loadFailed;
       }
     } finally {
-      this._loading = false;
+      if (generation === this._loadGen) this._loading = false;
     }
     if (hass && hass.callWS && this._on("show_calls", false)) {
       const callsEntity = _callsSensor(hass, entry);
@@ -896,6 +952,36 @@ class HomexaPhoneCard extends HTMLElement {
 
   disconnectedCallback() {
     this._stopRemoteTimer();
+    this._stopLoadWatch();
+  }
+
+  _stopLoadWatch() {
+    if (this._loadTimer && typeof clearTimeout === "function") clearTimeout(this._loadTimer);
+    this._loadTimer = null;
+  }
+
+  _armLoadWatch() {
+    if (this._loadTimer || typeof setTimeout !== "function") return;
+    this._loadTimer = setTimeout(() => {
+      this._loadTimer = null;
+      if (!this._checkLoadTimeout()) return;
+      this._key = "";
+      this._render();
+    }, 15000);
+  }
+
+  _checkLoadTimeout() {
+    if (!(this._loadingSince > 0) || Date.now() - this._loadingSince < 15000) return false;
+    if (this._messages && this._messages.length) {
+      this._loadingSince = 0;
+      return false;
+    }
+    this._loadingSince = 0;
+    this._loading = false;
+    this._notice = "";
+    this._hint = "";
+    this._error = this._loadError || _copy(this._hass).loadTimeout;
+    return true;
   }
 
   _remoteSnapshot() {
@@ -1049,9 +1135,21 @@ class HomexaPhoneCard extends HTMLElement {
     const pending = this._media("media_stop");
     const clear = () => {
       if (_feature(attrs, FEATURE.clear)) this._media("clear_playlist");
+      this._restoreVolume(remote, attrs);
     };
     if (pending && typeof pending.then === "function") pending.then(clear).catch(() => {});
     else clear();
+  }
+
+  _restoreVolume(remote, attrs) {
+    const previous = remote && remote.previousVolume;
+    const applied = remote && remote.appliedVolume;
+    const current = attrs && attrs.volume_level;
+    if (!_feature(attrs, FEATURE.volumeSet)) return;
+    if (typeof previous !== "number" || typeof applied !== "number" || typeof current !== "number") return;
+    if (Math.abs(current - applied) > 0.02) return;
+    if (Math.abs(previous - applied) <= 0.02) return;
+    this._media("volume_set", { volume_level: previous });
   }
 
   _nudgeVolume(direction) {
@@ -1113,17 +1211,23 @@ class HomexaPhoneCard extends HTMLElement {
     const copy = _copy(hass);
     const players = _playableIds(hass, cfg);
     const allowed = this._playerEnabled !== false;
-    const hint = this._notice || this._hint || (allowed && !players.length ? copy.noPlayer : "");
+    const hint = this._hint || (allowed && !players.length && !this._notice && !this._error ? copy.noPlayer : "");
     n.hint.hidden = !hint;
     n.hint.textContent = hint;
     const messages = this._messages || [];
     const playing = this._playingAudio();
     const rows = [];
     if (!messages.length) {
-      const empty = _el("div");
-      empty.className = this._error ? "empty error" : "empty";
-      empty.textContent = this._notice || this._error || (this._messages === null ? "Chargement…" : "Aucun message");
-      rows.push(empty);
+      if (this._error) {
+        const retry = this._button("retry-voicemail", "", copy.retry, "", false);
+        retry.className = "stop";
+        rows.push(retry);
+      } else {
+        const empty = _el("div");
+        empty.className = "empty";
+        empty.textContent = this._notice || (this._messages === null ? "Chargement…" : "Aucun message");
+        rows.push(empty);
+      }
     }
     messages.forEach((item) => {
       const row = _el("div");
@@ -1226,6 +1330,17 @@ class HomexaPhoneCard extends HTMLElement {
   _click(dataset) {
     const act = dataset.act;
     const id = dataset.id;
+    if (act === "retry-voicemail") {
+      this._error = "";
+      this._loadError = "";
+      this._notice = "";
+      this._loadingSince = 0;
+      this._loading = false;
+      this._fetchKey = "";
+      this._key = "";
+      this._fetch(true);
+      return;
+    }
     if (act === "dect") this._service("start_dect_ring", {});
     else if (act === "fxs") this._service("start_fxs_ring", {});
     else if (act === "stop-dect") this._service("stop_dect_ring", {});
@@ -1300,9 +1415,64 @@ class HomexaPhoneCard extends HTMLElement {
     this._menuFor = "";
     this._key = "";
     this._render();
-    const pending = this._service("play_voicemail", { id, entity_id: entityId });
-    if (pending && typeof pending.then === "function") {
-      pending.then(() => {
+    const prepared = this._prepareVolume(entityId);
+    const start = (info) => {
+      const pending = this._service("play_voicemail", { id, entity_id: entityId });
+      if (pending && typeof pending.then === "function") {
+        pending.then(() => this._startedRemote(id, entityId, info)).catch((err) => {
+          this._notice = "";
+          this._error = _visibleError(err, copy.failed);
+          this._key = "";
+          this._render();
+        });
+        return;
+      }
+      this._startedRemote(id, entityId, info);
+    };
+    if (prepared && typeof prepared.then === "function") prepared.then(start).catch(() => start({}));
+    else start(prepared || {});
+  }
+
+  _voicemailLevel() {
+    const percent = _volumePercent(this._config);
+    return percent > 0 ? percent / 100 : null;
+  }
+
+  _prepareVolume(entityId) {
+    const level = this._voicemailLevel();
+    const empty = {};
+    if (level == null) return empty;
+    const hass = this._hass;
+    const state = hass && hass.states ? hass.states[entityId] : null;
+    const attrs = (state && state.attributes) || {};
+    if (!_feature(attrs, FEATURE.volumeSet)) return empty;
+    const previous = typeof attrs.volume_level === "number" ? attrs.volume_level : null;
+    const info = { previousVolume: previous, appliedVolume: level };
+    if (previous != null && Math.abs(previous - level) <= 0.02) return info;
+    if (!hass || typeof hass.callService !== "function") return empty;
+    let pending;
+    try {
+      pending = hass.callService("media_player", "volume_set", {
+        entity_id: entityId,
+        volume_level: level,
+      });
+    } catch (err) {
+      return empty;
+    }
+    const wait = (left) => {
+      const current = hass.states && hass.states[entityId] && hass.states[entityId].attributes;
+      const now = current && current.volume_level;
+      if ((typeof now === "number" && Math.abs(now - level) <= 0.02) || left <= 0) return info;
+      const pause = _sleep(250);
+      if (!pause || typeof pause.then !== "function") return info;
+      return pause.then(() => wait(left - 1));
+    };
+    const after = () => wait(typeof setTimeout === "function" ? 8 : 0);
+    if (pending && typeof pending.then === "function") return pending.then(after).catch(() => empty);
+    return after();
+  }
+
+  _startedRemote(id, entityId, info) {
         this._notice = "";
         this._error = "";
         let seconds = NaN;
@@ -1319,17 +1489,12 @@ class HomexaPhoneCard extends HTMLElement {
           late: false,
           released: false,
           duration: seconds,
+          previousVolume: info && typeof info.previousVolume === "number" ? info.previousVolume : null,
+          appliedVolume: info && typeof info.appliedVolume === "number" ? info.appliedVolume : null,
         };
         this._armRemote();
         this._key = "";
         this._render();
-      }).catch((err) => {
-        this._notice = "";
-        this._error = _visibleError(err, copy.failed);
-        this._key = "";
-        this._render();
-      });
-    }
   }
 }
 
@@ -1377,7 +1542,9 @@ class HomexaPhoneCardEditor extends HTMLElement {
           ? copy.editors.helpNumber
           : schema.name === "media_players"
             ? copy.editors.helpPlayers
-            : undefined;
+            : schema.name === "voicemail_volume"
+              ? copy.editors.helpVolume
+              : undefined;
     const configured = _playerIds(this._config);
     const known = _platformsKnown(this._hass);
     const unsupported = known && configured.some((id) => {
@@ -1443,6 +1610,9 @@ class HomexaPhoneCardEditor extends HTMLElement {
     next.show_calls = value.show_calls === true;
     if (value.max_calls !== undefined && value.max_calls !== null && value.max_calls !== "") {
       next.max_calls = Number(value.max_calls);
+    }
+    if (value.voicemail_volume !== undefined && value.voicemail_volume !== null && value.voicemail_volume !== "") {
+      next.voicemail_volume = _volumePercent({ voicemail_volume: value.voicemail_volume });
     }
     this._config = next;
     if (typeof this.dispatchEvent === "function") this.dispatchEvent(_configChanged(next));

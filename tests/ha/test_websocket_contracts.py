@@ -182,3 +182,55 @@ def test_call_formatter_preserves_defaults_and_rejects_invalid_timestamp():
         "duration": 0, "new": False}]
     with pytest.raises(ValueError, match="Invalid call timestamp"):
         format_calls([{"datetime": "not a timestamp"}])
+
+
+def test_spoken_number_is_grouped_and_absent_unless_requested():
+    from custom_components.freebox_homexa.calls_ws import caller_fields, spoken_number
+    from custom_components.freebox_homexa.voicemail import (
+        VoicemailMessage,
+        public_message,
+    )
+
+    sample = "0610135787"
+    assert spoken_number(sample) == "06, 10, 13, 57, 87"
+    assert spoken_number("+33 6 10 13 57 87") == "06, 10, 13, 57, 87"
+    assert spoken_number("0033610135787") == "06, 10, 13, 57, 87"
+    assert spoken_number("610135787", country_code="33") == "06, 10, 13, 57, 87"
+    assert spoken_number("061") == "06, 1"
+    assert spoken_number("Numéro privé") == "numéro masqué"
+    assert spoken_number("anonymous") == "numéro masqué"
+    assert spoken_number("****") == "numéro masqué"
+    assert spoken_number("06**87") == "numéro masqué"
+    assert spoken_number("") == ""
+    hidden = caller_fields("", sample, include_number=False)
+    assert "number" not in hidden
+    assert "number_spoken" not in hidden
+    assert sample not in str(hidden)
+    shown = caller_fields("", sample, include_number=True)
+    assert shown["caller"] == sample
+    assert shown["number"] == sample
+    assert shown["number_spoken"] == "06, 10, 13, 57, 87"
+    named = caller_fields("Martin", sample, include_number=True)
+    assert named["caller"] == "Martin"
+    assert named["number_spoken"] == "06, 10, 13, 57, 87"
+    rows = format_calls(
+        [{"name": "", "number": "+33610135787", "datetime": 1700000000}],
+        include_number=True,
+    )
+    assert rows[0]["number"] == "+33610135787"
+    assert rows[0]["number_spoken"] == "06, 10, 13, 57, 87"
+    quiet = format_calls([{"name": "", "number": sample, "datetime": 1700000000}])
+    assert "number_spoken" not in quiet[0]
+    assert sample not in str(quiet)
+    mail = VoicemailMessage(
+        id="token",
+        country_code="33",
+        phone_number="610135787",
+        date=1,
+        read=False,
+        duration=3,
+    )
+    public = public_message(mail, public_id="token", include_number=True)
+    assert public["phone_number"] == "610135787"
+    assert public["number_spoken"] == "06, 10, 13, 57, 87"
+    assert "number_spoken" not in public_message(mail, public_id="token")

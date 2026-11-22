@@ -195,9 +195,9 @@ data:
 
 Le capteur **Messages vocaux non lus** compte les messages non lus. Ses attributs donnent le total, la date du plus récent, `voicemail_available`, `voicemail_supported`, `voicemail_error` et une liste (jeton, date, durée, lu) **sans numéro**. Un nouveau message non lu, après le premier relevé, émet `freebox_homexa_new_voicemail` (jeton, durée, date, `caller`, `name`). Le jeton n'est pas le nom de fichier Freebox. Si la Freebox n'a pas de messagerie, le capteur reste disponible avec `voicemail_supported: false` et la carte affiche « Messagerie vocale non disponible sur cette Freebox ».
 
-Un nouvel appel manqué, après le premier relevé du journal, émet `freebox_homexa_missed_call` (`entry_id`, `date`, `caller`, `name`). `caller` est le nom du contact, ou le numéro si l'option **Inclure le numéro dans les événements** est cochée. Sinon, sans contact, `caller` vaut `Inconnu` et le numéro n'est pas dans l'événement. L'option est décochée par défaut. Les options déjà enregistrées ne changent pas. Aucun numéro n'est journalisé.
+Un nouvel appel manqué, après le premier relevé du journal, émet `freebox_homexa_missed_call` (`entry_id`, `date`, `caller`, `name`). `caller` est le nom du contact, ou le numéro si l'option **Inclure le numéro dans les événements** est cochée. Sinon, sans contact, `caller` vaut `Inconnu` et le numéro n'est pas dans l'événement. L'option est décochée par défaut. Les options déjà enregistrées ne changent pas. Aucun numéro n'est journalisé. Quand l'option est cochée, `number_spoken` est le numéro à faire lire : chiffres groupés deux par deux (« 06, 10, 13, 57, 87 »), un `+33` ou `0033` devenant `0`, et un numéro masqué lu « numéro masqué ». Le même champ est sur `freebox_homexa_new_voicemail`. Homexa n'envoie pas elle-même l'annonce à Alexa. Quand l'option est cochée, `number_spoken` est le numéro à faire lire : chiffres groupés deux par deux (« 06, 10, 13, 57, 87 »), un `+33` ou `0033` devenant `0`, et un numéro masqué lu « numéro masqué ». Le même champ est sur `freebox_homexa_new_voicemail`. Homexa n'envoie pas elle-même l'annonce à Alexa.
 
-La carte **Homexa Téléphone** (chargée avec les autres cartes Homexa, sans ressource Lovelace à ajouter) regroupe les sonneries, l'état des combinés, la messagerie et, si on l'active, les derniers appels. Le numéro reste masqué tant que `show_number` n'est pas coché. On peut écouter dans le navigateur (MP3), ou envoyer le message à un ou plusieurs lecteurs, puis le marquer lu ou le supprimer (avec confirmation). La liste affichée est celle du capteur : un rafraîchissement vide ne la cache pas.
+La carte **Homexa Téléphone** (chargée avec les autres cartes Homexa, sans ressource Lovelace à ajouter) regroupe les sonneries, l'état des combinés, la messagerie et, si on l'active, les derniers appels. Le numéro reste masqué tant que `show_number` n'est pas coché. On peut écouter dans le navigateur (MP3), ou envoyer le message à un ou plusieurs lecteurs, puis le marquer lu ou le supprimer (avec confirmation). La liste affichée est celle du capteur : un rafraîchissement vide ne la cache pas. Si le chargement dépasse 15 secondes, ou si la lecture échoue, la carte affiche l'erreur et un bouton Réessayer au lieu de rester sur « Chargement ». Avant la lecture sur un lecteur, le volume passe au pourcentage de l'option `voicemail_volume` (50 par défaut) quand le lecteur le permet, puis retrouve son volume d'origine à la fin du message si personne ne l'a modifié. 0 laisse le volume inchangé.
 
 Dans l'éditeur visuel : titre, Freebox, lecteurs, afficher le numéro, derniers appels et nombre d'appels. Les lecteurs proposés sont le Freebox Player (`freebox_homexa`) et Music Assistant. Une carte déjà réglée avec `media_player: media_player.salon` continue de fonctionner : cette clé est lue comme une liste d'un seul lecteur. Si cette liste contient `alexa_devices` ou `alexa_media`, ces lecteurs n'apparaissent ni dans le sélecteur ni dans le menu. Si l'intégration n'est pas connue, il reste et l'éditeur l'indique. Avec un seul lecteur retenu, le bouton affiche « Sur » et le nom court. Avec plusieurs, « Écouter sur… » ouvre les noms ; deux lecteurs du même nom restent distingués par l'intégration ou l'entity_id. Le choix appelle `play_voicemail` et le navigateur retient le dernier choix. Après un envoi réussi, un mini-lecteur suit l'état du lecteur (lecture, pause, progression, volume, stop) et se ferme d'un bouton. S'il n'a pas démarré au bout de dix secondes, le mini-lecteur le dit, sans adresse. Quand le message se termine, ou avec Stop, la carte arrête le lecteur seulement si c'est encore ce message : Music Assistant vide sa file si elle le permet, le Freebox Player arrête AirMedia et retrouve sa source précédente quand elle est connue. Le titre affiché est « Message vocal Freebox ». Si le lecteur refuse, la carte affiche le code d'erreur, sans l'adresse du message.
 
@@ -222,6 +222,28 @@ actions:
   - action: notify.notify
     data:
       message: "Appel manqué de {{ trigger.event.data.caller }}"
+```
+
+Pour une enceinte, utiliser `number_spoken` à la place du numéro brut. `caller` reste le nom du contact, ou le numéro tel quel. Homexa ne crée pas cette automatisation.
+
+```yaml
+alias: Annoncer un appel manqué
+triggers:
+  - trigger: event
+    event_type: freebox_homexa_missed_call
+actions:
+  - action: notify.alexa_media_salon
+    data:
+      data:
+        type: tts
+      message: >-
+        Appel manqué de
+        {% set who = trigger.event.data.name %}
+        {% if who and who != 'Inconnu' %}
+        {{ who }}
+        {% else %}
+        {{ trigger.event.data.number_spoken | default('Inconnu') }}
+        {% endif %}
 ```
 
 ```yaml

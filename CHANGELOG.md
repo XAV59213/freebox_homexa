@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+- Carte Téléphone : si le chargement de la messagerie dépasse 15 secondes, ou si la lecture échoue, « Chargement » ne reste plus affiché. La carte montre l'erreur et un bouton Réessayer.
+- Carte Téléphone : avant un message sur un lecteur, le volume passe à 50 % s'il est réglable, puis revient à la valeur d'origine à la fin si personne ne l'a changé. L'éditeur a « Volume du message (%) » ; 0 ne touche pas au volume.
+- Événements d'appel et de message : `number_spoken` donne le numéro à lire (« 06, 10, 13, 57, 87 »). Un +33 ou un 0033 est ramené à 0. Un numéro masqué vaut « numéro masqué ». Le champ n'est présent que si l'option d'inclure le numéro est cochée. `caller` et `number` ne changent pas.
+
 ## 28.8.104 — 2026-11-22
 
 - Carte Téléphone : après un envoi vers un lecteur, un mini-lecteur montre son état, la progression et les commandes supportées (pause, stop, volume). S'il ne démarre pas en dix secondes, un message l'indique. Le bouton tient sur une ligne : « Sur » suivi du nom court.

@@ -1432,6 +1432,7 @@ async def test_missed_call_and_voicemail_events_name_the_contact(hass, home_cont
     assert "number" not in by_caller["Martin"]
     assert by_caller["Inconnu"]["caller"] == "Inconnu"
     assert "number" not in by_caller["Inconnu"]
+    assert "number_spoken" not in by_caller["Inconnu"]
     assert SECRET not in str(missed)
     assert "0699999999" not in str(missed)
     assert SECRET not in caplog.text
@@ -1451,6 +1452,7 @@ async def test_missed_call_and_voicemail_events_name_the_contact(hass, home_cont
     numbered = next(item for item in missed if item.get("number") == "0688888888")
     assert numbered["caller"] == "0688888888"
     assert numbered["name"] == "Inconnu"
+    assert numbered["number_spoken"] == "06, 88, 88, 88, 88"
     script.messages = [message(ident="plain.au")]
     await router._update_voicemails()
     await hass.async_block_till_done()
@@ -1467,6 +1469,7 @@ async def test_missed_call_and_voicemail_events_name_the_contact(hass, home_cont
     assert voices and voices[0]["caller"] == "Nadia"
     assert voices[0]["name"] == "Nadia"
     assert voices[0]["number"] == SECRET
+    assert voices[0]["number_spoken"] == "06, 12, 34, 56, 78"
     assert MESSAGE not in str(voices[0])
     assert SECRET not in caplog.text
 

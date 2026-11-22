@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 28.8.107 — 2026-11-22
 
 - Player : `media_player.play_media` récupère un fichier audio HTTP, HTTPS ou une source média, l'emballe en MP4 (AAC et image noire) et le sert sur une adresse signée de courte durée. L'API Player ne permet pas de désigner l'application : `control/open` n'a que l'adresse et le type, donc le fichier est annoncé `video/mp4` pour que le choix préselectionne le lecteur multimédia. Si le choix reste affiché, OK est envoyé tout seul (une ou deux fois), seulement si la lecture n'a pas déjà démarré et si le lecteur multimédia n'est pas déjà au premier plan. Le code télécommande déjà enregistré est utilisé ; aucun nouveau réglage. L'adresse d'origine n'est envoyée que si cette préparation échoue. AirMedia n'essaie plus le type audio : uniquement la vidéo, avec la position 0. Un refus `http` ou `req_in_progress` est réessayé une fois après une seconde. Le récepteur choisi a la vidéo, n'est pas le Freebox Server, et son nom correspond à celui du Player visé quand c'est possible. La lecture est reconnue aussi si le Player était déjà sur une chaîne (l'application ou le média change, même si l'état de lecture reste le même). La messagerie sur le Player passe par le même MP4 et la même confirmation.
 - Deux sons d'alarme sont fournis avec l'intégration (synthèse, mono, 44,1 kHz) : `freebox_homexa://sound/alarme_sirene` (sirène, environ 5 s) et `freebox_homexa://sound/alarme_bip` (bip-bip, environ 5 s). Ils passent par la même adresse signée et apparaissent dans le navigateur multimédia, dossier Sons d'alarme.

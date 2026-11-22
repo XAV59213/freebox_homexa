@@ -545,6 +545,9 @@ class FreeboxPlayerMediaPlayer(FreeboxReachableMixin, MediaPlayerEntity):
             )
             return
         resolved_type, resolved_id = await self._playable(media_type, media_id)
+        if PLAYER_AUDIO_MARKER in resolved_id:
+            await self._open_audio(resolved_id, PLAYER_AUDIO_MARKER)
+            return
         if is_http_audio(resolved_type, resolved_id):
             hosted = await async_host_http_audio(self.hass, resolved_id)
             if hosted:

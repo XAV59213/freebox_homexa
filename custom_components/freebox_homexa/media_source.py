@@ -54,7 +54,7 @@ class FreeboxVoicemailSource(MediaSource):
                 url = await async_host_sound(self.hass, sound)
             except HomeAssistantError as err:
                 raise Unresolvable("Lecture du son impossible") from err
-            return PlayMedia(url, "audio/mpeg")
+            return PlayMedia(url, "video/mp4")
         entry_id, public_id = _split_playable(item.identifier)
         router = _router(self.hass, entry_id)
         message = _message_by_token(router, public_id)

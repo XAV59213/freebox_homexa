@@ -125,7 +125,7 @@ Volume et lecture passent par l’API Player, sans ce code.
 
 ### Lire un MP3 (sirène, annonce)
 
-`media_player.play_media` lit une adresse HTTP ou HTTPS sur le Player quand le type est `audio/mpeg` (ou un autre `audio/*`), `music`, ou absent si le fichier finit par `.mp3`, `.aac`, `.ogg`, `.wav` ou `.flac`. Home Assistant récupère le fichier, le convertit en MP3 si besoin, et le sert sur une adresse signée de courte durée, comme un message vocal. AirMedia l'ouvre en vidéo. L'adresse d'origine n'est utilisée que si cette préparation échoue. Le changement de chaîne `tv:?channel=N` et la vidéo restent inchangés.
+`media_player.play_media` lit une adresse HTTP ou HTTPS sur le Player quand le type est `audio/mpeg` (ou un autre `audio/*`), `music`, ou absent si le fichier finit par `.mp3`, `.aac`, `.ogg`, `.wav` ou `.flac`. Home Assistant récupère le fichier, l'emballe en MP4 et le sert sur une adresse signée de courte durée. Le Player propose alors le lecteur multimédia. Si le choix d'application reste à l'écran, OK est envoyé avec le code télécommande déjà configuré, sans nouveau réglage. L'adresse d'origine n'est utilisée que si cette préparation échoue. Le changement de chaîne `tv:?channel=N` et la vidéo restent inchangés.
 
 Si la lecture ne démarre pas, l'action échoue avec un message au lieu de laisser la chaîne TV en cours.
 

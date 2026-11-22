@@ -6,6 +6,7 @@ from homeassistant.components.media_source.models import PlayMedia
 from homeassistant.exceptions import HomeAssistantError
 
 from custom_components.freebox_homexa.media_player import FreeboxPlayerMediaPlayer
+from custom_components.freebox_homexa.player_audio import async_audio_to_mp4 as _real_audio_to_mp4
 from test_home_platforms import home_context
 
 TOKEN = "synthetic-token"
@@ -58,6 +59,19 @@ def _patch_sleep():
     return patch(
         "custom_components.freebox_homexa.player_airmedia.asyncio.sleep",
         new=_no_sleep,
+    )
+
+
+@pytest.fixture(autouse=True)
+def _wrap_audio_as_mp4(monkeypatch):
+    """Évite ffmpeg pendant les tests : le résultat reste un MP4 reconnaissable."""
+
+    async def convert(_hass: object, payload: bytes) -> bytes:
+        return b"\x00\x00\x00\x18ftypisom" + payload
+
+    monkeypatch.setattr(
+        "custom_components.freebox_homexa.player_audio.async_audio_to_mp4",
+        convert,
     )
 
 
@@ -159,7 +173,7 @@ async def test_control_open_is_the_second_attempt(hass, home_context, caplog):
     assert posts[0][0].endswith("control/mediactrl")
     assert posts[0][1] == {"cmd": "stop"}
     assert posts[1][0].endswith("control/open")
-    assert posts[1][1] == {"url": AUDIO, "type": "audio/mpeg"}
+    assert posts[1][1] == {"url": AUDIO, "type": "video/mp4"}
     assert len(posts) == 2
     assert TOKEN not in caplog.text
     assert "192.0.2.10" not in caplog.text
@@ -567,10 +581,11 @@ async def test_local_mp3_is_served_from_the_signed_view(
     client = await hass_client()
     response = await client.get(f"{parts.path}?{parts.query}")
     assert response.status == 200
-    assert response.headers["Content-Type"] == "audio/mpeg"
+    assert response.headers["Content-Type"] == "video/mp4"
     assert response.headers["Cache-Control"] == "no-store"
-    assert response.headers["Content-Length"] == str(len(payload))
-    assert await response.read() == payload
+    wrapped = b"\x00\x00\x00\x18ftypisom" + payload
+    assert response.headers["Content-Length"] == str(len(wrapped))
+    assert await response.read() == wrapped
     missing = await client.get("/api/freebox_homexa/player_audio/absent")
     assert missing.status == 404
 
@@ -619,7 +634,8 @@ async def test_wav_uses_the_voicemail_ffmpeg_helper(hass, hass_client, home_cont
     parts = urlsplit(sent[0])
     client = await hass_client()
     response = await client.get(f"{parts.path}?{parts.query}")
-    assert await response.read() == converted
+    assert (await response.read()).startswith(b"\x00\x00\x00\x18ftypisom")
+    assert response.headers["Content-Type"] == "video/mp4"
 
 
 async def test_fetch_failure_falls_back_to_the_original_url_without_logging_it(
@@ -685,7 +701,7 @@ async def test_bundled_sound_ids_resolve_to_the_signed_view(
         second = await source.async_resolve_media(
             MediaSourceItem(hass, DOMAIN, "sound/alarme_sirene", None)
         )
-    assert first.mime_type == "audio/mpeg"
+    assert first.mime_type == "video/mp4"
     assert first.url == second.url
     assert "/api/freebox_homexa/player_audio/" in first.url
     assert "alarme_sirene" not in first.url
@@ -721,14 +737,15 @@ async def test_bundled_sound_ids_resolve_to_the_signed_view(
     client = await hass_client()
     response = await client.get(f"{parts.path}?{parts.query}")
     assert response.status == 200
-    assert response.headers["Content-Type"] == "audio/mpeg"
+    assert response.headers["Content-Type"] == "video/mp4"
     assert response.headers["Cache-Control"] == "no-store"
     from pathlib import Path
 
-    expected = (
+    alarm = (
         Path(__file__).resolve().parents[2]
         / "custom_components" / "freebox_homexa" / "sounds" / "alarme_bip.mp3"
     ).read_bytes()
+    expected = b"\x00\x00\x00\x18ftypisom" + alarm
     assert response.headers["Content-Length"] == str(len(expected))
     assert await response.read() == expected
     with pytest.raises(HomeAssistantError) as refused:
@@ -749,3 +766,143 @@ async def test_bundled_sound_ids_resolve_to_the_signed_view(
     newest = urlsplit(hosted[-1])
     assert (await client.get(f"{oldest.path}?{oldest.query}")).status == 404
     assert (await client.get(f"{newest.path}?{newest.query}")).status == 200
+
+
+def _enable_remote(hass, router, code: str = "12345678") -> None:
+    entry = hass.config_entries.async_get_entry(router.entry_id)
+    hass.config_entries.async_update_entry(
+        entry, options={**entry.options, "remote_code": code}
+    )
+
+
+async def test_ok_is_sent_twice_at_most_when_the_chooser_stays(hass, home_context, caplog):
+    router, entity = _entity(hass, home_context)
+    _enable_remote(hass, router)
+    keys: list[str] = []
+
+    async def send_airmedia(_name: str, _data: dict[str, object]) -> None:
+        raise RuntimeError("unimplemented")
+
+    async def send_key(**kwargs: object) -> bool:
+        keys.append(str(kwargs.get("key")))
+        return True
+
+    router._api.airmedia.get_airmedia_receivers = AsyncMock(return_value=_receivers())
+    router._api.airmedia.send_airmedia = send_airmedia
+    router._api.player._access.post = AsyncMock()
+    router._api.remote.send_key = send_key
+    with caplog.at_level("DEBUG"), _patch_status([TV]), _patch_sleep():
+        with pytest.raises(HomeAssistantError) as caught:
+            await entity.async_play_media("audio/mpeg", AUDIO)
+    assert caught.value.translation_key == "player_audio_silent"
+    assert keys == ["ok", "ok"]
+    assert "12345678" not in caplog.text
+    assert TOKEN not in caplog.text
+    assert "192.0.2.10" not in caplog.text
+
+
+async def test_ok_stops_when_the_media_player_starts(hass, home_context):
+    router, entity = _entity(hass, home_context)
+    _enable_remote(hass, router)
+    keys: list[str] = []
+
+    async def send_airmedia(_name: str, _data: dict[str, object]) -> None:
+        raise RuntimeError("unimplemented")
+
+    async def send_key(**kwargs: object) -> bool:
+        keys.append(str(kwargs.get("key")))
+        return True
+
+    playing = {
+        "playback_state": "playing",
+        "foreground_app": {"package": "fr.freebox.mediaplayer", "cur_url": "video/mp4"},
+    }
+    router._api.airmedia.get_airmedia_receivers = AsyncMock(return_value=_receivers())
+    router._api.airmedia.send_airmedia = send_airmedia
+    router._api.player._access.post = AsyncMock()
+    router._api.remote.send_key = send_key
+    with _patch_status([TV, TV, playing]), _patch_sleep():
+        await entity.async_play_media("audio/mpeg", AUDIO)
+    assert keys == ["ok"]
+
+
+async def test_ok_is_not_sent_when_playback_already_started(hass, home_context):
+    router, entity = _entity(hass, home_context)
+    _enable_remote(hass, router)
+    keys: list[str] = []
+
+    async def send_airmedia(_name: str, _data: dict[str, object]) -> None:
+        raise RuntimeError("unimplemented")
+
+    async def send_key(**kwargs: object) -> bool:
+        keys.append(str(kwargs.get("key")))
+        return True
+
+    router._api.airmedia.get_airmedia_receivers = AsyncMock(return_value=_receivers())
+    router._api.airmedia.send_airmedia = send_airmedia
+    router._api.player._access.post = AsyncMock()
+    router._api.remote.send_key = send_key
+    with _patch_status([TV, STARTED]), _patch_sleep():
+        await entity.async_play_media("audio/mpeg", AUDIO)
+    assert keys == []
+
+
+async def test_ok_is_not_sent_when_mediaplayer_is_already_foreground(hass, home_context):
+    router, entity = _entity(hass, home_context)
+    _enable_remote(hass, router)
+    keys: list[str] = []
+    same = {
+        "playback_state": "playing",
+        "foreground_app": {"package": "fr.freebox.mediaplayer", "cur_url": "app:media"},
+    }
+
+    async def send_airmedia(_name: str, _data: dict[str, object]) -> None:
+        raise RuntimeError("unimplemented")
+
+    async def send_key(**kwargs: object) -> bool:
+        keys.append(str(kwargs.get("key")))
+        return True
+
+    router._api.airmedia.get_airmedia_receivers = AsyncMock(return_value=_receivers())
+    router._api.airmedia.send_airmedia = send_airmedia
+    router._api.player._access.post = AsyncMock()
+    router._api.remote.send_key = send_key
+    with _patch_status([same]), _patch_sleep():
+        with pytest.raises(HomeAssistantError) as caught:
+            await entity.async_play_media("audio/mpeg", AUDIO)
+    assert caught.value.translation_key == "player_audio_silent"
+    assert keys == []
+
+
+async def test_mp4_wrapper_uses_a_black_frame_and_aac(hass):
+    from types import SimpleNamespace
+    from pathlib import Path
+
+    from homeassistant.components.ffmpeg import DATA_FFMPEG
+
+    hass.data[DATA_FFMPEG] = SimpleNamespace(binary="synthetic-ffmpeg")
+    seen: list[tuple[object, ...]] = []
+
+    class _Process:
+        returncode = 0
+
+        async def communicate(self, _data: bytes) -> tuple[bytes, bytes]:
+            return b"", b""
+
+    async def fake_exec(*args: object, **_kwargs: object) -> _Process:
+        seen.append(args)
+        Path(str(args[-1])).write_bytes(b"\x00\x00\x00\x18ftypisom")
+        return _Process()
+
+    with patch(
+        "custom_components.freebox_homexa.player_audio.asyncio.create_subprocess_exec",
+        new=fake_exec,
+    ):
+        body = await _real_audio_to_mp4(hass, b"ID3siren")
+    assert body.startswith(b"\x00\x00\x00\x18ftypisom")
+    command = [str(part) for part in seen[0]]
+    assert "color=c=black:s=64x64:r=1" in command
+    assert "aac" in command
+    assert "libx264" in command
+    assert "mp4" in command
+    assert "http://" not in " ".join(command)

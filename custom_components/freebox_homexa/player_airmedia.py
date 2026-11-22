@@ -21,6 +21,8 @@ _LOGGER = logging.getLogger(__name__)
 
 _AUDIO_SUFFIXES = (".mp3", ".aac", ".ogg", ".wav", ".flac")
 _START_POLLS = (1, 1, 2, 2)
+_CONFIRM_PAUSE = 2
+_MAX_OK = 2
 _VIDEO_RETRY = frozenset({"http", "req_in_progress"})
 _SERVER_RECEIVER = "freebox server"
 VOICEMAIL_MARKER = "freebox_homexa/voicemail"
@@ -251,6 +253,71 @@ async def async_stop_player_audio(router: FreeboxRouter) -> None:
         _LOGGER.warning("AirMedia video refusé (code=%s)", _error_code(err))
 
 
+def _remote_code(router: FreeboxRouter, player_id: int) -> str:
+    from .const import option_remote_code
+
+    entry = router.hass.config_entries.async_get_entry(router.entry_id)
+    if entry is None:
+        return ""
+    code = option_remote_code(entry, player_id)
+    return code if isinstance(code, str) else ""
+
+
+async def _press_ok(router: FreeboxRouter, player_id: int) -> bool:
+    """Envoie OK. Le code télécommande n'est pas journalisé."""
+    code = _remote_code(router, player_id)
+    if not code:
+        _LOGGER.debug("Confirmation du lecteur ignorée")
+        return False
+    from .player_remote import async_send_player_keys
+
+    failures = await async_send_player_keys(router, code, ["ok"])
+    if failures:
+        _LOGGER.warning(
+            "Confirmation du lecteur refusée (code=%s)", _error_code(failures[0][1])
+        )
+        return False
+    _LOGGER.debug("Confirmation du lecteur envoyée")
+    return True
+
+
+def _package_is_mediaplayer(status: object, marker: str) -> bool:
+    view = _player_view(status, marker)
+    return view is not None and "mediaplayer" in view[1]
+
+
+async def _confirm_playback(
+    router: FreeboxRouter,
+    player_id: int,
+    version: str,
+    before: tuple[str, str, str, bool] | None,
+    marker: str,
+) -> tuple[bool, str]:
+    """Attend le choix d'application, puis envoie OK au plus deux fois.
+
+    Rien n'est envoyé si la lecture a déjà démarré ou si le lecteur
+    multimédia est déjà au premier plan.
+    """
+    from .player_status import async_read_player_status
+
+    sent = 0
+    while sent < _MAX_OK:
+        await asyncio.sleep(_CONFIRM_PAUSE)
+        status, version = await async_read_player_status(router, player_id, version)
+        if _player_started(before, _player_view(status, marker)):
+            return True, version
+        if _package_is_mediaplayer(status, marker):
+            return False, version
+        if not await _press_ok(router, player_id):
+            return False, version
+        sent += 1
+    await asyncio.sleep(_CONFIRM_PAUSE)
+    status, version = await async_read_player_status(router, player_id, version)
+    if _player_started(before, _player_view(status, marker)):
+        return True, version
+    return False, version
+
+
 async def _wait_until_started(
     router: FreeboxRouter,
     player_id: int,
@@ -280,9 +347,11 @@ async def async_open_player_audio(
     """Joue l'URL et vérifie que l'état du Player change.
 
     AirMedia part en ``video`` (``position`` 0). Un code ``http`` ou
-    ``req_in_progress`` est réessayé une fois. ``control/open`` avec
-    ``audio/mpeg``, puis sans type, est le second essai. Sans changement
-    d'application ou de média, lève ``PlayerPlaybackError``.
+    ``req_in_progress`` est réessayé une fois. ``control/open`` ne documente
+    que ``url`` et ``type`` : ``video/mp4`` préselectionne le lecteur
+    multimédia. Si le choix d'application reste affiché, OK est envoyé au
+    plus deux fois. Sans changement d'application ou de média, lève
+    ``PlayerPlaybackError``.
     """
     from .player_status import async_read_player_status
 
@@ -299,33 +368,25 @@ async def async_open_player_audio(
         await _player_post(router, player_id, version, "control/mediactrl", {"cmd": "stop"})
     except Exception:
         _LOGGER.debug("Arrêt du média en cours ignoré avant la lecture audio")
-    opened = False
-    for mime in ("audio/mpeg", ""):
-        body: dict[str, str] = {"url": url}
-        if mime:
-            body["type"] = mime
-        try:
-            await _player_post(router, player_id, version, "control/open", body)
-            opened = True
-        except Exception as err:
-            raw_status = getattr(err, "status", None)
-            shown = (
-                raw_status
-                if isinstance(raw_status, int) and not isinstance(raw_status, bool)
-                else "-"
-            )
-            _LOGGER.warning(
-                "Ouverture audio du Player refusée (statut=%s, code=%s)",
-                shown,
-                _error_code(err),
-            )
-            continue
-        heard, version = await _wait_until_started(
-            router, player_id, version, before, marker
+    # Pas de champ d'application dans control/open (v6 et suivantes) : seulement url et type.
+    body: dict[str, str] = {"url": url, "type": "video/mp4"}
+    try:
+        await _player_post(router, player_id, version, "control/open", body)
+    except Exception as err:
+        raw_status = getattr(err, "status", None)
+        shown = (
+            raw_status
+            if isinstance(raw_status, int) and not isinstance(raw_status, bool)
+            else "-"
         )
-        if heard:
-            return
-    if not opened:
-        raise PlayerPlaybackError("refused")
+        _LOGGER.warning(
+            "Ouverture audio du Player refusée (statut=%s, code=%s)",
+            shown,
+            _error_code(err),
+        )
+        raise PlayerPlaybackError("refused") from err
+    heard, version = await _confirm_playback(router, player_id, version, before, marker)
+    if heard:
+        return
     _LOGGER.warning("Le Player n'a pas changé d'état après l'ouverture audio")
     raise PlayerPlaybackError("silent")

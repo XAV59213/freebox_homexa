@@ -1,16 +1,19 @@
-"""Fichier audio du Player : MP3 signé, cache court, sons embarqués.
+"""Fichier audio du Player : MP4 signé, cache court, sons embarqués.
 
-Home Assistant récupère l'adresse demandée, la convertit en MP3 comme un
-message vocal, puis la sert sur une vue de courte durée. Le Player joint
-cette vue, pas l'adresse d'origine. Les deux sons d'alarme sont synthétisés
-(aucun enregistrement tiers).
+Home Assistant récupère l'adresse demandée, l'emballe en MP4 (AAC et image
+noire) pour que le Player propose le lecteur multimédia, puis la sert sur une
+vue de courte durée. Les deux sons d'alarme sont synthétisés (aucun
+enregistrement tiers).
 """
 
 from __future__ import annotations
 
+import asyncio
 import hashlib
 import logging
+import os
 import secrets
+import tempfile
 import time
 from collections import OrderedDict
 from datetime import timedelta
@@ -97,10 +100,85 @@ def _prepare_failed(err: BaseException) -> HomeAssistantError:
     )
 
 
-def _looks_like_mp3(payload: bytes) -> bool:
-    if payload.startswith(b"ID3"):
-        return True
-    return len(payload) >= 2 and payload[0] == 0xFF and (payload[1] & 0xE0) == 0xE0
+def _looks_like_mp4(payload: bytes) -> bool:
+    return len(payload) > 11 and payload[4:8] == b"ftyp"
+
+
+async def async_audio_to_mp4(hass: HomeAssistant, audio: bytes) -> bytes:
+    """Emballe l'audio en MP4 AAC avec une image noire.
+
+    ``control/open`` ne connaît que ``url`` et ``type``. Un MP4 ``video/mp4``
+    préselectionne le lecteur multimédia ; un MP3 ouvre d'abord le navigateur.
+    """
+    from .voicemail_audio import _ffmpeg_binary, _input_format
+
+    destination = tempfile.NamedTemporaryFile(suffix=".mp4", delete=False)
+    destination.close()
+    path = destination.name
+    try:
+        try:
+            process = await asyncio.create_subprocess_exec(
+                _ffmpeg_binary(hass),
+                "-hide_banner",
+                "-loglevel",
+                "error",
+                "-y",
+                *_input_format(audio),
+                "-i",
+                "pipe:0",
+                "-f",
+                "lavfi",
+                "-i",
+                "color=c=black:s=64x64:r=1",
+                "-shortest",
+                "-map",
+                "1:v:0",
+                "-map",
+                "0:a:0",
+                "-c:v",
+                "libx264",
+                "-pix_fmt",
+                "yuv420p",
+                "-tune",
+                "stillimage",
+                "-preset",
+                "ultrafast",
+                "-c:a",
+                "aac",
+                "-b:a",
+                "96k",
+                "-ac",
+                "1",
+                "-movflags",
+                "+faststart",
+                "-f",
+                "mp4",
+                path,
+                stdin=asyncio.subprocess.PIPE,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+            )
+            await process.communicate(audio)
+        except OSError as err:
+            raise _prepare_failed(err) from err
+        if process.returncode != 0:
+            raise HomeAssistantError(
+                translation_domain=DOMAIN, translation_key="player_audio_prepare"
+            )
+        try:
+            body = Path(path).read_bytes()
+        except OSError as err:
+            raise _prepare_failed(err) from err
+    finally:
+        try:
+            os.unlink(path)
+        except OSError:
+            pass
+    if not body:
+        raise HomeAssistantError(
+            translation_domain=DOMAIN, translation_key="player_audio_prepare"
+        )
+    return body
 
 
 def _read_sound(name: str) -> bytes:
@@ -165,13 +243,8 @@ def _signed_url(hass: HomeAssistant, token: str) -> str:
 
 
 async def async_host_bytes(hass: HomeAssistant, key: str, payload: bytes) -> str:
-    """Sert un MP3. Un WAV ou un AU passe par le même ffmpeg que la messagerie."""
-    if _looks_like_mp3(payload):
-        body = payload
-    else:
-        from .voicemail_audio import async_wav_to_mp3
-
-        body = await async_wav_to_mp3(hass, payload)
+    """Sert un MP4. Un MP3, un WAV ou un AU est emballé, un MP4 est gardé."""
+    body = payload if _looks_like_mp4(payload) else await async_audio_to_mp4(hass, payload)
     if not body or len(body) > _MAX_BYTES:
         raise HomeAssistantError(
             translation_domain=DOMAIN, translation_key="player_audio_prepare"
@@ -226,7 +299,7 @@ async def async_host_http_audio(hass: HomeAssistant, url: str) -> str | None:
 
 
 class PlayerAudioView(HomeAssistantView):
-    """MP3 authentifié (session ou URL signée de courte durée)."""
+    """MP4 authentifié (session ou URL signée de courte durée)."""
 
     url = "/api/freebox_homexa/player_audio/{token}"
     name = "api:freebox_homexa:player_audio"
@@ -240,10 +313,10 @@ class PlayerAudioView(HomeAssistantView):
             body=body,
             status=200,
             headers={
-                "Content-Type": "audio/mpeg",
+                "Content-Type": "video/mp4",
                 "Content-Length": str(len(body)),
                 "Cache-Control": "no-store",
-                "Content-Disposition": 'inline; filename="audio.mp3"',
+                "Content-Disposition": 'inline; filename="audio.mp4"',
             },
         )
 

@@ -17,7 +17,7 @@ HDMI n’est **pas** un sélecteur d’entrée HDMI 1/2/3 de la télé. C’est 
 
 ## Fichier audio
 
-`media_player.play_media` prépare une URL HTTP ou HTTPS (type `audio/*` ou `music`, ou sans type si l'adresse finit par `.mp3`, `.aac`, `.ogg`, `.wav` ou `.flac`) : Home Assistant télécharge le fichier, le convertit en MP3 si besoin, et le sert sur une adresse signée de courte durée. AirMedia l'ouvre en vidéo, sur le récepteur du Player (pas le Freebox Server). Un refus `http` ou `req_in_progress` est réessayé une fois. `control/open` est le second essai. Sans changement d'application ou de média, l'action échoue avec un message traduit. L'adresse d'origine n'est envoyée que si la préparation échoue.
+`media_player.play_media` prépare une URL HTTP ou HTTPS (type `audio/*` ou `music`, ou sans type si l'adresse finit par `.mp3`, `.aac`, `.ogg`, `.wav` ou `.flac`) : Home Assistant télécharge le fichier, l'emballe en MP4 (son AAC et image noire) et le sert sur une adresse signée de courte durée. L'API du Player ne sait pas imposer une application : l'ouverture annonce `video/mp4`, ce qui préselectionne le lecteur multimédia plutôt que le navigateur. Si le choix reste affiché, OK est envoyé une ou deux fois avec le code télécommande déjà enregistré, et seulement tant que la lecture n'a pas démarré. AirMedia vise le récepteur du Player (pas le Freebox Server). Un refus `http` ou `req_in_progress` est réessayé une fois. Sans changement d'application ou de média, l'action échoue avec un message traduit. L'adresse d'origine n'est envoyée que si la préparation échoue.
 
 Le changement de chaîne reste `tv:?channel=N` avec le type `url`. La vidéo n'emprunte pas AirMedia.
 

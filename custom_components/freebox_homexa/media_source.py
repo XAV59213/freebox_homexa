@@ -1,7 +1,7 @@
 """Source média « Freebox – Messagerie vocale ».
 
 Les titres n'affichent ni numéro ni nom. La résolution renvoie une URL signée
-de courte durée (WAV, ou MP3 si le lecteur visé en a besoin).
+de courte durée, en MP3. Alexa / Echo exige en plus une URL publique.
 """
 
 from __future__ import annotations
@@ -49,13 +49,13 @@ class FreeboxVoicemailSource(MediaSource):
         if message is None:
             raise Unresolvable("Message vocal introuvable")
         target = item.target_media_player
-        mp3 = bool(target) and player_needs_mp3(self.hass, target)
+        external = bool(target) and player_needs_mp3(self.hass, target)
         try:
-            signed = signed_voicemail_path(self.hass, entry_id, public_id, mp3=mp3)
-            url = absolute_voicemail_url(self.hass, signed, external=mp3)
+            signed = signed_voicemail_path(self.hass, entry_id, public_id, mp3=True)
+            url = absolute_voicemail_url(self.hass, signed, external=external)
         except (HomeAssistantError, ServiceValidationError) as err:
             raise Unresolvable("Lecture du message vocal impossible") from err
-        return PlayMedia(url, "audio/mpeg" if mp3 else "audio/wav")
+        return PlayMedia(url, "audio/mpeg")
 
     async def async_browse_media(self, item: MediaSourceItem) -> BrowseMediaSource:
         identifier = item.identifier.strip("/")

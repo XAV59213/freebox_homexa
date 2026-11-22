@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+- Messagerie vocale : la carte, la source média et la lecture sur n'importe quel lecteur demandent un MP3. ffmpeg (déjà fourni par Home Assistant) accepte le WAV A-law/µ-law et l'AU `.snd`. La réponse est `audio/mpeg` avec `Content-Length`. `codec=wav` reste possible. La carte utilise `hass.hassUrl` quand il existe et affiche « Lecture impossible » avec une raison courte si le lecteur audio échoue.
+- Le chemin Freebox garde le point de `.au`. Si cette forme répond 404, un second essai encode le point (`%2E`) et la forme qui répond est mémorisée. Un 404 sur un seul message ne retire plus la liste ni ne marque la messagerie comme absente. Le préfixe v6 déjà choisi (`""`) n'est plus abandonné au profit de la version annoncée.
+- La carte Téléphone affiche la liste déjà présente sur le capteur. Une réponse WebSocket vide ou un `result` omis ne l'efface plus. Après un relevé réussi, un `internal_error`, un délai ou une erreur réseau garde la dernière liste, pose `voicemail_error` et `voicemail_stale`, et laisse le capteur disponible. Il ne passe indisponible qu'après environ 10 minutes d'échecs de suite. Le relevé est alors retenté au bout de 15 s, 30 s puis 60 s, et tout de suite après un nouvel appel manqué. Le premier échec et le retour sont journalisés en avertissement, sans numéro.
+- Un échec de lecture est journalisé en avertissement avec le code HTTP ou Freebox et `RIFF`, `.snd` ou `other`, sans identifiant ni numéro.
+- Notifications : `freebox_homexa_missed_call` (`entry_id`, `date`, `caller`, `name`) pour chaque nouvel appel manqué après le premier relevé. `freebox_homexa_new_voicemail` ajoute `caller` et `name` (nom du contact, sinon le journal d'appels au même numéro ou à la même heure). L'option **Inclure le numéro dans les événements** est décochée par défaut : le numéro est alors omis et, sans contact, `caller` vaut `Inconnu`. Les options déjà en place ne changent pas. Aucun numéro n'est journalisé.
+
 ## 28.8.97 — 2026-11-22
 
 - Messagerie vocale : un échec n'est plus silencieux. Le premier est journalisé en avertissement (classe d'exception et code Freebox, sans numéro, URL ni identifiant) ; les suivants restent en debug. Le capteur expose `voicemail_available`, `voicemail_supported` et `voicemail_error`. Une vraie panne affiche « Messagerie vocale indisponible (code) » sur la carte, avec le total « N message(s) sur la Freebox ». Les messages lus et non lus sont tous listés. Un message illisible n'efface plus la liste. Un identifiant numérique est accepté.

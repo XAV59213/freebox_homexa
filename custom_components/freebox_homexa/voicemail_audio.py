@@ -1,7 +1,9 @@
 """Lecture audio de la messagerie : vue HTTP signée et conversion MP3.
 
-ffmpeg est déjà une dépendance du manifeste. Alexa / Echo n'est pris en charge
-qu'au mieux : le lecteur doit pouvoir joindre une URL HTTPS publique.
+Le fichier Freebox est souvent un WAV A-law/µ-law ou un AU ``.snd``, illisible
+dans beaucoup de navigateurs. ffmpeg (déjà au manifeste) le transcode en MP3
+pour la carte, la source média et chaque lecteur. Alexa / Echo doit en plus
+pouvoir joindre une URL HTTPS publique.
 """
 
 from __future__ import annotations
@@ -22,7 +24,12 @@ from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.network import NoURLAvailableError, get_url
 
 from .const import DOMAIN
-from .voicemail import async_voicemail_audio, resolve_voicemail_token, validated_voicemail_id
+from .voicemail import (
+    async_voicemail_audio,
+    resolve_voicemail_token,
+    stored_error,
+    validated_voicemail_id,
+)
 
 if TYPE_CHECKING:
     from .router import FreeboxRouter
@@ -30,12 +37,11 @@ if TYPE_CHECKING:
 _LOGGER = logging.getLogger(__name__)
 
 _AUDIO_TTL = timedelta(minutes=5)
-_CHUNK = 65536
 _MP3_PLATFORMS = frozenset({"alexa", "alexa_media", "alexa_devices"})
 
 
 def player_needs_mp3(hass: HomeAssistant, entity_id: str) -> bool:
-    """Echo et Alexa lisent un MP3 joignable, pas le WAV interne."""
+    """Echo et Alexa doivent joindre une URL publique. Le fichier est un MP3 pour tous."""
     row = er.async_get(hass).async_get(entity_id)
     platform = row.platform if row is not None else ""
     if platform in _MP3_PLATFORMS or platform.startswith("alexa"):
@@ -64,8 +70,7 @@ def signed_voicemail_path(
         f"/api/freebox_homexa/voicemail/{quote(entry_id, safe='')}/"
         f"{quote(public_id, safe='')}"
     )
-    if mp3:
-        path += "?codec=mp3"
+    path += "?codec=mp3" if mp3 else "?codec=wav"
     return async_sign_path(hass, path, _AUDIO_TTL)
 
 
@@ -93,14 +98,43 @@ def _ffmpeg_binary(hass: HomeAssistant) -> str:
     return binary
 
 
+def audio_magic(payload: bytes | None) -> str:
+    """``RIFF``, ``.snd`` ou ``other``. Jamais le contenu ni un identifiant."""
+    if payload is None:
+        return "other"
+    if payload.startswith(b"RIFF"):
+        return "RIFF"
+    if payload.startswith(b".snd"):
+        return ".snd"
+    return "other"
+
+
+def _input_format(payload: bytes) -> list[str]:
+    """Le tube n'est pas cherchable : le conteneur est donné à ffmpeg."""
+    if payload.startswith(b"RIFF"):
+        return ["-f", "wav"]
+    if payload.startswith(b".snd"):
+        return ["-f", "au"]
+    return []
+
+
+def _log_audio_failure(err: BaseException | None, payload: bytes | None, *, code: str | None = None) -> None:
+    label = code if code else stored_error(err if err is not None else RuntimeError("audio"))
+    status = getattr(err, "status", None) if err is not None else None
+    if isinstance(status, int) and not isinstance(status, bool):
+        label = f"HTTP {status} {label}"
+    _LOGGER.warning("Lecture du message vocal impossible (%s, %s)", label, audio_magic(payload))
+
+
 async def async_wav_to_mp3(hass: HomeAssistant, wav: bytes) -> bytes:
-    """Convertit le WAV Freebox avec le binaire ffmpeg de Home Assistant."""
+    """Convertit un WAV A-law/µ-law ou un AU ``.snd`` avec le ffmpeg de Home Assistant."""
     try:
         process = await asyncio.create_subprocess_exec(
             _ffmpeg_binary(hass),
             "-hide_banner",
             "-loglevel",
             "error",
+            *_input_format(wav),
             "-i",
             "pipe:0",
             "-f",
@@ -114,10 +148,12 @@ async def async_wav_to_mp3(hass: HomeAssistant, wav: bytes) -> bytes:
         )
         stdout, _stderr = await process.communicate(wav)
     except OSError as err:
+        _log_audio_failure(err, wav)
         raise HomeAssistantError(
             translation_domain=DOMAIN, translation_key="voicemail_audio"
         ) from err
     if process.returncode != 0 or not stdout:
+        _log_audio_failure(None, wav, code="ffmpeg")
         raise HomeAssistantError(
             translation_domain=DOMAIN, translation_key="voicemail_audio"
         )
@@ -150,33 +186,32 @@ class VoicemailAudioView(HomeAssistantView):
         router = _loaded_router(hass, entry_id)
         if router is None:
             return web.Response(status=404, text="Messagerie vocale introuvable")
+        payload: bytes | None = None
         try:
-            wav = await async_voicemail_audio(router, message_id)
-            mp3 = request.query.get("codec") == "mp3"
-            body = await async_wav_to_mp3(hass, wav) if mp3 else wav
+            payload = await async_voicemail_audio(router, message_id)
+            wants_wav = request.query.get("codec") == "wav"
+            body = payload if wants_wav else await async_wav_to_mp3(hass, payload)
         except ServiceValidationError:
             return web.Response(status=404, text="Message vocal introuvable")
-        except HomeAssistantError:
+        except HomeAssistantError as err:
+            if payload is None:
+                _log_audio_failure(err, None)
             return web.Response(status=403, text="Messagerie vocale indisponible")
-        except Exception:
-            _LOGGER.info("Messagerie vocale Freebox indisponible")
+        except Exception as err:
+            _log_audio_failure(err, payload)
             return web.Response(status=502, text="Messagerie vocale indisponible")
-        content_type = "audio/mpeg" if request.query.get("codec") == "mp3" else "audio/wav"
-        extension = "mp3" if content_type == "audio/mpeg" else "wav"
-        response = web.StreamResponse(
+        content_type = "audio/wav" if request.query.get("codec") == "wav" else "audio/mpeg"
+        extension = "wav" if content_type == "audio/wav" else "mp3"
+        return web.Response(
+            body=body,
             status=200,
             headers={
                 "Content-Type": content_type,
+                "Content-Length": str(len(body)),
                 "Cache-Control": "no-store",
                 "Content-Disposition": f'inline; filename="message.{extension}"',
             },
         )
-        await response.prepare(request)
-        view = memoryview(body)
-        for offset in range(0, len(body), _CHUNK):
-            await response.write(view[offset : offset + _CHUNK])
-        await response.write_eof()
-        return response
 
 
 def async_register_voicemail_view(hass: HomeAssistant) -> None:
@@ -203,16 +238,16 @@ async def async_play_on_player(
         raise ServiceValidationError(
             translation_domain=DOMAIN, translation_key="voicemail_player"
         )
-    mp3 = player_needs_mp3(hass, entity_id)
-    signed = signed_voicemail_path(hass, router.entry_id, message_id, mp3=mp3)
-    url = absolute_voicemail_url(hass, signed, external=mp3)
+    external = player_needs_mp3(hass, entity_id)
+    signed = signed_voicemail_path(hass, router.entry_id, message_id, mp3=True)
+    url = absolute_voicemail_url(hass, signed, external=external)
     await hass.services.async_call(
         "media_player",
         "play_media",
         {
             "entity_id": entity_id,
             "media_content_id": url,
-            "media_content_type": "music" if mp3 else "audio/wav",
+            "media_content_type": "audio/mpeg",
         },
         blocking=True,
     )

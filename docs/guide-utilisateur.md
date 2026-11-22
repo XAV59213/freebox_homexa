@@ -247,6 +247,34 @@ data:
 
 Arrête la sonnerie DECT. Champs facultatifs : `config_entry_id`, `device_id`.
 
+### Appel manqué et nouveau message vocal
+
+Après le premier relevé réussi (rien n'est renvoyé au démarrage, y compris après un redémarrage), chaque nouvel appel manqué émet `freebox_homexa_missed_call`. Chaque nouveau message non lu émet `freebox_homexa_new_voicemail`.
+
+`caller` est le nom du contact Freebox. Sans contact, c'est le numéro seulement si l'option d'entrée **Inclure le numéro dans les événements** est cochée. Elle est décochée par défaut : `caller` vaut alors `Inconnu` et le champ `number` est absent. `name` ne contient jamais le numéro. Aucun numéro n'est écrit dans le journal.
+
+```yaml
+alias: Notifier un appel manqué
+triggers:
+  - trigger: event
+    event_type: freebox_homexa_missed_call
+actions:
+  - action: notify.notify
+    data:
+      message: "Appel manqué de {{ trigger.event.data.caller }}"
+```
+
+```yaml
+alias: Notifier un message vocal
+triggers:
+  - trigger: event
+    event_type: freebox_homexa_new_voicemail
+actions:
+  - action: notify.notify
+    data:
+      message: "Message vocal de {{ trigger.event.data.caller }}"
+```
+
 ### `freebox_homexa.mark_voicemail_read`
 
 Marque un message vocal comme lu. Droit Téléphonie. Champs :

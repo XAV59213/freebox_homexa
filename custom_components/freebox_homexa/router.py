@@ -395,12 +395,21 @@ class FreeboxRouter:
         self.voicemail_supported: bool | None = None
         self.voicemail_error: str | None = None
         self.voicemail_failure_logged: bool = False
+        self.voicemail_stale: bool = False
+        self.voicemail_failure_since: float | None = None
+        self.voicemail_retry_index: int = 0
+        self.voicemail_retry_unsub: object | None = None
         # "" = chemin relatif de la session (v6). "/api/v10/" = version annoncée.
         # None = pas encore déterminé.
         self.voicemail_api_prefix: str | None = None
         self.voicemail_advertised_prefix: str | None = None
         self.voicemail_tokens: object | None = None
         self.voicemail_seen: set[str] | None = None
+        # None = forme du point pas encore vue. False = « .au » littéral. True = « %2E ».
+        self.voicemail_encode_dot: bool | None = None
+        self.voicemail_refresh_lock: asyncio.Lock = asyncio.Lock()
+        # None = le premier journal réussi n'a pas encore servi de référence.
+        self.missed_call_seen: set[str] | None = None
         self.home_granted = True
         self.home_devices: dict[str, Any] = {}
         self.listeners: list[object] = []
@@ -904,6 +913,13 @@ class FreeboxRouter:
             if self.calls_available:
                 _LOGGER.info("Journal d'appels Freebox indisponible")
             self.calls_available = False
+            return
+        from .calls_ws import announce_missed_calls
+
+        try:
+            announce_missed_calls(self)
+        except Exception as err:
+            _LOGGER.debug("Notification d'appel manqué non émise (%s)", type(err).__name__)
 
     async def _update_phones(self) -> None:
         """Combinés FXS et DECT, sans faire échouer les autres capteurs."""
@@ -1062,6 +1078,9 @@ class FreeboxRouter:
                 return
             # Stop new interval reads, drain current ones, then close the public SDK.
             self.closing = True
+            from .voicemail import cancel_voicemail_retry
+
+            cancel_voicemail_retry(self)
             pending = (self.poll_tasks | self.read_tasks) - {asyncio.current_task()}
             for task in pending:
                 task.cancel()

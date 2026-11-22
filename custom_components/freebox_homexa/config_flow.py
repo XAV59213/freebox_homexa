@@ -33,6 +33,7 @@ from homeassistant.helpers.storage import Store
 from .const import (
     CONF_CREATE_LAN_DEVICES,
     CONF_CREATE_WIFI_SENSORS,
+    CONF_EVENT_INCLUDE_NUMBER,
     CONF_HOME_POLL_INTERVAL,
     CONF_REMOTE_CODE,
     CONF_REMOTE_CODES,
@@ -137,6 +138,10 @@ def _options_schema(
             CONF_REMOTE_CODE,
             default=_coerce_remote_code(defaults.get(CONF_REMOTE_CODE)),
         ): str,
+        vol.Optional(
+            CONF_EVENT_INCLUDE_NUMBER,
+            default=bool(defaults.get(CONF_EVENT_INCLUDE_NUMBER, False)),
+        ): bool,
     }
     raw_codes = defaults.get(CONF_REMOTE_CODES)
     codes = raw_codes if isinstance(raw_codes, dict) else {}
@@ -176,6 +181,7 @@ def _options_from_input(
         ),
         CONF_REMOTE_CODE: shared,
         CONF_REMOTE_CODES: per_player,
+        CONF_EVENT_INCLUDE_NUMBER: bool(user_input.get(CONF_EVENT_INCLUDE_NUMBER, False)),
         **extra,
     }
 

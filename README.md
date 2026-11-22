@@ -169,11 +169,24 @@ data:
 
 ### Messagerie vocale
 
-Le capteur **Messages vocaux non lus** compte les messages non lus. Ses attributs donnent le total, la date du plus récent, `voicemail_available`, `voicemail_supported`, `voicemail_error` et une liste (jeton, date, durée, lu) **sans numéro**. Un nouveau message non lu, après le premier relevé, émet `freebox_homexa_new_voicemail` (jeton, durée, date, pas de numéro). Le jeton n'est pas le nom de fichier Freebox. Si la Freebox n'a pas de messagerie, le capteur reste disponible avec `voicemail_supported: false` et la carte affiche « Messagerie vocale non disponible sur cette Freebox ».
+Le capteur **Messages vocaux non lus** compte les messages non lus. Ses attributs donnent le total, la date du plus récent, `voicemail_available`, `voicemail_supported`, `voicemail_error` et une liste (jeton, date, durée, lu) **sans numéro**. Un nouveau message non lu, après le premier relevé, émet `freebox_homexa_new_voicemail` (jeton, durée, date, `caller`, `name`). Le jeton n'est pas le nom de fichier Freebox. Si la Freebox n'a pas de messagerie, le capteur reste disponible avec `voicemail_supported: false` et la carte affiche « Messagerie vocale non disponible sur cette Freebox ».
 
-La carte **Homexa Téléphone** (chargée avec les autres cartes Homexa, sans ressource Lovelace à ajouter) regroupe les sonneries, l'état des combinés, la messagerie et, si on l'active, les derniers appels. Le numéro reste masqué tant que `show_number` n'est pas coché. On peut écouter dans le navigateur, ou envoyer le message à un lecteur (`play_voicemail`), puis le marquer lu ou le supprimer (avec confirmation).
+Un nouvel appel manqué, après le premier relevé du journal, émet `freebox_homexa_missed_call` (`entry_id`, `date`, `caller`, `name`). `caller` est le nom du contact, ou le numéro si l'option **Inclure le numéro dans les événements** est cochée. Sinon, sans contact, `caller` vaut `Inconnu` et le numéro n'est pas dans l'événement. L'option est décochée par défaut. Les options déjà enregistrées ne changent pas. Aucun numéro n'est journalisé.
 
-La lecture sur une enceinte **Alexa / Echo** est au mieux. Ces enceintes doivent télécharger un MP3 depuis une **URL HTTPS publique** (Nabu Casa ou l'URL externe des réglages réseau de Home Assistant). Sans cette URL, l'action échoue avec un message clair au lieu d'un faux succès. Les autres lecteurs reçoivent le WAV signé, valable quelques minutes.
+La carte **Homexa Téléphone** (chargée avec les autres cartes Homexa, sans ressource Lovelace à ajouter) regroupe les sonneries, l'état des combinés, la messagerie et, si on l'active, les derniers appels. Le numéro reste masqué tant que `show_number` n'est pas coché. On peut écouter dans le navigateur (MP3), ou envoyer le message à un lecteur (`play_voicemail`), puis le marquer lu ou le supprimer (avec confirmation). La liste affichée est celle du capteur : un rafraîchissement vide ne la cache pas.
+
+La lecture est un MP3 signé, valable quelques minutes, y compris pour un lecteur quelconque. Une enceinte **Alexa / Echo** doit en plus pouvoir télécharger ce MP3 depuis une **URL HTTPS publique** (Nabu Casa ou l'URL externe des réglages réseau de Home Assistant). Sans cette URL, l'action échoue avec un message clair au lieu d'un faux succès.
+
+```yaml
+alias: Notifier un appel manqué
+triggers:
+  - trigger: event
+    event_type: freebox_homexa_missed_call
+actions:
+  - action: notify.notify
+    data:
+      message: "Appel manqué de {{ trigger.event.data.caller }}"
+```
 
 ```yaml
 action: freebox_homexa.play_voicemail

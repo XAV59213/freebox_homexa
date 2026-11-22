@@ -18,6 +18,11 @@ from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
 
 from .const import DOMAIN
+from .player_audio import (
+    BUNDLED_SOUNDS,
+    SOUND_TITLES,
+    async_host_sound,
+)
 from .voicemail import (
     messages_of,
     public_message,
@@ -43,6 +48,13 @@ class FreeboxVoicemailSource(MediaSource):
         self.hass = hass
 
     async def async_resolve_media(self, item: MediaSourceItem) -> PlayMedia:
+        sound = _sound_name(item.identifier)
+        if sound is not None:
+            try:
+                url = await async_host_sound(self.hass, sound)
+            except HomeAssistantError as err:
+                raise Unresolvable("Lecture du son impossible") from err
+            return PlayMedia(url, "audio/mpeg")
         entry_id, public_id = _split_playable(item.identifier)
         router = _router(self.hass, entry_id)
         message = _message_by_token(router, public_id)
@@ -61,6 +73,9 @@ class FreeboxVoicemailSource(MediaSource):
         identifier = item.identifier.strip("/")
         if not identifier:
             return _root(self.hass)
+        sounds = _browse_sound(identifier)
+        if sounds is not None:
+            return sounds
         if "/" not in identifier:
             return _entry_folder(self.hass, identifier)
         entry_id, message_id = _split_playable(identifier)
@@ -109,7 +124,11 @@ def _root(hass: HomeAssistant) -> BrowseMediaSource:
     entries = _entries(hass)
     if len(entries) == 1:
         entry_id, _title, router = entries[0]
-        return _folder(entry_id, _SOURCE_NAME, _children(entry_id, router))
+        return _folder(
+            entry_id,
+            _SOURCE_NAME,
+            [*_children(entry_id, router), *_sound_leaves()],
+        )
     children = [
         BrowseMediaSource(
             domain=DOMAIN,
@@ -122,7 +141,55 @@ def _root(hass: HomeAssistant) -> BrowseMediaSource:
         )
         for entry_id, title, _router in entries
     ]
+    children.append(
+        BrowseMediaSource(
+            domain=DOMAIN,
+            identifier="sound",
+            media_class=MediaClass.DIRECTORY,
+            media_content_type=MediaType.PLAYLIST,
+            title="Sons d'alarme",
+            can_play=False,
+            can_expand=True,
+        )
+    )
     return _folder("", _SOURCE_NAME, children)
+
+
+def _sound_name(identifier: str) -> str | None:
+    text = identifier.strip("/")
+    if not text.startswith("sound/"):
+        return None
+    name = text[len("sound/"):]
+    if "/" in name or name not in BUNDLED_SOUNDS:
+        raise Unresolvable("Son introuvable")
+    return name
+
+
+def _sound_leaf(name: str) -> BrowseMediaSource:
+    return BrowseMediaSource(
+        domain=DOMAIN,
+        identifier=f"sound/{name}",
+        media_class=MediaClass.MUSIC,
+        media_content_type=MediaType.MUSIC,
+        title=SOUND_TITLES[name],
+        can_play=True,
+        can_expand=False,
+    )
+
+
+def _sound_leaves() -> list[BrowseMediaSource]:
+    return [_sound_leaf(name) for name in BUNDLED_SOUNDS]
+
+
+def _browse_sound(identifier: str) -> BrowseMediaSource | None:
+    if identifier == "sound":
+        return _folder("sound", "Sons d'alarme", _sound_leaves())
+    if not identifier.startswith("sound/"):
+        return None
+    name = _sound_name(identifier)
+    if name is None:
+        raise Unresolvable("Son introuvable")
+    return _sound_leaf(name)
 
 
 def _entry_folder(hass: HomeAssistant, entry_id: str) -> BrowseMediaSource:

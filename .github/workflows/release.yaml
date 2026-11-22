@@ -81,6 +81,9 @@ jobs:
             echo "::error::Le zip contient des fichiers compilés (__pycache__ / .pyc)"
             exit 1
           fi
+          for sound in sounds/alarme_sirene.mp3 sounds/alarme_bip.mp3; do
+            unzip -l "$ZIP" "$sound" >/dev/null || { echo "::error::$sound absent du zip HACS"; exit 1; }
+          done
           echo "Archive : $(unzip -Z1 "$ZIP" | wc -l) fichiers, $(du -h "$ZIP" | cut -f1)"
 
           # Notes : section correspondante de CHANGELOG.md, sinon notes générées par GitHub

@@ -37,6 +37,13 @@ from .player_airmedia import (
     remember_player_source,
     take_player_source,
 )
+from .player_audio import (
+    PLAYER_AUDIO_MARKER,
+    PLAYER_AUDIO_TITLE,
+    async_host_http_audio,
+    async_host_sound,
+    bundled_sound_name,
+)
 from .player_diagnostics import cache_player_schema
 from .player_remote import async_send_player_keys, filter_ready_players
 from .router import FreeboxConfigEntry, FreeboxRouter
@@ -367,9 +374,12 @@ class FreeboxPlayerMediaPlayer(FreeboxReachableMixin, MediaPlayerEntity):
             self._sync_icon_metadata()
             return
         foreground_url = foreground.get("cur_url") if isinstance(foreground, dict) else None
-        ours = VOICEMAIL_MARKER in " ".join(
+        shown = " ".join(
             part for part in (foreground_url, current if isinstance(current, str) else "") if part
         )
+        voice = VOICEMAIL_MARKER in shown
+        hosted_audio = PLAYER_AUDIO_MARKER in shown
+        ours = voice or hosted_audio
         if isinstance(current, str) and (
             current.startswith("tv:") or current == "fr.freebox.tv"
         ):
@@ -396,9 +406,12 @@ class FreeboxPlayerMediaPlayer(FreeboxReachableMixin, MediaPlayerEntity):
                 )
         elif self._attr_source in APP_ARTWORK_URLS:
             self._attr_media_image_url = APP_ARTWORK_URLS[self._attr_source]
-        if ours:
+        if voice:
             self._attr_media_content_id = VOICEMAIL_MARKER
             self._attr_media_title = VOICEMAIL_TITLE
+        elif hosted_audio:
+            self._attr_media_content_id = PLAYER_AUDIO_MARKER
+            self._attr_media_title = PLAYER_AUDIO_TITLE
         else:
             self._attr_media_content_id = None
 
@@ -461,6 +474,32 @@ class FreeboxPlayerMediaPlayer(FreeboxReachableMixin, MediaPlayerEntity):
         self._attr_source = source
         self.async_write_ha_state()
 
+    def _airmedia_name(self) -> str:
+        for key in ("device_name", "name"):
+            raw = self._player.get(key)
+            if isinstance(raw, str) and raw.strip():
+                return raw.strip()
+        return ""
+
+    async def _open_audio(self, url: str, marker: str) -> None:
+        remember_player_source(self.entity_id or str(self._player_id), self._attr_source)
+        try:
+            await async_open_player_audio(
+                self._router,
+                self._numeric_player_id(),
+                self._api_version,
+                url,
+                marker=marker,
+                device_name=self._airmedia_name(),
+            )
+        except PlayerPlaybackError as err:
+            raise HomeAssistantError(
+                translation_domain=DOMAIN,
+                translation_key=(
+                    "player_audio_silent" if err.kind == "silent" else "player_audio_refused"
+                ),
+            ) from err
+
     def _numeric_player_id(self) -> int:
         raw = self._player_id
         if isinstance(raw, int) and not isinstance(raw, bool):
@@ -497,26 +536,21 @@ class FreeboxPlayerMediaPlayer(FreeboxReachableMixin, MediaPlayerEntity):
 
     @async_action_errors
     async def async_play_media(self, media_type: str, media_id: str, **kwargs: Any) -> None:
-        # Une URL audio passe par AirMedia, comme la messagerie. ``tv:``, la
-        # vidéo et les autres URI restent sur ``control/open``.
+        # Un son embarqué ou une URL audio passe par AirMedia, comme la
+        # messagerie. ``tv:``, la vidéo et les autres URI restent sur ``control/open``.
+        sound = bundled_sound_name(media_id)
+        if sound is not None:
+            await self._open_audio(
+                await async_host_sound(self.hass, sound), PLAYER_AUDIO_MARKER
+            )
+            return
         resolved_type, resolved_id = await self._playable(media_type, media_id)
         if is_http_audio(resolved_type, resolved_id):
-            remember_player_source(self.entity_id or str(self._player_id), self._attr_source)
-            try:
-                await async_open_player_audio(
-                    self._router,
-                    self._numeric_player_id(),
-                    self._api_version,
-                    resolved_id,
-                    marker=resolved_id,
-                )
-            except PlayerPlaybackError as err:
-                raise HomeAssistantError(
-                    translation_domain=DOMAIN,
-                    translation_key=(
-                        "player_audio_silent" if err.kind == "silent" else "player_audio_refused"
-                    ),
-                ) from err
+            hosted = await async_host_http_audio(self.hass, resolved_id)
+            if hosted:
+                await self._open_audio(hosted, PLAYER_AUDIO_MARKER)
+            else:
+                await self._open_audio(resolved_id, resolved_id)
             return
         payload: dict[str, str] = {"url": resolved_id}
         if "/" in resolved_type:

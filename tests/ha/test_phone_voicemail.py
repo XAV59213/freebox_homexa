@@ -832,7 +832,8 @@ async def test_remaining_phone_and_voicemail_branches(
     second.mock_state(hass, ConfigEntryState.LOADED)
     root = await source.async_browse_media(MediaSourceItem(hass, DOMAIN, "", None))
     assert root.can_expand is True
-    assert len(root.children or []) == 2
+    assert len(root.children or []) == 3
+    assert any(getattr(child, "identifier", "") == "sound" for child in (root.children or []))
     with patch(
         "custom_components.freebox_homexa.voicemail_audio.get_url",
         side_effect=NoURLAvailableError,
@@ -1774,7 +1775,7 @@ async def test_freebox_player_open_requires_a_real_state_change(hass, home_conte
 
     views_stuck = [
         {"playback_state": "playing", "foreground_app": {"package": "youtube", "cur_url": "https://www.youtube.com/watch"}},
-    ] * 8
+    ] * 16
 
     async def stuck(_router, _player_id, version):
         return views_stuck.pop(0), version

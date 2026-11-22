@@ -798,6 +798,9 @@
     "player_audio_silent": {
       "message": "Le Player Freebox a accepté la demande mais n'a pas lancé la lecture."
     },
+    "player_audio_prepare": {
+      "message": "Le fichier audio n'a pas pu être préparé pour le Player."
+    },
     "command_unconfirmed": {
       "message": "La réponse du Player ne confirme pas la commande. Vérifiez son état avant de réessayer."
     },

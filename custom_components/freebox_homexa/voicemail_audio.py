@@ -319,6 +319,8 @@ async def _open_freebox_player_audio(
     player_id = _coerce_player_id(attributes.get("player_id"))
     raw_version = attributes.get("api_version")
     version = raw_version if isinstance(raw_version, str) and raw_version.startswith("v") else "v6"
+    raw_name = attributes.get("friendly_name") if isinstance(attributes, dict) else None
+    device_name = raw_name.strip() if isinstance(raw_name, str) else ""
     if player_id is None:
         raise HomeAssistantError(
             translation_domain=DOMAIN, translation_key="voicemail_player_unreachable"
@@ -330,6 +332,7 @@ async def _open_freebox_player_audio(
             version,
             url,
             marker="freebox_homexa/voicemail",
+            device_name=device_name,
         )
     except PlayerPlaybackError as err:
         if err.kind == "silent":

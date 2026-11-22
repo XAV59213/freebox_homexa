@@ -123,6 +123,30 @@ Sur le Player : **Réglages → Système → Informations**. Utile sur Révoluti
 
 Volume et lecture passent par l’API Player, sans ce code.
 
+### Lire un MP3 (sirène, annonce)
+
+`media_player.play_media` lit une adresse HTTP ou HTTPS sur le Player quand le type est `audio/mpeg` (ou un autre `audio/*`), `music`, ou absent si le fichier finit par `.mp3`, `.aac`, `.ogg`, `.wav` ou `.flac`. Le Player la reçoit par AirMedia, comme un message vocal. Le changement de chaîne `tv:?channel=N` et la vidéo restent inchangés.
+
+Le fichier doit être joignable par le Player, par exemple `http://homeassistant.local:8123/local/sirene.mp3` (dossier `config/www`). Si la lecture ne démarre pas, l'action échoue avec un message au lieu de laisser la chaîne TV en cours.
+
+```yaml
+alias: Sirène du Player quand l'alarme se déclenche
+triggers:
+  - trigger: state
+    entity_id: alarm_control_panel.systeme_d_alarme
+    to: triggered
+    not_from:
+      - unavailable
+      - unknown
+actions:
+  - action: media_player.play_media
+    target:
+      entity_id: media_player.freebox_player
+    data:
+      media_content_id: http://homeassistant.local:8123/local/sirene.mp3
+      media_content_type: audio/mpeg
+```
+
 ---
 
 ## Actions

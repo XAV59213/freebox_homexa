@@ -792,6 +792,12 @@
     "invalid_source": {
       "message": "This source is not supported by the Player."
     },
+    "player_audio_refused": {
+      "message": "The Freebox Player refused to open the audio file."
+    },
+    "player_audio_silent": {
+      "message": "The Freebox Player accepted the request but did not start playback."
+    },
     "command_unconfirmed": {
       "message": "The Player response did not confirm the command. Check its state before retrying."
     },

@@ -1749,7 +1749,7 @@ async def test_freebox_player_open_requires_a_real_state_change(hass, home_conte
         "custom_components.freebox_homexa.player_status.async_read_player_status",
         side_effect=read_status,
     ), patch(
-        "custom_components.freebox_homexa.voicemail_audio.asyncio.sleep",
+        "custom_components.freebox_homexa.player_airmedia.asyncio.sleep",
         new=no_sleep,
     ):
         await async_play_on_player(hass, router, tokens_of(router).issue(MESSAGE), entity.entity_id)
@@ -1782,7 +1782,7 @@ async def test_freebox_player_open_requires_a_real_state_change(hass, home_conte
         "custom_components.freebox_homexa.player_status.async_read_player_status",
         side_effect=stuck,
     ), patch(
-        "custom_components.freebox_homexa.voicemail_audio.asyncio.sleep",
+        "custom_components.freebox_homexa.player_airmedia.asyncio.sleep",
         new=no_sleep,
     ):
         with pytest.raises(HomeAssistantError) as silent:

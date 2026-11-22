@@ -19,7 +19,7 @@ else:
     from homeassistant.components.media_player import MediaPlayerDeviceClass, MediaPlayerEntityFeature, MediaPlayerState
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
-from homeassistant.exceptions import ServiceValidationError
+from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.dispatcher import async_dispatcher_send
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
@@ -27,6 +27,7 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from .discovery import DiscoveryCandidate, async_setup_discovery
 from .const import DOMAIN, URL_BASE, option_remote_code
 from .availability import FreeboxReachableMixin
+from .player_airmedia import PlayerPlaybackError, async_open_player_audio, is_http_audio
 from .player_diagnostics import cache_player_schema
 from .player_remote import async_send_player_keys, filter_ready_players
 from .router import FreeboxConfigEntry, FreeboxRouter
@@ -434,13 +435,65 @@ class FreeboxPlayerMediaPlayer(FreeboxReachableMixin, MediaPlayerEntity):
         self._attr_source = source
         self.async_write_ha_state()
 
+    def _numeric_player_id(self) -> int:
+        raw = self._player_id
+        if isinstance(raw, int) and not isinstance(raw, bool):
+            return raw
+        if isinstance(raw, str) and raw.isdigit():
+            return int(raw)
+        raise HomeAssistantError(
+            translation_domain=DOMAIN, translation_key="player_audio_refused"
+        )
+
+    async def _playable(self, media_type: str, media_id: str) -> tuple[str, str]:
+        """Résout une source média, puis une URL Home Assistant, sans toucher à ``tv:``."""
+        from homeassistant.components import media_source
+        from homeassistant.components.media_player.browse_media import (
+            async_process_play_media_url,
+        )
+
+        resolved_type = media_type if isinstance(media_type, str) else ""
+        resolved_id = media_id if isinstance(media_id, str) else ""
+        if resolved_id and media_source.is_media_source_id(resolved_id):
+            sourced = await media_source.async_resolve_media(
+                self.hass, resolved_id, self.entity_id
+            )
+            if not isinstance(sourced.url, str) or not sourced.url:
+                raise HomeAssistantError(
+                    translation_domain=DOMAIN, translation_key="player_audio_refused"
+                )
+            resolved_id = sourced.url
+            if isinstance(sourced.mime_type, str) and sourced.mime_type:
+                resolved_type = sourced.mime_type
+        if resolved_id:
+            resolved_id = async_process_play_media_url(self.hass, resolved_id)
+        return resolved_type, resolved_id
+
     @async_action_errors
     async def async_play_media(self, media_type: str, media_id: str, **kwargs: Any) -> None:
-        # Le type MIME (audio/mpeg, video/...) dit au Player quelle appli ouvrir.
-        # « music » est un type Home Assistant, pas un type Freebox.
-        payload: dict[str, Any] = {"url": media_id}
-        if isinstance(media_type, str) and "/" in media_type:
-            payload["type"] = media_type
+        # Une URL audio passe par AirMedia, comme la messagerie. ``tv:``, la
+        # vidéo et les autres URI restent sur ``control/open``.
+        resolved_type, resolved_id = await self._playable(media_type, media_id)
+        if is_http_audio(resolved_type, resolved_id):
+            try:
+                await async_open_player_audio(
+                    self._router,
+                    self._numeric_player_id(),
+                    self._api_version,
+                    resolved_id,
+                    marker=resolved_id,
+                )
+            except PlayerPlaybackError as err:
+                raise HomeAssistantError(
+                    translation_domain=DOMAIN,
+                    translation_key=(
+                        "player_audio_silent" if err.kind == "silent" else "player_audio_refused"
+                    ),
+                ) from err
+            return
+        payload: dict[str, str] = {"url": resolved_id}
+        if "/" in resolved_type:
+            payload["type"] = resolved_type
         await self._post("control/open", payload)
 
     @async_action_errors

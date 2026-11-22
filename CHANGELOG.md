@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 28.8.99 — 2026-11-22
 
 - Messagerie vocale : un `internal_error` passager, au démarrage ou plus tard, ne bascule plus l'état à chaque essai. Sans liste encore reçue, le capteur reste disponible avec `voicemail_loading` et la carte affiche « Chargement de la messagerie… ». Une liste déjà connue reste affichée (mention « données en cache ») et `voicemail_error` / `voicemail_stale` ne sont publiés qu'après environ 10 minutes d'échecs de suite. Les à-coups sont journalisés en debug ; l'indisponibilité et le retour le sont une seule fois. Les requêtes `call/voicemail/` sont sérialisées, une relance déjà posée n'est pas doublée, et le succès annule le minuteur.
 - Options : un seul Player n'affiche plus le champ brut `remote_code_<id>`. Le code commun est prérempli depuis cette clé si elle existe, et la clé stockée est conservée. Plusieurs Players : la description indique quel identifiant correspond à quel Player.

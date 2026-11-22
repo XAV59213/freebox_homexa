@@ -506,6 +506,147 @@ async function main() {
   bare.shadowRoot.querySelector("ha-card").listeners.click({ target: disabled });
   assert.equal(bareCalls.length, 0);
 
+  const oneList = makeCard();
+  const oneCalls = [];
+  oneList._hass = {
+    language: "fr",
+    states: card._hass.states,
+    entities: card._hass.entities,
+    callService: (domain, service, data) => {
+      oneCalls.push([domain, service, data]);
+      return Promise.resolve();
+    },
+    callWS: async () => ({
+      available: true,
+      messages: [{ id: "msg.au", date: "2026-11-22T10:00:00Z", duration: 12, read: false }],
+      total: 1,
+    }),
+  };
+  oneList.setConfig({ title: "Téléphone", media_players: ["media_player.echo"] });
+  await new Promise((resolve) => setImmediate(resolve));
+  const oneButton = oneList.shadowRoot.querySelectorAll("button").find((button) =>
+    String(button.textContent || "").includes("Écouter sur le Player")
+  );
+  assert.ok(oneButton);
+  assert.equal(oneButton.disabled, false);
+  oneList.shadowRoot.querySelector("ha-card").listeners.click({ target: oneButton });
+  assert.equal(oneCalls.length, 1);
+  assert.equal(oneCalls[0][1], "play_voicemail");
+  assert.equal(oneCalls[0][2].entity_id, "media_player.echo");
+  assert.equal(oneCalls[0][2].id, "msg.au");
+  assert.equal(oneList.shadowRoot.innerHTML.includes('class="menu"'), false);
+
+  const saved = new Map();
+  context.localStorage = {
+    getItem: (key) => (saved.has(key) ? saved.get(key) : null),
+    setItem: (key, value) => saved.set(key, String(value)),
+    removeItem: (key) => saved.delete(key),
+  };
+  const multi = makeCard();
+  const multiCalls = [];
+  multi._hass = {
+    language: "fr",
+    states: {
+      ...card._hass.states,
+      "media_player.salon": { state: "idle", attributes: { friendly_name: "Salon" } },
+      "media_player.cuisine": { state: "idle", attributes: { friendly_name: "Cuisine" } },
+    },
+    entities: card._hass.entities,
+    callService: (domain, service, data) => {
+      multiCalls.push([domain, service, data]);
+      return Promise.resolve();
+    },
+    callWS: async () => ({
+      available: true,
+      messages: [{ id: "msg.au", date: "2026-11-22T10:00:00Z", duration: 12, read: false }],
+      total: 1,
+    }),
+  };
+  multi.setConfig({
+    title: "Téléphone",
+    media_player: "media_player.echo",
+    media_players: ["media_player.salon", "media_player.cuisine", "media_player.salon"],
+  });
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(multi.shadowRoot.innerHTML.includes("Ajoutez un lecteur"), false);
+  const choose = multi.shadowRoot.querySelectorAll("button").find((button) =>
+    String(button.textContent || "").includes("Écouter sur…")
+  );
+  assert.ok(choose);
+  const chooseHost = multi.shadowRoot.querySelector("ha-card");
+  chooseHost.listeners.click({ target: choose.childNodes[0] || choose });
+  assert.equal(multiCalls.length, 0);
+  assert.match(multi.shadowRoot.innerHTML, /class="menu"/);
+  assert.match(multi.shadowRoot.innerHTML, /Salon/);
+  assert.match(multi.shadowRoot.innerHTML, /Cuisine/);
+  const salon = multi.shadowRoot.querySelectorAll("button").find((button) => button.textContent === "Salon");
+  assert.ok(salon);
+  chooseHost.listeners.click({ target: salon.childNodes[0] || salon });
+  assert.equal(multiCalls.length, 1);
+  assert.equal(multiCalls[0][1], "play_voicemail");
+  assert.equal(multiCalls[0][2].entity_id, "media_player.salon");
+  assert.equal(multiCalls[0][2].id, "msg.au");
+  assert.equal([...saved.values()][0], "media_player.salon");
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.match(multi.shadowRoot.innerHTML, /Lecture lancée sur Salon/);
+  const again = multi.shadowRoot.querySelectorAll("button").find((button) =>
+    String(button.textContent || "").includes("Écouter sur Salon")
+  );
+  assert.ok(again);
+  chooseHost.listeners.click({ target: again });
+  const chosen = multi.shadowRoot.querySelectorAll("button").find((button) => button.className === "chosen");
+  assert.equal(chosen && chosen.textContent, "Salon");
+  chooseHost.listeners.click({ target: chooseHost });
+  assert.equal(multi.shadowRoot.innerHTML.includes('class="menu"'), false);
+
+  const Editor = registry.get("homexa-phone-card-editor");
+  assert.equal(typeof Editor, "function");
+  const editorHost = new El("div");
+  const editor = Object.create(Editor.prototype);
+  editor.appendChild = (node) => editorHost.appendChild(node);
+  editor.querySelector = (selector) => editorHost.querySelector(selector);
+  const edited = [];
+  editor.dispatchEvent = (event) => edited.push(event);
+  editor.setConfig({
+    title: "Téléphone",
+    media_player: "media_player.echo",
+    show_number: false,
+    show_calls: true,
+    max_calls: 5,
+  });
+  const form = editorHost.querySelector("ha-form");
+  assert.ok(form);
+  assert.deepEqual([...form.data.media_players], ["media_player.echo"]);
+  assert.equal(form.data.show_number, false);
+  assert.equal(form.data.show_calls, true);
+  assert.equal(form.schema.find((item) => item.name === "media_players").selector.entity.multiple, true);
+  assert.equal(form.schema.some((item) => item.name === "show_number"), true);
+  assert.equal(form.schema.some((item) => item.name === "max_calls"), true);
+  assert.equal(form.computeLabel({ name: "show_number" }), "Afficher le numéro");
+  editor.hass = { language: "en" };
+  assert.equal(form.computeLabel({ name: "media_players" }), "Media players");
+  assert.equal(form.computeLabel({ name: "show_calls" }), "Recent calls");
+  form.listeners["value-changed"]({
+    detail: {
+      value: {
+        title: "Téléphone",
+        media_players: ["media_player.echo", "media_player.salon"],
+        show_number: false,
+        show_calls: true,
+        max_calls: 5,
+      },
+    },
+  });
+  assert.deepEqual([...edited[0].detail.config.media_players], ["media_player.echo", "media_player.salon"]);
+  assert.equal(edited[0].detail.config.media_player, undefined);
+  assert.equal(edited[0].detail.config.show_number, false);
+  assert.equal(Card.getConfigElement().tagName, "HOMEXA-PHONE-CARD-EDITOR");
+  assert.equal(Card.getStubConfig().show_number, false);
+  assert.equal(
+    Card.getConfigForm().schema.find((item) => item.name === "media_players").selector.entity.domain,
+    "media_player"
+  );
+
   console.log("OK: carte Téléphone, numéro masqué, confirmation, sonneries, lecteur");
 }
 

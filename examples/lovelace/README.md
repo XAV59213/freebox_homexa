@@ -59,6 +59,21 @@ type: custom:homexa-tnt-card
 
 Tableau de bord → Ajouter une carte → cherche **Homexa TNT**. Options : voir [homexa-tnt-card.yaml](homexa-tnt-card.yaml).
 
+# Carte « Homexa Téléphone »
+
+```yaml
+type: custom:homexa-phone-card
+title: Téléphone
+media_players:
+  - media_player.salon
+  - media_player.cuisine
+show_number: false
+show_calls: true
+max_calls: 5
+```
+
+L'éditeur visuel couvre le titre, la Freebox, les lecteurs, le numéro et les appels. `media_player: media_player.salon` (une seule chaîne) reste accepté. Un lecteur : bouton « Écouter sur le Player ». Plusieurs : « Écouter sur… » liste les noms, et le dernier choix est gardé dans le navigateur.
+
 # Carte « Homexa Appels » (journal téléphonique)
 
 ```yaml

@@ -104,26 +104,130 @@ const COPY = {
     phoneShort: "Sur mon téléphone",
     player: "Écouter sur le Player",
     playerShort: "Sur le Player",
+    choose: "Écouter sur…",
+    chooseShort: "Sur…",
+    listenOn: "Écouter sur",
     asking: "Lecture demandée sur le Player…",
+    askingNamed: "Lecture demandée sur ",
     launched: "Lecture lancée sur le Player",
+    launchedNamed: "Lecture lancée sur ",
     failed: "Le Player n'a pas lu le message",
     noPlayer: "Ajoutez un lecteur dans l'éditeur de la carte.",
+    editors: {
+      title: "Titre",
+      config_entry: "Freebox",
+      media_players: "Lecteurs",
+      show_number: "Afficher le numéro",
+      show_calls: "Derniers appels",
+      max_calls: "Nombre d'appels",
+      helpEntry: "Utile s'il y a plusieurs Freebox. Vide = détection automatique.",
+      helpPlayers: "Un ou plusieurs lecteurs. L'ancienne option media_player reste acceptée.",
+      helpNumber: "Masqué par défaut. Les numéros ne sont pas dans les états Home Assistant.",
+    },
   },
   en: {
     phone: "Play on my phone",
     phoneShort: "On my phone",
     player: "Play on the Player",
     playerShort: "On the Player",
+    choose: "Play on…",
+    chooseShort: "On…",
+    listenOn: "Play on",
     asking: "Starting playback on the Player…",
+    askingNamed: "Starting playback on ",
     launched: "Playback started on the Player",
+    launchedNamed: "Playback started on ",
     failed: "The Player did not play the message",
     noPlayer: "Add a media player in the card editor.",
+    editors: {
+      title: "Title",
+      config_entry: "Freebox",
+      media_players: "Media players",
+      show_number: "Show the number",
+      show_calls: "Recent calls",
+      max_calls: "Number of calls",
+      helpEntry: "Useful with several Freeboxes. Empty = automatic detection.",
+      helpPlayers: "One or more players. The older media_player option still works.",
+      helpNumber: "Hidden by default. Numbers are not stored in Home Assistant states.",
+    },
   },
 };
 
 function _copy(hass) {
   const raw = hass && (hass.language || (hass.locale && hass.locale.language)) || "fr";
   return String(raw).toLowerCase().startsWith("en") ? COPY.en : COPY.fr;
+}
+
+function _playerIds(config) {
+  const cfg = config || {};
+  const listed = cfg.media_players;
+  const raw = Array.isArray(listed) && listed.length ? listed : cfg.media_player;
+  const items = Array.isArray(raw) ? raw : raw ? [raw] : [];
+  const seen = new Set();
+  const ids = [];
+  items.forEach((item) => {
+    const id = typeof item === "string" ? item.trim() : "";
+    if (!id.startsWith("media_player.") || seen.has(id)) return;
+    seen.add(id);
+    ids.push(id);
+  });
+  return ids;
+}
+
+function _friendly(hass, entityId) {
+  const state = hass && hass.states ? hass.states[entityId] : null;
+  const name = state && state.attributes ? state.attributes.friendly_name : "";
+  if (typeof name === "string" && name.trim()) return name.trim();
+  return String(entityId || "").replace(/^media_player\./, "").replace(/_/g, " ");
+}
+
+function _playerKey(config) {
+  const cfg = config || {};
+  const entry = typeof cfg.config_entry === "string" ? cfg.config_entry : "";
+  const title = typeof cfg.title === "string" ? cfg.title : "";
+  return `homexa-phone-card:${entry}:${title}:${_playerIds(cfg).join("|")}`;
+}
+
+function _memory() {
+  try {
+    const box = globalThis.localStorage;
+    if (box && typeof box.getItem === "function" && typeof box.setItem === "function") return box;
+  } catch (err) {
+    return null;
+  }
+  return null;
+}
+
+function _editorSchema() {
+  return [
+    { name: "title", selector: { text: {} } },
+    { name: "config_entry", selector: { config_entry: { integration: "freebox_homexa" } } },
+    { name: "media_players", selector: { entity: { domain: "media_player", multiple: true } } },
+    { name: "show_number", selector: { boolean: {} } },
+    { name: "show_calls", selector: { boolean: {} } },
+    { name: "max_calls", selector: { number: { min: 1, max: 30, mode: "box" } } },
+  ];
+}
+
+function _editorData(config) {
+  const cfg = config || {};
+  const data = {
+    media_players: _playerIds(cfg),
+    show_number: cfg.show_number === true,
+    show_calls: cfg.show_calls === true,
+  };
+  if (typeof cfg.title === "string") data.title = cfg.title;
+  if (typeof cfg.config_entry === "string" && cfg.config_entry) data.config_entry = cfg.config_entry;
+  if (cfg.max_calls !== undefined && cfg.max_calls !== null && cfg.max_calls !== "") {
+    data.max_calls = Number(cfg.max_calls);
+  }
+  return data;
+}
+
+function _configChanged(config) {
+  const detail = { detail: { config }, bubbles: true, composed: true };
+  if (typeof CustomEvent === "function") return new CustomEvent("config-changed", detail);
+  return { type: "config-changed", ...detail };
 }
 
 function _eventElement(event) {
@@ -156,6 +260,11 @@ const STYLES = `
     .tools button .short { display: inline; }
   }
   button:disabled { opacity: 0.55; cursor: default; }
+  .picker { position: relative; display: inline-flex; max-width: 100%; }
+  .tools button.player .long { max-width: 12rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; vertical-align: bottom; }
+  .menu { position: absolute; z-index: 5; top: calc(100% + 4px); left: 0; display: flex; flex-direction: column; gap: 4px; min-width: 10rem; padding: 6px; border-radius: 12px; background: var(--card-background-color, #fff); box-shadow: 0 6px 18px rgba(0,0,0,.24); }
+  .menu button { background: var(--secondary-background-color, #eee); color: var(--primary-text-color); text-align: left; }
+  .menu button.chosen { outline: 2px solid var(--primary-color); }
   audio { width: 100%; margin-top: 6px; }
   .empty, .notice { padding: 8px 0; color: var(--secondary-text-color); }
   .error { color: var(--error-color, #db4437); font-size: 13px; }
@@ -178,38 +287,31 @@ class HomexaPhoneCard extends HTMLElement {
     this._pendingDelete = "";
     this._audioUrl = "";
     this._audioFor = "";
+    this._menuFor = "";
     this._key = "";
     this._loading = false;
     this._fetchPending = false;
     this.attachShadow({ mode: "open" });
   }
 
+  static getConfigElement() {
+    return document.createElement("homexa-phone-card-editor");
+  }
+
   static getConfigForm() {
+    const labels = COPY.fr.editors;
     return {
-      schema: [
-        { name: "title", selector: { text: {} } },
-        { name: "config_entry", selector: { config_entry: { integration: "freebox_homexa" } } },
-        { name: "media_player", selector: { entity: { domain: "media_player" } } },
-        { name: "show_number", default: false, selector: { boolean: {} } },
-        { name: "show_calls", default: false, selector: { boolean: {} } },
-        { name: "max_calls", selector: { number: { min: 1, max: 30, mode: "box" } } },
-      ],
-      computeLabel: (schema) =>
-        ({
-          title: "Titre",
-          config_entry: "Freebox",
-          media_player: "Lecteur pour la lecture",
-          show_number: "Afficher le numéro",
-          show_calls: "Derniers appels",
-          max_calls: "Nombre d'appels",
-        })[schema.name],
+      schema: _editorSchema().map((item) =>
+        item.name === "show_number" || item.name === "show_calls" ? { ...item, default: false } : item
+      ),
+      computeLabel: (schema) => labels[schema.name],
       computeHelper: (schema) =>
         schema.name === "config_entry"
-          ? "Utile s'il y a plusieurs Freebox. Vide = détection automatique."
+          ? labels.helpEntry
           : schema.name === "show_number"
-            ? "Masqué par défaut. Les numéros ne sont pas dans les états Home Assistant."
-            : schema.name === "media_player"
-              ? "Par exemple une enceinte Echo. Alexa exige une URL HTTPS publique."
+            ? labels.helpNumber
+            : schema.name === "media_players"
+              ? labels.helpPlayers
               : undefined,
     };
   }
@@ -223,6 +325,7 @@ class HomexaPhoneCard extends HTMLElement {
       throw new Error("Configuration de la carte Téléphone invalide");
     }
     this._config = { ...config };
+    this._menuFor = "";
     this._key = "";
     this._showList(null);
     this._render();
@@ -483,6 +586,9 @@ class HomexaPhoneCard extends HTMLElement {
       this._pendingDelete,
       this._audioFor,
       this._audioUrl,
+      this._menuFor,
+      this._remembered(),
+      _playerIds(cfg).map((id) => _friendly(hass, id)),
       this._handsets(),
       this._on("show_number", false),
       attrs.voicemail_loading === true,
@@ -501,7 +607,14 @@ class HomexaPhoneCard extends HTMLElement {
     card.addEventListener("click", (event) => {
       const origin = _eventElement(event);
       const button = origin ? origin.closest("button") : null;
-      if (!button || !card.contains(button) || button.disabled) return;
+      if (!button || !card.contains(button) || button.disabled) {
+        if (this._menuFor) {
+          this._menuFor = "";
+          this._key = "";
+          this._render();
+        }
+        return;
+      }
       this._click(button.dataset || {});
     });
     this._nodes = {
@@ -631,7 +744,8 @@ class HomexaPhoneCard extends HTMLElement {
     n.total.hidden = !total;
     n.total.textContent = total;
     const copy = _copy(hass);
-    const hint = this._notice || this._hint || (!cfg.media_player ? copy.noPlayer : "");
+    const players = _playerIds(cfg);
+    const hint = this._notice || this._hint || (!players.length ? copy.noPlayer : "");
     n.hint.hidden = !hint;
     n.hint.textContent = hint;
     const messages = this._messages || [];
@@ -660,12 +774,30 @@ class HomexaPhoneCard extends HTMLElement {
       tools.className = "tools";
       const copy = _copy(hass);
       tools.appendChild(this._button("browser", item.id, copy.phone, copy.phoneShort, false));
-      const playerButton = this._button("player", item.id, copy.player, copy.playerShort, false);
-      if (!cfg.media_player) {
-        playerButton.disabled = true;
-        playerButton.className = "stop";
+      const remembered = players.length > 1 ? this._remembered() : "";
+      const rememberedName = remembered ? _friendly(hass, remembered) : "";
+      const longLabel = players.length > 1
+        ? (rememberedName ? `${copy.listenOn} ${rememberedName}` : copy.choose)
+        : copy.player;
+      const shortLabel = players.length > 1 ? copy.chooseShort : copy.playerShort;
+      const playerButton = this._button("player", item.id, longLabel, shortLabel, false);
+      playerButton.className = players.length ? "player" : "player stop";
+      playerButton.disabled = players.length === 0;
+      const wrap = _el("span");
+      wrap.className = "picker";
+      wrap.appendChild(playerButton);
+      if (players.length > 1 && this._menuFor === item.id) {
+        const menu = _el("div");
+        menu.className = "menu";
+        players.forEach((entityId) => {
+          const choice = this._button("pick", item.id, _friendly(hass, entityId), "", false);
+          choice.dataset.entity = entityId;
+          if (entityId === remembered) choice.className = "chosen";
+          menu.appendChild(choice);
+        });
+        wrap.appendChild(menu);
       }
-      tools.appendChild(playerButton);
+      tools.appendChild(wrap);
       tools.appendChild(this._button("read", item.id, "Lu", "", false));
       const confirm = this._pendingDelete === item.id;
       tools.appendChild(this._button("delete", item.id, confirm ? "Confirmer" : "Supprimer", "", confirm));
@@ -728,40 +860,152 @@ class HomexaPhoneCard extends HTMLElement {
     else if (act === "stop-fxs") this._service("stop_fxs_ring", {});
     else if (act === "browser") this._playBrowser(id);
     else if (act === "player") {
-      const copy = _copy(this._hass);
-      if (!this._config.media_player) {
-        this._notice = copy.noPlayer;
-        this._error = "";
+      const players = _playerIds(this._config);
+      if (players.length > 1) {
+        this._menuFor = this._menuFor === id ? "" : id;
         this._key = "";
         this._render();
         return;
       }
-      this._notice = copy.asking;
-      this._error = "";
-      this._key = "";
-      this._render();
-      const pending = this._service("play_voicemail", { id, entity_id: this._config.media_player });
-      if (pending && typeof pending.then === "function") {
-        pending.then(() => {
-          this._notice = copy.launched;
-          this._error = "";
-          this._key = "";
-          this._render();
-        }).catch((err) => {
-          const message = err && typeof err.message === "string" ? err.message : "";
-          this._notice = "";
-          this._error = message && !/\d{6,}/.test(message) ? message : copy.failed;
-          this._key = "";
-          this._render();
-        });
-      }
+      this._playOn(id, players[0] || "");
+    }
+    else if (act === "pick") {
+      const entityId = dataset.entity || "";
+      this._menuFor = "";
+      if (_playerIds(this._config).includes(entityId)) this._remember(entityId);
+      this._playOn(id, entityId);
     }
     else if (act === "read") this._mutate("mark_read", id);
     else if (act === "delete") this._delete(id);
   }
+
+  _remember(entityId) {
+    const box = _memory();
+    if (!box || !_playerIds(this._config).includes(entityId)) return;
+    try {
+      box.setItem(_playerKey(this._config), entityId);
+    } catch (err) {
+      // Navigation privée ou quota : le choix reste valable pour cet affichage.
+    }
+  }
+
+  _remembered() {
+    const players = _playerIds(this._config);
+    const box = _memory();
+    if (!box) return "";
+    let value = "";
+    try {
+      value = box.getItem(_playerKey(this._config)) || "";
+    } catch (err) {
+      return "";
+    }
+    return players.includes(value) ? value : "";
+  }
+
+  _playOn(id, entityId) {
+    const copy = _copy(this._hass);
+    const players = _playerIds(this._config);
+    if (!entityId || !players.includes(entityId)) {
+      this._notice = copy.noPlayer;
+      this._error = "";
+      this._key = "";
+      this._render();
+      return;
+    }
+    const named = players.length > 1 ? _friendly(this._hass, entityId) : "";
+    this._notice = named ? `${copy.askingNamed}${named}…` : copy.asking;
+    this._error = "";
+    this._menuFor = "";
+    this._key = "";
+    this._render();
+    const pending = this._service("play_voicemail", { id, entity_id: entityId });
+    if (pending && typeof pending.then === "function") {
+      pending.then(() => {
+        this._notice = named ? `${copy.launchedNamed}${named}` : copy.launched;
+        this._error = "";
+        this._key = "";
+        this._render();
+      }).catch((err) => {
+        const message = err && typeof err.message === "string" ? err.message : "";
+        this._notice = "";
+        this._error = message && !/\d{6,}/.test(message) ? message : copy.failed;
+        this._key = "";
+        this._render();
+      });
+    }
+  }
+}
+
+const PHONE_EDITOR_TAG = "homexa-phone-card-editor";
+
+class HomexaPhoneCardEditor extends HTMLElement {
+  constructor() {
+    super();
+    this._config = {};
+    this._hass = null;
+  }
+
+  setConfig(config) {
+    this._config = { ...(config || {}) };
+    this._render();
+  }
+
+  set hass(hass) {
+    this._hass = hass;
+    this._render();
+  }
+
+  _render() {
+    if (typeof document === "undefined" || typeof this.querySelector !== "function") return;
+    let form = this.querySelector("ha-form");
+    if (!form) {
+      form = document.createElement("ha-form");
+      form.addEventListener("value-changed", (event) => this._onForm(event));
+      if (typeof this.appendChild === "function") this.appendChild(form);
+    }
+    const copy = _copy(this._hass);
+    const data = _editorData(this._config);
+    const stamp = JSON.stringify(data);
+    form.hass = this._hass;
+    form.schema = _editorSchema();
+    if (form._stamp !== stamp) {
+      form._stamp = stamp;
+      form.data = data;
+    }
+    form.computeLabel = (schema) => copy.editors[schema.name];
+    form.computeHelper = (schema) =>
+      schema.name === "config_entry"
+        ? copy.editors.helpEntry
+        : schema.name === "show_number"
+          ? copy.editors.helpNumber
+          : schema.name === "media_players"
+            ? copy.editors.helpPlayers
+            : undefined;
+  }
+
+  _onForm(event) {
+    const value = (event && event.detail && event.detail.value) || {};
+    const next = { ...(this._config || {}) };
+    delete next.media_player;
+    const players = _playerIds({ media_players: value.media_players });
+    if (players.length) next.media_players = players;
+    else delete next.media_players;
+    if (typeof value.title === "string" && value.title.trim()) next.title = value.title;
+    else delete next.title;
+    if (typeof value.config_entry === "string" && value.config_entry) next.config_entry = value.config_entry;
+    else delete next.config_entry;
+    next.show_number = value.show_number === true;
+    next.show_calls = value.show_calls === true;
+    if (value.max_calls !== undefined && value.max_calls !== null && value.max_calls !== "") {
+      next.max_calls = Number(value.max_calls);
+    }
+    this._config = next;
+    if (typeof this.dispatchEvent === "function") this.dispatchEvent(_configChanged(next));
+  }
 }
 
 if (!customElements.get(PHONE_TAG)) customElements.define(PHONE_TAG, HomexaPhoneCard);
+if (!customElements.get(PHONE_EDITOR_TAG)) customElements.define(PHONE_EDITOR_TAG, HomexaPhoneCardEditor);
 window.customCards = window.customCards || [];
 if (!window.customCards.some((card) => card.type === PHONE_TAG)) {
   window.customCards.push({

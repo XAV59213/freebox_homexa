@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Carte Téléphone : l'éditeur visuel accepte plusieurs lecteurs (`media_players`). L'ancienne clé `media_player` reste lue telle quelle. Un seul lecteur garde le bouton « Écouter sur le Player ». Plusieurs lecteurs ouvrent une liste de noms ; le dernier choix est mémorisé dans le navigateur pour cette carte. Le rendu reste en place.
+
 ## 28.8.100 — 2026-11-22
 
 - Carte Téléphone : « Écouter sur mon téléphone » joue dans l'application, « Écouter sur le Player » envoie le message au lecteur configuré. Sans lecteur, le second bouton est inactif et un texte l'indique. Un appui sur le texte du bouton est bien pris en compte. La carte affiche « Lecture lancée sur le Player » ou l'erreur précise. Les libellés courts tiennent sur un écran étroit. Le rendu en place ne change pas.

@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 28.8.96 — 2026-11-22
 
 - Téléphonie : sonnerie des combinés DECT (boutons « Faire sonner les combinés DECT » et « Arrêter la sonnerie DECT », actions `start_dect_ring` et `stop_dect_ring`, durée 1 à 300 s, 30 s par défaut). Les boutons n'apparaissent que si la Freebox a au moins un combiné DECT. Capteurs « Sonne » et « Décroché » par combiné, mis à jour avec le relevé existant. Le champ `on_hook` est recopié tel quel : s'il est absent ou en retard selon le firmware, « Décroché » reste inconnu.
 - Messagerie vocale : capteur « Messages vocaux non lus » (total, date du plus récent, liste sans numéro), événement `freebox_homexa_new_voicemail` sans numéro, actions pour marquer lu, supprimer et lire sur un lecteur média. Lecture dans le navigateur par une URL signée de courte durée, avec conversion MP3 pour les lecteurs qui en ont besoin. La lecture sur Alexa ou Echo est au mieux et exige une URL HTTPS publique (Nabu Casa ou URL externe).

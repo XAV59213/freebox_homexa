@@ -191,11 +191,11 @@ def test_spoken_number_is_grouped_and_absent_unless_requested():
         public_message,
     )
 
-    sample = "0610135787"
-    assert spoken_number(sample) == "06, 10, 13, 57, 87"
-    assert spoken_number("+33 6 10 13 57 87") == "06, 10, 13, 57, 87"
-    assert spoken_number("0033610135787") == "06, 10, 13, 57, 87"
-    assert spoken_number("610135787", country_code="33") == "06, 10, 13, 57, 87"
+    sample = "0612345678"
+    assert spoken_number(sample) == "06, 12, 34, 56, 78"
+    assert spoken_number("+33 6 12 34 56 78") == "06, 12, 34, 56, 78"
+    assert spoken_number("0033612345678") == "06, 12, 34, 56, 78"
+    assert spoken_number("612345678", country_code="33") == "06, 12, 34, 56, 78"
     assert spoken_number("061") == "06, 1"
     assert spoken_number("Numéro privé") == "numéro masqué"
     assert spoken_number("anonymous") == "numéro masqué"
@@ -209,28 +209,28 @@ def test_spoken_number_is_grouped_and_absent_unless_requested():
     shown = caller_fields("", sample, include_number=True)
     assert shown["caller"] == sample
     assert shown["number"] == sample
-    assert shown["number_spoken"] == "06, 10, 13, 57, 87"
+    assert shown["number_spoken"] == "06, 12, 34, 56, 78"
     named = caller_fields("Martin", sample, include_number=True)
     assert named["caller"] == "Martin"
-    assert named["number_spoken"] == "06, 10, 13, 57, 87"
+    assert named["number_spoken"] == "06, 12, 34, 56, 78"
     rows = format_calls(
-        [{"name": "", "number": "+33610135787", "datetime": 1700000000}],
+        [{"name": "", "number": "+33612345678", "datetime": 1700000000}],
         include_number=True,
     )
-    assert rows[0]["number"] == "+33610135787"
-    assert rows[0]["number_spoken"] == "06, 10, 13, 57, 87"
+    assert rows[0]["number"] == "+33612345678"
+    assert rows[0]["number_spoken"] == "06, 12, 34, 56, 78"
     quiet = format_calls([{"name": "", "number": sample, "datetime": 1700000000}])
     assert "number_spoken" not in quiet[0]
     assert sample not in str(quiet)
     mail = VoicemailMessage(
         id="token",
         country_code="33",
-        phone_number="610135787",
+        phone_number="612345678",
         date=1,
         read=False,
         duration=3,
     )
     public = public_message(mail, public_id="token", include_number=True)
-    assert public["phone_number"] == "610135787"
-    assert public["number_spoken"] == "06, 10, 13, 57, 87"
+    assert public["phone_number"] == "612345678"
+    assert public["number_spoken"] == "06, 12, 34, 56, 78"
     assert "number_spoken" not in public_message(mail, public_id="token")

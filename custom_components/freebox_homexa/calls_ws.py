@@ -103,7 +103,7 @@ def _with_country(value: str, country_code: str) -> str:
 
 
 def spoken_number(value: str, *, country_code: str = "") -> str:
-    """Numéro lu deux chiffres par deux : « 06, 10, 13, 57, 87 ».
+    """Numéro lu deux chiffres par deux : « 06, 12, 34, 56, 78 ».
 
     Un numéro masqué (privé, anonyme, étoiles) devient « numéro masqué ».
     Une chaîne vide ne produit rien. Le texte d'entrée n'est pas journalisé.

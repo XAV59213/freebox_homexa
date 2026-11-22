@@ -251,7 +251,7 @@ Arrête la sonnerie DECT. Champs facultatifs : `config_entry_id`, `device_id`.
 
 Après le premier relevé réussi (rien n'est renvoyé au démarrage, y compris après un redémarrage), chaque nouvel appel manqué émet `freebox_homexa_missed_call`. Chaque nouveau message non lu émet `freebox_homexa_new_voicemail`.
 
-`caller` est le nom du contact Freebox. Sans contact, c'est le numéro seulement si l'option d'entrée **Inclure le numéro dans les événements** est cochée. Elle est décochée par défaut : `caller` vaut alors `Inconnu` et les champs `number` et `number_spoken` sont absents. `name` ne contient jamais le numéro. Aucun numéro n'est écrit dans le journal. `number_spoken`, présent seulement avec l'option, est la forme à faire lire : « 06, 10, 13, 57, 87 ». Un `+33` ou `0033` est ramené à `0`. Un numéro masqué vaut « numéro masqué ». Le même champ est ajouté au message vocal.
+`caller` est le nom du contact Freebox. Sans contact, c'est le numéro seulement si l'option d'entrée **Inclure le numéro dans les événements** est cochée. Elle est décochée par défaut : `caller` vaut alors `Inconnu` et les champs `number` et `number_spoken` sont absents. `name` ne contient jamais le numéro. Aucun numéro n'est écrit dans le journal. `number_spoken`, présent seulement avec l'option, est la forme à faire lire : « 06, 12, 34, 56, 78 ». Un `+33` ou `0033` est ramené à `0`. Un numéro masqué vaut « numéro masqué ». Le même champ est ajouté au message vocal.
 
 ```yaml
 alias: Notifier un appel manqué

@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 28.8.100 — 2026-11-22
 
 - Carte Téléphone : « Écouter sur mon téléphone » joue dans l'application, « Écouter sur le Player » envoie le message au lecteur configuré. Sans lecteur, le second bouton est inactif et un texte l'indique. Un appui sur le texte du bouton est bien pris en compte. La carte affiche « Lecture lancée sur le Player » ou l'erreur précise. Les libellés courts tiennent sur un écran étroit. Le rendu en place ne change pas.
 - Player Freebox : la lecture passe par AirMedia (type video, l'audio direct répond souvent unimplemented) avec l'URL HTTP du MP3, comme le fait Music Assistant quand il réécrit l'adresse. `control/open` avec le type audio/mpeg est le second essai. Si l'état du Player ne change pas, l'action échoue avec un message traduit et le message n'est pas marqué lu. Un autre lecteur configuré, par exemple Music Assistant, est utilisé tel quel.

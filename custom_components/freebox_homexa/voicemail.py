@@ -32,7 +32,12 @@ from homeassistant.helpers.event import async_call_later
 from homeassistant.util import dt as dt_util
 
 from .availability import FreeboxReachableMixin
-from .calls_ws import contact_label, event_caller_fields, events_include_number
+from .calls_ws import (
+    contact_label,
+    event_caller_fields,
+    events_include_number,
+    spoken_number,
+)
 from .const import DOMAIN
 from .errors import api_error_code, is_permission_denied, is_shutdown_error
 
@@ -279,6 +284,9 @@ def public_message(
     }
     if include_number:
         payload["phone_number"] = message.phone_number
+        spoken = spoken_number(message.phone_number, country_code=message.country_code)
+        if spoken:
+            payload["number_spoken"] = spoken
     return payload
 
 
@@ -694,6 +702,7 @@ def _announce(router: FreeboxRouter, messages: list[VoicemailMessage]) -> None:
                     stamp=item.date,
                     own_name=item.contact_name,
                     include_number=events_include_number(router),
+                    country_code=item.country_code,
                 ),
             },
         )

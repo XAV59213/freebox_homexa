@@ -33,8 +33,95 @@ CALL_LOG_KEY = "calls_log"
 MISSED_KEY = "missed"
 MISSED_CALL_EVENT = "freebox_homexa_missed_call"
 UNKNOWN_CALLER = "Inconnu"
+SPOKEN_WITHHELD = "numéro masqué"
 _CALL_MATCH_SECONDS = 180
 _CALL_ID = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,80}$")
+_MASK_WORDS = (
+    "anonymous",
+    "anonyme",
+    "unavailable",
+    "withheld",
+    "restricted",
+    "private",
+    "secret",
+    "inconnu",
+    "masque",
+    "prive",
+)
+
+
+def _fold(value: str) -> str:
+    folded = value.casefold()
+    for src, dst in (
+        ("é", "e"),
+        ("è", "e"),
+        ("ê", "e"),
+        ("ë", "e"),
+        ("à", "a"),
+        ("â", "a"),
+        ("ù", "u"),
+        ("û", "u"),
+        ("ô", "o"),
+        ("î", "i"),
+        ("ï", "i"),
+        ("ç", "c"),
+    ):
+        folded = folded.replace(src, dst)
+    return " ".join(folded.split())
+
+
+def _national_digits(value: str) -> str:
+    """Chiffres du numéro. Un préfixe +33 ou 0033 devient un 0 national."""
+    stripped = value.strip()
+    international = stripped.startswith(("+", "00"))
+    digits = "".join(ch for ch in stripped if ch.isdigit())
+    if international and digits.startswith("33"):
+        rest = digits[2:]
+        if not rest:
+            return ""
+        return rest if rest.startswith("0") else "0" + rest
+    if digits.startswith("0033"):
+        rest = digits[4:]
+        if not rest:
+            return ""
+        return rest if rest.startswith("0") else "0" + rest
+    return digits
+
+
+def _with_country(value: str, country_code: str) -> str:
+    """Ajoute +33 quand le numéro est national sans le 0, pour le lire ensuite."""
+    country = "".join(ch for ch in country_code if ch.isdigit())
+    stripped = value.strip()
+    if country != "33" or not stripped:
+        return stripped
+    if stripped.startswith(("+", "00", "0")):
+        return stripped
+    digits = "".join(ch for ch in stripped if ch.isdigit())
+    if digits.startswith("33") and len(digits) >= 11:
+        return "+" + digits
+    return "+33" + stripped
+
+
+def spoken_number(value: str, *, country_code: str = "") -> str:
+    """Numéro lu deux chiffres par deux : « 06, 10, 13, 57, 87 ».
+
+    Un numéro masqué (privé, anonyme, étoiles) devient « numéro masqué ».
+    Une chaîne vide ne produit rien. Le texte d'entrée n'est pas journalisé.
+    """
+    raw = _with_country(value, country_code)
+    if not raw:
+        return ""
+    folded = _fold(raw)
+    letters = "".join(ch for ch in folded if ch.isalpha())
+    masked = set(letters) <= {"x"} or any(word in folded for word in _MASK_WORDS)
+    if letters and masked:
+        return SPOKEN_WITHHELD
+    if any(ch in raw for ch in "*#"):
+        return SPOKEN_WITHHELD
+    digits = _national_digits(raw)
+    if not digits:
+        return SPOKEN_WITHHELD if not letters else ""
+    return ", ".join(digits[index : index + 2] for index in range(0, len(digits), 2))
 
 
 def _timestamp(call: Mapping[str, object]) -> float:
@@ -69,7 +156,9 @@ def contact_label(raw_name: object, number: str) -> str:
     return name
 
 
-def caller_fields(name: str, number: str, *, include_number: bool) -> dict[str, object]:
+def caller_fields(
+    name: str, number: str, *, include_number: bool, country_code: str = ""
+) -> dict[str, object]:
     """``caller`` est le nom, sinon le numéro si l'option l'autorise, sinon « Inconnu ».
 
     ``number`` est omis quand l'option est désactivée. Le numéro n'est jamais recopié dans ``name``.
@@ -87,6 +176,9 @@ def caller_fields(name: str, number: str, *, include_number: bool) -> dict[str, 
     payload: dict[str, object] = {"caller": caller, "name": shown}
     if include_number and number:
         payload["number"] = number
+        spoken = spoken_number(number, country_code=country_code)
+        if spoken:
+            payload["number_spoken"] = spoken
     return payload
 
 
@@ -151,9 +243,12 @@ def event_caller_fields(
     stamp: int,
     own_name: str,
     include_number: bool,
+    country_code: str = "",
 ) -> dict[str, object]:
     name, resolved = match_caller(call_list, number=number, stamp=stamp, own_name=own_name)
-    return caller_fields(name, resolved, include_number=include_number)
+    return caller_fields(
+        name, resolved, include_number=include_number, country_code=country_code
+    )
 
 
 def _call_identity(call: Mapping[str, object]) -> str | None:
@@ -254,18 +349,22 @@ def format_calls(
         name = _call_text(call.get("name")).strip()
         if not name or name == number:
             name = "Inconnu"
-        rows.append(
-            {
-                "name": name,
-                "number": number if include_number else "",
-                "type": call.get("type") or "",
-                "datetime": dt_util.utc_from_timestamp(_timestamp(call)).isoformat()
-                if call.get("datetime")
-                else None,
-                "duration": call.get("duration") or 0,
-                "new": bool(call.get("new", False)),
-            }
-        )
+        shown_number = number if include_number else ""
+        row: dict[str, object] = {
+            "name": name,
+            "number": shown_number,
+            "type": call.get("type") or "",
+            "datetime": dt_util.utc_from_timestamp(_timestamp(call)).isoformat()
+            if call.get("datetime")
+            else None,
+            "duration": call.get("duration") or 0,
+            "new": bool(call.get("new", False)),
+        }
+        if shown_number:
+            spoken = spoken_number(shown_number)
+            if spoken:
+                row["number_spoken"] = spoken
+        rows.append(row)
     return rows
 
 

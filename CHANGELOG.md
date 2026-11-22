@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 28.8.105 — 2026-11-22
 
 - Carte Téléphone : si le chargement de la messagerie dépasse 15 secondes, ou si la lecture échoue, « Chargement » ne reste plus affiché. La carte montre l'erreur et un bouton Réessayer.
 - Carte Téléphone : avant un message sur un lecteur, le volume passe à 50 % s'il est réglable, puis revient à la valeur d'origine à la fin si personne ne l'a changé. L'éditeur a « Volume du message (%) » ; 0 ne touche pas au volume.

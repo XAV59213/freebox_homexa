@@ -22,6 +22,7 @@ import homeassistant.helpers.device_registry as dr
 
 from .calls_ws import async_register_calls_websocket_api
 from .phone_dect import async_release_dect_ring
+from .server_ws import async_register_server_websocket_api
 from .voicemail_audio import async_register_voicemail_view
 from .voicemail_ws import async_register_voicemail_websocket_api
 from .const import (
@@ -69,6 +70,7 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
     hass.data.setdefault(DOMAIN, {})
     async_setup_services(hass)
     async_register_calls_websocket_api(hass)
+    async_register_server_websocket_api(hass)
     async_register_voicemail_websocket_api(hass)
     async_register_voicemail_view(hass)
     try:

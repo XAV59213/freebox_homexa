@@ -512,6 +512,9 @@
       "voicemail_unread": {
         "name": "Unread voicemails"
       },
+      "fan_rpm": {
+        "name": "Fan {fan_id}"
+      },
       "partition_free_space": {
         "name": "{partition} free space"
       },

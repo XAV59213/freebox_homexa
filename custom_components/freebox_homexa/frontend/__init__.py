@@ -25,6 +25,7 @@ from ..const import (
     CALLS_CARD_FILENAME,
     CARD_FILENAME,
     PHONE_CARD_FILENAME,
+    SERVER_CARD_FILENAME,
     STATIC_CARD_PATH,
     URL_BASE,
     VERSION,
@@ -95,6 +96,9 @@ class JSModuleRegistration:
         add_extra_js_url(self.hass, f"{URL_BASE}/{CALLS_CARD_FILENAME}?v={VERSION}")
         # Carte « Homexa Téléphone » : chemin statique + module, sans ressource Lovelace.
         add_extra_js_url(self.hass, f"{URL_BASE}/{PHONE_CARD_FILENAME}?v={VERSION}")
+        # Carte « Freebox Server » : même chemin statique, même cache-buster, aucune
+        # ressource Lovelace créée ni modifiée.
+        add_extra_js_url(self.hass, f"{URL_BASE}/{SERVER_CARD_FILENAME}?v={VERSION}")
 
         if self.hass.is_running:
             await self._async_register_lovelace_resources()

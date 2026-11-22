@@ -2,7 +2,9 @@
 
 ## Freebox Server
 
-Capteurs réseau / connexion, suivi des appareils Wi-Fi.
+Capteurs réseau / connexion, suivi des appareils Wi-Fi, températures et vitesse des ventilateurs.
+
+Carte Lovelace **Freebox Server** (connexion, santé, réseau, appels manqués, redémarrage). Elle est chargée avec l'intégration : rien à ajouter dans les ressources Lovelace.
 
 ## Freebox Home
 

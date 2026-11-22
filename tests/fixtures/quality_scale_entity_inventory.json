@@ -661,6 +661,16 @@
   },
   {
     "class": "FreeboxSensor",
+    "variant": "fan/fan_1",
+    "category": "diagnostic",
+    "device_class": null,
+    "enabled_default": true,
+    "has_entity_name": true,
+    "translation_key": "fan_rpm",
+    "unit": "rpm"
+  },
+  {
+    "class": "FreeboxSensor",
     "variant": "temperature",
     "category": "diagnostic",
     "device_class": "temperature",

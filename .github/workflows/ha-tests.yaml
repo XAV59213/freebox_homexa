@@ -32,6 +32,7 @@ jobs:
           node tests/player_card_artwork.cjs
           node tests/tnt_reminder_errors.cjs
           node tests/phone_card.cjs
+          node tests/server_card.cjs
       - name: Quality Scale inventory validation
         run: python -B tests/validate_quality_scale.py
       - name: HA tests (device network blocked by test plugin)

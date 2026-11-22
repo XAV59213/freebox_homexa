@@ -17,6 +17,7 @@ from homeassistant.components.sensor import (
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import (
     PERCENTAGE,
+    REVOLUTIONS_PER_MINUTE,
     SIGNAL_STRENGTH_DECIBELS_MILLIWATT,
     EntityCategory,
     UnitOfDataRate,
@@ -145,6 +146,20 @@ def temperature_sensor_description(sensor_name: str) -> SensorEntityDescription:
     )
 
 
+def fan_sensor_description(fan_id: str) -> SensorEntityDescription:
+    """RPM d'un ventilateur. L'identité est ``fan_<id>``, pas le libellé Freebox."""
+    key = f"fan_{fan_id}"
+    return SensorEntityDescription(
+        key=key,
+        name=key,
+        native_unit_of_measurement=REVOLUTIONS_PER_MINUTE,
+        state_class=SensorStateClass.MEASUREMENT,
+        entity_category=EntityCategory.DIAGNOSTIC,
+        translation_key="fan_rpm",
+        translation_placeholders={"fan_id": fan_id},
+    )
+
+
 async def async_setup_entry(
     hass: HomeAssistant, entry: FreeboxConfigEntry, async_add_entities: AddEntitiesCallback
 ) -> None:
@@ -160,6 +175,9 @@ async def async_setup_entry(
     def candidates() -> Iterable[DiscoveryCandidate]:
         for sensor_name in router.sensors_temperature:
             yield f"temperature:{sensor_name}", partial(FreeboxSensor, router, temperature_sensor_description(sensor_name))
+        for fan_key in router.sensors_fans:
+            yield f"fan:{fan_key}", partial(
+                FreeboxSensor, router, fan_sensor_description(fan_key.removeprefix("fan_")))
         for disk in router.disks.values():
             for partition in disk["partitions"].values():
                 for description in DISK_PARTITION_SENSORS:
@@ -252,13 +270,20 @@ class FreeboxSensor(FreeboxReachableMixin, SensorEntity):
         self._router = router
         self._attr_unique_id = f"{router.mac} {description.name}"
         # Keep the historical description (and unique ID), change display only.
-        if description.key not in {"rate_down", "rate_up", "ipv4", "uptime", "missed", "calls_log", "partition_free_space"} and isinstance(description.name, str):
+        if (
+            description.key not in {"rate_down", "rate_up", "ipv4", "uptime", "missed", "calls_log", "partition_free_space"}
+            and not str(description.key).startswith("fan_")
+            and isinstance(description.name, str)
+        ):
             self._attr_name = description.name.removesuffix(" Freebox").removeprefix("Freebox ")
         self._attr_device_info = router.device_info
 
     @callback
     def async_update_state(self) -> None:
-        if self.entity_description.key in ["ipv4"]:
+        if self.entity_description.translation_key == "fan_rpm":
+            # Mesure isolée : une température homonyme ne remplace pas le RPM.
+            state = getattr(self._router, "sensors_fans", {}).get(self.entity_description.key)
+        elif self.entity_description.key in ["ipv4"]:
             state = self._router._attrs.get("IPv4")
         elif self.entity_description.key == "uptime":
             state = self._router.sensors_connection.get("uptime")

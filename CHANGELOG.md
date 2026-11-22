@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 28.8.104 — 2026-11-22
 
 - Carte Téléphone : après un envoi vers un lecteur, un mini-lecteur montre son état, la progression et les commandes supportées (pause, stop, volume). S'il ne démarre pas en dix secondes, un message l'indique. Le bouton tient sur une ligne : « Sur » suivi du nom court.
 - Fin du message : si le média affiché est encore celui de la messagerie, la carte arrête le lecteur. Music Assistant vide aussi sa file quand il le permet. Le Freebox Player arrête AirMedia et revient à la source précédente si elle est connue. Le titre envoyé est « Message vocal Freebox », sans nom ni numéro.

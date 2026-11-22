@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Téléphonie : sonnerie des combinés DECT (boutons « Faire sonner les combinés DECT » et « Arrêter la sonnerie DECT », actions `start_dect_ring` et `stop_dect_ring`, durée 1 à 300 s, 30 s par défaut). Les boutons n'apparaissent que si la Freebox a au moins un combiné DECT. Capteurs « Sonne » et « Décroché » par combiné, mis à jour avec le relevé existant. Le champ `on_hook` est recopié tel quel : s'il est absent ou en retard selon le firmware, « Décroché » reste inconnu.
+- Messagerie vocale : capteur « Messages vocaux non lus » (total, date du plus récent, liste sans numéro), événement `freebox_homexa_new_voicemail` sans numéro, actions pour marquer lu, supprimer et lire sur un lecteur média. Lecture dans le navigateur par une URL signée de courte durée, avec conversion MP3 pour les lecteurs qui en ont besoin. La lecture sur Alexa ou Echo est au mieux et exige une URL HTTPS publique (Nabu Casa ou URL externe).
+- Carte Lovelace « Homexa Téléphone » : sonneries, état des combinés, messagerie et appels récents en option. Le numéro reste masqué sauf si `show_number` est activé. Aucun numéro ni nom d'appelant n'est journalisé ni placé dans les états.
 - Carte Lovelace « Freebox Server » : en-tête (modèle, firmware, temps de fonctionnement), tuile connexion (débits avec courbe, IP externe, type de lien), tuile santé (températures, ventilateurs, RAID, espace disque), tuile réseau (Wi-Fi, clients, répéteurs, groupes LAN) et pied de page (appels manqués, redémarrage avec confirmation). Une tuile sans entité reste masquée. Plusieurs Freebox : choix dans l'éditeur visuel. Les entity_id sont retrouvés par l'entrée et le unique_id, pas par le nom affiché.
 - Capteurs de vitesse des ventilateurs (`system.fans`) : un capteur RPM par ventilateur (`fan_<id>`), créé comme les températures. Les entity_id, unique_id et options déjà en place ne changent pas.
 

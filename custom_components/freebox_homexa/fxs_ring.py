@@ -1,9 +1,10 @@
-"""Sonnerie du téléphone branché sur le port FXS de la Freebox.
+"""Sonnerie téléphonique Freebox (port FXS et combinés DECT).
 
-Les boutons démarrent ou arrêtent immédiatement. L'action ``start_fxs_ring`` peut
-prendre une durée : l'arrêt est alors toujours demandé, y compris si le démarrage
-échoue, si l'action est annulée ou si l'entrée est déchargée. Aucun journal
-d'appels n'est lu.
+Le contrôleur est générique : il reçoit une paire (démarrage, arrêt). La sonnerie
+FXS conserve ses entités, ses actions et son comportement. Les boutons FXS
+démarrent ou arrêtent immédiatement. L'action ``start_fxs_ring`` peut prendre une
+durée : l'arrêt est alors toujours demandé, y compris si le démarrage échoue, si
+l'action est annulée ou si l'entrée est déchargée. Aucun journal d'appels n'est lu.
 """
 
 from __future__ import annotations
@@ -56,8 +57,31 @@ class _Slot:
         self.release_done: asyncio.Future[None] | None = None
 
 
-class FxsRingController:
-    """Coordonne les sonneries FXS d'une instance Home Assistant."""
+class RingOps:
+    """Paire (démarrage, arrêt) et traduction des erreurs pour une sonnerie."""
+
+    __slots__ = ("invoke", "label", "start", "stop")
+
+    def __init__(
+        self,
+        start: Callable[[], Awaitable[object]],
+        stop: Callable[[], Awaitable[object]],
+        invoke: Callable[[Callable[[], Awaitable[object]]], Awaitable[None]],
+        label: str,
+    ) -> None:
+        self.start = start
+        self.stop = stop
+        self.invoke = invoke
+        self.label = label
+
+
+class RingController:
+    """Coordonne une famille de sonneries d'une instance Home Assistant.
+
+    ``start`` et ``stop`` forment une paire : une durée programme toujours l'arrêt
+    de cette paire, y compris si le démarrage échoue ou si l'attente est annulée.
+    Deux familles (FXS et DECT) utilisent deux contrôleurs, pour ne pas se couper.
+    """
 
     def __init__(self) -> None:
         self._slots: dict[str, _Slot] = {}
@@ -78,17 +102,17 @@ class FxsRingController:
         return slot
 
     async def async_start(
-        self, entry_id: str, phone: Phone, duration: float | None
+        self, entry_id: str, ops: RingOps, duration: float | None
     ) -> None:
         """Démarre la sonnerie. ``duration`` programme un arrêt obligatoire."""
         generation, inherited = await self._bump(entry_id)
         if duration is None:
             try:
                 await self._ensure_open(entry_id)
-                await _invoke(phone.start_fxs_ring)
+                await ops.invoke(ops.start)
             except BaseException:
                 if inherited:
-                    await self._best_effort_stop(entry_id, phone, generation)
+                    await self._best_effort_stop(entry_id, ops, generation)
                 raise
             await self._mark_armed(entry_id, generation)
             return
@@ -97,23 +121,23 @@ class FxsRingController:
         try:
             try:
                 await self._ensure_open(entry_id)
-                await _invoke(phone.start_fxs_ring)
+                await ops.invoke(ops.start)
             except BaseException:
-                await self._best_effort_stop(entry_id, phone, generation)
+                await self._best_effort_stop(entry_id, ops, generation)
                 raise
             await self._mark_armed(entry_id, generation)
             try:
                 should_stop = await self._wait(entry_id, generation, duration)
             except BaseException:
-                await self._best_effort_stop(entry_id, phone, generation)
+                await self._best_effort_stop(entry_id, ops, generation)
                 raise
             if should_stop:
-                await self._stop_if_current(entry_id, phone, generation)
+                await self._stop_current(entry_id, ops, generation)
         finally:
             if not done.done():
                 done.set_result(None)
 
-    async def async_stop(self, entry_id: str, phone: Phone) -> None:
+    async def async_stop(self, entry_id: str, ops: RingOps) -> None:
         """Arrête la sonnerie et retire l'arrêt programmé précédent."""
         async with self._lock(entry_id):
             slot = self._slot(entry_id)
@@ -125,16 +149,16 @@ class FxsRingController:
         if wake is not None and not wake.is_set():
             wake.set()
         try:
-            await _invoke(phone.stop_fxs_ring)
+            await ops.invoke(ops.stop)
         except Exception:
-            _LOGGER.debug("Arrêt de la sonnerie FXS non confirmé")
+            _LOGGER.debug("Arrêt de la sonnerie %s non confirmé", ops.label)
             raise
         async with self._lock(entry_id):
             slot = self._slot(entry_id)
             if slot.generation == generation:
                 slot.armed = False
 
-    async def async_release(self, entry_id: str, phone: Phone) -> None:
+    async def async_release(self, entry_id: str, ops: RingOps) -> None:
         """Arrête une sonnerie encore sous notre responsabilité (déchargement).
 
         Le créneau est retiré à la fin : un rechargement peut sonner de nouveau.
@@ -172,9 +196,9 @@ class FxsRingController:
             if not armed:
                 return
             try:
-                await _await_shielded(_invoke(phone.stop_fxs_ring))
+                await _await_shielded(ops.invoke(ops.stop))
             except Exception:
-                _LOGGER.debug("Arrêt FXS au déchargement non confirmé")
+                _LOGGER.debug("Arrêt %s au déchargement non confirmé", ops.label)
                 return
             async with self._lock(entry_id):
                 current = self._slots.get(entry_id)
@@ -247,20 +271,43 @@ class FxsRingController:
             slot = self._slot(entry_id)
             return slot.generation == generation and (slot.stop_on_wake or slot.closed)
 
-    async def _stop_if_current(self, entry_id: str, phone: Phone, generation: int) -> None:
+    async def _stop_current(self, entry_id: str, ops: RingOps, generation: int) -> None:
         async with self._lock(entry_id):
             slot = self._slot(entry_id)
             if slot.generation != generation:
                 return
             slot.generation += 1
-            await _invoke(phone.stop_fxs_ring)
+            await ops.invoke(ops.stop)
             slot.armed = False
 
-    async def _best_effort_stop(self, entry_id: str, phone: Phone, generation: int) -> None:
+    async def _best_effort_stop(self, entry_id: str, ops: RingOps, generation: int) -> None:
         try:
-            await _await_shielded(self._stop_if_current(entry_id, phone, generation))
+            await _await_shielded(self._stop_current(entry_id, ops, generation))
         except Exception:
-            _LOGGER.debug("Arrêt de la sonnerie FXS non confirmé")
+            _LOGGER.debug("Arrêt de la sonnerie %s non confirmé", ops.label)
+
+
+def _fxs_ops(phone: Phone) -> RingOps:
+    return RingOps(phone.start_fxs_ring, phone.stop_fxs_ring, _invoke, "FXS")
+
+
+class FxsRingController(RingController):
+    """Sonnerie FXS : la paire est ``start_fxs_ring`` / ``stop_fxs_ring``."""
+
+    async def async_start(
+        self, entry_id: str, phone: Phone, duration: float | None
+    ) -> None:
+        await super().async_start(entry_id, _fxs_ops(phone), duration)
+
+    async def async_stop(self, entry_id: str, phone: Phone) -> None:
+        await super().async_stop(entry_id, _fxs_ops(phone))
+
+    async def async_release(self, entry_id: str, phone: Phone) -> None:
+        await super().async_release(entry_id, _fxs_ops(phone))
+
+    async def _stop_if_current(self, entry_id: str, phone: Phone, generation: int) -> None:
+        """Compatibilité des tests FXS : ils passent l'objet Phone du SDK."""
+        await self._stop_current(entry_id, _fxs_ops(phone), generation)
 
 
 def async_controller(hass: HomeAssistant) -> FxsRingController:

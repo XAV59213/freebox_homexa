@@ -21,7 +21,10 @@ from freebox_api.exceptions import (
 import homeassistant.helpers.device_registry as dr
 
 from .calls_ws import async_register_calls_websocket_api
+from .phone_dect import async_release_dect_ring
 from .server_ws import async_register_server_websocket_api
+from .voicemail_audio import async_register_voicemail_view
+from .voicemail_ws import async_register_voicemail_websocket_api
 from .const import (
     CONF_CREATE_LAN_DEVICES,
     DEFAULT_CREATE_LAN_DEVICES,
@@ -68,6 +71,8 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
     async_setup_services(hass)
     async_register_calls_websocket_api(hass)
     async_register_server_websocket_api(hass)
+    async_register_voicemail_websocket_api(hass)
+    async_register_voicemail_view(hass)
     try:
         await async_setup_reminders(hass)
     except Exception:  # noqa: BLE001
@@ -328,6 +333,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: FreeboxConfigEntry) -> b
 
     async def async_close_connection(event: Event) -> None:
         await async_release_fxs_ring(router)
+        await async_release_dect_ring(router)
         await router.close()
         await save_data()
 
@@ -348,6 +354,7 @@ async def async_unload_entry(hass: HomeAssistant, entry: FreeboxConfigEntry) -> 
     if router is not None:
         # Arrêt FXS tant que la session répond, avant de refuser les nouveaux relevés.
         await async_release_fxs_ring(router)
+        await async_release_dect_ring(router)
         # Déchargement / rechargement : les relevés encore en vol ne journalisent plus
         # « Connector is closed » comme une erreur.
         router.closing = True

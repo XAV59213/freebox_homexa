@@ -24,6 +24,7 @@ from homeassistant.helpers.event import async_call_later
 from ..const import (
     CALLS_CARD_FILENAME,
     CARD_FILENAME,
+    PHONE_CARD_FILENAME,
     SERVER_CARD_FILENAME,
     STATIC_CARD_PATH,
     URL_BASE,
@@ -93,6 +94,8 @@ class JSModuleRegistration:
         add_extra_js_url(self.hass, f"{URL_BASE}/{TNT_CARD_FILENAME}?v={VERSION}")
         # Carte « Homexa Appels » (journal téléphonique), même mécanisme.
         add_extra_js_url(self.hass, f"{URL_BASE}/{CALLS_CARD_FILENAME}?v={VERSION}")
+        # Carte « Homexa Téléphone » : chemin statique + module, sans ressource Lovelace.
+        add_extra_js_url(self.hass, f"{URL_BASE}/{PHONE_CARD_FILENAME}?v={VERSION}")
         # Carte « Freebox Server » : même chemin statique, même cache-buster, aucune
         # ressource Lovelace créée ni modifiée.
         add_extra_js_url(self.hass, f"{URL_BASE}/{SERVER_CARD_FILENAME}?v={VERSION}")

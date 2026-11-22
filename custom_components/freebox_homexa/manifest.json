@@ -13,6 +13,7 @@
   "dependencies": [
     "ffmpeg",
     "http",
+    "media_source",
     "frontend",
     "websocket_api"
   ],

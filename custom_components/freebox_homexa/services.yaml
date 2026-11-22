@@ -114,6 +114,142 @@ stop_fxs_ring:
       selector:
         device:
           integration: freebox_homexa
+start_dect_ring:
+  name: Ring DECT handsets
+  description: >-
+    Rings the Freebox DECT handsets. Requires the Telephony permission. Duration
+    defaults to 30 seconds. Stop is always requested, including on error,
+    cancellation or unload.
+  fields:
+    duration:
+      name: Duration
+      description: >-
+        Ring duration in seconds, from 1 to 300. Defaults to 30 when omitted.
+        Stop is always requested.
+      required: false
+      example: 30
+      selector:
+        number:
+          min: 1
+          max: 300
+          step: 1
+          unit_of_measurement: s
+          mode: box
+    config_entry_id:
+      name: Integration entry
+      description: Optional Homexa config entry ID. Selects the entry without changing its configuration.
+      required: false
+      selector:
+        text: {}
+    device_id:
+      name: Homexa device
+      description: Optional Homexa device used to select the integration entry.
+      required: false
+      selector:
+        device:
+          integration: freebox_homexa
+stop_dect_ring:
+  name: Stop DECT ring
+  description: >-
+    Stops the DECT handset ring. Requires the Telephony permission. Does not
+    read call logs, caller names or phone numbers.
+  fields:
+    config_entry_id:
+      name: Integration entry
+      description: Optional Homexa config entry ID. Selects the entry without changing its configuration.
+      required: false
+      selector:
+        text: {}
+    device_id:
+      name: Homexa device
+      description: Optional Homexa device used to select the integration entry.
+      required: false
+      selector:
+        device:
+          integration: freebox_homexa
+mark_voicemail_read:
+  name: Mark voicemail as read
+  description: >-
+    Marks one Freebox voicemail as read. Requires the Telephony permission.
+  fields:
+    id:
+      name: Message
+      description: Voicemail id returned by the Freebox.
+      required: true
+      example: 20221215_154135_r0334371508.au
+      selector:
+        text: {}
+    config_entry_id:
+      name: Integration entry
+      description: Optional Homexa config entry ID. Selects the entry without changing its configuration.
+      required: false
+      selector:
+        text: {}
+    device_id:
+      name: Homexa device
+      description: Optional Homexa device used to select the integration entry.
+      required: false
+      selector:
+        device:
+          integration: freebox_homexa
+delete_voicemail:
+  name: Delete voicemail
+  description: Deletes one Freebox voicemail. Requires the Telephony permission.
+  fields:
+    id:
+      name: Message
+      description: Voicemail id returned by the Freebox.
+      required: true
+      example: 20221215_154135_r0334371508.au
+      selector:
+        text: {}
+    config_entry_id:
+      name: Integration entry
+      description: Optional Homexa config entry ID. Selects the entry without changing its configuration.
+      required: false
+      selector:
+        text: {}
+    device_id:
+      name: Homexa device
+      description: Optional Homexa device used to select the integration entry.
+      required: false
+      selector:
+        device:
+          integration: freebox_homexa
+play_voicemail:
+  name: Play voicemail
+  description: >-
+    Plays one voicemail on a media player, then marks it as read. Alexa or Echo
+    playback is best effort and needs a public HTTPS URL (Nabu Casa or an
+    external URL).
+  fields:
+    id:
+      name: Message
+      description: Voicemail id returned by the Freebox.
+      required: true
+      example: 20221215_154135_r0334371508.au
+      selector:
+        text: {}
+    entity_id:
+      name: Media player
+      description: media_player entity that should play the message.
+      required: true
+      selector:
+        entity:
+          domain: media_player
+    config_entry_id:
+      name: Integration entry
+      description: Optional Homexa config entry ID. Selects the entry without changing its configuration.
+      required: false
+      selector:
+        text: {}
+    device_id:
+      name: Homexa device
+      description: Optional Homexa device used to select the integration entry.
+      required: false
+      selector:
+        device:
+          integration: freebox_homexa
 schedule_reminder:
   name: Schedule reminder
   description: Programme un rappel avant le debut d'un programme (notification et/ou annonce vocale).

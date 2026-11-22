@@ -46,6 +46,7 @@ from .tnt_const import selected_channels
 from .tnt_setup import TNT_COORDINATORS_KEY
 from .tnt_sensor import HomexaTntSensor
 from .lan_group_sensors import async_setup_lan_group_sensors
+from .voicemail import async_setup_voicemail_sensor
 from .wifi_ap_sensors import async_setup_wifi_ap_sensors
 from .registry_compat import as_version
 from .availability import FreeboxReachableMixin, FreeboxLanReachableMixin
@@ -207,6 +208,7 @@ async def async_setup_entry(
 
     if entities:
         async_add_entities(entities, True)
+    async_setup_voicemail_sensor(router, async_add_entities)
 
     tracked_wifi: set[str] = set()
 

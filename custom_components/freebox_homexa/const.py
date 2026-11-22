@@ -20,6 +20,11 @@ SERVICE_RELOAD = "reload"
 SERVICE_REMOTE = "remote"
 SERVICE_START_FXS_RING = "start_fxs_ring"
 SERVICE_STOP_FXS_RING = "stop_fxs_ring"
+SERVICE_START_DECT_RING = "start_dect_ring"
+SERVICE_STOP_DECT_RING = "stop_dect_ring"
+SERVICE_MARK_VOICEMAIL_READ = "mark_voicemail_read"
+SERVICE_DELETE_VOICEMAIL = "delete_voicemail"
+SERVICE_PLAY_VOICEMAIL = "play_voicemail"
 
 VALUE_NOT_SET = -1
 DEFAULT_DEVICE_NAME = "Unknown device"
@@ -30,6 +35,7 @@ URL_BASE = "/freebox_homexa"
 CARD_FILENAME = "freebox-homexa-card.js"
 STATIC_CARD_PATH = f"{URL_BASE}/{CARD_FILENAME}"
 CALLS_CARD_FILENAME = "homexa-calls-card.js"
+PHONE_CARD_FILENAME = "homexa-phone-card.js"
 SERVER_CARD_FILENAME = "freebox-server-card.js"
 
 # Options (Paramètres → Intégration → Configurer)

@@ -23,6 +23,7 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers import entity_registry as er
 
 from .discovery import DiscoveryCandidate, async_setup_discovery
+from .phone_dect import async_setup_dect_sensors
 from .const import DOMAIN, REPEATER_MODEL, FreeboxHomeCategory
 from .entity import FreeboxHomeEntity
 from .errors import is_shutdown_error
@@ -93,6 +94,7 @@ async def async_setup_entry(
     async_setup_discovery(hass, entry, router,
         [router.signal_sensor_update, router.signal_home_device_new, router.signal_home_device_update],
         candidates, async_add_entities)
+    async_setup_dect_sensors(hass, entry, router, async_add_entities)
 
     tracked_aps: set[str] = set()
 

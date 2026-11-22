@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 28.8.98 — 2026-11-22
 
 - Messagerie vocale : la carte, la source média et la lecture sur n'importe quel lecteur demandent un MP3. ffmpeg (déjà fourni par Home Assistant) accepte le WAV A-law/µ-law et l'AU `.snd`. La réponse est `audio/mpeg` avec `Content-Length`. `codec=wav` reste possible. La carte utilise `hass.hassUrl` quand il existe et affiche « Lecture impossible » avec une raison courte si le lecteur audio échoue.
 - Le chemin Freebox garde le point de `.au`. Si cette forme répond 404, un second essai encode le point (`%2E`) et la forme qui répond est mémorisée. Un 404 sur un seul message ne retire plus la liste ni ne marque la messagerie comme absente. Le préfixe v6 déjà choisi (`""`) n'est plus abandonné au profit de la version annoncée.

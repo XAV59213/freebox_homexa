@@ -173,7 +173,19 @@ Le capteur **Messages vocaux non lus** compte les messages non lus. Ses attribut
 
 Un nouvel appel manqué, après le premier relevé du journal, émet `freebox_homexa_missed_call` (`entry_id`, `date`, `caller`, `name`). `caller` est le nom du contact, ou le numéro si l'option **Inclure le numéro dans les événements** est cochée. Sinon, sans contact, `caller` vaut `Inconnu` et le numéro n'est pas dans l'événement. L'option est décochée par défaut. Les options déjà enregistrées ne changent pas. Aucun numéro n'est journalisé.
 
-La carte **Homexa Téléphone** (chargée avec les autres cartes Homexa, sans ressource Lovelace à ajouter) regroupe les sonneries, l'état des combinés, la messagerie et, si on l'active, les derniers appels. Le numéro reste masqué tant que `show_number` n'est pas coché. On peut écouter dans le navigateur (MP3), ou envoyer le message à un lecteur (`play_voicemail`), puis le marquer lu ou le supprimer (avec confirmation). La liste affichée est celle du capteur : un rafraîchissement vide ne la cache pas.
+La carte **Homexa Téléphone** (chargée avec les autres cartes Homexa, sans ressource Lovelace à ajouter) regroupe les sonneries, l'état des combinés, la messagerie et, si on l'active, les derniers appels. Le numéro reste masqué tant que `show_number` n'est pas coché. On peut écouter dans le navigateur (MP3), ou envoyer le message à un ou plusieurs lecteurs, puis le marquer lu ou le supprimer (avec confirmation). La liste affichée est celle du capteur : un rafraîchissement vide ne la cache pas.
+
+Dans l'éditeur visuel : titre, Freebox, lecteurs (`media_players`, plusieurs entités `media_player`), afficher le numéro, derniers appels et nombre d'appels. Une carte déjà réglée avec `media_player: media_player.salon` continue de fonctionner : cette clé est lue comme une liste d'un seul lecteur. Avec un seul lecteur, le bouton reste « Écouter sur le Player ». Avec plusieurs, « Écouter sur… » ouvre les noms affichés ; le choix appelle `play_voicemail` sur cette entité et le navigateur retient le dernier choix pour cette carte.
+
+```yaml
+type: custom:homexa-phone-card
+title: Téléphone
+media_players:
+  - media_player.salon
+  - media_player.cuisine
+show_number: false
+show_calls: false
+```
 
 La lecture est un MP3 signé, valable quelques minutes, y compris pour un lecteur quelconque. Une enceinte **Alexa / Echo** doit en plus pouvoir télécharger ce MP3 depuis une **URL HTTPS publique** (Nabu Casa ou l'URL externe des réglages réseau de Home Assistant). Sans cette URL, l'action échoue avec un message clair au lieu d'un faux succès.
 

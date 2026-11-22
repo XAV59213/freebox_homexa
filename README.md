@@ -169,7 +169,7 @@ data:
 
 ### Messagerie vocale
 
-Le capteur **Messages vocaux non lus** compte les messages non lus. Ses attributs donnent le total, la date du plus récent et une liste (identifiant, date, durée, lu) **sans numéro**. Un nouveau message non lu, après le premier relevé, émet `freebox_homexa_new_voicemail` (identifiant, durée, date, pas de numéro).
+Le capteur **Messages vocaux non lus** compte les messages non lus. Ses attributs donnent le total, la date du plus récent, `voicemail_available`, `voicemail_supported`, `voicemail_error` et une liste (jeton, date, durée, lu) **sans numéro**. Un nouveau message non lu, après le premier relevé, émet `freebox_homexa_new_voicemail` (jeton, durée, date, pas de numéro). Le jeton n'est pas le nom de fichier Freebox. Si la Freebox n'a pas de messagerie, le capteur reste disponible avec `voicemail_supported: false` et la carte affiche « Messagerie vocale non disponible sur cette Freebox ».
 
 La carte **Homexa Téléphone** (chargée avec les autres cartes Homexa, sans ressource Lovelace à ajouter) regroupe les sonneries, l'état des combinés, la messagerie et, si on l'active, les derniers appels. Le numéro reste masqué tant que `show_number` n'est pas coché. On peut écouter dans le navigateur, ou envoyer le message à un lecteur (`play_voicemail`), puis le marquer lu ou le supprimer (avec confirmation).
 
@@ -178,7 +178,7 @@ La lecture sur une enceinte **Alexa / Echo** est au mieux. Ces enceintes doivent
 ```yaml
 action: freebox_homexa.play_voicemail
 data:
-  id: "20221215_154135_r0334371508.au"
+  id: "jeton-fourni-par-la-carte-ou-l-evenement"
   entity_id: media_player.echo_salon
 ```
 

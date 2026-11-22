@@ -133,6 +133,49 @@ async def test_tnt_cached_programmes_multi_entry_first_match_and_profiles(hass, 
     assert (await client.receive_json())["result"]["channel_order"]
 
 
+def test_call_formatter_does_not_reuse_the_number_as_a_name():
+    hidden = "0612345678"
+    masked = format_calls([
+        {"name": hidden, "number": hidden, "datetime": 1700000000, "type": "accepted"},
+        {"number": "0699999999", "datetime": 1700000100, "type": "missed"},
+    ])
+    assert masked[0]["name"] == "Inconnu"
+    assert masked[0]["number"] == ""
+    assert masked[1]["name"] == "Inconnu"
+    assert hidden not in str(masked)
+    assert "0699999999" not in str(masked)
+    shown = format_calls(
+        [{"name": "", "number": hidden, "datetime": 1700000000}], include_number=True
+    )
+    assert shown[0]["name"] == "Inconnu"
+    assert shown[0]["number"] == hidden
+
+
+async def test_calls_websocket_hides_numbers_until_asked(hass, hass_ws_client, calls_context):
+    router, _entry, entities = calls_context
+    hidden = "0612345678"
+    router.call_list = [
+        {"name": hidden, "number": hidden, "datetime": 1700000000, "type": "accepted", "new": False},
+    ]
+    client = await hass_ws_client(hass)
+    async_register_calls_websocket_api(hass)
+    await client.send_json_auto_id({
+        "type": "freebox_homexa/calls", "entity_id": entities[0].entity_id,
+    })
+    hidden_result = await client.receive_json()
+    assert hidden_result["success"] is True
+    assert hidden_result["result"]["calls"][0]["name"] == "Inconnu"
+    assert hidden not in str(hidden_result)
+    await client.send_json_auto_id({
+        "type": "freebox_homexa/calls",
+        "entity_id": entities[0].entity_id,
+        "include_number": True,
+    })
+    shown = await client.receive_json()
+    assert shown["result"]["calls"][0]["name"] == "Inconnu"
+    assert shown["result"]["calls"][0]["number"] == hidden
+
+
 def test_call_formatter_preserves_defaults_and_rejects_invalid_timestamp():
     assert format_calls(None) == []
     assert format_calls([{}]) == [{"name": "Inconnu", "number": "", "type": "", "datetime": None,

@@ -18,7 +18,12 @@ from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
 
 from .const import DOMAIN
-from .voicemail import messages_of, public_message
+from .voicemail import (
+    messages_of,
+    public_message,
+    resolve_voicemail_token,
+    tokens_of,
+)
 from .voicemail_audio import (
     absolute_voicemail_url,
     player_needs_mp3,
@@ -38,14 +43,15 @@ class FreeboxVoicemailSource(MediaSource):
         self.hass = hass
 
     async def async_resolve_media(self, item: MediaSourceItem) -> PlayMedia:
-        entry_id, message_id = _split_playable(item.identifier)
+        entry_id, public_id = _split_playable(item.identifier)
         router = _router(self.hass, entry_id)
-        if router is None or not any(message.id == message_id for message in messages_of(router)):
+        message = _message_by_token(router, public_id)
+        if message is None:
             raise Unresolvable("Message vocal introuvable")
         target = item.target_media_player
         mp3 = bool(target) and player_needs_mp3(self.hass, target)
         try:
-            signed = signed_voicemail_path(self.hass, entry_id, message_id, mp3=mp3)
+            signed = signed_voicemail_path(self.hass, entry_id, public_id, mp3=mp3)
             url = absolute_voicemail_url(self.hass, signed, external=mp3)
         except (HomeAssistantError, ServiceValidationError) as err:
             raise Unresolvable("Lecture du message vocal impossible") from err
@@ -127,18 +133,32 @@ def _entry_folder(hass: HomeAssistant, entry_id: str) -> BrowseMediaSource:
     return _folder(entry_id, title, _children(entry_id, router))
 
 
+def _message_by_token(router: object, public_id: str) -> object | None:
+    from .router import FreeboxRouter
+
+    if not isinstance(router, FreeboxRouter):
+        return None
+    try:
+        raw = resolve_voicemail_token(router, public_id)
+    except ServiceValidationError:
+        return None
+    return next((item for item in messages_of(router) if item.id == raw), None)
+
+
 def _children(entry_id: str, router: object) -> list[BrowseMediaSource]:
     from .router import FreeboxRouter
 
     if not isinstance(router, FreeboxRouter):
         return []
+    store = tokens_of(router)
     children: list[BrowseMediaSource] = []
     for message in messages_of(router):
-        payload = public_message(message)
+        public_id = store.issue(message.id)
+        payload = public_message(message, public_id=public_id)
         children.append(
             BrowseMediaSource(
                 domain=DOMAIN,
-                identifier=f"{entry_id}/{message.id}",
+                identifier=f"{entry_id}/{public_id}",
                 media_class=MediaClass.MUSIC,
                 media_content_type=MediaType.MUSIC,
                 title=_message_title(payload),
@@ -152,18 +172,20 @@ def _children(entry_id: str, router: object) -> list[BrowseMediaSource]:
 def _message_leaf(hass: HomeAssistant, entry_id: str, message_id: str) -> BrowseMediaSource:
     router = _router(hass, entry_id)
     from .router import FreeboxRouter
+    from .voicemail import VoicemailMessage
 
     if not isinstance(router, FreeboxRouter):
         raise Unresolvable("Message vocal introuvable")
-    message = next((item for item in messages_of(router) if item.id == message_id), None)
-    if message is None:
+    message = _message_by_token(router, message_id)
+    if not isinstance(message, VoicemailMessage):
         raise Unresolvable("Message vocal introuvable")
+    public_id = tokens_of(router).issue(message.id)
     return BrowseMediaSource(
         domain=DOMAIN,
-        identifier=f"{entry_id}/{message.id}",
+        identifier=f"{entry_id}/{public_id}",
         media_class=MediaClass.MUSIC,
         media_content_type=MediaType.MUSIC,
-        title=_message_title(public_message(message)),
+        title=_message_title(public_message(message, public_id=public_id)),
         can_play=True,
         can_expand=False,
     )

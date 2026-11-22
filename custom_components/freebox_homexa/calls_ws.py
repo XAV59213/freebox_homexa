@@ -40,28 +40,45 @@ def _timestamp(call: Mapping[str, object]) -> float:
     return float(value)
 
 
+def _call_text(value: object) -> str:
+    return value if isinstance(value, str) else ""
+
+
 def format_calls(
-    call_list: Sequence[Mapping[str, object]] | None, limit: int = CALL_LOG_MAX
+    call_list: Sequence[Mapping[str, object]] | None,
+    limit: int = CALL_LOG_MAX,
+    *,
+    include_number: bool = False,
 ) -> list[dict[str, object]]:
-    """Derniers appels, du plus récent au plus ancien (format de la carte)."""
+    """Derniers appels, du plus récent au plus ancien (format de la carte).
+
+    Le numéro n'est jamais recopié dans le nom. Il n'est envoyé que si la carte
+    demande ``include_number``.
+    """
     calls = sorted(
         (c for c in call_list or [] if isinstance(c, dict)),
         key=_timestamp,
         reverse=True,
     )[:limit]
-    return [
-        {
-            "name": c.get("name") or c.get("number") or "Inconnu",
-            "number": c.get("number") or "",
-            "type": c.get("type") or "",
-            "datetime": dt_util.utc_from_timestamp(_timestamp(c)).isoformat()
-            if c.get("datetime")
-            else None,
-            "duration": c.get("duration") or 0,
-            "new": bool(c.get("new", False)),
-        }
-        for c in calls
-    ]
+    rows: list[dict[str, object]] = []
+    for call in calls:
+        number = _call_text(call.get("number"))
+        name = _call_text(call.get("name")).strip()
+        if not name or name == number:
+            name = "Inconnu"
+        rows.append(
+            {
+                "name": name,
+                "number": number if include_number else "",
+                "type": call.get("type") or "",
+                "datetime": dt_util.utc_from_timestamp(_timestamp(call)).isoformat()
+                if call.get("datetime")
+                else None,
+                "duration": call.get("duration") or 0,
+                "new": bool(call.get("new", False)),
+            }
+        )
+    return rows
 
 
 @callback
@@ -81,6 +98,7 @@ def _loaded_entries(hass: HomeAssistant) -> list[FreeboxConfigEntry]:
         "type": "freebox_homexa/calls",
         "entity_id": str,
         "limit": vol.All(int, vol.Range(min=1, max=CALL_LOG_MAX)),
+        vol.Optional("include_number"): bool,
     }
 )
 @callback
@@ -101,6 +119,9 @@ def websocket_homexa_calls(
         raise vol.Invalid("Invalid entity id", path=["entity_id"])
     if not isinstance(limit, int) or not 1 <= limit <= CALL_LOG_MAX:
         raise vol.Invalid("Invalid call limit", path=["limit"])
+    include_number = msg.get("include_number", False)
+    if not isinstance(include_number, bool):
+        include_number = False
     entries = _loaded_entries(hass)
     entry = None
     only_missed = False
@@ -133,4 +154,6 @@ def websocket_homexa_calls(
     call_list = entry.runtime_data.call_list or []
     if only_missed:
         call_list = [c for c in call_list if c.get("type") == MISSED_KEY and c.get("new", False)]
-    connection.send_result(message_id, {"calls": format_calls(call_list, limit)})
+    connection.send_result(
+        message_id, {"calls": format_calls(call_list, limit, include_number=include_number)}
+    )

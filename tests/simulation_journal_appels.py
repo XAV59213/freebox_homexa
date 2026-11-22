@@ -125,7 +125,8 @@ print("OK : Appels manqués -> état 1, plus de nom dans les attributs")
 
 out = calls_ws.format_calls(CALLS, 3)
 assert [c["type"] for c in out] == ["accepted", "missed", "missed"], out
-assert out[0]["name"] == "0605060708" and out[0]["duration"] == 125
+assert out[0]["name"] == "Inconnu" and out[0]["number"] == "" and out[0]["duration"] == 125
+assert "0605060708" not in str(out)
 assert set(out[0]) == {"name", "number", "type", "datetime", "duration", "new"}
 assert out[0]["datetime"].startswith("2026-")
 print("OK : format_calls -> du plus récent au plus ancien, limite respectée")

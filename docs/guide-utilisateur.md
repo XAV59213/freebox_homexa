@@ -266,7 +266,7 @@ Supprime un message vocal. Champs : `id` (requis), `config_entry_id` et
 
 Lit un message sur un lecteur média, puis le marque comme lu. Champs :
 
-- `id` (requis) : identifiant du message.
+- `id` (requis) : jeton du message (carte, événement ou source média), pas le nom de fichier Freebox.
 - `entity_id` (requis) : entité `media_player` (par exemple une enceinte).
 - `config_entry_id` (facultatif).
 - `device_id` (facultatif).
@@ -278,7 +278,7 @@ l'action échoue avec un message clair.
 ```yaml
 action: freebox_homexa.play_voicemail
 data:
-  id: "20221215_154135_r0334371508.au"
+  id: "jeton-fourni-par-la-carte-ou-l-evenement"
   entity_id: media_player.echo_salon
 ```
 

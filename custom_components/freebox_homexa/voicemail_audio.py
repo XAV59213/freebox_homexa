@@ -22,7 +22,7 @@ from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.network import NoURLAvailableError, get_url
 
 from .const import DOMAIN
-from .voicemail import async_voicemail_audio, validated_voicemail_id
+from .voicemail import async_voicemail_audio, resolve_voicemail_token, validated_voicemail_id
 
 if TYPE_CHECKING:
     from .router import FreeboxRouter
@@ -52,10 +52,17 @@ def player_needs_mp3(hass: HomeAssistant, entity_id: str) -> bool:
 def signed_voicemail_path(
     hass: HomeAssistant, entry_id: str, message_id: str, *, mp3: bool
 ) -> str:
-    ident = validated_voicemail_id(message_id)
+    """URL signée du jeton, jamais du nom de fichier Freebox."""
+    public_id = validated_voicemail_id(message_id)
+    router = _loaded_router(hass, entry_id)
+    if router is None:
+        raise ServiceValidationError(
+            translation_domain=DOMAIN, translation_key="voicemail_invalid_id"
+        )
+    resolve_voicemail_token(router, public_id)
     path = (
         f"/api/freebox_homexa/voicemail/{quote(entry_id, safe='')}/"
-        f"{quote(ident, safe='')}"
+        f"{quote(public_id, safe='')}"
     )
     if mp3:
         path += "?codec=mp3"
@@ -144,7 +151,6 @@ class VoicemailAudioView(HomeAssistantView):
         if router is None:
             return web.Response(status=404, text="Messagerie vocale introuvable")
         try:
-            validated_voicemail_id(message_id)
             wav = await async_voicemail_audio(router, message_id)
             mp3 = request.query.get("codec") == "mp3"
             body = await async_wav_to_mp3(hass, wav) if mp3 else wav
@@ -197,9 +203,8 @@ async def async_play_on_player(
         raise ServiceValidationError(
             translation_domain=DOMAIN, translation_key="voicemail_player"
         )
-    ident = validated_voicemail_id(message_id)
     mp3 = player_needs_mp3(hass, entity_id)
-    signed = signed_voicemail_path(hass, router.entry_id, ident, mp3=mp3)
+    signed = signed_voicemail_path(hass, router.entry_id, message_id, mp3=mp3)
     url = absolute_voicemail_url(hass, signed, external=mp3)
     await hass.services.async_call(
         "media_player",
@@ -211,4 +216,4 @@ async def async_play_on_player(
         },
         blocking=True,
     )
-    await async_mark_voicemail_read(router, ident)
+    await async_mark_voicemail_read(router, message_id)

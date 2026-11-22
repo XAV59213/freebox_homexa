@@ -275,7 +275,7 @@
       "fields": {
         "id": {
           "name": "Message",
-          "description": "Identifiant du message renvoyé par la Freebox (par exemple 20221215_154135_r0334371508.au)."
+          "description": "Jeton du message affiché par la carte, l'événement ou la source média. Le nom de fichier Freebox n'est pas accepté."
         },
         "config_entry_id": {
           "name": "Entrée de l’intégration",
@@ -293,7 +293,7 @@
       "fields": {
         "id": {
           "name": "Message",
-          "description": "Identifiant du message renvoyé par la Freebox."
+          "description": "Jeton du message affiché par la carte, l'événement ou la source média. Le nom de fichier Freebox n'est pas accepté."
         },
         "config_entry_id": {
           "name": "Entrée de l’intégration",
@@ -311,7 +311,7 @@
       "fields": {
         "id": {
           "name": "Message",
-          "description": "Identifiant du message renvoyé par la Freebox."
+          "description": "Jeton du message affiché par la carte, l'événement ou la source média. Le nom de fichier Freebox n'est pas accepté."
         },
         "entity_id": {
           "name": "Lecteur média",
@@ -740,6 +740,9 @@
     },
     "voicemail_permission": {
       "message": "L’application Home Assistant n’a pas le droit Téléphonie nécessaire à la messagerie vocale. Autorise Téléphonie dans Freebox OS, puis recharge l’intégration."
+    },
+    "voicemail_unsupported": {
+      "message": "Cette Freebox ne propose pas la messagerie vocale."
     },
     "voicemail_audio": {
       "message": "Le message vocal n’a pas pu être lu."

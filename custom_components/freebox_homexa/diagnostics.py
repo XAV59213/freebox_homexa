@@ -7,6 +7,7 @@ sont explicitement autorisées, sans titre ni identité.
 
 from __future__ import annotations
 
+import re
 from typing import Any
 
 from homeassistant.components.diagnostics import async_redact_data
@@ -51,6 +52,31 @@ TO_REDACT = {
 }
 
 
+_SAFE_CODE = re.compile(r"^[A-Za-z][A-Za-z0-9_]{0,63}$")
+
+
+def _voicemail_diagnostics(router: object) -> dict[str, object]:
+    """Comptage et code d'erreur. Jamais d'identifiant, de numéro ou d'URL."""
+    from .voicemail import VoicemailMessage, unread_count
+
+    raw_messages = getattr(router, "voicemails", None)
+    messages = (
+        [item for item in raw_messages if isinstance(item, VoicemailMessage)]
+        if isinstance(raw_messages, list)
+        else []
+    )
+    error = getattr(router, "voicemail_error", None)
+    available = getattr(router, "voicemail_available", None)
+    supported = getattr(router, "voicemail_supported", None)
+    return {
+        "available": available is not False,
+        "supported": supported if isinstance(supported, bool) else None,
+        "error": error if isinstance(error, str) and _SAFE_CODE.fullmatch(error) else None,
+        "total": len(messages),
+        "unread": unread_count(messages),
+    }
+
+
 def _count_links(links: dict[str, str]) -> dict[str, int]:
     counts: dict[str, int] = {}
     for link in links.values():
@@ -68,8 +94,17 @@ async def async_get_config_entry_diagnostics(
     }
     if router is None:
         data["router"] = "non chargé"
-        return {"legacy_schema": status_schema(async_redact_data(data, TO_REDACT)),
-                "players": []}
+        return {
+            "legacy_schema": status_schema(async_redact_data(data, TO_REDACT)),
+            "players": [],
+            "voicemail": {
+                "available": False,
+                "supported": None,
+                "error": None,
+                "total": 0,
+                "unread": 0,
+            },
+        }
     hosts = {
         mac: device
         for mac, device in (router.devices or {}).items()
@@ -122,4 +157,5 @@ async def async_get_config_entry_diagnostics(
         "privacy_mode": "schema_plus_allowlisted_playback_timings",
         "legacy_schema": status_schema(async_redact_data(data, TO_REDACT)),
         "players": player_diagnostics(router),
+        "voicemail": _voicemail_diagnostics(router),
     }

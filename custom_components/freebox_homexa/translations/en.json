@@ -262,7 +262,7 @@
       "fields": {
         "id": {
           "name": "Message",
-          "description": "Voicemail id returned by the Freebox (for example 20221215_154135_r0334371508.au)."
+          "description": "Opaque message token from the card, the event or the media source. The Freebox file name is not accepted."
         },
         "config_entry_id": {
           "name": "Integration entry",
@@ -280,7 +280,7 @@
       "fields": {
         "id": {
           "name": "Message",
-          "description": "Voicemail id returned by the Freebox."
+          "description": "Opaque message token from the card, the event or the media source. The Freebox file name is not accepted."
         },
         "config_entry_id": {
           "name": "Integration entry",
@@ -298,7 +298,7 @@
       "fields": {
         "id": {
           "name": "Message",
-          "description": "Voicemail id returned by the Freebox."
+          "description": "Opaque message token from the card, the event or the media source. The Freebox file name is not accepted."
         },
         "entity_id": {
           "name": "Media player",
@@ -727,6 +727,9 @@
     },
     "voicemail_permission": {
       "message": "The Home Assistant application does not have the Telephony permission required for voicemail. Allow Telephony in Freebox OS, then reload the integration."
+    },
+    "voicemail_unsupported": {
+      "message": "This Freebox does not provide voicemail."
     },
     "voicemail_audio": {
       "message": "The voicemail audio could not be read."

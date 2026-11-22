@@ -38,6 +38,7 @@ function makeCard() {
   card._hass = null;
   card._messages = null;
   card._calls = null;
+  card._total = null;
   card._error = "";
   card._pendingDelete = "";
   card._audioUrl = "";
@@ -83,7 +84,14 @@ async function main() {
     callWS: async (payload) => {
       ws.push(payload);
       if (payload.type === "freebox_homexa/calls") {
-        return { calls: [{ name: "Martin", number: SECRET, datetime: "2026-11-22T10:00:00Z", type: "accepted" }] };
+        return {
+          calls: [{
+            name: "Martin",
+            number: payload.include_number ? SECRET : "",
+            datetime: "2026-11-22T10:00:00Z",
+            type: "accepted",
+          }],
+        };
       }
       if (payload.action === "audio_url") {
         return { url: "/api/freebox_homexa/voicemail/entry-a/msg.au?authSig=synthetic" };
@@ -98,6 +106,7 @@ async function main() {
         }],
         unread: 1,
         total: 1,
+        available: true,
       };
     },
   };
@@ -105,6 +114,8 @@ async function main() {
   await new Promise((resolve) => setImmediate(resolve));
   let html = card.shadowRoot.innerHTML;
   assert.equal(html.includes(SECRET), false);
+  assert.match(html, /1 message sur la Freebox/);
+  assert.equal(ws.some((item) => item.type === "freebox_homexa/calls" && item.include_number === false), true);
   assert.match(html, /class="main unread"/);
   assert.match(html, /Combiné 2/);
   assert.match(html, /Décroché/);
@@ -151,6 +162,116 @@ async function main() {
   assert.equal(card.shadowRoot.innerHTML.includes("<img"), false);
   assert.match(card.shadowRoot.innerHTML, /&lt;img/);
   assert.equal(context.window.customCards.some((item) => item.type === "homexa-phone-card"), true);
+
+  const down = makeCard();
+  down._hass = {
+    states: card._hass.states,
+    entities: card._hass.entities,
+    callService() {},
+    callWS: async (payload) => {
+      if (payload.type === "freebox_homexa/voicemails") {
+        return { available: false, error: "invalid_request", messages: [], total: null };
+      }
+      return { calls: [] };
+    },
+  };
+  down.setConfig({ title: "Téléphone", show_calls: false });
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.match(down.shadowRoot.innerHTML, /Messagerie vocale indisponible \(invalid_request\)/);
+  assert.equal(down.shadowRoot.innerHTML.includes("Aucun message"), false);
+
+  const missing = makeCard();
+  missing._hass = {
+    states: card._hass.states,
+    entities: card._hass.entities,
+    callService() {},
+    callWS: async () => ({ supported: false, available: true, error: "invalid_request", messages: [] }),
+  };
+  missing.setConfig({ title: "Téléphone", show_calls: false });
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.match(missing.shadowRoot.innerHTML, /Messagerie vocale non disponible sur cette Freebox/);
+  assert.equal(missing.shadowRoot.innerHTML.includes("Aucun message"), false);
+
+  const both = makeCard();
+  const hidden = "0611111111";
+  both._hass = {
+    states: card._hass.states,
+    entities: card._hass.entities,
+    callService() {},
+    callWS: async (payload) => {
+      if (payload.type === "freebox_homexa/calls") {
+        assert.equal(payload.include_number, false);
+        return {
+          calls: [{
+            name: payload.include_number ? hidden : "Inconnu",
+            number: payload.include_number ? hidden : "",
+            datetime: "2026-11-22T10:00:00Z",
+            type: "accepted",
+          }],
+        };
+      }
+      return {
+        available: true,
+        total: 2,
+        messages: [
+          { id: "tok-unread", date: "2026-11-22T10:00:00Z", duration: 12, read: false },
+          { id: "tok-read", date: "2026-11-22T09:00:00Z", duration: 4, read: true },
+        ],
+      };
+    },
+  };
+  both.setConfig({ title: "Téléphone", show_calls: true, show_number: false });
+  await new Promise((resolve) => setImmediate(resolve));
+  const bothHtml = both.shadowRoot.innerHTML;
+  assert.match(bothHtml, /Inconnu/);
+  assert.match(bothHtml, /Non lu/);
+  assert.match(bothHtml, />Lu/);
+  assert.match(bothHtml, /2 messages sur la Freebox/);
+  assert.equal(bothHtml.includes(hidden), false);
+
+  const callsContext = {
+    HTMLElement: class {},
+    window: { customCards: [] },
+    customElements: {
+      get: (name) => registry.get(name),
+      define: (name, cls) => registry.set(name, cls),
+    },
+  };
+  vm.createContext(callsContext);
+  vm.runInContext(
+    fs.readFileSync("custom_components/freebox_homexa/frontend/homexa-calls-card.js", "utf8"),
+    callsContext
+  );
+  const Calls = registry.get("homexa-calls-card");
+  const callsCard = Object.create(Calls.prototype);
+  callsCard._config = {};
+  callsCard._hass = null;
+  callsCard._key = "";
+  callsCard._calls = null;
+  callsCard._error = "";
+  callsCard._fetchKey = "";
+  callsCard._loading = false;
+  callsCard.shadowRoot = new Shadow();
+  callsCard._hass = {
+    states: { "sensor.appels": { state: "1", attributes: { icon: "mdi:phone-log" }, last_updated: "1" } },
+    entities: { "sensor.appels": { platform: "freebox_homexa" } },
+    callWS: async (payload) => {
+      assert.equal(payload.include_number, false);
+      return {
+        calls: [{
+          name: "Inconnu",
+          number: payload.include_number ? hidden : "",
+          datetime: "2026-11-22T10:00:00Z",
+          type: "accepted",
+          duration: 12,
+        }],
+      };
+    },
+  };
+  callsCard.setConfig({ entity: "sensor.appels", title: "Appels", show_number: false });
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.match(callsCard.shadowRoot.innerHTML, /Inconnu/);
+  assert.equal(callsCard.shadowRoot.innerHTML.includes(hidden), false);
   console.log("OK: carte Téléphone, numéro masqué, confirmation, sonneries, lecteur");
 }
 

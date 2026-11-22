@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 28.8.102 — 2026-11-22
 
 - Lecture sur un lecteur : si le lecteur refuse, l'erreur traduite et la carte indiquent le code (par exemple cannot_retrieve_data_with_error), sans numéro, nom, jeton ni URL.
 - Alexa Media et Alexa Devices ne reçoivent plus l'adresse du message. Leur `play_media` ne lit pas une URL (recherche musicale, ou retéléchargement trop fragile). L'action explique de choisir l'entité Music Assistant du même appareil. Les autres lecteurs ne changent pas.

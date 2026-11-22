@@ -1,5 +1,9 @@
 # Changelog
 
+## 28.8.106 — 2026-11-22
+
+- Exemples de numéro remplacés par un numéro fictif dans le code, la doc et les tests.
+
 ## 28.8.105 — 2026-11-22
 
 - Carte Téléphone : si le chargement de la messagerie dépasse 15 secondes, ou si la lecture échoue, « Chargement » ne reste plus affiché. La carte montre l'erreur et un bouton Réessayer.

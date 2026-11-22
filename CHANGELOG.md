@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Carte Téléphone : le sélecteur et le menu de lecture ne proposent que le Freebox Player et Music Assistant. Une configuration déjà enregistrée retire explicitement `alexa_devices` et `alexa_media` dès que l'intégration est connue. Si l'intégration n'est pas connue, le lecteur reste et l'éditeur le signale. L'ancienne clé `media_player` est toujours lue.
+
 ## 28.8.102 — 2026-11-22
 
 - Lecture sur un lecteur : si le lecteur refuse, l'erreur traduite et la carte indiquent le code (par exemple cannot_retrieve_data_with_error), sans numéro, nom, jeton ni URL.

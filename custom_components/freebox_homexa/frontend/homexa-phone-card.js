@@ -34,6 +34,12 @@ function _duration(sec) {
   return m ? `${m} min ${String(s % 60).padStart(2, "0")}` : `${s} s`;
 }
 
+function _totalLabel(count) {
+  if (typeof count !== "number" || !Number.isFinite(count)) return "";
+  const total = Math.max(0, Math.trunc(count));
+  return total > 1 ? `${total} messages sur la Freebox` : `${total} message sur la Freebox`;
+}
+
 function _registry(hass, entityId) {
   return ((hass && hass.entities) || {})[entityId] || {};
 }
@@ -87,6 +93,7 @@ class HomexaPhoneCard extends HTMLElement {
     this._hass = null;
     this._messages = null;
     this._calls = null;
+    this._total = null;
     this._error = "";
     this._pendingDelete = "";
     this._audioUrl = "";
@@ -205,18 +212,38 @@ class HomexaPhoneCard extends HTMLElement {
       if (sensor) payload.entity_id = sensor;
       if (entry) payload.config_entry_id = entry;
       const res = await hass.callWS(payload);
-      this._messages = Array.isArray(res && res.messages) ? res.messages : [];
-      this._error = "";
+      if (res && res.supported === false) {
+        this._messages = [];
+        this._total = null;
+        this._error = "Messagerie vocale non disponible sur cette Freebox";
+      } else if (res && res.available === false) {
+        this._messages = [];
+        this._total = null;
+        const code = typeof res.error === "string" && res.error ? ` (${res.error})` : "";
+        this._error = `Messagerie vocale indisponible${code}`;
+      } else {
+        this._messages = Array.isArray(res && res.messages) ? res.messages : [];
+        this._total = typeof (res && res.total) === "number" ? res.total : this._messages.length;
+        this._error = "";
+      }
       if (this._on("show_calls", false)) {
         const callsEntity = _callsSensor(hass, entry);
+        const showNumber = this._on("show_number", false);
         if (callsEntity) {
-          const calls = await hass.callWS({ type: "freebox_homexa/calls", entity_id: callsEntity, limit: 30 });
+          const calls = await hass.callWS({
+            type: "freebox_homexa/calls",
+            entity_id: callsEntity,
+            limit: 30,
+            include_number: showNumber,
+          });
           this._calls = Array.isArray(calls && calls.calls) ? calls.calls : [];
         } else this._calls = [];
       } else this._calls = null;
     } catch (err) {
       this._messages = [];
-      this._error = "Messagerie vocale indisponible";
+      this._total = null;
+      const code = err && typeof err.code === "string" && err.code ? ` (${err.code})` : "";
+      this._error = `Messagerie vocale indisponible${code}`;
     } finally {
       this._loading = false;
     }
@@ -294,7 +321,7 @@ class HomexaPhoneCard extends HTMLElement {
     const messages = this._messages || [];
     const handsets = this._handsets();
     const several = _voicemailSensors(hass).length > 1 && !cfg.config_entry;
-    const key = JSON.stringify([title, cfg, messages, this._calls, this._error, this._pendingDelete, this._audioFor, handsets, showNumber]);
+    const key = JSON.stringify([title, cfg, messages, this._total, this._calls, this._error, this._pendingDelete, this._audioFor, handsets, showNumber]);
     if (key === this._key) return;
     this._key = key;
     const chips = handsets
@@ -338,6 +365,7 @@ class HomexaPhoneCard extends HTMLElement {
       ${chips ? `<div class="chips">${chips}</div>` : ""}
       ${several ? `<div class="error">Plusieurs Freebox : choisissez-en une dans l'éditeur.</div>` : ""}
       <div class="section">Messagerie vocale</div>
+      ${_totalLabel(this._total) ? `<div class="meta">${_esc(_totalLabel(this._total))}</div>` : ""}
       <div class="list">${rows || `<div class="empty">${_esc(this._error || (this._messages === null ? "Chargement…" : "Aucun message"))}</div>`}</div>
       ${this._on("show_calls", false) ? `<div class="section">Derniers appels</div><div class="list">${calls || `<div class="empty">Aucun appel</div>`}</div>` : ""}
     </ha-card>`;

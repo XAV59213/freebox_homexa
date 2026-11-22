@@ -124,7 +124,12 @@ class HomexaCallsCard extends HTMLElement {
     }
     this._loading = true;
     try {
-      const res = await hass.callWS({ type: "freebox_homexa/calls", entity_id: entity, limit: 30 });
+      const res = await hass.callWS({
+        type: "freebox_homexa/calls",
+        entity_id: entity,
+        limit: 30,
+        include_number: this._on("show_number", false),
+      });
       this._calls = Array.isArray(res && res.calls) ? res.calls : [];
       this._error = "";
     } catch (err) {
@@ -239,7 +244,7 @@ class HomexaCallsCard extends HTMLElement {
           .join(" · ");
         return `<div class="row">
           <div class="ico" style="--c:${t.color}"><ha-icon icon="${t.icon}"></ha-icon></div>
-          <div class="main"><div class="name ${c.new ? "new" : ""}">${_esc(c.name || c.number || "Inconnu")}</div>${meta ? `<div class="meta">${_esc(meta)}</div>` : ""}</div>
+          <div class="main"><div class="name ${c.new ? "new" : ""}">${_esc(c.name || "Inconnu")}</div>${meta ? `<div class="meta">${_esc(meta)}</div>` : ""}</div>
           <div class="right"><div class="time">${_esc(w.time)}</div><div class="day">${_esc(w.day)}</div></div>
         </div>`;
       })

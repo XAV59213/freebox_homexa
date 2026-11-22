@@ -22,8 +22,9 @@ from .const import DOMAIN
 from .voicemail import (
     async_delete_voicemail,
     async_mark_voicemail_read,
+    async_refresh_voicemails,
     messages_of,
-    public_message,
+    public_messages,
     unread_count,
 )
 from .voicemail_audio import signed_voicemail_path
@@ -83,6 +84,34 @@ async def websocket_homexa_voicemails(
     if entry is None:
         return
     router = _router(entry)
+    if action == "list":
+        await async_refresh_voicemails(router)
+        if router.voicemail_supported is False:
+            connection.send_result(
+                message_id,
+                {
+                    "available": True,
+                    "supported": False,
+                    "error": router.voicemail_error,
+                    "messages": [],
+                    "unread": 0,
+                    "total": None,
+                },
+            )
+            return
+        if router.voicemail_available is False:
+            connection.send_result(
+                message_id,
+                {
+                    "available": False,
+                    "supported": router.voicemail_supported is not False,
+                    "error": router.voicemail_error,
+                    "messages": [],
+                    "unread": 0,
+                    "total": None,
+                },
+            )
+            return
     try:
         if action == "mark_read":
             assert isinstance(voicemail_id, str)
@@ -110,7 +139,10 @@ async def websocket_homexa_voicemails(
     connection.send_result(
         message_id,
         {
-            "messages": [public_message(item, include_number=include_number) for item in found],
+            "available": True,
+            "supported": True,
+            "error": None,
+            "messages": public_messages(router, found, include_number=include_number),
             "unread": unread_count(found),
             "total": len(found),
         },

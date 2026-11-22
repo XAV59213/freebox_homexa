@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+- Messagerie vocale : un échec n'est plus silencieux. Le premier est journalisé en avertissement (classe d'exception et code Freebox, sans numéro, URL ni identifiant) ; les suivants restent en debug. Le capteur expose `voicemail_available`, `voicemail_supported` et `voicemail_error`. Une vraie panne affiche « Messagerie vocale indisponible (code) » sur la carte, avec le total « N message(s) sur la Freebox ». Les messages lus et non lus sont tous listés. Un message illisible n'efface plus la liste. Un identifiant numérique est accepté.
+- Si `call/voicemail` répond 404, `invalid_request` ou un endpoint inconnu, la liste, le marquage lu, la suppression et le fichier audio sont rejoués une fois avec la version annoncée par la Freebox (`/api_version`, par exemple `/api/v10/`). Si cette version répond aussi que l'endpoint n'existe pas, la Freebox n'a pas de messagerie : le capteur reste disponible avec `voicemail_supported: false` et la carte affiche « Messagerie vocale non disponible sur cette Freebox » au lieu de « Aucun message ». La variante qui répond est mémorisée.
+- Numéros : un appel sans nom, ou dont le nom est le numéro, s'affiche « Inconnu ». `freebox_homexa/calls` n'envoie le numéro que si `include_number` est vrai ; les cartes passent `show_number`. Les identifiants bruts de messages, qui contiennent le numéro, sont remplacés par un jeton opaque propre à l'entrée (carte, événement, URL, actions et source média).
+
 ## 28.8.96 — 2026-11-22
 
 - Téléphonie : sonnerie des combinés DECT (boutons « Faire sonner les combinés DECT » et « Arrêter la sonnerie DECT », actions `start_dect_ring` et `stop_dect_ring`, durée 1 à 300 s, 30 s par défaut). Les boutons n'apparaissent que si la Freebox a au moins un combiné DECT. Capteurs « Sonne » et « Décroché » par combiné, mis à jour avec le relevé existant. Le champ `on_hook` est recopié tel quel : s'il est absent ou en retard selon le firmware, « Décroché » reste inconnu.

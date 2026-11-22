@@ -1,5 +1,6 @@
 """DECT ring, handset state and voicemail. No Freebox, no real numbers in logs."""
 import logging
+import re
 from datetime import timedelta
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, patch
@@ -30,6 +31,7 @@ from custom_components.freebox_homexa.voicemail import (
     NEW_VOICEMAIL_EVENT,
     parse_voicemails,
     public_summary,
+    tokens_of,
     validated_voicemail_id,
 )
 from custom_components.freebox_homexa.voicemail_audio import (
@@ -275,23 +277,30 @@ async def test_voicemail_sensor_event_repair_and_actions(hass, home_context, cap
     state = hass.states.get(sensor.entity_id)
     assert state.state == "1"
     assert SECRET not in str(state.attributes)
+    assert MESSAGE not in str(state.attributes)
     assert state.attributes["total"] == 1
     assert state.attributes["voicemail"] is True
+    assert state.attributes["voicemail_available"] is True
+    assert state.attributes["voicemail_supported"] is True
+    assert state.attributes["voicemail_error"] is None
 
     script.messages = [message(), message(ident="fresh.au")]
     await router._update_voicemails()
     await hass.async_block_till_done()
     assert len(events) == 1
-    assert events[0]["id"] == "fresh.au"
+    assert events[0]["id"] != "fresh.au"
+    assert "fresh.au" not in str(events[0])
+    assert MESSAGE not in str(events[0])
     assert "phone_number" not in events[0]
     assert SECRET not in str(events[0])
+    assert re.fullmatch(r"[0-9a-f]{64}", str(events[0]["id"]))
 
     await hass.services.async_call(
-        DOMAIN, "mark_voicemail_read", {"id": MESSAGE}, blocking=True
+        DOMAIN, "mark_voicemail_read", {"id": tokens_of(router).issue(MESSAGE)}, blocking=True
     )
     assert ("put", f"call/voicemail/{MESSAGE.replace('.', '%2E')}", {"read": True}) in script.paths
     await hass.services.async_call(
-        DOMAIN, "delete_voicemail", {"id": "fresh.au"}, blocking=True
+        DOMAIN, "delete_voicemail", {"id": events[0]["id"]}, blocking=True
     )
     assert ("delete", "call/voicemail/fresh%2Eau") in script.paths
     with pytest.raises(ServiceValidationError):
@@ -332,7 +341,9 @@ async def test_audio_view_auth_signed_path_and_mp3(
     hass.data[DATA_FFMPEG] = SimpleNamespace(binary="synthetic-ffmpeg")
     client = await hass_client()
     anonymous = await hass_client_no_auth()
-    path = f"/api/freebox_homexa/voicemail/{router.entry_id}/{MESSAGE}"
+    public = tokens_of(router).issue(MESSAGE)
+    path = f"/api/freebox_homexa/voicemail/{router.entry_id}/{public}"
+    assert MESSAGE not in path
     with caplog.at_level(logging.DEBUG, logger=_LOG):
         denied = await anonymous.get(path)
     assert denied.status == 401
@@ -371,7 +382,8 @@ async def test_audio_view_auth_signed_path_and_mp3(
     script.error = None
 
     from custom_components.freebox_homexa.voicemail_audio import signed_voicemail_path
-    signed = signed_voicemail_path(hass, router.entry_id, MESSAGE, mp3=False)
+    signed = signed_voicemail_path(hass, router.entry_id, public, mp3=False)
+    assert MESSAGE not in signed
     opened = await anonymous.get(signed)
     assert opened.status == 200
 
@@ -395,9 +407,10 @@ async def test_play_marks_read_and_echo_needs_a_public_url(hass, home_context, c
         "custom_components.freebox_homexa.voicemail_audio.get_url",
         return_value="http://homeassistant.local:8123",
     ), caplog.at_level(logging.DEBUG, logger=_LOG):
-        await async_play_on_player(hass, router, MESSAGE, "media_player.box")
+        played_id = tokens_of(router).issue(MESSAGE)
+        await async_play_on_player(hass, router, played_id, "media_player.box")
     assert played and played[0]["media_content_type"] == "audio/wav"
-    assert SECRET not in str(played) and SECRET not in caplog.text
+    assert SECRET not in str(played) and MESSAGE not in str(played) and SECRET not in caplog.text
     assert any(item[0] == "put" for item in script.paths)
 
     hass.states.async_set("media_player.echo", "idle", {"friendly_name": "Echo cuisine"})
@@ -411,7 +424,7 @@ async def test_play_marks_read_and_echo_needs_a_public_url(hass, home_context, c
     before = len([item for item in script.paths if item[0] == "put"])
     with patch("custom_components.freebox_homexa.voicemail_audio.get_url", side_effect=external):
         with pytest.raises(HomeAssistantError) as exc:
-            await async_play_on_player(hass, router, MESSAGE, "media_player.echo")
+            await async_play_on_player(hass, router, tokens_of(router).issue(MESSAGE), "media_player.echo")
     assert exc.value.translation_key == "voicemail_public_url"
     assert len([item for item in script.paths if item[0] == "put"]) == before
     with pytest.raises(ServiceValidationError) as missing:
@@ -437,8 +450,11 @@ async def test_media_source_browse_and_resolve_hide_numbers(hass, home_context):
     assert SECRET not in root.title
     dumped = str([getattr(child, "title", "") for child in (root.children or [])])
     assert SECRET not in dumped
-    assert MESSAGE in dumped or any(MESSAGE in getattr(child, "identifier", "") for child in root.children or [])
-    item = MediaSourceItem(hass, DOMAIN, f"{router.entry_id}/{MESSAGE}", None)
+    child = (root.children or [None])[0]
+    assert child is not None
+    assert MESSAGE not in child.identifier
+    assert SECRET not in child.identifier
+    item = MediaSourceItem(hass, DOMAIN, child.identifier, None)
     with patch(
         "custom_components.freebox_homexa.voicemail_audio.get_url",
         return_value="http://homeassistant.local:8123",
@@ -481,7 +497,11 @@ async def test_voicemail_websocket_list_read_delete_and_privacy(
         listed = await client.receive_json()
     assert listed["success"] is True
     assert listed["result"]["unread"] == 1
+    assert listed["result"]["available"] is True
     assert SECRET not in str(listed)
+    assert MESSAGE not in str(listed)
+    public = listed["result"]["messages"][0]["id"]
+    assert public != MESSAGE
     await client.send_json_auto_id({
         "type": "freebox_homexa/voicemails",
         "action": "list",
@@ -494,17 +514,18 @@ async def test_voicemail_websocket_list_read_delete_and_privacy(
         "type": "freebox_homexa/voicemails",
         "action": "audio_url",
         "entity_id": row.entity_id,
-        "message_id": MESSAGE,
+        "message_id": public,
     })
     audio = await client.receive_json()
     assert audio["success"] is True
     assert audio["result"]["url"].startswith("/api/freebox_homexa/voicemail/")
     assert SECRET not in audio["result"]["url"]
+    assert MESSAGE not in audio["result"]["url"]
     await client.send_json_auto_id({
         "type": "freebox_homexa/voicemails",
         "action": "mark_read",
         "entity_id": row.entity_id,
-        "message_id": MESSAGE,
+        "message_id": public,
     })
     marked = await client.receive_json()
     assert marked["success"] is True
@@ -563,8 +584,9 @@ async def test_remaining_phone_and_voicemail_branches(
     assert parse_voicemails(None) == []
     parsed = parse_voicemails([{"id": "a.au", "date": -1, "duration": True, "read": "yes"}])
     assert parsed[0].date == 0 and parsed[0].duration == 0 and parsed[0].read is False
+    assert parse_voicemails([{"id": ""}, {"id": 4242, "read": True, "date": 3, "duration": 2}, "bad"])[0].id == "4242"
     with pytest.raises(ValueError):
-        parse_voicemails([{"id": ""}])
+        parse_voicemails({"id": "nope"})
 
     router.closing = True
     script.error = RuntimeError("closed")
@@ -630,13 +652,14 @@ async def test_remaining_phone_and_voicemail_branches(
     from custom_components.freebox_homexa.voicemail import async_voicemail_audio
     script.paths.clear()
     script.audio = Raw("audio", await_release=True)
-    assert await async_voicemail_audio(router, MESSAGE) == b"audio"
+    heard = tokens_of(router).issue(MESSAGE)
+    assert await async_voicemail_audio(router, heard) == b"audio"
     script.audio = Raw(1)
     with pytest.raises(HomeAssistantError):
-        await async_voicemail_audio(router, MESSAGE)
+        await async_voicemail_audio(router, heard)
     script.audio = object()
     with pytest.raises(HomeAssistantError):
-        await async_voicemail_audio(router, MESSAGE)
+        await async_voicemail_audio(router, heard)
     script.audio = b"RIFF-wav"
     script.error = permission_error()
     script.error_on = "voicemail"
@@ -670,7 +693,7 @@ async def test_remaining_phone_and_voicemail_branches(
         await hass.services.async_call(
             DOMAIN,
             "play_voicemail",
-            {"id": MESSAGE, "entity_id": "media_player.box"},
+            {"id": tokens_of(router).issue(MESSAGE), "entity_id": "media_player.box"},
             blocking=True,
         )
     with pytest.raises(ServiceValidationError):
@@ -741,7 +764,7 @@ async def test_remaining_phone_and_voicemail_branches(
         "type": "freebox_homexa/voicemails",
         "action": "mark_read",
         "config_entry_id": router.entry_id,
-        "message_id": MESSAGE,
+        "message_id": tokens_of(router).issue(MESSAGE),
     })
     assert (await admin.receive_json())["success"] is False
     script.error = OSError("synthetic")
@@ -749,7 +772,7 @@ async def test_remaining_phone_and_voicemail_branches(
         "type": "freebox_homexa/voicemails",
         "action": "delete",
         "config_entry_id": router.entry_id,
-        "message_id": MESSAGE,
+        "message_id": tokens_of(router).issue(MESSAGE),
     })
     assert (await admin.receive_json())["success"] is False
     script.error = None
@@ -759,7 +782,9 @@ async def test_remaining_phone_and_voicemail_branches(
     assert missing_box.status == 404
     script.error = OSError("synthetic")
     script.error_on = "audio_file"
-    broken = await client.get(f"/api/freebox_homexa/voicemail/{router.entry_id}/{MESSAGE}")
+    broken = await client.get(
+        f"/api/freebox_homexa/voicemail/{router.entry_id}/{tokens_of(router).issue(MESSAGE)}"
+    )
     assert broken.status == 502
     script.error = None
 
@@ -782,7 +807,9 @@ async def test_remaining_phone_and_voicemail_branches(
     ):
         with pytest.raises(Exception):
             await source.async_resolve_media(
-                MediaSourceItem(hass, DOMAIN, f"{router.entry_id}/{MESSAGE}", echo)
+                MediaSourceItem(
+                    hass, DOMAIN, f"{router.entry_id}/{tokens_of(router).issue(MESSAGE)}", echo
+                )
             )
 
 
@@ -808,8 +835,8 @@ async def test_last_coverage_gaps(hass, hass_ws_client, home_context):
     script.messages = [message(ident="plain.au")]
     await router._update_voicemails()
     assert public_summary(parse_voicemails([{"id": "a.au", "date": 0}]))["latest"] is None
-    with pytest.raises(ValueError):
-        parse_voicemails(["not-a-dict"])
+    kept = parse_voicemails(["not-a-dict", {"id": "kept.au", "date": 4, "duration": 1, "read": False}])
+    assert [item.id for item in kept] == ["kept.au"]
     sensor = next(iter(()), None)
     from custom_components.freebox_homexa.voicemail import FreeboxVoicemailSensor
     entity = FreeboxVoicemailSensor(router)
@@ -817,13 +844,14 @@ async def test_last_coverage_gaps(hass, hass_ws_client, home_context):
     assert entity.native_value is None
     router.voicemail_available = True
 
+    plain = tokens_of(router).issue("plain.au")
     script.error = HomeAssistantError(translation_domain=DOMAIN, translation_key="command_failed")
     script.error_on = "voicemail"
     with pytest.raises(HomeAssistantError):
-        await async_mark_voicemail_read(router, "plain.au")
+        await async_mark_voicemail_read(router, plain)
     script.error = OSError("synthetic")
     with pytest.raises(OSError):
-        await async_mark_voicemail_read(router, "plain.au")
+        await async_mark_voicemail_read(router, plain)
     script.error = None
 
     class Raw:
@@ -832,7 +860,7 @@ async def test_last_coverage_gaps(hass, hass_ws_client, home_context):
         def release(self) -> None:
             return None
     script.audio = Raw()
-    assert await async_voicemail_audio(router, "plain.au") == b"wav"
+    assert await async_voicemail_audio(router, plain) == b"wav"
     hass.data.pop(DATA_FFMPEG, None)
     with pytest.raises(HomeAssistantError):
         _ffmpeg_binary(hass)
@@ -884,6 +912,241 @@ async def test_last_coverage_gaps(hass, hass_ws_client, home_context):
     async_register_voicemail_view(hass)
 
 
+class VersionScript:
+    """v6 puis, si besoin, la version annoncée. Pas de session : ``get('/api_version')``."""
+
+    def __init__(self, *, fail_relative: bool, fail_absolute: bool = False, code: str = "invalid_request") -> None:
+        self.paths: list[tuple[object, ...]] = []
+        self.messages: object = []
+        self.audio: object = b"RIFF-wav"
+        self.fail_relative = fail_relative
+        self.fail_absolute = fail_absolute
+        self.code = code
+
+    def _mismatch(self) -> HttpRequestError:
+        return http_error(self.code)
+
+    async def get(self, path: str) -> object:
+        self.paths.append(("get", path))
+        if path == "/api_version":
+            return {"api_version": "10.4", "api_base_url": "/api/"}
+        if path == "call/voicemail/" and self.fail_relative:
+            raise self._mismatch()
+        if path == "call/voicemail/":
+            return self.messages
+        if path == "/api/v10/call/voicemail/":
+            if self.fail_absolute:
+                raise self._mismatch()
+            return self.messages
+        if path.startswith("/api/v10/") and path.endswith("/audio_file"):
+            return self.audio
+        if path.endswith("/audio_file"):
+            return self.audio
+        raise AssertionError(path)
+
+    async def put(self, path: str, payload: object = None) -> None:
+        self.paths.append(("put", path, payload))
+        if path.startswith("/api/v10/"):
+            return None
+        raise self._mismatch()
+
+    async def delete(self, path: str, payload: object = None) -> None:
+        self.paths.append(("delete", path))
+        if not path.startswith("/api/v10/"):
+            raise self._mismatch()
+
+
+def test_parse_skips_a_bad_item_and_keeps_the_rest():
+    kept = parse_voicemails([
+        {"id": ""},
+        "bad",
+        {"id": 7, "read": False, "date": 8, "duration": 1, "phone_number": SECRET},
+        message(),
+    ])
+    assert [item.id for item in kept] == ["7", MESSAGE]
+    assert kept[0].phone_number == SECRET
+    assert SECRET not in repr(kept[0])
+
+
+async def test_relative_api_is_kept_when_voicemail_answers(hass, home_context):
+    router, _node = home_context
+    script = VersionScript(fail_relative=False)
+    script.messages = [message()]
+    router._api.call._access = script
+    load(hass, router)
+    await router._update_voicemails()
+    assert script.paths == [("get", "call/voicemail/")]
+    assert router.voicemail_api_prefix == ""
+    assert router.voicemail_supported is True
+    assert router.voicemail_available is True
+    await router._update_voicemails()
+    assert script.paths == [("get", "call/voicemail/"), ("get", "call/voicemail/")]
+
+
+async def test_advertised_api_version_is_remembered_for_every_verb(hass, home_context):
+    router, _node = home_context
+    script = VersionScript(fail_relative=True)
+    script.messages = [message()]
+    router._api.call._access = script
+    load(hass, router)
+    await router._update_voicemails()
+    assert ("get", "/api_version") in script.paths
+    assert ("get", "/api/v10/call/voicemail/") in script.paths
+    assert router.voicemail_api_prefix == "/api/v10/"
+    assert router.voicemail_supported is True
+    assert len(router.voicemails) == 1
+    script.paths.clear()
+    await router._update_voicemails()
+    public = tokens_of(router).issue(MESSAGE)
+    from custom_components.freebox_homexa.voicemail import (
+        async_delete_voicemail,
+        async_mark_voicemail_read,
+        async_voicemail_audio,
+    )
+    await async_mark_voicemail_read(router, public)
+    await async_delete_voicemail(router, public)
+    await async_voicemail_audio(router, public)
+    relative = [item for item in script.paths if isinstance(item[1], str) and item[1].startswith("call/")]
+    assert relative == []
+    assert any(isinstance(item[1], str) and item[1].startswith("/api/v10/call/voicemail/") for item in script.paths)
+    assert any(item[0] == "put" for item in script.paths)
+    assert any(item[0] == "delete" for item in script.paths)
+    assert any(item[0] == "get" and str(item[1]).endswith("/audio_file") for item in script.paths)
+
+
+async def test_missing_voicemail_api_stays_available_after_one_fallback(
+    hass, hass_ws_client, home_context, caplog
+):
+    router, _node = home_context
+    script = VersionScript(fail_relative=True, fail_absolute=True, code="invalid_request")
+    router._api.call._access = script
+    load(hass, router)
+    sensors = Collector()
+    entry = hass.config_entries.async_get_entry(router.entry_id)
+    await setup_sensors(hass, entry, sensors.add)
+    sensor = next(entity for entity in sensors.entities if str(entity.unique_id).endswith("Messages vocaux non lus"))
+    platform = make_platform(hass, "sensor")
+    await platform.async_add_entities([sensor])
+    with caplog.at_level(logging.DEBUG, logger=_LOG):
+        await router._update_voicemails()
+        await router._update_voicemails()
+    assert router.voicemail_supported is False
+    assert router.voicemail_available is True
+    assert router.voicemail_error == "invalid_request"
+    assert ("get", "/api_version") in script.paths
+    assert ("get", "/api/v10/call/voicemail/") in script.paths
+    version_calls = [item for item in script.paths if item[1] == "/api_version"]
+    assert len(version_calls) == 1
+    warnings = [
+        record for record in caplog.records
+        if record.levelno >= logging.WARNING and record.name.startswith(_LOG)
+    ]
+    assert warnings == []
+    infos = [record.getMessage() for record in caplog.records if record.levelno == logging.INFO]
+    assert any("invalid_request" in message and "HttpRequestError" in message for message in infos)
+    assert all(re.search(r"\d", message) is None for message in infos if "Messagerie" in message)
+    assert SECRET not in caplog.text
+    assert MESSAGE not in caplog.text
+    sensor.async_write_ha_state()
+    state = hass.states.get(sensor.entity_id)
+    assert state is not None
+    assert state.state == "0"
+    assert state.attributes["voicemail_supported"] is False
+    assert state.attributes["voicemail_available"] is True
+    assert state.attributes["voicemail_error"] == "invalid_request"
+    from homeassistant.helpers import entity_registry as er
+    row = er.async_get(hass).async_get_or_create(
+        "sensor", DOMAIN, f"{router.mac} Messages vocaux non lus", config_entry=entry
+    )
+    async_register_voicemail_websocket_api(hass)
+    client = await hass_ws_client(hass)
+    await client.send_json_auto_id({"type": "freebox_homexa/voicemails", "entity_id": row.entity_id})
+    listed = await client.receive_json()
+    assert listed["success"] is True
+    assert listed["result"]["supported"] is False
+    assert listed["result"]["available"] is True
+    assert listed["result"]["messages"] == []
+    assert SECRET not in str(listed)
+    from custom_components.freebox_homexa.diagnostics import async_get_config_entry_diagnostics
+    exported = await async_get_config_entry_diagnostics(hass, entry)
+    assert exported["voicemail"]["supported"] is False
+    assert exported["voicemail"]["error"] == "invalid_request"
+    assert SECRET not in str(exported["voicemail"])
+    assert MESSAGE not in str(exported["voicemail"])
+    await platform.async_reset()
+
+
+class NotFound:
+    status = 404
+
+
+async def test_http_404_then_advertised_version_is_not_supported(hass, home_context):
+    router, _node = home_context
+
+    class Gone(VersionScript):
+        async def get(self, path: str) -> object:
+            self.paths.append(("get", path))
+            if path == "/api_version":
+                return {"api_version": "8.0", "api_base_url": "/api/"}
+            if path == "call/voicemail/":
+                return NotFound()
+            if path == "/api/v8/call/voicemail/":
+                raise http_error("unsupported")
+            raise AssertionError(path)
+
+    script = Gone(fail_relative=True)
+    router._api.call._access = script
+    load(hass, router)
+    await router._update_voicemails()
+    assert router.voicemail_supported is False
+    assert router.voicemail_available is True
+    assert router.voicemail_error == "not_found"
+    assert ("get", "/api/v8/call/voicemail/") in script.paths
+
+
+async def test_real_voicemail_failure_is_visible_once(hass, hass_ws_client, home_context, caplog):
+    router, _node = home_context
+    script = bind(router)
+    script.error = http_error("internal_error")
+    script.error_on = "voicemail"
+    load(hass, router)
+    sensors = Collector()
+    entry = hass.config_entries.async_get_entry(router.entry_id)
+    await setup_sensors(hass, entry, sensors.add)
+    sensor = next(entity for entity in sensors.entities if str(entity.unique_id).endswith("Messages vocaux non lus"))
+    platform = make_platform(hass, "sensor")
+    await platform.async_add_entities([sensor])
+    with caplog.at_level(logging.DEBUG, logger=_LOG):
+        await router._update_voicemails()
+        await router._update_voicemails()
+    warnings = [
+        record for record in caplog.records
+        if record.levelno == logging.WARNING and record.name.startswith(_LOG) and "Messagerie" in record.getMessage()
+    ]
+    assert len(warnings) == 1
+    assert re.search(r"\d", warnings[0].getMessage()) is None
+    assert "HttpRequestError" in warnings[0].getMessage()
+    assert "internal_error" in warnings[0].getMessage()
+    assert SECRET not in warnings[0].getMessage()
+    assert router.voicemail_available is False
+    assert router.voicemail_error == "internal_error"
+    assert not any(item[1] == "/api_version" for item in script.paths)
+    sensor.async_write_ha_state()
+    assert hass.states.get(sensor.entity_id).state == "unavailable"
+    from homeassistant.helpers import entity_registry as er
+    row = er.async_get(hass).async_get_or_create(
+        "sensor", DOMAIN, f"{router.mac} Messages vocaux non lus", config_entry=entry
+    )
+    async_register_voicemail_websocket_api(hass)
+    client = await hass_ws_client(hass)
+    await client.send_json_auto_id({"type": "freebox_homexa/voicemails", "entity_id": row.entity_id})
+    listed = await client.receive_json()
+    assert listed["result"]["available"] is False
+    assert listed["result"]["error"] == "internal_error"
+    assert SECRET not in str(listed)
+    await platform.async_reset()
+
+
 async def async_delete_voicemail_direct(router) -> None:
-    from custom_components.freebox_homexa.voicemail import async_delete_voicemail
-    await async_delete_voicemail(router, MESSAGE)
+    from custom_components.freebox_homexa.voicemail import async_delete_voicemail, tokens_of
+    await async_delete_voicemail(router, tokens_of(router).issue(MESSAGE))

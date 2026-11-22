@@ -174,9 +174,8 @@ mark_voicemail_read:
   fields:
     id:
       name: Message
-      description: Voicemail id returned by the Freebox.
+      description: Opaque message token from the card, the event or the media source. The Freebox file name is not accepted.
       required: true
-      example: 20221215_154135_r0334371508.au
       selector:
         text: {}
     config_entry_id:
@@ -198,9 +197,8 @@ delete_voicemail:
   fields:
     id:
       name: Message
-      description: Voicemail id returned by the Freebox.
+      description: Opaque message token from the card, the event or the media source. The Freebox file name is not accepted.
       required: true
-      example: 20221215_154135_r0334371508.au
       selector:
         text: {}
     config_entry_id:
@@ -225,9 +223,8 @@ play_voicemail:
   fields:
     id:
       name: Message
-      description: Voicemail id returned by the Freebox.
+      description: Opaque message token from the card, the event or the media source. The Freebox file name is not accepted.
       required: true
-      example: 20221215_154135_r0334371508.au
       selector:
         text: {}
     entity_id:

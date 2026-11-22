@@ -391,6 +391,15 @@ class FreeboxRouter:
         self.phones_available: bool = True
         self.voicemails: list[object] = []
         self.voicemail_available: bool = True
+        # None tant que le premier essai (session, puis version annoncée) n'est pas fait.
+        self.voicemail_supported: bool | None = None
+        self.voicemail_error: str | None = None
+        self.voicemail_failure_logged: bool = False
+        # "" = chemin relatif de la session (v6). "/api/v10/" = version annoncée.
+        # None = pas encore déterminé.
+        self.voicemail_api_prefix: str | None = None
+        self.voicemail_advertised_prefix: str | None = None
+        self.voicemail_tokens: object | None = None
         self.voicemail_seen: set[str] | None = None
         self.home_granted = True
         self.home_devices: dict[str, Any] = {}

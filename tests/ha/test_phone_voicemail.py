@@ -1662,6 +1662,135 @@ async def test_play_keeps_going_when_mark_read_fails(hass, home_context, caplog)
     assert playback_content_type(hass, "media_player.box") == "audio/mpeg"
 
 
+async def test_write_uses_trailing_slash_when_literal_id_is_rejected(hass, home_context, caplog):
+    router, _node = home_context
+    script = bind(router)
+    load(hass, router)
+    script.messages = [message()]
+    await router._update_voicemails()
+    public = tokens_of(router).issue(MESSAGE)
+
+    class Slash(Script):
+        async def put(self, path: str, payload: object = None) -> None:
+            self.paths.append(("put", path, payload))
+            if path.endswith("/"):
+                return None
+            error = http_error("invalid_id")
+            error.status = 200
+            raise error
+
+        async def get(self, path: str) -> object:
+            self.paths.append(("get", path))
+            if path == "call/voicemail/":
+                return [message(read=True)]
+            raise AssertionError(path)
+
+    slash = Slash()
+    router._api.call._access = slash
+    from custom_components.freebox_homexa.voicemail import async_mark_voicemail_read
+    with caplog.at_level(logging.DEBUG, logger=_LOG):
+        await async_mark_voicemail_read(router, public)
+    assert any(item[0] == "put" and str(item[1]).endswith("/") for item in slash.paths)
+    assert "forme=literal" in caplog.text
+    assert "code=invalid_id" in caplog.text
+    assert "statut=200" in caplog.text
+    assert SECRET not in caplog.text
+    assert MESSAGE not in caplog.text
+
+
+async def test_freebox_player_open_requires_a_real_state_change(hass, home_context):
+    router, _node = home_context
+    script = bind(router)
+    load(hass, router)
+    assert await async_setup_component(hass, "http", {"http": {}})
+    script.messages = [message()]
+    await router._update_voicemails()
+    from homeassistant.helpers import entity_registry as er
+    registry = er.async_get(hass)
+    entity = registry.async_get_or_create(
+        "media_player", DOMAIN, "player-salon", suggested_object_id="salon_freebox_player"
+    )
+    hass.states.async_set(entity.entity_id, "on", {"player_id": 3, "api_version": "v6", "friendly_name": "Salon"})
+    posts: list[tuple[str, object]] = []
+
+    class PlayerAccess:
+        async def post(self, path: str, payload: object = None) -> None:
+            posts.append((path, payload))
+
+        async def get(self, path: str) -> dict[str, str]:
+            return {}
+
+    router._api.player._access = PlayerAccess()
+    sent: list[tuple[str, dict[str, str]]] = []
+
+    async def send_airmedia(name: str, data: dict[str, str]) -> None:
+        sent.append((name, data))
+
+    router._api.airmedia.get_airmedia_receivers = AsyncMock(return_value=[
+        {"name": "Freebox Player", "capabilities": {"audio": True, "video": True}},
+    ])
+    router._api.airmedia.send_airmedia = send_airmedia
+    views = [
+        {"playback_state": "playing", "foreground_app": {"package": "youtube", "cur_url": "https://www.youtube.com/watch"}},
+        {"playback_state": "playing", "foreground_app": {"cur_url": "http://homeassistant.local/api/freebox_homexa/voicemail/entry/token"}},
+    ]
+
+    async def read_status(_router, _player_id, version):
+        return views.pop(0), version
+
+    async def no_sleep(_delay: float) -> None:
+        return None
+
+    from custom_components.freebox_homexa.voicemail_audio import async_play_on_player
+    with patch(
+        "custom_components.freebox_homexa.voicemail_audio.get_url",
+        return_value="http://homeassistant.local:8123",
+    ), patch(
+        "custom_components.freebox_homexa.player_status.async_read_player_status",
+        side_effect=read_status,
+    ), patch(
+        "custom_components.freebox_homexa.voicemail_audio.asyncio.sleep",
+        new=no_sleep,
+    ):
+        await async_play_on_player(hass, router, tokens_of(router).issue(MESSAGE), entity.entity_id)
+    assert sent and sent[0][0] == "Freebox%20Player"
+    assert sent[0][1]["action"] == "start"
+    assert sent[0][1]["media_type"] == "video"
+    assert "freebox_homexa/voicemail" in sent[0][1]["media"]
+    assert not any(str(path).endswith("control/open") for path, _payload in posts)
+    assert SECRET not in str(sent) and SECRET not in str(posts)
+
+    async def refuse_airmedia(_name: str, data: dict[str, str]) -> None:
+        if data.get("media_type") == "video":
+            raise http_error("unimplemented")
+        raise http_error("unimplemented")
+
+    router._api.airmedia.send_airmedia = refuse_airmedia
+
+    views_stuck = [
+        {"playback_state": "playing", "foreground_app": {"package": "youtube", "cur_url": "https://www.youtube.com/watch"}},
+    ] * 8
+
+    async def stuck(_router, _player_id, version):
+        return views_stuck.pop(0), version
+
+    script.paths.clear()
+    with patch(
+        "custom_components.freebox_homexa.voicemail_audio.get_url",
+        return_value="http://homeassistant.local:8123",
+    ), patch(
+        "custom_components.freebox_homexa.player_status.async_read_player_status",
+        side_effect=stuck,
+    ), patch(
+        "custom_components.freebox_homexa.voicemail_audio.asyncio.sleep",
+        new=no_sleep,
+    ):
+        with pytest.raises(HomeAssistantError) as silent:
+            await async_play_on_player(hass, router, tokens_of(router).issue(MESSAGE), entity.entity_id)
+    assert silent.value.translation_key == "voicemail_player_silent"
+    assert not any(item[0] == "put" for item in script.paths)
+
+
 async def async_delete_voicemail_direct(router) -> None:
     from custom_components.freebox_homexa.voicemail import async_delete_voicemail, tokens_of
     await async_delete_voicemail(router, tokens_of(router).issue(MESSAGE))

@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+- Carte Téléphone : « Écouter sur mon téléphone » joue dans l'application, « Écouter sur le Player » envoie le message au lecteur configuré. Sans lecteur, le second bouton est inactif et un texte l'indique. Un appui sur le texte du bouton est bien pris en compte. La carte affiche « Lecture lancée sur le Player » ou l'erreur précise. Les libellés courts tiennent sur un écran étroit. Le rendu en place ne change pas.
+- Player Freebox : la lecture passe par AirMedia (type video, l'audio direct répond souvent unimplemented) avec l'URL HTTP du MP3, comme le fait Music Assistant quand il réécrit l'adresse. `control/open` avec le type audio/mpeg est le second essai. Si l'état du Player ne change pas, l'action échoue avec un message traduit et le message n'est pas marqué lu. Un autre lecteur configuré, par exemple Music Assistant, est utilisé tel quel.
+- Messagerie : lu et suppression essaient l'identifiant tel quel, puis avec une barre finale, puis avec le point encodé. Un `internal_error` ou un `invalid_id` passe à la forme suivante. Le journal indique la méthode, la forme, le statut HTTP et le code, jamais le numéro ni le jeton.
+
 ## 28.8.99 — 2026-11-22
 
 - Messagerie vocale : un `internal_error` passager, au démarrage ou plus tard, ne bascule plus l'état à chaque essai. Sans liste encore reçue, le capteur reste disponible avec `voicemail_loading` et la carte affiche « Chargement de la messagerie… ». Une liste déjà connue reste affichée (mention « données en cache ») et `voicemail_error` / `voicemail_stale` ne sont publiés qu'après environ 10 minutes d'échecs de suite. Les à-coups sont journalisés en debug ; l'indisponibilité et le retour le sont une seule fois. Les requêtes `call/voicemail/` sont sérialisées, une relance déjà posée n'est pas doublée, et le succès annule le minuteur.

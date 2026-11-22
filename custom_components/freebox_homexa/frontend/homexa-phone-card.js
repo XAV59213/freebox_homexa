@@ -98,6 +98,40 @@ function _callsSensor(hass, entryId) {
   return match || "";
 }
 
+const COPY = {
+  fr: {
+    phone: "Écouter sur mon téléphone",
+    phoneShort: "Sur mon téléphone",
+    player: "Écouter sur le Player",
+    playerShort: "Sur le Player",
+    asking: "Lecture demandée sur le Player…",
+    launched: "Lecture lancée sur le Player",
+    failed: "Le Player n'a pas lu le message",
+    noPlayer: "Ajoutez un lecteur dans l'éditeur de la carte.",
+  },
+  en: {
+    phone: "Play on my phone",
+    phoneShort: "On my phone",
+    player: "Play on the Player",
+    playerShort: "On the Player",
+    asking: "Starting playback on the Player…",
+    launched: "Playback started on the Player",
+    failed: "The Player did not play the message",
+    noPlayer: "Add a media player in the card editor.",
+  },
+};
+
+function _copy(hass) {
+  const raw = hass && (hass.language || (hass.locale && hass.locale.language)) || "fr";
+  return String(raw).toLowerCase().startsWith("en") ? COPY.en : COPY.fr;
+}
+
+function _eventElement(event) {
+  let node = event && event.target;
+  if (node && node.nodeType === 3) node = node.parentNode;
+  return node && typeof node.closest === "function" ? node : null;
+}
+
 const STYLES = `
   ha-card { padding: 12px 16px 8px; }
   .head { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
@@ -114,8 +148,14 @@ const STYLES = `
   .main { flex: 1; min-width: 0; }
   .unread { font-weight: 700; }
   .meta { font-size: 12px; color: var(--secondary-text-color); }
-  .tools { display: flex; gap: 4px; flex: none; }
-  .tools button { padding: 4px 8px; }
+  .tools { display: flex; flex-wrap: wrap; gap: 4px; flex: 1 1 160px; max-width: 100%; }
+  .tools button { padding: 4px 8px; max-width: 100%; touch-action: manipulation; pointer-events: auto; }
+  .tools button .short { display: none; }
+  @media (max-width: 420px) {
+    .tools button .long { display: none; }
+    .tools button .short { display: inline; }
+  }
+  button:disabled { opacity: 0.55; cursor: default; }
   audio { width: 100%; margin-top: 6px; }
   .empty, .notice { padding: 8px 0; color: var(--secondary-text-color); }
   .error { color: var(--error-color, #db4437); font-size: 13px; }
@@ -365,11 +405,11 @@ class HomexaPhoneCard extends HTMLElement {
 
   _service(name, data) {
     const hass = this._hass;
-    if (!hass || !hass.callService) return;
+    if (!hass || !hass.callService) return undefined;
     const payload = { ...(data || {}) };
     const entry = this._entry();
     if (entry) payload.config_entry_id = entry;
-    hass.callService("freebox_homexa", name, payload);
+    return hass.callService("freebox_homexa", name, payload);
   }
 
   async _mutate(action, id) {
@@ -459,8 +499,9 @@ class HomexaPhoneCard extends HTMLElement {
     style.textContent = STYLES;
     const card = _el("ha-card");
     card.addEventListener("click", (event) => {
-      const button = event.target && event.target.closest ? event.target.closest("button") : null;
-      if (!button || !card.contains(button)) return;
+      const origin = _eventElement(event);
+      const button = origin ? origin.closest("button") : null;
+      if (!button || !card.contains(button) || button.disabled) return;
       this._click(button.dataset || {});
     });
     this._nodes = {
@@ -536,11 +577,23 @@ class HomexaPhoneCard extends HTMLElement {
     return audio;
   }
 
-  _button(act, id, label, warn) {
+  _button(act, id, label, shortLabel, warn) {
     const button = _el("button");
+    button.type = "button";
     button.dataset.act = act;
     button.dataset.id = id;
-    button.textContent = label;
+    if (shortLabel) {
+      const long = _el("span");
+      long.className = "long";
+      long.textContent = label;
+      const short = _el("span");
+      short.className = "short";
+      short.textContent = shortLabel;
+      button.appendChild(long);
+      button.appendChild(short);
+    } else {
+      button.textContent = label;
+    }
     if (warn) button.className = "warn";
     return button;
   }
@@ -577,8 +630,10 @@ class HomexaPhoneCard extends HTMLElement {
     const total = _totalLabel(this._total);
     n.total.hidden = !total;
     n.total.textContent = total;
-    n.hint.hidden = !this._hint;
-    n.hint.textContent = this._hint || "";
+    const copy = _copy(hass);
+    const hint = this._notice || this._hint || (!cfg.media_player ? copy.noPlayer : "");
+    n.hint.hidden = !hint;
+    n.hint.textContent = hint;
     const messages = this._messages || [];
     const playing = this._playingAudio();
     const rows = [];
@@ -603,11 +658,17 @@ class HomexaPhoneCard extends HTMLElement {
       main.appendChild(meta);
       const tools = _el("div");
       tools.className = "tools";
-      tools.appendChild(this._button("browser", item.id, "Écouter", false));
-      if (cfg.media_player) tools.appendChild(this._button("player", item.id, "Sur le lecteur", false));
-      tools.appendChild(this._button("read", item.id, "Lu", false));
+      const copy = _copy(hass);
+      tools.appendChild(this._button("browser", item.id, copy.phone, copy.phoneShort, false));
+      const playerButton = this._button("player", item.id, copy.player, copy.playerShort, false);
+      if (!cfg.media_player) {
+        playerButton.disabled = true;
+        playerButton.className = "stop";
+      }
+      tools.appendChild(playerButton);
+      tools.appendChild(this._button("read", item.id, "Lu", "", false));
       const confirm = this._pendingDelete === item.id;
-      tools.appendChild(this._button("delete", item.id, confirm ? "Confirmer" : "Supprimer", confirm));
+      tools.appendChild(this._button("delete", item.id, confirm ? "Confirmer" : "Supprimer", "", confirm));
       row.appendChild(main);
       row.appendChild(tools);
       rows.push(row);
@@ -666,7 +727,35 @@ class HomexaPhoneCard extends HTMLElement {
     else if (act === "stop-dect") this._service("stop_dect_ring", {});
     else if (act === "stop-fxs") this._service("stop_fxs_ring", {});
     else if (act === "browser") this._playBrowser(id);
-    else if (act === "player") this._service("play_voicemail", { id, entity_id: this._config.media_player });
+    else if (act === "player") {
+      const copy = _copy(this._hass);
+      if (!this._config.media_player) {
+        this._notice = copy.noPlayer;
+        this._error = "";
+        this._key = "";
+        this._render();
+        return;
+      }
+      this._notice = copy.asking;
+      this._error = "";
+      this._key = "";
+      this._render();
+      const pending = this._service("play_voicemail", { id, entity_id: this._config.media_player });
+      if (pending && typeof pending.then === "function") {
+        pending.then(() => {
+          this._notice = copy.launched;
+          this._error = "";
+          this._key = "";
+          this._render();
+        }).catch((err) => {
+          const message = err && typeof err.message === "string" ? err.message : "";
+          this._notice = "";
+          this._error = message && !/\d{6,}/.test(message) ? message : copy.failed;
+          this._key = "";
+          this._render();
+        });
+      }
+    }
     else if (act === "read") this._mutate("mark_read", id);
     else if (act === "delete") this._delete(id);
   }

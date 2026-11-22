@@ -61,8 +61,15 @@ _LIST_PATH = "call/voicemail/"
 VOICEMAIL_RETRY_DELAYS = (15, 30, 60)
 # Plusieurs échecs de suite, environ 10 minutes, avant de rendre le capteur indisponible.
 VOICEMAIL_UNAVAILABLE_AFTER = 600
-# Écritures (lu, suppression) : quelques essais rapides, pas le cycle de 10 minutes.
-_WRITE_RETRY_DELAYS = (0, 1, 2)
+# Écritures (lu, suppression) : la forme d'identifiant, pas une longue attente.
+# L'URL qui se termine par « .au » renvoie souvent internal_error ou invalid_id ;
+# l'audio GET marche parce qu'un segment suit l'identifiant.
+_WRITE_FORMS = (
+    ("literal", False, ""),
+    ("slash", False, "/"),
+    ("dot", True, ""),
+    ("dot-slash", True, "/"),
+)
 _TRANSIENT_CODES = frozenset({
     "internal_error",
     "timeout",
@@ -968,14 +975,30 @@ async def _deny(router: FreeboxRouter, err: Exception) -> None:
     ) from err
 
 
-def _log_write(action: str, err: BaseException) -> None:
-    """Code et classe seulement. Pas de numéro, de jeton, d'URL ni de corps."""
+def _http_status_label(err: BaseException) -> str:
+    status = getattr(err, "status", None)
+    if isinstance(status, bool) or not isinstance(status, int):
+        return "-"
+    return str(status)
+
+
+def _log_write(action: str, form: str, err: BaseException) -> None:
+    """Méthode, forme d'identifiant, statut HTTP et code. Jamais le chemin réel."""
     _LOGGER.warning(
-        "Écriture messagerie vocale échouée (%s, %s, %s)",
+        "Écriture messagerie %s call/voicemail/{id} forme=%s statut=%s code=%s",
         action,
-        _safe_kind(err),
+        form,
+        _http_status_label(err),
         stored_error(err),
     )
+
+
+def _try_another_write_form(err: BaseException) -> bool:
+    """internal_error et invalid_id dépendent de la forme de l'identifiant."""
+    if is_permission_denied(err):
+        return False
+    code = stored_error(err)
+    return code in {"internal_error", "invalid_id", "invalid_request", "not_found"} or _is_transient(err)
 
 
 def _write_error(err: BaseException) -> HomeAssistantError:
@@ -992,31 +1015,30 @@ async def _write_voicemail(
     ident: str,
     payload: object = None,
 ) -> None:
-    """PUT/DELETE. Relance la version annoncée et un ``internal_error`` passager."""
+    """PUT/DELETE. Essaie la barre finale et le point encodé si l'id est refusé.
+
+    Le corps et le chemin ne sont pas journalisés : l'identifiant contient le numéro.
+    """
     last: BaseException | None = None
-    for delay in _WRITE_RETRY_DELAYS:
-        if delay:
-            await asyncio.sleep(delay)
-        try:
-            await async_voicemail_by_id(router, method, ident, "", payload)
+    async with router.voicemail_refresh_lock:
+        for form, encode, suffix in _WRITE_FORMS:
+            path = voicemail_api_path(ident, suffix, encode_dot=encode)
+            try:
+                await async_voicemail_exchange(router, method, path, payload)
+            except HomeAssistantError:
+                raise
+            except Exception as err:
+                last = err
+                _log_write(method, form, err)
+                if is_permission_denied(err):
+                    await _deny(router, err)
+                if _try_another_write_form(err):
+                    continue
+                raise _write_error(err) from _minimal_http_error(err)
+            if encode:
+                router.voicemail_encode_dot = True
             return
-        except HomeAssistantError:
-            raise
-        except Exception as err:
-            last = err
-            if is_permission_denied(err):
-                await _deny(router, err)
-            if _is_transient(err):
-                _LOGGER.debug(
-                    "Écriture messagerie vocale retentée (%s, %s)",
-                    _safe_kind(err),
-                    stored_error(err),
-                )
-                continue
-            _log_write(method, err)
-            raise _write_error(err) from _minimal_http_error(err)
     if last is not None:
-        _log_write(method, last)
         raise _write_error(last) from _minimal_http_error(last)
 
 

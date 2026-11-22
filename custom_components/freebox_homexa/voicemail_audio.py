@@ -76,7 +76,12 @@ def player_needs_mp3(hass: HomeAssistant, entity_id: str) -> bool:
 
 
 def signed_voicemail_path(
-    hass: HomeAssistant, entry_id: str, message_id: str, *, mp3: bool
+    hass: HomeAssistant,
+    entry_id: str,
+    message_id: str,
+    *,
+    mp3: bool,
+    codec: str = "",
 ) -> str:
     """URL signée du jeton, jamais du nom de fichier Freebox."""
     public_id = validated_voicemail_id(message_id)
@@ -90,7 +95,8 @@ def signed_voicemail_path(
         f"/api/freebox_homexa/voicemail/{quote(entry_id, safe='')}/"
         f"{quote(public_id, safe='')}"
     )
-    path += "?codec=mp3" if mp3 else "?codec=wav"
+    chosen = codec if codec in {"mp3", "wav", "mp4"} else ("mp3" if mp3 else "wav")
+    path += f"?codec={chosen}"
     return async_sign_path(hass, path, _AUDIO_TTL)
 
 
@@ -218,10 +224,15 @@ class VoicemailAudioView(HomeAssistantView):
             return web.Response(status=404, text="Messagerie vocale introuvable")
         payload: bytes | None = None
         try:
-            wants_wav = request.query.get("codec") == "wav"
-            if wants_wav:
+            codec = request.query.get("codec")
+            if codec == "wav":
                 payload = await async_voicemail_audio(router, message_id)
                 body = payload
+            elif codec == "mp4":
+                payload = await async_cached_mp3(hass, router, message_id)
+                from .player_audio import async_audio_to_mp4
+
+                body = await async_audio_to_mp4(hass, payload)
             else:
                 body = await async_cached_mp3(hass, router, message_id)
                 payload = body
@@ -234,8 +245,16 @@ class VoicemailAudioView(HomeAssistantView):
         except Exception as err:
             _log_audio_failure(err, payload)
             return web.Response(status=502, text="Messagerie vocale indisponible")
-        content_type = "audio/wav" if request.query.get("codec") == "wav" else "audio/mpeg"
-        extension = "wav" if content_type == "audio/wav" else "mp3"
+        codec = request.query.get("codec")
+        if codec == "wav":
+            content_type = "audio/wav"
+            extension = "wav"
+        elif codec == "mp4":
+            content_type = "video/mp4"
+            extension = "mp4"
+        else:
+            content_type = "audio/mpeg"
+            extension = "mp3"
         return web.Response(
             body=body,
             status=200,
@@ -303,10 +322,9 @@ async def _open_freebox_player_audio(
     """Joue le MP3 sur le Player Freebox et vérifie que l'état change.
 
     Music Assistant y arrive en réécrivant l'URL. Ici, AirMedia envoie la même
-    URL HTTP (type ``video``, car ``audio`` répond souvent ``unimplemented``).
-    ``control/open`` avec ``audio/mpeg`` est le second essai : sans type MIME,
-    le Player accepte et reste sur YouTube. Le même envoi sert à
-    ``media_player.play_media`` pour un fichier audio.
+    URL HTTP (type ``video``). ``control/open`` annonce ``video/mp4`` : l'API
+    Player n'a pas de champ pour imposer une application. Si le choix
+    d'application reste affiché, OK est envoyé tout seul.
     """
     from .player_airmedia import PlayerPlaybackError, async_open_player_audio
 
@@ -319,6 +337,8 @@ async def _open_freebox_player_audio(
     player_id = _coerce_player_id(attributes.get("player_id"))
     raw_version = attributes.get("api_version")
     version = raw_version if isinstance(raw_version, str) and raw_version.startswith("v") else "v6"
+    raw_name = attributes.get("friendly_name") if isinstance(attributes, dict) else None
+    device_name = raw_name.strip() if isinstance(raw_name, str) else ""
     if player_id is None:
         raise HomeAssistantError(
             translation_domain=DOMAIN, translation_key="voicemail_player_unreachable"
@@ -330,6 +350,7 @@ async def _open_freebox_player_audio(
             version,
             url,
             marker="freebox_homexa/voicemail",
+            device_name=device_name,
         )
     except PlayerPlaybackError as err:
         if err.kind == "silent":
@@ -386,8 +407,15 @@ async def async_play_on_player(
             translation_placeholders={"platform": shown},
         )
     external = player_needs_mp3(hass, entity_id)
+    own_player = platform == DOMAIN
     try:
-        signed = signed_voicemail_path(hass, router.entry_id, message_id, mp3=True)
+        signed = signed_voicemail_path(
+            hass,
+            router.entry_id,
+            message_id,
+            mp3=True,
+            codec="mp4" if own_player else "mp3",
+        )
         url = absolute_voicemail_url(hass, signed, external=external)
     except HomeAssistantError:
         raise
@@ -396,7 +424,6 @@ async def async_play_on_player(
         raise HomeAssistantError(
             translation_domain=DOMAIN, translation_key="voicemail_audio"
         ) from err
-    own_player = platform == DOMAIN
     if own_player:
         await _open_freebox_player_audio(hass, router, entity_id, url)
     else:

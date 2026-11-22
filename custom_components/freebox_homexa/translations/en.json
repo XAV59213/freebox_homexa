@@ -785,6 +785,9 @@
     "player_audio_silent": {
       "message": "The Freebox Player accepted the request but did not start playback."
     },
+    "player_audio_prepare": {
+      "message": "The audio file could not be prepared for the Player."
+    },
     "command_unconfirmed": {
       "message": "The Player response did not confirm the command. Check its state before retrying."
     },

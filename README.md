@@ -125,9 +125,11 @@ Volume et lecture passent par l’API Player, sans ce code.
 
 ### Lire un MP3 (sirène, annonce)
 
-`media_player.play_media` lit une adresse HTTP ou HTTPS sur le Player quand le type est `audio/mpeg` (ou un autre `audio/*`), `music`, ou absent si le fichier finit par `.mp3`, `.aac`, `.ogg`, `.wav` ou `.flac`. Le Player la reçoit par AirMedia, comme un message vocal. Le changement de chaîne `tv:?channel=N` et la vidéo restent inchangés.
+`media_player.play_media` lit une adresse HTTP ou HTTPS sur le Player quand le type est `audio/mpeg` (ou un autre `audio/*`), `music`, ou absent si le fichier finit par `.mp3`, `.aac`, `.ogg`, `.wav` ou `.flac`. Home Assistant récupère le fichier, l'emballe en MP4 et le sert sur une adresse signée de courte durée. Le Player propose alors le lecteur multimédia. Si le choix d'application reste à l'écran, OK est envoyé avec le code télécommande déjà configuré, sans nouveau réglage. L'adresse d'origine n'est utilisée que si cette préparation échoue. Le changement de chaîne `tv:?channel=N` et la vidéo restent inchangés.
 
-Le fichier doit être joignable par le Player, par exemple `http://homeassistant.local:8123/local/sirene.mp3` (dossier `config/www`). Si la lecture ne démarre pas, l'action échoue avec un message au lieu de laisser la chaîne TV en cours.
+Si la lecture ne démarre pas, l'action échoue avec un message au lieu de laisser la chaîne TV en cours.
+
+Deux sons sont livrés avec l'intégration, aussi visibles dans le navigateur multimédia (dossier **Sons d'alarme**) :
 
 ```yaml
 alias: Sirène du Player quand l'alarme se déclenche
@@ -143,9 +145,22 @@ actions:
     target:
       entity_id: media_player.freebox_player
     data:
-      media_content_id: http://homeassistant.local:8123/local/sirene.mp3
+      media_content_id: freebox_homexa://sound/alarme_sirene
       media_content_type: audio/mpeg
 ```
+
+```yaml
+alias: Bip d'alarme sur le Player
+actions:
+  - action: media_player.play_media
+    target:
+      entity_id: media_player.freebox_player
+    data:
+      media_content_id: freebox_homexa://sound/alarme_bip
+      media_content_type: audio/mpeg
+```
+
+Un fichier de `config/www` fonctionne aussi, par exemple `http://homeassistant.local:8123/local/sirene.mp3`.
 
 ---
 

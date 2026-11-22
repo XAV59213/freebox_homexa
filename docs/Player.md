@@ -17,11 +17,13 @@ HDMI n’est **pas** un sélecteur d’entrée HDMI 1/2/3 de la télé. C’est 
 
 ## Fichier audio
 
-`media_player.play_media` envoie une URL HTTP ou HTTPS au Player par AirMedia (le même chemin que la messagerie) lorsque le type est `audio/*` ou `music`, ou lorsqu'il est absent et que l'adresse finit par `.mp3`, `.aac`, `.ogg`, `.wav` ou `.flac`. `control/open` est le second essai. Sans changement d'état, l'action échoue avec un message traduit.
+`media_player.play_media` prépare une URL HTTP ou HTTPS (type `audio/*` ou `music`, ou sans type si l'adresse finit par `.mp3`, `.aac`, `.ogg`, `.wav` ou `.flac`) : Home Assistant télécharge le fichier, l'emballe en MP4 (son AAC et image noire) et le sert sur une adresse signée de courte durée. L'API du Player ne sait pas imposer une application : l'ouverture annonce `video/mp4`, ce qui préselectionne le lecteur multimédia plutôt que le navigateur. Si le choix reste affiché, OK est envoyé une ou deux fois avec le code télécommande déjà enregistré, et seulement tant que la lecture n'a pas démarré. AirMedia vise le récepteur du Player (pas le Freebox Server). Un refus `http` ou `req_in_progress` est réessayé une fois. Sans changement d'application ou de média, l'action échoue avec un message traduit. L'adresse d'origine n'est envoyée que si la préparation échoue.
 
 Le changement de chaîne reste `tv:?channel=N` avec le type `url`. La vidéo n'emprunte pas AirMedia.
 
-Exemple, sirène quand l'alarme se déclenche (fichier dans `config/www`) :
+Deux sons d'alarme sont inclus (synthèse, environ 5 secondes). Ils sont aussi dans le navigateur multimédia, dossier **Sons d'alarme**.
+
+Sirène :
 
 ```yaml
 alias: Sirène du Player quand l'alarme se déclenche
@@ -37,9 +39,24 @@ actions:
     target:
       entity_id: media_player.freebox_player
     data:
-      media_content_id: http://homeassistant.local:8123/local/sirene.mp3
+      media_content_id: freebox_homexa://sound/alarme_sirene
       media_content_type: audio/mpeg
 ```
+
+Bip-bip :
+
+```yaml
+alias: Bip d'alarme sur le Player
+actions:
+  - action: media_player.play_media
+    target:
+      entity_id: media_player.freebox_player
+    data:
+      media_content_id: freebox_homexa://sound/alarme_bip
+      media_content_type: audio/mpeg
+```
+
+Un fichier placé dans `config/www` reste utilisable, par exemple `http://homeassistant.local:8123/local/sirene.mp3`.
 
 ## Code télécommande
 

@@ -30,6 +30,7 @@ def build_inventory(hass, router, node, entry):
     for description in s.CONNECTION_SENSORS:
         add("connection/" + description.key, s.FreeboxSensor(router, description))
     add("temperature", s.FreeboxSensor(router, s.temperature_sensor_description("temp_cpu")))
+    add("fan/fan_1", s.FreeboxSensor(router, s.fan_sensor_description("1")))
     for description in s.CALL_SENSORS:
         add("calls/" + description.key, s.FreeboxCallSensor(router, description))
     add("call-log", s.FreeboxCallLogSensor(router, s.CALL_LOG_SENSOR))

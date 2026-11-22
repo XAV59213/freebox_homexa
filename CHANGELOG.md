@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+- Carte Lovelace « Freebox Server » : en-tête (modèle, firmware, temps de fonctionnement), tuile connexion (débits avec courbe, IP externe, type de lien), tuile santé (températures, ventilateurs, RAID, espace disque), tuile réseau (Wi-Fi, clients, répéteurs, groupes LAN) et pied de page (appels manqués, redémarrage avec confirmation). Une tuile sans entité reste masquée. Plusieurs Freebox : choix dans l'éditeur visuel. Les entity_id sont retrouvés par l'entrée et le unique_id, pas par le nom affiché.
+- Capteurs de vitesse des ventilateurs (`system.fans`) : un capteur RPM par ventilateur (`fan_<id>`), créé comme les températures. Les entity_id, unique_id et options déjà en place ne changent pas.
+
 ## 28.8.95 — 2026-11-20
 - README : badge des étoiles GitHub qui renvoie vers la liste des stargazers (#128). Aucun changement de code.
 

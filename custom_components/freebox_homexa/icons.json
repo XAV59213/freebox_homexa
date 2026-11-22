@@ -170,6 +170,9 @@
       "calls_log": {
         "default": "mdi:phone-log"
       },
+      "fan_rpm": {
+        "default": "mdi:fan"
+      },
       "partition_free_space": {
         "default": "mdi:harddisk"
       },

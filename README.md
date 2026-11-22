@@ -260,6 +260,21 @@ type: custom:homexa-tnt-card
   <em>Carte Homexa TNT</em>
 </p>
 
+### Carte « Freebox Server »
+
+```yaml
+type: custom:freebox-server-card
+# title: Salon          # facultatif, sinon le nom du modèle
+# entry_id: abc123def456  # facultatif ; à choisir dans l'éditeur s'il y a plusieurs Freebox
+```
+
+Vue du Freebox Server : modèle, firmware et temps de fonctionnement, débits (avec une courbe sur l'heure), IP externe et type de lien, températures, ventilateurs, état RAID, espace disque, Wi-Fi, clients, répéteurs, groupes LAN, appels manqués et redémarrage (avec confirmation). Une tuile dont les entités n'existent pas est masquée. Le choix de la Freebox se fait dans l'éditeur visuel de la carte. Chargée automatiquement (`/freebox_homexa/freebox-server-card.js`), sans ressource Lovelace à ajouter.
+
+<p align="center">
+  <img src="https://raw.githubusercontent.com/XAV59213/freebox_homexa/main/docs/images/freebox-server-card.png" alt="Carte Freebox Server" width="420"><br>
+  <em>Carte Freebox Server</em>
+</p>
+
 HACS → Frontend → [Mushroom](https://github.com/piitaya/lovelace-mushroom), puis colle le YAML dans l’éditeur brut du tableau de bord. Remplace les `entity_id` par tes entités Homexa.
 
 ---

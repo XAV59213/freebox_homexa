@@ -413,6 +413,9 @@
       "calls_log": {
         "name": "Derniers appels"
       },
+      "fan_rpm": {
+        "name": "Ventilateur {fan_id}"
+      },
       "partition_free_space": {
         "name": "{partition} espace libre"
       },

@@ -457,6 +457,55 @@ async function main() {
   await new Promise((resolve) => setImmediate(resolve));
   assert.match(listed.shadowRoot.innerHTML, /src="https:\/\/ha\.example\/api\/freebox_homexa\/voicemail\/entry-a\/msg\.au\?authSig=synthetic"/);
 
+  const playerCard = makeCard();
+  const playerCalls = [];
+  playerCard._hass = {
+    language: "fr",
+    states: card._hass.states,
+    entities: card._hass.entities,
+    callService: (domain, service, data) => {
+      playerCalls.push([domain, service, data]);
+      return Promise.resolve();
+    },
+    callWS: async () => ({
+      available: true,
+      messages: [{ id: "msg.au", date: "2026-11-22T10:00:00Z", duration: 12, read: false }],
+      total: 1,
+    }),
+  };
+  playerCard.setConfig({ title: "Téléphone", media_player: "media_player.salon_freebox_player" });
+  await new Promise((resolve) => setImmediate(resolve));
+  const host = playerCard.shadowRoot.querySelector("ha-card");
+  const playerButton = playerCard.shadowRoot.querySelectorAll("button").find((button) =>
+    String(button.textContent || "").includes("Écouter sur le Player")
+  );
+  assert.ok(playerButton);
+  const label = playerButton.childNodes.find((node) => String(node.textContent || "").includes("Écouter sur le Player"));
+  host.listeners.click({ target: label || playerButton });
+  assert.equal(playerCalls[0][0], "freebox_homexa");
+  assert.equal(playerCalls[0][1], "play_voicemail");
+  assert.equal(playerCalls[0][2].id, "msg.au");
+  assert.equal(playerCalls[0][2].entity_id, "media_player.salon_freebox_player");
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.match(playerCard.shadowRoot.innerHTML, /Lecture lancée sur le Player/);
+
+  const bare = makeCard();
+  const bareCalls = [];
+  bare._hass = playerCard._hass;
+  bare._hass = {
+    ...playerCard._hass,
+    callService: (domain, service, data) => bareCalls.push([domain, service, data]),
+  };
+  bare.setConfig({ title: "Téléphone" });
+  await new Promise((resolve) => setImmediate(resolve));
+  const disabled = bare.shadowRoot.querySelectorAll("button").find((button) =>
+    String(button.textContent || "").includes("Écouter sur le Player")
+  );
+  assert.equal(disabled.disabled, true);
+  assert.match(bare.shadowRoot.innerHTML, /Ajoutez un lecteur/);
+  bare.shadowRoot.querySelector("ha-card").listeners.click({ target: disabled });
+  assert.equal(bareCalls.length, 0);
+
   console.log("OK: carte Téléphone, numéro masqué, confirmation, sonneries, lecteur");
 }
 

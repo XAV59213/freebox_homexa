@@ -267,6 +267,194 @@ def _looks_like_mp3(payload: bytes) -> bool:
     return payload.startswith((b"ID3", b"\xff\xfb"))
 
 
+def _coerce_player_id(raw: object) -> int | None:
+    if isinstance(raw, bool) or raw is None:
+        return None
+    if isinstance(raw, int):
+        return raw
+    if isinstance(raw, str) and raw.isdigit():
+        return int(raw)
+    return None
+
+
+def _player_view(status: object) -> tuple[str, str, bool] | None:
+    """Lecture, application, et si l'URL de la messagerie est au premier plan."""
+    if not isinstance(status, dict):
+        return None
+    foreground = status.get("foreground_app")
+    app = ""
+    parts = [
+        status.get("uri"),
+        status.get("app"),
+        status.get("source"),
+        status.get("title"),
+    ]
+    if isinstance(foreground, dict):
+        app = str(foreground.get("package") or "")
+        parts.append(foreground.get("cur_url"))
+    blob = " ".join(str(part) for part in parts if isinstance(part, str)).lower()
+    playback = str(
+        status.get("playback_state") or status.get("state") or status.get("playback") or ""
+    ).lower()
+    return playback, app.lower(), "freebox_homexa/voicemail" in blob
+
+
+def _player_started(
+    before: tuple[str, str, bool] | None,
+    after: tuple[str, str, bool] | None,
+) -> bool:
+    if after is None:
+        return False
+    if after[2]:
+        return True
+    if before is None:
+        return after[0] in {"playing", "play"}
+    if after == before:
+        return False
+    if after[0] in {"playing", "play"} and after[1] != before[1]:
+        return True
+    return False
+
+
+async def _player_request(
+    router: FreeboxRouter, player_id: int, version: str, method: str, suffix: str, payload: object
+) -> object:
+    access = router._api.player._access
+    path = f"player/{player_id}/api/{version}/{suffix}"
+    action = getattr(access, method, None)
+    if not callable(action):
+        raise HomeAssistantError(
+            translation_domain=DOMAIN, translation_key="voicemail_player_refused"
+        )
+    if method == "get":
+        return await action(path)
+    return await action(path, payload)
+
+
+async def _airmedia_receivers(router: FreeboxRouter) -> list[str]:
+    api = getattr(router._api, "airmedia", None)
+    getter = getattr(api, "get_airmedia_receivers", None)
+    if not callable(getter):
+        return []
+    try:
+        raw = await getter()
+    except Exception as err:
+        _LOGGER.warning("Liste AirMedia indisponible (code=%s)", stored_error_name(err))
+        return []
+    if not isinstance(raw, list):
+        return []
+    names: list[str] = []
+    for item in raw:
+        if not isinstance(item, dict):
+            continue
+        name = item.get("name")
+        caps = item.get("capabilities")
+        if isinstance(caps, dict) and caps.get("audio") is False and caps.get("video") is False:
+            continue
+        if isinstance(name, str) and name.strip():
+            names.append(name.strip())
+    names.sort(key=lambda value: (0 if "player" in value.lower() else 1, value.lower()))
+    return names
+
+
+async def _airmedia_start(router: FreeboxRouter, url: str) -> bool:
+    """Envoie l'URL HTTP. ``audio`` est souvent ``unimplemented`` : ``video`` lit le MP3."""
+    api = getattr(router._api, "airmedia", None)
+    sender = getattr(api, "send_airmedia", None)
+    if not callable(sender):
+        return False
+    names = await _airmedia_receivers(router)
+    if not names:
+        return False
+    quoted = quote(names[0], safe="")
+    for media_type in ("video", "audio"):
+        try:
+            await sender(
+                quoted,
+                {"action": "start", "media_type": media_type, "media": url},
+            )
+            return True
+        except Exception as err:
+            _LOGGER.warning("AirMedia %s refusé (code=%s)", media_type, stored_error_name(err))
+    return False
+
+
+async def _open_freebox_player_audio(
+    hass: HomeAssistant, router: FreeboxRouter, entity_id: str, url: str
+) -> None:
+    """Joue le MP3 sur le Player Freebox et vérifie que l'état change.
+
+    Music Assistant y arrive en réécrivant l'URL. Ici, AirMedia envoie la même
+    URL HTTP (type ``video``, car ``audio`` répond souvent ``unimplemented``).
+    ``control/open`` avec ``audio/mpeg`` est le second essai : sans type MIME,
+    le Player accepte et reste sur YouTube.
+    """
+    from .player_status import async_read_player_status
+
+    state = hass.states.get(entity_id)
+    attributes = state.attributes if state is not None else {}
+    player_id = _coerce_player_id(attributes.get("player_id"))
+    raw_version = attributes.get("api_version")
+    version = raw_version if isinstance(raw_version, str) and raw_version.startswith("v") else "v6"
+    if player_id is None:
+        raise HomeAssistantError(
+            translation_domain=DOMAIN, translation_key="voicemail_player_unreachable"
+        )
+    before_status, version = await async_read_player_status(router, player_id, version)
+    before = _player_view(before_status)
+
+    async def _heard() -> bool:
+        current = before
+        for delay in (1, 1):
+            await asyncio.sleep(delay)
+            status, _version = await async_read_player_status(router, player_id, version)
+            current = _player_view(status)
+            if _player_started(before, current):
+                return True
+        return False
+
+    if await _airmedia_start(router, url) and await _heard():
+        return
+    try:
+        await _player_request(router, player_id, version, "post", "control/mediactrl", {"cmd": "stop"})
+    except Exception:
+        _LOGGER.debug("Arrêt du média en cours ignoré avant la messagerie")
+    opened = False
+    for mime in ("audio/mpeg", ""):
+        body: dict[str, str] = {"url": url}
+        if mime:
+            body["type"] = mime
+        try:
+            await _player_request(router, player_id, version, "post", "control/open", body)
+            opened = True
+        except Exception as err:
+            _LOGGER.warning(
+                "Ouverture audio du Player refusée (statut=%s, code=%s)",
+                getattr(err, "status", "-"),
+                stored_error_name(err),
+            )
+            continue
+        for delay in (1, 1):
+            await asyncio.sleep(delay)
+            status, version = await async_read_player_status(router, player_id, version)
+            if _player_started(before, _player_view(status)):
+                return
+    if not opened:
+        raise HomeAssistantError(
+            translation_domain=DOMAIN, translation_key="voicemail_player_refused"
+        )
+    _LOGGER.warning("Le Player n'a pas changé d'état après l'ouverture audio")
+    raise HomeAssistantError(
+        translation_domain=DOMAIN, translation_key="voicemail_player_silent"
+    )
+
+
+def stored_error_name(err: BaseException) -> str:
+    from .voicemail import stored_error
+
+    return stored_error(err)
+
+
 async def async_play_on_player(
     hass: HomeAssistant, router: FreeboxRouter, message_id: str, entity_id: str
 ) -> None:
@@ -302,6 +490,28 @@ async def async_play_on_player(
         raise HomeAssistantError(
             translation_domain=DOMAIN, translation_key="voicemail_audio"
         ) from err
+    own_player = False
+    row = er.async_get(hass).async_get(entity_id)
+    if row is not None and row.platform == DOMAIN and row.domain == "media_player":
+        own_player = True
+    if own_player:
+        await _open_freebox_player_audio(hass, router, entity_id, url)
+    else:
+        await _play_via_media_player(hass, entity_id, url)
+    try:
+        await async_mark_voicemail_read(router, message_id)
+    except Exception as err:
+        _LOGGER.warning(
+            "Lecture commencée, marquage lu reporté (%s)",
+            err.translation_key if isinstance(err, HomeAssistantError) and err.translation_key
+            else stored_error(err),
+        )
+        schedule_mark_read_retry(router, message_id)
+
+
+async def _play_via_media_player(hass: HomeAssistant, entity_id: str, url: str) -> None:
+    from .voicemail import stored_error
+
     try:
         await hass.services.async_call(
             "media_player",
@@ -319,6 +529,8 @@ async def async_play_on_player(
             "voicemail_player_unreachable",
             "voicemail_public_url",
             "voicemail_audio",
+            "voicemail_player_refused",
+            "voicemail_player_silent",
         }:
             raise
         _LOGGER.warning(
@@ -336,12 +548,3 @@ async def async_play_on_player(
         raise HomeAssistantError(
             translation_domain=DOMAIN, translation_key="voicemail_player_refused"
         ) from err
-    try:
-        await async_mark_voicemail_read(router, message_id)
-    except Exception as err:
-        _LOGGER.warning(
-            "Lecture commencée, marquage lu reporté (%s)",
-            err.translation_key if isinstance(err, HomeAssistantError) and err.translation_key
-            else stored_error(err),
-        )
-        schedule_mark_read_retry(router, message_id)

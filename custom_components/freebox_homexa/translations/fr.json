@@ -763,6 +763,9 @@
     "voicemail_player_refused": {
       "message": "Le lecteur a refusé le message vocal. Il n'a pas été marqué comme lu."
     },
+    "voicemail_player_silent": {
+      "message": "Le Player Freebox a accepté la demande mais n'a pas lancé la lecture. Le message n'a pas été marqué comme lu."
+    },
     "voicemail_write_failed": {
       "message": "Le message vocal n'a pas pu être modifié ({code})."
     },

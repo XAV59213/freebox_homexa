@@ -750,6 +750,9 @@
     "voicemail_player_refused": {
       "message": "The media player refused the voicemail. The message was not marked as read."
     },
+    "voicemail_player_silent": {
+      "message": "The Freebox Player accepted the request but did not start playback. The message was not marked as read."
+    },
     "voicemail_write_failed": {
       "message": "The voicemail could not be updated ({code})."
     },

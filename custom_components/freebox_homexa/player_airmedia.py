@@ -19,6 +19,9 @@ if TYPE_CHECKING:
 _LOGGER = logging.getLogger(__name__)
 
 _AUDIO_SUFFIXES = (".mp3", ".aac", ".ogg", ".wav", ".flac")
+VOICEMAIL_MARKER = "freebox_homexa/voicemail"
+VOICEMAIL_TITLE = "Message vocal Freebox"
+_PREVIOUS_SOURCE: dict[str, str] = {}
 
 
 class PlayerPlaybackError(Exception):
@@ -127,8 +130,25 @@ async def _airmedia_receivers(router: FreeboxRouter) -> list[str]:
     return names
 
 
-async def _airmedia_start(router: FreeboxRouter, url: str) -> bool:
-    """Envoie l'URL HTTP. ``audio`` est souvent ``unimplemented`` : ``video`` lit le MP3."""
+def remember_player_source(key: str, source: object) -> None:
+    """Mémorise une source nommée, jamais une adresse."""
+    if not isinstance(key, str) or not key:
+        return
+    if not isinstance(source, str):
+        return
+    cleaned = source.strip()
+    if not cleaned or "://" in cleaned or VOICEMAIL_MARKER in cleaned:
+        return
+    _PREVIOUS_SOURCE[key] = cleaned
+
+
+def take_player_source(key: str) -> str:
+    if not isinstance(key, str) or not key:
+        return ""
+    return _PREVIOUS_SOURCE.pop(key, "")
+
+
+async def _airmedia_command(router: FreeboxRouter, action_name: str, url: str) -> bool:
     api = getattr(router._api, "airmedia", None)
     sender = getattr(api, "send_airmedia", None)
     if not callable(sender):
@@ -138,12 +158,25 @@ async def _airmedia_start(router: FreeboxRouter, url: str) -> bool:
         return False
     quoted = quote(names[0], safe="")
     for media_type in ("video", "audio"):
+        body: dict[str, str] = {"action": action_name, "media_type": media_type}
+        if url:
+            body["media"] = url
         try:
-            await sender(quoted, {"action": "start", "media_type": media_type, "media": url})
+            await sender(quoted, body)
             return True
         except Exception as err:
             _LOGGER.warning("AirMedia %s refusé (code=%s)", media_type, _error_code(err))
     return False
+
+
+async def _airmedia_start(router: FreeboxRouter, url: str) -> bool:
+    """Envoie l'URL HTTP. ``audio`` est souvent ``unimplemented`` : ``video`` lit le MP3."""
+    return await _airmedia_command(router, "start", url)
+
+
+async def async_stop_player_audio(router: FreeboxRouter) -> None:
+    """Arrête AirMedia sans renvoyer l'adresse du message."""
+    await _airmedia_command(router, "stop", "")
 
 
 async def async_open_player_audio(

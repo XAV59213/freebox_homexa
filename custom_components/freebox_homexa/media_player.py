@@ -27,7 +27,16 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from .discovery import DiscoveryCandidate, async_setup_discovery
 from .const import DOMAIN, URL_BASE, option_remote_code
 from .availability import FreeboxReachableMixin
-from .player_airmedia import PlayerPlaybackError, async_open_player_audio, is_http_audio
+from .player_airmedia import (
+    VOICEMAIL_MARKER,
+    VOICEMAIL_TITLE,
+    PlayerPlaybackError,
+    async_open_player_audio,
+    async_stop_player_audio,
+    is_http_audio,
+    remember_player_source,
+    take_player_source,
+)
 from .player_diagnostics import cache_player_schema
 from .player_remote import async_send_player_keys, filter_ready_players
 from .router import FreeboxConfigEntry, FreeboxRouter
@@ -352,10 +361,15 @@ class FreeboxPlayerMediaPlayer(FreeboxReachableMixin, MediaPlayerEntity):
         self._attr_media_image_url = None
         if self._attr_state == MediaPlayerState.OFF:
             self._attr_media_title = None
+            self._attr_media_content_id = None
             self._attr_media_channel = None
             self._channel_number = None
             self._sync_icon_metadata()
             return
+        foreground_url = foreground.get("cur_url") if isinstance(foreground, dict) else None
+        ours = VOICEMAIL_MARKER in " ".join(
+            part for part in (foreground_url, current if isinstance(current, str) else "") if part
+        )
         if isinstance(current, str) and (
             current.startswith("tv:") or current == "fr.freebox.tv"
         ):
@@ -364,7 +378,7 @@ class FreeboxPlayerMediaPlayer(FreeboxReachableMixin, MediaPlayerEntity):
             self._attr_source = "YouTube"
         elif isinstance(current, str) and "netflix" in current.lower():
             self._attr_source = "Netflix"
-        elif current:
+        elif current and not ours:
             self._attr_source = str(current)
         # Repli UX uniquement : nom de l'application déjà reconnue, jamais un
         # titre de vidéo inventé. La chaîne TV (ex. BFM TV) reste prioritaire.
@@ -382,6 +396,11 @@ class FreeboxPlayerMediaPlayer(FreeboxReachableMixin, MediaPlayerEntity):
                 )
         elif self._attr_source in APP_ARTWORK_URLS:
             self._attr_media_image_url = APP_ARTWORK_URLS[self._attr_source]
+        if ours:
+            self._attr_media_content_id = VOICEMAIL_MARKER
+            self._attr_media_title = VOICEMAIL_TITLE
+        else:
+            self._attr_media_content_id = None
 
         self._sync_icon_metadata()
 
@@ -411,7 +430,14 @@ class FreeboxPlayerMediaPlayer(FreeboxReachableMixin, MediaPlayerEntity):
 
     @async_action_errors
     async def async_media_stop(self) -> None:
+        key = self.entity_id or str(self._player_id)
+        ours = self._attr_media_content_id == VOICEMAIL_MARKER
+        previous = take_player_source(key) if ours else ""
+        if ours:
+            await async_stop_player_audio(self._router)
         await self._command("stop")
+        if previous and previous in COMMON_SOURCES:
+            await self.async_select_source(previous)
 
     @async_action_errors
     async def async_media_next_track(self) -> None:
@@ -475,6 +501,7 @@ class FreeboxPlayerMediaPlayer(FreeboxReachableMixin, MediaPlayerEntity):
         # vidéo et les autres URI restent sur ``control/open``.
         resolved_type, resolved_id = await self._playable(media_type, media_id)
         if is_http_audio(resolved_type, resolved_id):
+            remember_player_source(self.entity_id or str(self._player_id), self._attr_source)
             try:
                 await async_open_player_audio(
                     self._router,

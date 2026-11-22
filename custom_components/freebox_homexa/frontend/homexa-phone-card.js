@@ -137,6 +137,8 @@ const COPY = {
       show_number: "Afficher le numéro",
       show_calls: "Derniers appels",
       max_calls: "Nombre d'appels",
+      voicemail_volume: "Volume du message (%)",
+      helpVolume: "50 par défaut. 0 laisse le volume du lecteur inchangé.",
       helpEntry: "Utile s'il y a plusieurs Freebox. Vide = détection automatique.",
       helpPlayers: "Freebox Player ou Music Assistant. L'ancienne option media_player reste acceptée.",
       helpNumber: "Masqué par défaut. Les numéros ne sont pas dans les états Home Assistant.",
@@ -182,6 +184,8 @@ const COPY = {
       show_number: "Show the number",
       show_calls: "Recent calls",
       max_calls: "Number of calls",
+      voicemail_volume: "Voicemail volume (%)",
+      helpVolume: "50 by default. 0 leaves the player volume unchanged.",
       helpEntry: "Useful with several Freeboxes. Empty = automatic detection.",
       helpPlayers: "Freebox Player or Music Assistant. The older media_player option still works.",
       helpNumber: "Hidden by default. Numbers are not stored in Home Assistant states.",
@@ -367,6 +371,19 @@ function _memory() {
   return null;
 }
 
+function _sleep(ms) {
+  if (typeof Promise !== "function" || typeof setTimeout !== "function") return null;
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function _volumePercent(config) {
+  const cfg = config || {};
+  if (!Object.prototype.hasOwnProperty.call(cfg, "voicemail_volume")) return 50;
+  const value = Number(cfg.voicemail_volume);
+  if (!Number.isFinite(value)) return 50;
+  return Math.max(0, Math.min(100, Math.round(value)));
+}
+
 function _editorSchema() {
   return [
     { name: "title", selector: { text: {} } },
@@ -386,6 +403,7 @@ function _editorSchema() {
     { name: "show_number", selector: { boolean: {} } },
     { name: "show_calls", selector: { boolean: {} } },
     { name: "max_calls", selector: { number: { min: 1, max: 30, mode: "box" } } },
+    { name: "voicemail_volume", selector: { number: { min: 0, max: 100, step: 1, mode: "box" } } },
   ];
 }
 
@@ -395,6 +413,7 @@ function _editorData(config, hass) {
     media_players: _playableIds(hass, cfg),
     show_number: cfg.show_number === true,
     show_calls: cfg.show_calls === true,
+    voicemail_volume: _volumePercent(cfg),
   };
   if (typeof cfg.title === "string") data.title = cfg.title;
   if (typeof cfg.config_entry === "string" && cfg.config_entry) data.config_entry = cfg.config_entry;
@@ -507,7 +526,9 @@ class HomexaPhoneCard extends HTMLElement {
             ? labels.helpNumber
             : schema.name === "media_players"
               ? labels.helpPlayers
-              : undefined,
+              : schema.name === "voicemail_volume"
+                ? labels.helpVolume
+                : undefined,
     };
   }
 
@@ -1114,9 +1135,21 @@ class HomexaPhoneCard extends HTMLElement {
     const pending = this._media("media_stop");
     const clear = () => {
       if (_feature(attrs, FEATURE.clear)) this._media("clear_playlist");
+      this._restoreVolume(remote, attrs);
     };
     if (pending && typeof pending.then === "function") pending.then(clear).catch(() => {});
     else clear();
+  }
+
+  _restoreVolume(remote, attrs) {
+    const previous = remote && remote.previousVolume;
+    const applied = remote && remote.appliedVolume;
+    const current = attrs && attrs.volume_level;
+    if (!_feature(attrs, FEATURE.volumeSet)) return;
+    if (typeof previous !== "number" || typeof applied !== "number" || typeof current !== "number") return;
+    if (Math.abs(current - applied) > 0.02) return;
+    if (Math.abs(previous - applied) <= 0.02) return;
+    this._media("volume_set", { volume_level: previous });
   }
 
   _nudgeVolume(direction) {
@@ -1382,9 +1415,64 @@ class HomexaPhoneCard extends HTMLElement {
     this._menuFor = "";
     this._key = "";
     this._render();
-    const pending = this._service("play_voicemail", { id, entity_id: entityId });
-    if (pending && typeof pending.then === "function") {
-      pending.then(() => {
+    const prepared = this._prepareVolume(entityId);
+    const start = (info) => {
+      const pending = this._service("play_voicemail", { id, entity_id: entityId });
+      if (pending && typeof pending.then === "function") {
+        pending.then(() => this._startedRemote(id, entityId, info)).catch((err) => {
+          this._notice = "";
+          this._error = _visibleError(err, copy.failed);
+          this._key = "";
+          this._render();
+        });
+        return;
+      }
+      this._startedRemote(id, entityId, info);
+    };
+    if (prepared && typeof prepared.then === "function") prepared.then(start).catch(() => start({}));
+    else start(prepared || {});
+  }
+
+  _voicemailLevel() {
+    const percent = _volumePercent(this._config);
+    return percent > 0 ? percent / 100 : null;
+  }
+
+  _prepareVolume(entityId) {
+    const level = this._voicemailLevel();
+    const empty = {};
+    if (level == null) return empty;
+    const hass = this._hass;
+    const state = hass && hass.states ? hass.states[entityId] : null;
+    const attrs = (state && state.attributes) || {};
+    if (!_feature(attrs, FEATURE.volumeSet)) return empty;
+    const previous = typeof attrs.volume_level === "number" ? attrs.volume_level : null;
+    const info = { previousVolume: previous, appliedVolume: level };
+    if (previous != null && Math.abs(previous - level) <= 0.02) return info;
+    if (!hass || typeof hass.callService !== "function") return empty;
+    let pending;
+    try {
+      pending = hass.callService("media_player", "volume_set", {
+        entity_id: entityId,
+        volume_level: level,
+      });
+    } catch (err) {
+      return empty;
+    }
+    const wait = (left) => {
+      const current = hass.states && hass.states[entityId] && hass.states[entityId].attributes;
+      const now = current && current.volume_level;
+      if ((typeof now === "number" && Math.abs(now - level) <= 0.02) || left <= 0) return info;
+      const pause = _sleep(250);
+      if (!pause || typeof pause.then !== "function") return info;
+      return pause.then(() => wait(left - 1));
+    };
+    const after = () => wait(typeof setTimeout === "function" ? 8 : 0);
+    if (pending && typeof pending.then === "function") return pending.then(after).catch(() => empty);
+    return after();
+  }
+
+  _startedRemote(id, entityId, info) {
         this._notice = "";
         this._error = "";
         let seconds = NaN;
@@ -1401,17 +1489,12 @@ class HomexaPhoneCard extends HTMLElement {
           late: false,
           released: false,
           duration: seconds,
+          previousVolume: info && typeof info.previousVolume === "number" ? info.previousVolume : null,
+          appliedVolume: info && typeof info.appliedVolume === "number" ? info.appliedVolume : null,
         };
         this._armRemote();
         this._key = "";
         this._render();
-      }).catch((err) => {
-        this._notice = "";
-        this._error = _visibleError(err, copy.failed);
-        this._key = "";
-        this._render();
-      });
-    }
   }
 }
 
@@ -1459,7 +1542,9 @@ class HomexaPhoneCardEditor extends HTMLElement {
           ? copy.editors.helpNumber
           : schema.name === "media_players"
             ? copy.editors.helpPlayers
-            : undefined;
+            : schema.name === "voicemail_volume"
+              ? copy.editors.helpVolume
+              : undefined;
     const configured = _playerIds(this._config);
     const known = _platformsKnown(this._hass);
     const unsupported = known && configured.some((id) => {
@@ -1525,6 +1610,9 @@ class HomexaPhoneCardEditor extends HTMLElement {
     next.show_calls = value.show_calls === true;
     if (value.max_calls !== undefined && value.max_calls !== null && value.max_calls !== "") {
       next.max_calls = Number(value.max_calls);
+    }
+    if (value.voicemail_volume !== undefined && value.voicemail_volume !== null && value.voicemail_volume !== "") {
+      next.voicemail_volume = _volumePercent({ voicemail_volume: value.voicemail_volume });
     }
     this._config = next;
     if (typeof this.dispatchEvent === "function") this.dispatchEvent(_configChanged(next));

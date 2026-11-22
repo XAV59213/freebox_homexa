@@ -1085,12 +1085,13 @@ async function main() {
   clickNamed("Pause");
   clickNamed("Volume +");
   clickNamed("Stop");
-  const controls = mediaCalls.filter((item) => item[0] === "media_player");
+  const controls = mediaCalls.filter((item) => item[0] === "media_player" && item[1] !== "volume_set");
+  const levels = mediaCalls.filter((item) => item[1] === "volume_set");
+  assert.equal(levels[0][2].volume_level, 0.5);
   assert.equal(controls[0][1], "media_play_pause");
   assert.equal(controls[0][2].entity_id, "media_player.echo_show");
-  assert.equal(controls[1][1], "volume_set");
-  assert.equal(controls[1][2].volume_level, 0.45);
-  assert.equal(controls[2][1], "media_stop");
+  assert.equal(levels[1][2].volume_level, 0.45);
+  assert.equal(controls[1][1], "media_stop");
   mini._hass.states["media_player.echo_show"].attributes.supported_features = 0;
   mini._key = "";
   mini._render();
@@ -1145,6 +1146,92 @@ async function main() {
   assert.equal(released[0][2].entity_id, "media_player.echo_show");
   assert.equal(released[1][1], "clear_playlist");
   assert.equal(JSON.stringify(released).includes("token"), false);
+
+  const loud = makeCard();
+  const loudCalls = [];
+  loud._hass = {
+    language: "fr",
+    states: {
+      "sensor.messages": card._hass.states["sensor.messages"],
+      "media_player.echo_show": {
+        state: "idle",
+        attributes: { friendly_name: "Salon", supported_features: 4, volume_level: 0.2 },
+      },
+    },
+    entities: {
+      ...card._hass.entities,
+      "media_player.echo_show": { platform: "music_assistant" },
+    },
+    callService: (domain, service, data) => {
+      loudCalls.push([domain, service, data]);
+      if (service === "volume_set") {
+        loud._hass.states["media_player.echo_show"].attributes.volume_level = data.volume_level;
+      }
+      return Promise.resolve();
+    },
+    callWS: async () => ({
+      available: true,
+      messages: [{ id: "msg.au", date: "2026-11-22T10:00:00Z", duration: 8, read: false }],
+      total: 1,
+    }),
+  };
+  loud.setConfig({ title: "Téléphone", media_player: "media_player.echo_show", voicemail_volume: 50 });
+  await new Promise((resolve) => setImmediate(resolve));
+  loud.shadowRoot.querySelector("ha-card").listeners.click({
+    target: loud.shadowRoot.querySelectorAll("button").find((button) =>
+      String(button.textContent || "").includes("Sur Salon")
+    ),
+  });
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(loudCalls[0][1], "volume_set");
+  assert.equal(loudCalls[0][2].volume_level, 0.5);
+  assert.equal(loudCalls[1][0], "freebox_homexa");
+  assert.equal(loudCalls[1][1], "play_voicemail");
+  loud._hass.states["media_player.echo_show"].state = "paused";
+  loud._hass.states["media_player.echo_show"].attributes.media_content_id = "freebox_homexa/voicemail";
+  loud._hass.states["media_player.echo_show"].attributes.media_title = "Message vocal Freebox";
+  loud._remote.sawPlaying = true;
+  loud._remote.released = false;
+  loud._key = "";
+  loud._render();
+  await new Promise((resolve) => setImmediate(resolve));
+  const restored = loudCalls.filter((item) => item[1] === "volume_set");
+  assert.equal(restored[restored.length - 1][2].volume_level, 0.2);
+
+  loud._hass.states["media_player.echo_show"].attributes.volume_level = 0.8;
+  loud._remote.released = false;
+  loud._remote.sawPlaying = true;
+  const mark = loudCalls.length;
+  loud._key = "";
+  loud._render();
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(loudCalls.slice(mark).some((item) => item[1] === "volume_set"), false);
+
+  const quietVolume = makeCard();
+  const quietVolumeCalls = [];
+  quietVolume._hass = {
+    language: "fr",
+    states: loud._hass.states,
+    entities: loud._hass.entities,
+    callService: (domain, service, data) => {
+      quietVolumeCalls.push([domain, service, data]);
+      return Promise.resolve();
+    },
+    callWS: async () => ({
+      available: true,
+      messages: [{ id: "msg.au", date: "2026-11-22T10:00:00Z", duration: 8, read: false }],
+      total: 1,
+    }),
+  };
+  quietVolume.setConfig({ title: "Téléphone", media_player: "media_player.echo_show", voicemail_volume: 0 });
+  await new Promise((resolve) => setImmediate(resolve));
+  const quietButton = quietVolume.shadowRoot.querySelectorAll("button").find((button) =>
+    String(button.textContent || "").includes("Sur Salon")
+  );
+  if (quietButton) quietVolume.shadowRoot.querySelector("ha-card").listeners.click({ target: quietButton });
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(quietVolumeCalls.some((item) => item[1] === "volume_set"), false);
+  assert.equal(Card.getConfigForm().schema.some((item) => item.name === "voicemail_volume"), true);
 
   let releaseLoad;
   const hung = new Promise((resolve) => {

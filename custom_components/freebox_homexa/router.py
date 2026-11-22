@@ -6,6 +6,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import json
+import math
 from pathlib import Path
 from contextlib import suppress
 from datetime import datetime, timedelta
@@ -184,6 +185,44 @@ def _sdk_list(payload: object, what: str) -> list[object]:
     return items
 
 
+def _fan_key(fan_id: object) -> str | None:
+    """Identifiant stable ``fan_<id>``. Un id vide ou espacé est ignoré."""
+    if not isinstance(fan_id, str):
+        return None
+    cleaned = fan_id.strip()
+    if not cleaned or any(char.isspace() for char in cleaned) or len(cleaned) > 64:
+        return None
+    return f"fan_{cleaned}"
+
+
+def _fan_rpm(value: object) -> int | None:
+    """Tours/minute. 0 est un ventilateur à l'arrêt ; une valeur illisible reste inconnue."""
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        return None
+    if isinstance(value, float) and not math.isfinite(value):
+        return None
+    if value < 0:
+        return None
+    return int(value) if isinstance(value, int) else int(round(value))
+
+
+def fan_readings(raw: object) -> dict[str, int | None]:
+    """``system.fans`` : une mesure par id. None (liste vide) et un champ absent donnent {}."""
+    if raw is None:
+        return {}
+    if not isinstance(raw, list):
+        raise ValueError("Invalid system fans")
+    readings: dict[str, int | None] = {}
+    for item in raw:
+        if not isinstance(item, dict):
+            continue
+        key = _fan_key(item.get("id"))
+        if key is None:
+            continue
+        readings[key] = _fan_rpm(item.get("value"))
+    return readings
+
+
 async def get_api(hass: HomeAssistant, host: str) -> Freepybox:
     """Obtient l'API Freebox en réutilisant le token déjà enregistré."""
     token_file = _token_path(hass, host)
@@ -345,6 +384,7 @@ class FreeboxRouter:
         self.supports_raid = True
         self.raids: dict[int, dict[str, Any]] = {}
         self.sensors_temperature: dict[str, int] = {}
+        self.sensors_fans: dict[str, int | None] = {}
         self.sensors_connection: dict[str, float | None] = {}
         self.call_list: list[dict[str, Any]] = []
         self.home_granted = True
@@ -776,6 +816,12 @@ class FreeboxRouter:
             self.sensors_temperature = {
                 sensor["name"]: sensor.get("value") for sensor in syst_datas["sensors"]
             }
+            try:
+                self.sensors_fans = fan_readings(syst_datas.get("fans", []))
+            except ValueError:
+                # Une liste de ventilateurs illisible ne coupe pas températures, débits ni disques.
+                _LOGGER.info("Liste de ventilateurs Freebox illisible")
+                self.sensors_fans = {}
 
             serial = syst_datas["serial"]
             self.note_permission("system")
@@ -1489,7 +1535,8 @@ class FreeboxRouter:
 
     @property
     def sensors(self) -> dict[str, Any]:
-        return {**self.sensors_temperature, **self.sensors_connection}
+        # Les températures gardent leur clé historique si elle croisait un id de ventilateur.
+        return {**self.sensors_fans, **self.sensors_temperature, **self.sensors_connection}
 
     @property
     def call(self) -> Call:

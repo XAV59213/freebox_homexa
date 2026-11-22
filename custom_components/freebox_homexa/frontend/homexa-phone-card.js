@@ -121,6 +121,9 @@ const COPY = {
     volUp: "Volume +",
     volDown: "Volume -",
     close: "Fermer",
+    loadTimeout: "La messagerie ne répond pas.",
+    loadFailed: "La messagerie n'a pas pu être lue.",
+    retry: "Réessayer",
     asking: "Lecture demandée sur le Player…",
     askingNamed: "Lecture demandée sur ",
     launched: "Lecture lancée sur le Player",
@@ -163,6 +166,9 @@ const COPY = {
     volUp: "Volume +",
     volDown: "Volume -",
     close: "Close",
+    loadTimeout: "Voicemail is not responding.",
+    loadFailed: "Voicemail could not be loaded.",
+    retry: "Retry",
     asking: "Starting playback on the Player…",
     askingNamed: "Starting playback on ",
     launched: "Playback started on the Player",
@@ -320,6 +326,17 @@ function _leaks(value) {
   return /https?:\/\//i.test(value) || /\d{6,}/.test(value) || /authSig|token=/i.test(value);
 }
 
+function _publicText(value) {
+  const text = String(value || "")
+    .replace(/https?:\/\/\S+/gi, "")
+    .replace(/authSig[=:][^\s&]+/gi, "")
+    .replace(/\d{6,}/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+  if (!text || text.length > 160) return "";
+  return text;
+}
+
 function _visibleError(err, fallback) {
   const direct = err && typeof err.message === "string" ? err.message : "";
   const body = err && err.body && typeof err.body === "object" ? err.body : null;
@@ -465,6 +482,9 @@ class HomexaPhoneCard extends HTMLElement {
     this._playerEnabled = true;
     this._key = "";
     this._loading = false;
+    this._loadingSince = 0;
+    this._loadError = "";
+    this._loadTimer = null;
     this._fetchPending = false;
     this.attachShadow({ mode: "open" });
   }
@@ -582,6 +602,9 @@ class HomexaPhoneCard extends HTMLElement {
     const fromSocket = wsMessages.length > 0;
     const messages = fromSocket ? wsMessages : sensorMessages;
     if (messages.length && supported) {
+      this._loadingSince = 0;
+      this._loadError = "";
+      this._stopLoadWatch();
       this._messages = messages;
       if (fromSocket && ws && typeof ws.total === "number") this._total = ws.total;
       else if (stored && typeof stored.total === "number") this._total = stored.total;
@@ -594,6 +617,13 @@ class HomexaPhoneCard extends HTMLElement {
     }
     if (!ws && this._messages && this._messages.length) return;
     if (loading) {
+      if (!(this._loadingSince > 0)) this._loadingSince = Date.now();
+      this._armLoadWatch();
+      if (this._checkLoadTimeout()) {
+        this._messages = [];
+        this._total = null;
+        return;
+      }
       this._messages = this._messages && this._messages.length ? this._messages : [];
       if (!this._messages.length) this._total = null;
       this._notice = "Chargement de la messagerie…";
@@ -601,6 +631,9 @@ class HomexaPhoneCard extends HTMLElement {
       this._error = "";
       return;
     }
+    this._loadingSince = 0;
+    this._loadError = "";
+    this._stopLoadWatch();
     if (!ws) return;
     if (!available) {
       this._messages = [];
@@ -631,30 +664,32 @@ class HomexaPhoneCard extends HTMLElement {
     if (!force && key === this._fetchKey) return;
     this._fetchKey = key;
     this._loading = true;
+    const generation = (this._loadGen = (this._loadGen || 0) + 1);
     try {
       const payload = { type: "freebox_homexa/voicemails", action: "list", include_number: this._on("show_number", false) };
       if (sensor) payload.entity_id = sensor;
       if (entry) payload.config_entry_id = entry;
       const res = await hass.callWS(payload);
+      if (generation !== this._loadGen) return;
       this._showList(res);
     } catch (err) {
+      if (generation !== this._loadGen) return;
       const stored = _sensorList(this._hass, this._sensors()[0] || "");
-      const server = err && typeof err.message === "string" ? err.message : "";
-      if (stored && stored.loading && (!stored.messages || !stored.messages.length)) {
-        this._notice = "Chargement de la messagerie…";
+      const server = _publicText(err && err.message);
+      this._loadError = server;
+      this._loadingSince = 0;
+      this._stopLoadWatch();
+      this._notice = "";
+      if (stored && stored.messages && stored.messages.length) {
+        this._messages = stored.messages;
         this._error = "";
-      } else if (!stored || !stored.messages.length) {
+      } else if (!(this._messages && this._messages.length)) {
         this._messages = [];
         this._total = null;
-        this._notice = "";
-        if (server && !/\d/.test(server)) this._error = server;
-        else {
-          const code = err && typeof err.code === "string" && err.code ? ` (${err.code})` : "";
-          this._error = `Messagerie vocale indisponible${code}`;
-        }
+        this._error = server || _copy(this._hass).loadFailed;
       }
     } finally {
-      this._loading = false;
+      if (generation === this._loadGen) this._loading = false;
     }
     if (hass && hass.callWS && this._on("show_calls", false)) {
       const callsEntity = _callsSensor(hass, entry);
@@ -896,6 +931,36 @@ class HomexaPhoneCard extends HTMLElement {
 
   disconnectedCallback() {
     this._stopRemoteTimer();
+    this._stopLoadWatch();
+  }
+
+  _stopLoadWatch() {
+    if (this._loadTimer && typeof clearTimeout === "function") clearTimeout(this._loadTimer);
+    this._loadTimer = null;
+  }
+
+  _armLoadWatch() {
+    if (this._loadTimer || typeof setTimeout !== "function") return;
+    this._loadTimer = setTimeout(() => {
+      this._loadTimer = null;
+      if (!this._checkLoadTimeout()) return;
+      this._key = "";
+      this._render();
+    }, 15000);
+  }
+
+  _checkLoadTimeout() {
+    if (!(this._loadingSince > 0) || Date.now() - this._loadingSince < 15000) return false;
+    if (this._messages && this._messages.length) {
+      this._loadingSince = 0;
+      return false;
+    }
+    this._loadingSince = 0;
+    this._loading = false;
+    this._notice = "";
+    this._hint = "";
+    this._error = this._loadError || _copy(this._hass).loadTimeout;
+    return true;
   }
 
   _remoteSnapshot() {
@@ -1113,17 +1178,23 @@ class HomexaPhoneCard extends HTMLElement {
     const copy = _copy(hass);
     const players = _playableIds(hass, cfg);
     const allowed = this._playerEnabled !== false;
-    const hint = this._notice || this._hint || (allowed && !players.length ? copy.noPlayer : "");
+    const hint = this._hint || (allowed && !players.length && !this._notice && !this._error ? copy.noPlayer : "");
     n.hint.hidden = !hint;
     n.hint.textContent = hint;
     const messages = this._messages || [];
     const playing = this._playingAudio();
     const rows = [];
     if (!messages.length) {
-      const empty = _el("div");
-      empty.className = this._error ? "empty error" : "empty";
-      empty.textContent = this._notice || this._error || (this._messages === null ? "Chargement…" : "Aucun message");
-      rows.push(empty);
+      if (this._error) {
+        const retry = this._button("retry-voicemail", "", copy.retry, "", false);
+        retry.className = "stop";
+        rows.push(retry);
+      } else {
+        const empty = _el("div");
+        empty.className = "empty";
+        empty.textContent = this._notice || (this._messages === null ? "Chargement…" : "Aucun message");
+        rows.push(empty);
+      }
     }
     messages.forEach((item) => {
       const row = _el("div");
@@ -1226,6 +1297,17 @@ class HomexaPhoneCard extends HTMLElement {
   _click(dataset) {
     const act = dataset.act;
     const id = dataset.id;
+    if (act === "retry-voicemail") {
+      this._error = "";
+      this._loadError = "";
+      this._notice = "";
+      this._loadingSince = 0;
+      this._loading = false;
+      this._fetchKey = "";
+      this._key = "";
+      this._fetch(true);
+      return;
+    }
     if (act === "dect") this._service("start_dect_ring", {});
     else if (act === "fxs") this._service("start_fxs_ring", {});
     else if (act === "stop-dect") this._service("stop_dect_ring", {});

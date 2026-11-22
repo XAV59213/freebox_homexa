@@ -1146,6 +1146,71 @@ async function main() {
   assert.equal(released[1][1], "clear_playlist");
   assert.equal(JSON.stringify(released).includes("token"), false);
 
+  let releaseLoad;
+  const hung = new Promise((resolve) => {
+    releaseLoad = resolve;
+  });
+  const slow = makeCard();
+  slow._hass = {
+    language: "fr",
+    states: {
+      "sensor.messages": {
+        state: "unknown",
+        attributes: { voicemail: true, voicemail_loading: true, messages: [], total: null },
+      },
+    },
+    entities: { "sensor.messages": { platform: "freebox_homexa", config_entry_id: "entry-a" } },
+    callService() {},
+    callWS: () => hung,
+  };
+  slow.setConfig({ title: "Téléphone", show_calls: false });
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.match(slow.shadowRoot.innerHTML, /Chargement de la messagerie/);
+  slow._loadingSince = Date.now() - 16000;
+  slow._showList(null);
+  slow._key = "";
+  slow._render();
+  assert.equal(slow.shadowRoot.innerHTML.includes("Chargement de la messagerie"), false);
+  assert.match(slow.shadowRoot.innerHTML, /La messagerie ne répond pas/);
+  assert.match(slow.shadowRoot.innerHTML, /Réessayer/);
+  slow._hass.callWS = async () => ({
+    available: true,
+    loading: false,
+    messages: [{ id: "msg.au", date: "2026-11-22T10:00:00Z", duration: 8, read: false }],
+    total: 1,
+  });
+  slow.shadowRoot.querySelector("ha-card").listeners.click({
+    target: slow.shadowRoot.querySelectorAll("button").find((button) => button.textContent === "Réessayer"),
+  });
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.match(slow.shadowRoot.innerHTML, /Non lu/);
+  assert.equal(slow.shadowRoot.innerHTML.includes("Chargement de la messagerie"), false);
+  releaseLoad({ available: true, loading: false, messages: [], total: 0 });
+
+  const failed = makeCard();
+  failed._hass = {
+    language: "fr",
+    states: {
+      "sensor.messages": {
+        state: "unknown",
+        attributes: { voicemail: true, voicemail_loading: true, messages: [] },
+      },
+    },
+    entities: { "sensor.messages": { platform: "freebox_homexa", config_entry_id: "entry-a" } },
+    callService() {},
+    callWS: async () => {
+      throw new Error("délai dépassé https://secret.example/voicemail?authSig=abc");
+    },
+  };
+  failed.setConfig({ title: "Téléphone", show_calls: false });
+  await new Promise((resolve) => setImmediate(resolve));
+  const failedHtml = failed.shadowRoot.innerHTML;
+  assert.match(failedHtml, /délai dépassé/);
+  assert.match(failedHtml, /Réessayer/);
+  assert.equal(failedHtml.includes("Chargement de la messagerie"), false);
+  assert.equal(failedHtml.includes("secret.example"), false);
+  assert.equal(failedHtml.includes("authSig"), false);
+
   console.log("OK: carte Téléphone, numéro masqué, confirmation, sonneries, lecteur");
 }
 

@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Carte Téléphone : si le chargement de la messagerie dépasse 15 secondes, ou si la lecture échoue, « Chargement » ne reste plus affiché. La carte montre l'erreur et un bouton Réessayer.
+
 ## 28.8.104 — 2026-11-22
 
 - Carte Téléphone : après un envoi vers un lecteur, un mini-lecteur montre son état, la progression et les commandes supportées (pause, stop, volume). S'il ne démarre pas en dix secondes, un message l'indique. Le bouton tient sur une ligne : « Sur » suivi du nom court.

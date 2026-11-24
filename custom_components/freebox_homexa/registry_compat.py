@@ -7,9 +7,13 @@ uniquement si elles sont absentes.
 
 from __future__ import annotations
 
+import logging
 from typing import Any
 
+from homeassistant.core import HomeAssistant
 from homeassistant.helpers import device_registry as dr
+
+_LOGGER = logging.getLogger(__name__)
 
 
 def device_entry_id(device: object) -> str | None:
@@ -111,6 +115,50 @@ def as_version(value: object) -> str | None:
     if value is None or value == "":
         return None
     return str(value)
+
+
+def device_is_disabled(device: object | None) -> bool:
+    """True si l'appareil est désactivé (les entités suivent alors disabled_by)."""
+    if device is None:
+        return False
+    if getattr(device, "disabled_by", None) is not None:
+        return True
+    return getattr(device, "disabled", False) is True
+
+
+def update_entity_device(
+    hass: HomeAssistant,
+    entity_id: str,
+    device_id: str | None,
+    *,
+    allow_enable: bool = False,
+) -> bool:
+    """Change l'appareil d'une entité seulement si l'identifiant diffère.
+
+    Quitter un appareil désactivé remet disabled_by à vide : Home Assistant
+    recharge alors l'entrée au bout de 30 secondes. Ce déplacement est refusé,
+    sauf si l'ancien appareil va être supprimé (allow_enable). Un basculement
+    possible est journalisé en debug, sans nom, adresse ni numéro.
+    """
+    from homeassistant.helpers import entity_registry as er
+
+    entities = er.async_get(hass)
+    current = entities.async_get(entity_id)
+    if current is None or current.device_id == device_id:
+        return False
+    registry = dr.async_get(hass)
+    previous = registry.async_get(current.device_id) if current.device_id else None
+    nxt = registry.async_get(device_id) if device_id else None
+    if device_is_disabled(previous) != device_is_disabled(nxt):
+        domain = entity_id.split(".", 1)[0]
+        _LOGGER.debug(
+            "Une entité %s change d'appareil : disabled_by peut basculer",
+            domain,
+        )
+    if device_is_disabled(previous) and not device_is_disabled(nxt) and not allow_enable:
+        return False
+    entities.async_update_entity(entity_id, device_id=device_id)
+    return True
 
 
 def registry_device_id(device: object) -> str | None:

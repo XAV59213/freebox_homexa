@@ -514,6 +514,11 @@ async def test_device_tracker_links_lan_client_without_moving_foreign_mac(hass, 
         name="Telephone",
     )
     devices.async_update_device(phone_device.id, name_by_user="Mon telephone")
+    # ScannerEntity est désactivé par défaut depuis HA 2026.11. Une entité
+    # déjà activée reste le cas de l'utilisateur ; la MAC seule ne l'active plus.
+    er.async_get(hass).async_get_or_create(
+        "device_tracker", DOMAIN, tracker.unique_id, disabled_by=None,
+    )
     platform = make_platform(hass, "device_tracker")
     try:
         await platform.async_add_entities([tracker])

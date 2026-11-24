@@ -109,7 +109,11 @@ async def test_entity_families_share_seven_device_contracts(hass, home_context):
     assert signal.device_info["manufacturer"] == "Inconnu"
     assert "model" not in signal.device_info
     tracker = FreeboxDevice(router, phone, True)
-    assert tracker.device_info is None
+    # HA 2026.10 fige la propriété à None. 2026.11 expose la connexion MAC,
+    # le même appareil que ensure_lan_client_device, sans identifiant Homexa.
+    tracker_info = tracker.device_info if tracker.device_info is not None else tracker._attr_device_info
+    assert tracker_info["connections"] == {(dr.CONNECTION_NETWORK_MAC, "aa:bb:cc:dd:ee:10")}
+    assert "identifiers" not in tracker_info
 
     calendar = FreeboxTvGuideCalendar(router)
     assert calendar.device_info["identifiers"] == TNT_DEVICE_INFO["identifiers"]

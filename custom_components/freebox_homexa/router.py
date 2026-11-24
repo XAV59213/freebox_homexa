@@ -1406,9 +1406,9 @@ class FreeboxRouter:
     def ensure_lan_client_device(self, mac: str) -> str | None:
         """Crée / range l'appareil d'un client LAN dont l'entité est active ; renvoie son id.
 
-        Les entités device_tracker (ScannerEntity) ne créent pas d'appareil elles-mêmes
-        (device_info figé à None par HA) : Homexa le crée ici, rangé sous « Clients réseau
-        filaires › type », « Clients Wi-Fi › type » ou le répéteur.
+        Le suivi d'appareil porte la même connexion MAC dans son device_info, donc
+        Home Assistant le rattache à cet appareil. Homexa le range ici sous
+        « Clients réseau filaires › type », « Clients Wi-Fi › type » ou le répéteur.
         """
         from .device_groups import lan_client_name
 
@@ -1419,9 +1419,8 @@ class FreeboxRouter:
         self.lan_device_ids.pop(norm, None)
         self.lan_client_placements.pop(norm, None)
         if not self.create_lan_devices:
-            # Option désactivée : comportement Home Assistant (ScannerEntity). Aucun
-            # appareil créé, aucun appareil existant (même d'une autre intégration)
-            # déplacé ; pas de groupes de clients ni de « Clients connectés ».
+            # Option désactivée : aucun appareil créé, aucun appareil existant
+            # (même d'une autre intégration) déplacé ; pas de groupes de clients.
             return None
         if device is None or not self._is_lan_client(device):
             return None

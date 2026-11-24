@@ -48,7 +48,11 @@ async def test_primary_secondary_names_follow_device_rename_not_user_entity_name
         await hass.async_block_till_done()
         assert registry.async_get(device.id).name == "Nouveau nom source"
         assert registry.async_get(device.id).name_by_user == "Porte personnalisée"
-        assert hass.states.get(battery.entity_id).attributes["friendly_name"] == "Pile personnalisée"
+        # HA 2026.11 préfixe le nom choisi par le nom de l'appareil.
+        # 2026.10 affiche seulement le nom choisi. Le nom source ne remplace ni l'un ni l'autre.
+        chosen = hass.states.get(battery.entity_id).attributes["friendly_name"]
+        assert chosen in {"Pile personnalisée", "Porte personnalisée Pile personnalisée"}
+        assert "Nouveau nom source" not in chosen
         assert ids == [primary.entity_id, battery.entity_id]
         router._api.home.set_home_endpoint_value.assert_not_called()
     finally:

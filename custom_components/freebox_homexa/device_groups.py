@@ -12,11 +12,13 @@ from homeassistant.helpers import device_registry as dr
 
 from .const import DOMAIN, FreeboxHomeCategory
 from .registry_compat import (
+    device_is_disabled,
     device_owned_by,
     entry_devices,
     get_device_by_identifier,
     remove_device,
     shared_with_other_entries,
+    update_entity_device,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -774,14 +776,58 @@ def group_choices() -> list[str]:
     return [GROUP_AUTO, *SERVICE_CHOICES, *LAN_GROUPS]
 
 
+def client_device_is_protected(
+    hass: HomeAssistant | None, device: object, entry_id: str
+) -> bool:
+    """Client à conserver : partagé, renommé, placé, désactivé, ou entité tierce.
+
+    Le supprimer (ou en détacher une entité alors qu'il est désactivé) fait
+    changer disabled_by et recharge l'entrée en boucle.
+    """
+    if shared_with_other_entries(device, entry_id):
+        return True
+    if getattr(device, "name_by_user", None):
+        return True
+    if getattr(device, "area_id", None):
+        return True
+    if device_is_disabled(device):
+        return True
+    device_id = getattr(device, "id", None)
+    if hass is None or not isinstance(device_id, str):
+        return False
+    from homeassistant.helpers import entity_registry as er
+
+    entities = er.async_get(hass)
+    return any(
+        ent.config_entry_id != entry_id
+        for ent in er.async_entries_for_device(
+            entities, device_id, include_disabled_entities=True
+        )
+    )
+
+
+def _detach_entry_entities(hass: HomeAssistant, device_id: str, entry_id: str) -> None:
+    """Détache les entités de cette entrée avant de supprimer leur appareil."""
+    from homeassistant.helpers import entity_registry as er
+
+    entities = er.async_get(hass)
+    for ent in er.async_entries_for_device(
+        entities, device_id, include_disabled_entities=True
+    ):
+        if ent.config_entry_id == entry_id:
+            update_entity_device(hass, ent.entity_id, None, allow_enable=True)
+
+
 def async_remove_lan_client_devices(
     hass: HomeAssistant, entry: ConfigEntry, router_mac: str
 ) -> int:
-    """Détache cette entrée des devices clients LAN (option désactivée).
+    """Retire les appareils clients LAN automatiques de cette entrée.
 
-    Un client LAN = device de l'entrée sans identifiant Homexa, uniquement
-    des connexions MAC (répéteurs, players, disques… ont des identifiants).
-    Le device n'est supprimé que s'il n'appartient à aucune autre intégration.
+    Un client LAN = appareil sans identifiant Homexa, uniquement des connexions
+    MAC (répéteurs, players, disques ont des identifiants). Les entités Homexa
+    sont détachées d'abord, sinon Home Assistant les supprime avec l'appareil
+    puis les recrée. Un appareil partagé, renommé, placé, désactivé ou portant
+    une entité d'une autre entrée n'est jamais supprimé.
     """
     registry = dr.async_get(hass)
     removed = 0
@@ -791,12 +837,39 @@ def async_remove_lan_client_devices(
         macs = {c[1] for c in device.connections if c[0] == dr.CONNECTION_NETWORK_MAC}
         if not macs or router_mac in macs:
             continue
-        if shared_with_other_entries(device, entry.entry_id):
-            # Appareil partagé avec une autre intégration (ex. Shelly, ou relié par
-            # Home Assistant au tracker) : jamais supprimé.
+        if client_device_is_protected(hass, device, entry.entry_id):
             continue
+        if hass is not None:
+            _detach_entry_entities(hass, device.id, entry.entry_id)
         remove_device(registry, device.id)
         removed += 1
+    return removed
+
+
+# Une fois par processus : le refaire à chaque setup supprime l'appareil,
+# Home Assistant recrée le suivi, et l'entrée se recharge toutes les 30 s.
+LAN_CLIENT_CLEANUP_KEY = "_lan_client_devices_cleaned"
+
+
+def async_cleanup_lan_client_devices_once(
+    hass: HomeAssistant,
+    entry: ConfigEntry,
+    router_mac: str,
+    create_lan_devices: bool,
+) -> int:
+    """Nettoie les appareils clients automatiques une seule fois tant que l'option est décochée."""
+    store = hass.data.setdefault(DOMAIN, {})
+    cleaned = store.get(LAN_CLIENT_CLEANUP_KEY)
+    if not isinstance(cleaned, set):
+        cleaned = set()
+        store[LAN_CLIENT_CLEANUP_KEY] = cleaned
+    if create_lan_devices:
+        cleaned.discard(entry.entry_id)
+        return 0
+    if entry.entry_id in cleaned:
+        return 0
+    removed = async_remove_lan_client_devices(hass, entry, router_mac)
+    cleaned.add(entry.entry_id)
     return removed
 
 
@@ -1074,7 +1147,7 @@ def async_merge_repeater_devices(
             # Seules nos propres entités sont déplacées vers l'appareil conservé.
             for ent in dup_entities:
                 if ent.config_entry_id == entry.entry_id:
-                    entities.async_update_entity(ent.entity_id, device_id=keeper.id)
+                    update_entity_device(hass, ent.entity_id, keeper.id, allow_enable=True)
             if foreign:
                 # Entité d'une autre intégration : l'appareil n'est jamais supprimé.
                 _LOGGER.debug("Répéteur %s : doublon %s conservé (entités tierces)", canon, dup.id)
@@ -1230,7 +1303,7 @@ def async_clean_repeater_connections(
             # Entité d'une autre intégration sur cet appareil : on ne touche à rien.
             continue
         for ent in device_entities:
-            entities.async_update_entity(ent.entity_id, device_id=keeper.id)
+            update_entity_device(hass, ent.entity_id, keeper.id, allow_enable=True)
         for child in entry_devices(registry, entry_id):
             if child.via_device_id == device.id and not shared_with_other_entries(child, entry_id):
                 registry.async_update_device(child.id, via_device_id=keeper.id)

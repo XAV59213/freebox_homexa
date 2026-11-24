@@ -8,7 +8,9 @@ import logging
 from homeassistant.components.device_tracker.entity import ScannerEntity
 from .availability import FreeboxReachableMixin
 from homeassistant.core import HomeAssistant, callback
+from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers import entity_registry as er
+from homeassistant.helpers.device_registry import CONNECTION_NETWORK_MAC, DeviceInfo
 from homeassistant.helpers.dispatcher import async_dispatcher_connect
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
@@ -20,7 +22,12 @@ from .const import (
     DEVICE_ICONS,
     option_enabled,
 )
-from .device_groups import lan_client_name
+from .device_groups import client_device_is_protected, lan_client_name
+from .registry_compat import (
+    foreign_device_with_connection,
+    get_device_by_connection,
+    update_entity_device,
+)
 from .router import FreeboxConfigEntry, FreeboxRouter, is_freebox_repeater, normalize_mac
 
 _LOGGER = logging.getLogger(__name__)
@@ -104,20 +111,60 @@ class FreeboxDevice(FreeboxReachableMixin, ScannerEntity):
         self._attr_unique_id = f"{router.mac}_{self._mac}"
         self._active = False
         self._attr_extra_state_attributes: dict[str, Any] = {}
-        # HA crée / relie l'appareil d'un ScannerEntity sous ce nom (sinon la MAC).
+        # HA nomme l'appareil du suivi avec ce libellé quand il en crée un (sinon la MAC).
         self._attr_hostname = self._name
         self._norm_mac = normalize_mac(self._mac)
-        # device_info est figé à None par HA pour les ScannerEntity : l'appareil d'un
-        # client LAN est créé et rangé par le routeur (ensure_lan_client_device).
         self._lan_client = router._is_lan_client(device)
+        # Attribut, pas la propriété : sur HA 2026.10 device_info est final et vaut
+        # None, donc rien ne change. Sur 2026.11, sans device_info, HA crée un
+        # appareil par MAC et peut recharger l'entrée en boucle.
+        self._assign_device_info(device)
+
+    def _assign_device_info(self, device: dict[str, Any]) -> None:
+        """Décrit l'appareil du suivi (Server, répéteur, client, ou aucun)."""
+        if not self._lan_client:
+            if self._router.is_repeater_host(device):
+                model = device.get("model")
+                manufacturer = device.get("vendor_name")
+                self._attr_device_info = self._router.repeater_device_info(
+                    self._mac,
+                    self._name,
+                    model if isinstance(model, str) else None,
+                    manufacturer if isinstance(manufacturer, str) else None,
+                )
+                return
+            self._attr_device_info = self._router.device_info
+            return
+        # Même connexion que ensure_lan_client_device : un seul appareil.
+        connection = (CONNECTION_NETWORK_MAC, self._mac.lower())
+        if self._create_lan_devices:
+            self._attr_device_info = DeviceInfo(connections={connection})
+            return
+        registry = dr.async_get(self._router.hass)
+        entry_id = self._router.entry_id
+        # Option décochée : la MAC seulement si une autre intégration a déjà
+        # l'appareil (comportement 2026.10), ou si l'appareil Homexa doit rester
+        # (renommé, placé, désactivé, partagé). Sinon DeviceInfo vide : aucun
+        # appareil créé.
+        if foreign_device_with_connection(registry, connection, entry_id) is not None:
+            self._attr_device_info = DeviceInfo(connections={connection})
+            return
+        existing = get_device_by_connection(registry, connection, entry_id)
+        if existing is not None and client_device_is_protected(
+            self._router.hass, existing, entry_id
+        ):
+            self._attr_device_info = DeviceInfo(connections={connection})
+            return
+        self._attr_device_info = DeviceInfo()
 
     @callback
     def _async_link_device(self) -> None:
-        """Rattache l'entité à l'appareil de son client (créé / rangé par Homexa).
+        """Range le client si l'option est active, sans déplacer l'entité pour rien.
 
-        Option « Créer des appareils pour les clients réseau » désactivée : rien ici,
-        Home Assistant relie lui-même le tracker à l'appareil d'une autre intégration
-        portant la même MAC (comportement standard des ScannerEntity).
+        Le device_info porte déjà la connexion MAC : Home Assistant rattache le
+        suivi au même appareil. Le déplacement ne sert qu'à HA 2026.10, où
+        device_info reste None. On ne retire pas une entité d'un appareil
+        désactivé : disabled_by repasserait à vide et l'entrée se rechargerait.
         """
         if (
             not self._create_lan_devices
@@ -129,10 +176,10 @@ class FreeboxDevice(FreeboxReachableMixin, ScannerEntity):
         device_id = self._router.lan_device_ids.get(self._norm_mac)
         if device_id is None:
             device_id = self._router.ensure_lan_client_device(self._mac)
-        if device_id and self.registry_entry.device_id != device_id:
-            self.registry_entry = er.async_get(self.hass).async_update_entity(
-                self.entity_id, device_id=device_id
-            )
+        if not device_id:
+            return
+        if update_entity_device(self.hass, self.entity_id, device_id):
+            self.registry_entry = er.async_get(self.hass).async_get(self.entity_id)
 
     @property
     def available(self) -> bool:

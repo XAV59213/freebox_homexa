@@ -37,8 +37,8 @@ from .const import (
 from .frontend import JSModuleRegistration
 from .device_groups import (
     CONF_DEVICE_GROUP_OVERRIDES,
+    async_cleanup_lan_client_devices_once,
     async_detach_top_level_devices,
-    async_remove_lan_client_devices,
     async_merge_repeater_devices,
     async_remove_merged_node_devices,
     async_remove_unused_group_devices,
@@ -232,10 +232,11 @@ async def async_setup_entry(hass: HomeAssistant, entry: FreeboxConfigEntry) -> b
     # Avant le premier relevé : le rangement des clients (ensure_lan_client_device)
     # lit cette valeur dès update_all.
     router.create_lan_devices = create_lan_devices
-    if not create_lan_devices:
-        removed = async_remove_lan_client_devices(hass, entry, mac)
-        if removed:
-            _LOGGER.info("%s appareil(s) client réseau retiré(s) du registre", removed)
+    # Une fois, pas à chaque setup : supprimer les appareils à chaque chargement
+    # fait recréer les suivis, et Home Assistant recharge l'entrée 30 s plus tard.
+    removed = async_cleanup_lan_client_devices_once(hass, entry, mac, create_lan_devices)
+    if removed:
+        _LOGGER.info("%s appareil(s) client réseau retiré(s) du registre", removed)
     await router.update_all()
     # Un appareil par répéteur physique : fusion des doublons avant l'ajout des entités.
     try:

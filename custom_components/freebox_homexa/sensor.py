@@ -491,11 +491,11 @@ class FreeboxWifiSignalSensor(FreeboxLanReachableMixin, SensorEntity):
 
         if self._create_lan_devices:
             self._attr_translation_key = "wifi_signal"
-            device_info: DeviceInfo = {
-                "connections": {(CONNECTION_NETWORK_MAC, self._mac)},
-                "manufacturer": device.get("vendor_name") or "Inconnu",
-                "name": name,
-            }
+            device_info = DeviceInfo(
+                connections={(CONNECTION_NETWORK_MAC, self._mac)},
+                manufacturer=device.get("vendor_name") or "Inconnu",
+                name=name,
+            )
             model = device.get("model")
             if isinstance(model, str) and model.strip():
                 device_info["model"] = model.strip()

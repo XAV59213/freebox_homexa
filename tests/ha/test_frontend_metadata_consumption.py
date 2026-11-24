@@ -61,7 +61,9 @@ async def test_every_fixed_label_consumed_by_real_entity_platform(hass, home_con
                 consumed[key] = expected
                 registry.async_update_entity(entity.entity_id, name='Mon libellé', icon='mdi:heart')
                 await hass.async_block_till_done()
-                assert hass.states.get(entity.entity_id).attributes['friendly_name'] == 'Mon libellé'
+                # HA 2026.11 préfixe le nom choisi avec le nom de l'appareil.
+                shown = hass.states.get(entity.entity_id).attributes['friendly_name']
+                assert shown == 'Mon libellé' or shown.endswith(' Mon libellé')
                 assert registry.async_get(entity.entity_id).icon == 'mdi:heart'
             finally:
                 await platform.async_reset()

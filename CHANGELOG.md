@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 28.8.108 — 2026-11-24
 
 - Home Assistant 2026.11 : les suivis d'appareils indiquent eux-mêmes leur appareil (connexion MAC du client, identifiants du Server ou du répéteur, ou aucun appareil si l'option « Créer des appareils pour les clients réseau » est décochée et qu'aucune autre intégration n'a cette MAC). L'intégration ne se recharge plus toute seule toutes les 30 secondes. Décocher l'option retire une seule fois les appareils clients automatiques, après avoir détaché les entités Homexa, et laisse un appareil renommé, placé, désactivé ou partagé. (#159)
 
